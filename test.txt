@@ -1,0 +1,7 @@
+---
+config:
+  case: false
+  frun: false
+  idletime: 30
+connections: {}
+profiles: {}
