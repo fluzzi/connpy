@@ -87,8 +87,12 @@ class node:
             logfile = re.sub(r'\$\{date (.*)}',now.strftime(dateconf.group(1)), logfile)
         return logfile
 
-    def _logclean(self, logfile):
-        t = open(logfile, "r").read().replace("\n","",1).replace("\a","")
+    def _logclean(self, logfile, var = False):
+        if var == False:
+            t = open(logfile, "r").read()
+        else:
+            t = logfile
+        t = t.replace("\n","",1).replace("\a","")
         t = t.replace('\n\n', '\n')
         t = re.sub('.\[K', '', t)
         while True:
@@ -98,10 +102,13 @@ class node:
             t = tb
         ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/ ]*[@-~])')
         t = ansi_escape.sub('', t)
-        d = open(logfile, "w")
-        d.write(t)
-        d.close()
-        return
+        if var == False:
+            d = open(logfile, "w")
+            d.write(t)
+            d.close()
+            return
+        else:
+            return t
 
     def interact(self, missingtext = False):
         connect = self._connect()
@@ -116,7 +123,7 @@ class node:
             if "logfile" in dir(self):
                 self._logclean(self.logfile)
 
-    def run(self, commands,*, folder = '', prompt = '>$|#$|\$.$'):
+    def run(self, commands,*, folder = '', prompt = '>$|#$|\$.$', stdout = False):
         connect = self._connect()
         if connect == True:
             output = ''
@@ -127,18 +134,20 @@ class node:
                     output = output + self.child.before.decode() + self.child.after.decode()
             else:
                 self.child.expect(prompt)
-                print(self.child.sendline(commands))
+                self.child.sendline(commands)
                 output = output + self.child.before.decode() + self.child.after.decode()
             self.child.expect(prompt)
             output = output + self.child.before.decode() + self.child.after.decode()
             if folder == '':
-                print(output)
+                if stdout == True:
+                    print(output)
             else:
                 with open(folder + "/" + self.unique, "w") as f:
                     f.write(output)
                     f.close()
                     self._logclean(folder + "/" + self.unique)
-
+            self.output = output
+            return output
 
             
 
