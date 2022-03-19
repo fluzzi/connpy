@@ -17,7 +17,7 @@ class connapp:
         self.nodes = self._getallnodes()
         parser = argparse.ArgumentParser(prog = "conn", description = "SSH and Telnet connection manager", formatter_class=argparse.RawTextHelpFormatter)
         crud = parser.add_mutually_exclusive_group()
-        parser.add_argument("node", metavar="node|folder", nargs='?', default=None, action='store', type=self._type, help="node[@subfolder][@folder]\nRecursively search in folders and subfolders if not specified\n[@subfolder][@folder]\nShow all available connections globaly or in specified path")
+        parser.add_argument("node", metavar="node|folder", nargs='?', default=None, action=self.store_type, type=self._type, help="node[@subfolder][@folder]\nRecursively search in folders and subfolders if not specified\n[@subfolder][@folder]\nShow all available connections globaly or in specified path")
         crud.add_argument("--add", dest="action", action='append_const', help="Add new node[@subfolder][@folder]", const="add")
         crud.add_argument("--del", "--rm", dest="action", action='append_const', help="Delete node[@subfolder][@folder]", const="del")
         crud.add_argument("--mod", "--edit", dest="action", action='append_const', help="Modify node[@subfolder][@folder]", const="mod")
@@ -55,7 +55,8 @@ class connapp:
     class store_type(argparse.Action):
         def __call__(self, parser, args, values, option_string=None):
             result = [self.default]
-            result.extend(values)
+            if values is not None:
+                result.extend(values)
             setattr(args, self.dest, result)
 
     def _getallnodes(self):
