@@ -1,17 +1,12 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 #Imports
 import yaml
 import os
 import re
-from . import tools
 from Crypto.PublicKey import RSA
 
 
-#Constants
-
-#Variables
-
-#functions and clsses
+#functions and classes
 
 class configfile:
     
@@ -78,6 +73,8 @@ class configfile:
         elif len(uniques) == 3:
             result["folder"] = uniques[2]
             result["subfolder"] = uniques[1]
+        elif len(uniques) > 3:
+            return False
         return result
 
     def _connections_add(self,*, id, host, folder='', subfolder='', options='', logs='', password='', port='', protocol='', user='' ):

@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 #Imports
 import yaml
 import os
@@ -10,14 +10,8 @@ import ast
 from time import sleep
 import datetime
 import sys
-from conn import tools
-from .configfile import configfile
 
-#Constants
-
-#Variables
-
-#functions and clsses
+#functions and classes
 
 class node:
     def __init__(self, unique, host, options='', logs='', password='', port='', protocol='', type='', user='', config=''):
@@ -118,7 +112,7 @@ class node:
                 self.child.logfile_read = open(self.logfile, "wb")
                 # self.child.logfile = sys.stdout.buffer
             if 'missingtext' in dir(self):
-                print(child.after.decode(), end='')
+                print(self.child.after.decode(), end='')
             self.child.interact()
             if "logfile" in dir(self):
                 self._logclean(self.logfile)
@@ -126,6 +120,8 @@ class node:
     def run(self, commands,*, folder = '', prompt = '>$|#$|\$.$', stdout = False):
         connect = self._connect()
         if connect == True:
+            winsize = self.child.getwinsize()
+            self.child.setwinsize(65535,winsize[1])
             output = ''
             if isinstance(commands, list):
                 for c in commands:
