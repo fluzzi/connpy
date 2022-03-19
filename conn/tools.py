@@ -1,15 +1,11 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 #Imports
 import os
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 import ast
 
-#Constants
-
-#Variables
-
-#functions and clsses
+#functions and classes
 
 def encrypt(password, keyfile=None):
     if keyfile is None:
