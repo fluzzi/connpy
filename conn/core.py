@@ -104,17 +104,18 @@ class node:
         else:
             return t
 
-    def interact(self, missingtext = False):
-        connect = self._connect()
+    def interact(self, debug = False):
+        connect = self._connect(debug = debug)
         if connect == True:
             print("Connected to " + self.unique + " at " + self.host + (":" if self.port != '' else '') + self.port + " via: " + self.protocol)
-            if 'logfile' in dir(self):
+            if debug:
+                self.child.logfile_read = None
+            elif 'logfile' in dir(self):
                 self.child.logfile_read = open(self.logfile, "wb")
-                # self.child.logfile = sys.stdout.buffer
             if 'missingtext' in dir(self):
                 print(self.child.after.decode(), end='')
             self.child.interact()
-            if "logfile" in dir(self):
+            if "logfile" in dir(self) and not debug:
                 self._logclean(self.logfile)
 
     def run(self, commands,*, folder = '', prompt = '>$|#$|\$.$', stdout = False):
@@ -147,7 +148,7 @@ class node:
 
             
 
-    def _connect(self):
+    def _connect(self, debug = False):
         if self.protocol == "ssh":
             cmd = "ssh"
             if self.idletime > 0:
@@ -166,7 +167,7 @@ class node:
                 passwords = self.__passtx(self.password)
             else:
                 passwords = []
-            expects = ['yes/no', 'refused', 'supported', 'cipher', 'sage', 'timeout', 'unavailable', 'closed', '[p|P]assword:|[u|U]sername:', '>$|#$|\$.$', 'suspend', pexpect.EOF]
+            expects = ['yes/no', 'refused', 'supported', 'cipher', 'sage', 'timeout', 'unavailable', 'closed', '[p|P]assword:|[u|U]sername:', '>$|#$|\$.$', 'suspend', pexpect.EOF, "No route to host"]
         elif self.protocol == "telnet":
             cmd = "telnet " + self.host
             if self.port != '':
@@ -179,11 +180,13 @@ class node:
                 passwords = self.__passtx(self.password)
             else:
                 passwords = []
-            expects = ['[u|U]sername:', 'refused', 'supported', 'cipher', 'sage', 'timeout', 'unavailable', 'closed', '[p|P]assword:', '>$|#$|\$.$', 'suspend', pexpect.EOF]
+            expects = ['[u|U]sername:', 'refused', 'supported', 'cipher', 'sage', 'timeout', 'unavailable', 'closed', '[p|P]assword:', '>$|#$|\$.$', 'suspend', pexpect.EOF, "No route to host"]
         else:
             print("Invalid protocol: " + self.protocol)
             return
         child = pexpect.spawn(cmd)
+        if debug:
+            child.logfile_read = sys.stdout.buffer
         if len(passwords) > 0:
             loops = len(passwords)
         else:
@@ -202,7 +205,7 @@ class node:
                             else:
                                 self.missingtext = True
                                 break
-                    case 1 | 2 | 3 | 4 | 5 | 6 |7:
+                    case 1 | 2 | 3 | 4 | 5 | 6 | 7 | 12:
                         print("Connection failed code:" + str(results))
                         child.close()
                         return
