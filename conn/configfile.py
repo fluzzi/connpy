@@ -67,12 +67,19 @@ class configfile:
 
     def _explode_unique(self, unique):
         uniques = unique.split("@")
-        result = {"id": uniques[0]}
+        if not unique.startswith("@"):
+            result = {"id": uniques[0]}
+        else:
+            result = {}
         if len(uniques) == 2:
             result["folder"] = uniques[1]
+            if result["folder"] == "":
+                return False
         elif len(uniques) == 3:
             result["folder"] = uniques[2]
             result["subfolder"] = uniques[1]
+            if result["folder"] == "" or result["subfolder"] == "":
+                return False
         elif len(uniques) > 3:
             return False
         return result
