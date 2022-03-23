@@ -279,6 +279,9 @@ class connapp:
                 print("{} moved succesfully to {}".format(args.data[0],args.data[1]))
             if args.command == "cp":
                 print("{} copied succesfully to {}".format(args.data[0],args.data[1]))
+        elif args.command == "bulk":
+            test = self._questions_bulk()
+            print(test)
         else:
             print(args.command)
             print(vars(args))
@@ -348,6 +351,33 @@ class connapp:
         if current.startswith("@"):
             if current[1:] not in self.profiles:
                 raise inquirer.errors.ValidationError("", reason="Profile {} don't exist".format(current))
+        return True
+
+    def _bulk_node_validation(self, answers, current, regex = "^[0-9a-zA-Z_.,$#-]+$"):
+        if not re.match(regex, current):
+            raise inquirer.errors.ValidationError("", reason="Host cannot be empty")
+        if current.startswith("@"):
+            if current[1:] not in self.profiles:
+                raise inquirer.errors.ValidationError("", reason="Profile {} don't exist".format(current))
+        return True
+
+    def _bulk_folder_validation(self, answers, current):
+
+        matches = list(filter(lambda k: k == current, self.folders))
+        if current != "" and len(matches) == 0:
+            raise inquirer.errors.ValidationError("", reason="Location {} don't exist".format(current))
+        return True
+
+    def _bulk_host_validation(self, answers, current, regex = "^.+$"):
+        if not re.match(regex, current):
+            raise inquirer.errors.ValidationError("", reason="Host cannot be empty")
+        if current.startswith("@"):
+            if current[1:] not in self.profiles:
+                raise inquirer.errors.ValidationError("", reason="Profile {} don't exist".format(current))
+        hosts = current.split(",")
+        nodes = answers["ids"].split(",")
+        if len(hosts) > 1 and len(hosts) != len(nodes):
+                raise inquirer.errors.ValidationError("", reason="Hosts list should be the same length of nodes list")
         return True
 
     def _questions_edit(self):
@@ -482,6 +512,33 @@ class connapp:
         result["id"] = unique
         return result
 
+    def _questions_bulk(self):
+        questions = []
+        questions.append(inquirer.Text("ids", message="add a comma separated list of nodes to add", validate=self._bulk_node_validation))
+        questions.append(inquirer.Text("location", message="Add a @folder, @subfolder@folder or leave empty", validate=self._bulk_folder_validation))
+        questions.append(inquirer.Text("host", message="Add comma separated list of Hostnames or IPs", validate=self._bulk_host_validation))
+        questions.append(inquirer.Text("protocol", message="Select Protocol", validate=self._protocol_validation))
+        questions.append(inquirer.Text("port", message="Select Port Number", validate=self._port_validation))
+        questions.append(inquirer.Text("options", message="Pass extra options to protocol", validate=self._default_validation))
+        questions.append(inquirer.Text("logs", message="Pick logging path/file ", validate=self._default_validation))
+        questions.append(inquirer.Text("user", message="Pick username", validate=self._default_validation))
+        questions.append(inquirer.List("password", message="Password: Use a local password, no password or a list of profiles to reference?", choices=["Local Password", "Profiles", "No Password"]))
+        answer = inquirer.prompt(questions)
+        if answer == None:
+            return False
+        if "password" in answer.keys():
+            if answer["password"] == "Local Password":
+                passq = [inquirer.Password("password", message="Set Password")]
+                passa = inquirer.prompt(passq)
+                answer["password"] = self.encrypt(passa["password"])
+            elif answer["password"] == "Profiles":
+                passq = [(inquirer.Text("password", message="Set a @profile or a comma separated list of @profiles", validate=self._pass_validation))]
+                passa = inquirer.prompt(passq)
+                answer["password"] = passa["password"].split(",")
+            elif answer["password"] == "No Password":
+                answer["password"] = ""
+        answer["type"] = "connection"
+        return answer
 
     def _type_node(self, arg_value, pat=re.compile(r"^[0-9a-zA-Z_.$@#-]+$")):
         if not pat.match(arg_value):
