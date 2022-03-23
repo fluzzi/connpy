@@ -246,9 +246,6 @@ class connapp:
                 self.config._profiles_add(**updateprofile)
                 self.config.saveconfig(self.config.file)
                 print("{} edited succesfully".format(args.data[0]))
-        else:
-            print(args.command)
-            print(vars(args))
     
     def _func_others(self, args):
         if args.command == "ls":
