@@ -34,7 +34,7 @@ class connapp:
         nodeparser.set_defaults(func=self._func_node)
         #PROFILEPARSER
         profileparser = subparsers.add_parser("profile", help="Manage profiles") 
-        profileparser.add_argument("profile", nargs='?', action=self.store_type, type=self._type_profile, help="Name of profile to manage")
+        profileparser.add_argument("profile", nargs=1, action=self.store_type, type=self._type_profile, help="Name of profile to manage")
         profilecrud = profileparser.add_mutually_exclusive_group(required=True)
         profilecrud.add_argument("--add", dest="action", action="store_const", help="Add new profile", const="add", default="connect")
         profilecrud.add_argument("--del", "--rm", dest="action", action="store_const", help="Delete profile", const="del", default="connect")
@@ -150,7 +150,7 @@ class connapp:
                     print("You can also leave empty any value except hostname/IP.")
                     print("You can pass 1 or more passwords using comma separated @profiles")
                     print("You can use this variables on logging file name: ${id} ${unique} ${host} ${port} ${user} ${protocol}")
-                    newnode = self._questions_nodes(args.data, args.action, uniques)
+                    newnode = self._questions_nodes(args.data, uniques)
                     if newnode == False:
                         return
                     self.config._connections_add(**newnode)
@@ -179,10 +179,9 @@ class connapp:
             if edits == None:
                 return
             uniques = self.config._explode_unique(args.data)
-            updatenode = self._questions_nodes(args.data, args.action, uniques, edit=edits)
+            updatenode = self._questions_nodes(args.data, uniques, edit=edits)
             if not updatenode:
                 return
-            node.pop("type")
             uniques.update(node)
             if sorted(updatenode.items()) == sorted(uniques.items()):
                 print("Nothing to do here")
@@ -193,17 +192,99 @@ class connapp:
                 print("{} edited succesfully".format(args.data))
 
 
-
-        else:
-            print(matches)
-
     def _func_profile(self, args):
-        print(args.command)
-        print(vars(args))
+        if args.action == "del":
+            matches = list(filter(lambda k: k == args.data[0], self.profiles))
+            if len(matches) == 0:
+                print("ERROR NO MACHEO PROFILE")
+                return
+            if matches[0] == "default":
+                print("CANT DELETE DEFAULT PROFILE")
+                return
+            question = [inquirer.Confirm("delete", message="Are you sure you want to delete {}?".format(matches[0]))]
+            confirm = inquirer.prompt(question)
+            if confirm["delete"]:
+                self.config._profiles_del(id = matches[0])
+                self.config.saveconfig(self.config.file)
+                print("{} deleted succesfully".format(matches[0]))
+        elif args.action == "show":
+            matches = list(filter(lambda k: k == args.data[0], self.profiles))
+            if len(matches) == 0:
+                print("ERROR NO MACHEO PROFILE")
+                return
+            profile = self.config.profiles[matches[0]]
+            print(yaml.dump(profile, Dumper=yaml.CDumper))
+        elif args.action == "add":
+            matches = list(filter(lambda k: k == args.data[0], self.profiles))
+            if len(matches) > 0:
+                print("Profile {} Already exist".format(matches[0]))
+                return
+            newprofile = self._questions_profiles(args.data[0])
+            if newprofile == False:
+                return
+            self.config._profiles_add(**newprofile)
+            self.config.saveconfig(self.config.file)
+            print("{} added succesfully".format(args.data[0]))
+        elif args.action == "mod":
+            matches = list(filter(lambda k: k == args.data[0], self.profiles))
+            if len(matches) == 0:
+                print("ERROR NO MACHEO PROFILE")
+                return
+            profile = self.config.profiles[matches[0]]
+            oldprofile = {"id": matches[0]}
+            oldprofile.update(profile)
+            edits = self._questions_edit()
+            if edits == None:
+                return
+            updateprofile = self._questions_profiles(matches[0], edit=edits)
+            if not updateprofile:
+                return
+            if sorted(updateprofile.items()) == sorted(oldprofile.items()):
+                print("Nothing to do here")
+                return
+            else:
+                self.config._profiles_add(**updateprofile)
+                self.config.saveconfig(self.config.file)
+                print("{} edited succesfully".format(args.data[0]))
+        else:
+            print(args.command)
+            print(vars(args))
     
     def _func_others(self, args):
-        print(args.command)
-        print(vars(args))
+        if args.command == "ls":
+            print(*getattr(self, args.data), sep="\n")
+        elif args.command == "move" or args.command == "cp":
+            source = list(filter(lambda k: k == args.data[0], self.nodes))
+            dest = list(filter(lambda k: k == args.data[1], self.nodes))
+            if len(source) != 1:
+                print("ERROR NO MACHEO NODE {}".format(args.data[0]))
+                return
+            if len(dest) > 0:
+                print("{} ALREADY EXIST".format(args.data[1]))
+                return
+            nodefolder = args.data[1].partition("@")
+            nodefolder = "@" + nodefolder[2]
+            if nodefolder not in self.folders and nodefolder != "@":
+                print(nodefolder + " DONT EXIST")
+                return
+            olduniques = self.config._explode_unique(args.data[0])
+            newuniques = self.config._explode_unique(args.data[1])
+            if newuniques == False:
+                print("Invalid node {}".format(args.data[1]))
+                return False
+            node = self._get_item(source[0])
+            newnode = {**newuniques, **node}
+            self.config._connections_add(**newnode)
+            if args.command == "move":
+               self.config._connections_del(**olduniques) 
+            self.config.saveconfig(self.config.file)
+            if args.command == "move":
+                print("{} moved succesfully to {}".format(args.data[0],args.data[1]))
+            if args.command == "cp":
+                print("{} copied succesfully to {}".format(args.data[0],args.data[1]))
+        else:
+            print(args.command)
+            print(vars(args))
 
     def _choose(self, list, name, action):
         questions = [inquirer.List(name, message="Pick {} to {}:".format(name,action), choices=list)]
@@ -221,6 +302,11 @@ class connapp:
                 raise inquirer.errors.ValidationError("", reason="Profile {} don't exist".format(current))
         return True
 
+    def _profile_protocol_validation(self, answers, current, regex = "(^ssh$|^telnet$|^$)"):
+        if not re.match(regex, current):
+            raise inquirer.errors.ValidationError("", reason="Pick between ssh, telnet or leave empty")
+        return True
+
     def _protocol_validation(self, answers, current, regex = "(^ssh$|^telnet$|^$|^@.+$)"):
         if not re.match(regex, current):
             raise inquirer.errors.ValidationError("", reason="Pick between ssh, telnet, leave empty or @profile")
@@ -229,9 +315,20 @@ class connapp:
                 raise inquirer.errors.ValidationError("", reason="Profile {} don't exist".format(current))
         return True
 
-    def _port_validation(self, answers, current, regex = "(^[0-9]*$|^@.+$)"):
+    def _profile_port_validation(self, answers, current, regex = "(^[0-9]*$)"):
         if not re.match(regex, current):
             raise inquirer.errors.ValidationError("", reason="Pick a port between 1-65535, @profile o leave empty")
+        try:
+            port = int(current)
+        except:
+            port = 0
+        if current != "" and not 1 <= int(port) <= 65535:
+            raise inquirer.errors.ValidationError("", reason="Pick a port between 1-65535 or leave empty")
+        return True
+
+    def _port_validation(self, answers, current, regex = "(^[0-9]*$|^@.+$)"):
+        if not re.match(regex, current):
+            raise inquirer.errors.ValidationError("", reason="Pick a port between 1-65535, @profile or leave empty")
         try:
             port = int(current)
         except:
@@ -268,7 +365,7 @@ class connapp:
         answers = inquirer.prompt(questions)
         return answers
 
-    def _questions_nodes(self, unique, action,uniques = None, edit = None):
+    def _questions_nodes(self, unique, uniques = None, edit = None):
         try:
             defaults = self._get_item(unique)
         except:
@@ -321,6 +418,7 @@ class connapp:
             elif answer["password"] == "No Password":
                 answer["password"] = ""
         result = {**uniques, **answer, **node}
+        result["type"] = "connection"
         return result
 
     def _get_item(self, unique):
@@ -340,6 +438,52 @@ class connapp:
                     node = self.config.connections[uniques["id"]]
                 return node
 
+    def _questions_profiles(self, unique, edit = None):
+        try:
+            defaults = self.config.profiles[unique]
+        except:
+            defaults = { "host":"", "protocol":"", "port":"", "user":"", "options":"", "logs":"" }
+        profile = {}
+        if edit == None:
+            edit = { "host":True, "protocol":True, "port":True, "user":True, "password": True,"options":True, "logs":True }
+        questions = []
+        if edit["host"]:
+            questions.append(inquirer.Text("host", message="Add Hostname or IP", default=defaults["host"]))
+        else:
+            profile["host"] = defaults["host"]
+        if edit["protocol"]:
+            questions.append(inquirer.Text("protocol", message="Select Protocol", validate=self._profile_protocol_validation, default=defaults["protocol"]))
+        else:
+            profile["protocol"] = defaults["protocol"]
+        if edit["port"]:
+            questions.append(inquirer.Text("port", message="Select Port Number", validate=self._profile_port_validation, default=defaults["port"]))
+        else:
+            profile["port"] = defaults["port"]
+        if edit["options"]:
+            questions.append(inquirer.Text("options", message="Pass extra options to protocol", default=defaults["options"]))
+        else:
+            profile["options"] = defaults["options"]
+        if edit["logs"]:
+            questions.append(inquirer.Text("logs", message="Pick logging path/file ", default=defaults["logs"]))
+        else:
+            profile["logs"] = defaults["logs"]
+        if edit["user"]:
+            questions.append(inquirer.Text("user", message="Pick username", default=defaults["user"]))
+        else:
+            profile["user"] = defaults["user"]
+        if edit["password"]:
+            questions.append(inquirer.Password("password", message="Set Password"))
+        else:
+            profile["password"] = defaults["password"]
+        answer = inquirer.prompt(questions)
+        if answer == None:
+            return False
+        if "password" in answer.keys():
+            if answer["password"] != "":
+                answer["password"] = self.encrypt(answer["password"])
+        result = {**answer, **profile}
+        result["id"] = unique
+        return result
 
 
     def _type_node(self, arg_value, pat=re.compile(r"^[0-9a-zA-Z_.$@#-]+$")):
