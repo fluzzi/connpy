@@ -117,7 +117,7 @@ class node:
                 self._logclean(self.logfile)
         else:
             print(connect)
-            exit(7)
+            exit(1)
 
     def run(self, commands,*, folder = '', prompt = '>$|#$|\$.$', stdout = False):
         connect = self._connect()
@@ -145,6 +145,8 @@ class node:
                     self._logclean(folder + "/" + self.unique)
             self.output = output
             return output
+        else:
+            return connect
 
     def _connect(self, debug = False):
         if self.protocol == "ssh":
@@ -165,7 +167,7 @@ class node:
                 passwords = self.__passtx(self.password)
             else:
                 passwords = []
-            expects = ['yes/no', 'refused', 'supported', 'cipher', 'sage', 'timeout', 'unavailable', 'closed', '[p|P]assword:|[u|U]sername:', '>$|#$|\$.$', 'suspend', pexpect.EOF, "No route to host"]
+            expects = ['yes/no', 'refused', 'supported', 'cipher', 'sage', 'timeout', 'unavailable', 'closed', '[p|P]assword:|[u|U]sername:', '>$|#$|\$.$', 'suspend', pexpect.EOF, "No route to host", "resolve hostname"]
         elif self.protocol == "telnet":
             cmd = "telnet " + self.host
             if self.port != '':
@@ -178,7 +180,7 @@ class node:
                 passwords = self.__passtx(self.password)
             else:
                 passwords = []
-            expects = ['[u|U]sername:', 'refused', 'supported', 'cipher', 'sage', 'timeout', 'unavailable', 'closed', '[p|P]assword:', '>$|#$|\$.$', 'suspend', pexpect.EOF, "No route to host"]
+            expects = ['[u|U]sername:', 'refused', 'supported', 'cipher', 'sage', 'timeout', 'unavailable', 'closed', '[p|P]assword:', '>$|#$|\$.$', 'suspend', pexpect.EOF, "No route to host", "resolve hostname"]
         else:
             raise ValueError("Invalid protocol: " + self.protocol)
         child = pexpect.spawn(cmd)
@@ -202,7 +204,7 @@ class node:
                             else:
                                 self.missingtext = True
                                 break
-                    case 1 | 2 | 3 | 4 | 5 | 6 | 7 | 12:
+                    case 1 | 2 | 3 | 4 | 5 | 6 | 7 | 12 | 13:
                         child.close()
                         return "Connection failed code:" + str(results)
                     case 8:
