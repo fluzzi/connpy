@@ -369,7 +369,7 @@ class connapp:
             print("Config saved")
 
     def _choose(self, list, name, action):
-        questions = [inquirer.List(name, message="Pick {} to {}:".format(name,action), choices=list)]
+        questions = [inquirer.List(name, message="Pick {} to {}:".format(name,action), choices=list, carousel=True)]
         answer = inquirer.prompt(questions)
         if answer == None:
             return
