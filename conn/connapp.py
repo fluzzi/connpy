@@ -20,6 +20,7 @@ class connapp:
         self.nodes = self._getallnodes()
         self.folders = self._getallfolders()
         self.profiles = list(self.config.profiles.keys())
+        self.case = self.config.config["case"]
         #DEFAULTPARSER
         defaultparser = argparse.ArgumentParser(prog = "conn", description = "SSH and Telnet connection manager", formatter_class=argparse.RawTextHelpFormatter)
         subparsers = defaultparser.add_subparsers(title="Commands")
@@ -27,19 +28,20 @@ class connapp:
         nodeparser = subparsers.add_parser("node", help=self._help("node"),formatter_class=argparse.RawTextHelpFormatter) 
         nodecrud = nodeparser.add_mutually_exclusive_group()
         nodeparser.add_argument("node", metavar="node|folder", nargs='?', default=None, action=self.store_type, type=self._type_node, help=self._help("node"))
-        nodecrud.add_argument("--add", dest="action", action="store_const", help="Add new node[@subfolder][@folder]", const="add", default="connect")
-        nodecrud.add_argument("--del", "--rm", dest="action", action="store_const", help="Delete node[@subfolder][@folder]", const="del", default="connect")
+        nodecrud.add_argument("--add", dest="action", action="store_const", help="Add new node[@subfolder][@folder] or [@subfolder]@folder", const="add", default="connect")
+        nodecrud.add_argument("--del", "--rm", dest="action", action="store_const", help="Delete node[@subfolder][@folder] or [@subfolder]@folder", const="del", default="connect")
         nodecrud.add_argument("--mod", "--edit", dest="action", action="store_const", help="Modify node[@subfolder][@folder]", const="mod", default="connect")
         nodecrud.add_argument("--show", dest="action", action="store_const", help="Show node[@subfolder][@folder]", const="show", default="connect")
+        nodecrud.add_argument("--debug", "-d", dest="action", action="store_const", help="Display all conections steps", const="debug", default="connect")
         nodeparser.set_defaults(func=self._func_node)
         #PROFILEPARSER
         profileparser = subparsers.add_parser("profile", help="Manage profiles") 
         profileparser.add_argument("profile", nargs=1, action=self.store_type, type=self._type_profile, help="Name of profile to manage")
         profilecrud = profileparser.add_mutually_exclusive_group(required=True)
-        profilecrud.add_argument("--add", dest="action", action="store_const", help="Add new profile", const="add", default="connect")
-        profilecrud.add_argument("--del", "--rm", dest="action", action="store_const", help="Delete profile", const="del", default="connect")
-        profilecrud.add_argument("--mod", "--edit", dest="action", action="store_const", help="Modify profile", const="mod", default="connect")
-        profilecrud.add_argument("--show", dest="action", action="store_const", help="Show profile", const="show", default="connect")
+        profilecrud.add_argument("--add", dest="action", action="store_const", help="Add new profile", const="add")
+        profilecrud.add_argument("--del", "--rm", dest="action", action="store_const", help="Delete profile", const="del")
+        profilecrud.add_argument("--mod", "--edit", dest="action", action="store_const", help="Modify profile", const="mod")
+        profilecrud.add_argument("--show", dest="action", action="store_const", help="Show profile", const="show")
         profileparser.set_defaults(func=self._func_profile)
         #MOVEPARSER
         moveparser = subparsers.add_parser("move", aliases=["mv"], help="Move node") 
@@ -57,8 +59,13 @@ class connapp:
         bulkparser = subparsers.add_parser("bulk", help="Add nodes in bulk") 
         bulkparser.add_argument("bulk", const="bulk", nargs=0, action=self.store_type, help="Add nodes in bulk")
         bulkparser.set_defaults(func=self._func_others)
+        #CONFIGPARSER
+        configparser = subparsers.add_parser("config", help="Manage app config") 
+        configparser.add_argument("--allow-uppercase", dest="case", nargs=1, action=self.store_type, help="Allow case sensitive names", choices=["true","false"])
+        configparser.add_argument("--keepalive", dest="idletime", nargs=1, action=self.store_type, help="Set keepalive time in seconds, 0 to disable", type=int, metavar="INT")
+        configparser.set_defaults(func=self._func_others)
         #Set default subparser and tune arguments
-        commands = ["node", "-h", "--help", "profile", "mv", "move","copy", "cp", "bulk", "ls", "list"]
+        commands = ["node", "-h", "--help", "profile", "mv", "move","copy", "cp", "bulk", "ls", "list", "config"]
         profilecmds = ["--add", "--del", "--rm", "--mod", "--edit", "--show"]
         if len(sys.argv) >= 3 and sys.argv[2] == "profile" and sys.argv[1] in profilecmds:
             sys.argv[2] = sys.argv[1]
@@ -68,8 +75,16 @@ class connapp:
         args = defaultparser.parse_args()
         args.func(args)
 
+    class store_type(argparse.Action):
+        def __call__(self, parser, args, values, option_string=None):
+            setattr(args, "data", values)
+            delattr(args,self.dest)
+            setattr(args, "command", self.dest)
+
     def _func_node(self, args):
-        if args.action == "connect":
+        if not self.case and args.data != None:
+            args.data = args.data.lower()
+        if args.action == "connect" or args.action == "debug":
             if args.data == None:
                 matches = self.nodes
             else:
@@ -78,26 +93,29 @@ class connapp:
                 else:
                     matches = list(filter(lambda k: k.startswith(args.data), self.nodes))
             if len(matches) == 0:
-                print("ERROR NO MACHEA NI FOLDER NI NODE")
-                return
+                print("{} not found".format(args.data))
+                exit(1)
             elif len(matches) > 1:
                 matches[0] = self._choose(matches,"node", "connect")
             if matches[0] == None:
-                return
-            node = self._get_item(matches[0])
+                exit(6)
+            node = self.config.getitem(matches[0])
             node = self.node(matches[0],**node, config = self.config)
-            node.interact()
+            if args.action == "debug":
+                node.interact(debug = True)
+            else:
+                node.interact()
         elif args.action == "del":
             if args.data == None:
-                print("MISSING ARGUMENT NODE")
-                return
+                print("Missing argument node")
+                exit(2)
             elif args.data.startswith("@"):
                 matches = list(filter(lambda k: k == args.data, self.folders))
             else:
                 matches = list(filter(lambda k: k == args.data, self.nodes))
             if len(matches) == 0:
-                print("ERROR NO MACHEO NI FOLDER NI NODE")
-                return
+                print("{} not found".format(args.data))
+                exit(1)
             question = [inquirer.Confirm("delete", message="Are you sure you want to delete {}?".format(matches[0]))]
             confirm = inquirer.prompt(question)
             if confirm["delete"]:
@@ -110,28 +128,33 @@ class connapp:
                 print("{} deleted succesfully".format(matches[0]))
         elif args.action == "add":
             if args.data == None:
-                print("MISSING ARGUMENT NODE")
-                return
+                print("Missing argument node")
+                exit(2)
             elif args.data.startswith("@"):
                 type = "folder"
                 matches = list(filter(lambda k: k == args.data, self.folders))
+                reversematches = list(filter(lambda k: "@" + k == args.data, self.nodes))
             else:
                 type = "node"
                 matches = list(filter(lambda k: k == args.data, self.nodes))
+                reversematches = list(filter(lambda k: k == "@" + args.data, self.folders))
             if len(matches) > 0:
-                print(matches[0] + " ALLREADY EXIST")
-                return
+                print("{} already exist".format(matches[0]))
+                exit(3)
+            if len(reversematches) > 0:
+                print("{} already exist".format(reversematches[0]))
+                exit(3)
             else:
                 if type == "folder":
                     uniques = self.config._explode_unique(args.data)
                     if uniques == False:
                         print("Invalid folder {}".format(args.data))
-                        return
+                        exit(4)
                     if "subfolder" in uniques.keys():
                         parent = "@" + uniques["folder"]
                         if parent not in self.folders:
-                            print("FOLDER {} DONT EXIST".format(uniques["folder"]))
-                            return
+                            print("Folder {} not found".format(uniques["folder"]))
+                            exit(1)
                     self.config._folder_add(**uniques)
                     self.config.saveconfig(self.config.file)
                     print("{} added succesfully".format(args.data))
@@ -140,48 +163,48 @@ class connapp:
                     nodefolder = args.data.partition("@")
                     nodefolder = "@" + nodefolder[2]
                     if nodefolder not in self.folders and nodefolder != "@":
-                        print(nodefolder + " DONT EXIST")
-                        return
+                        print(nodefolder + " not found")
+                        exit(1)
                     uniques = self.config._explode_unique(args.data)
                     if uniques == False:
                         print("Invalid node {}".format(args.data))
-                        return False
+                        exit(4)
                     print("You can use the configured setting in a profile using @profilename.")
                     print("You can also leave empty any value except hostname/IP.")
                     print("You can pass 1 or more passwords using comma separated @profiles")
                     print("You can use this variables on logging file name: ${id} ${unique} ${host} ${port} ${user} ${protocol}")
                     newnode = self._questions_nodes(args.data, uniques)
                     if newnode == False:
-                        return
+                        exit(6)
                     self.config._connections_add(**newnode)
                     self.config.saveconfig(self.config.file)
                     print("{} added succesfully".format(args.data))
         elif args.action == "show":
             if args.data == None:
-                print("MISSING ARGUMENT NODE")
-                return
+                print("Missing argument node")
+                exit(2)
             matches = list(filter(lambda k: k == args.data, self.nodes))
             if len(matches) == 0:
-                print("ERROR NO MACHEO NODE")
-                return
-            node = self._get_item(matches[0])
+                print("{} not found".format(args.data))
+                exit(1)
+            node = self.config.getitem(matches[0])
             print(yaml.dump(node, Dumper=yaml.CDumper))
         elif args.action == "mod":
             if args.data == None:
-                print("MISSING ARGUMENT NODE")
-                return
+                print("Missing argument node")
+                exit(2)
             matches = list(filter(lambda k: k == args.data, self.nodes))
             if len(matches) == 0:
-                print("ERROR NO MACHEO NODE")
-                return
-            node = self._get_item(matches[0])
+                print("{} not found".format(args.data))
+                exit(1)
+            node = self.config.getitem(matches[0])
             edits = self._questions_edit()
             if edits == None:
-                return
+                exit(6)
             uniques = self.config._explode_unique(args.data)
             updatenode = self._questions_nodes(args.data, uniques, edit=edits)
             if not updatenode:
-                return
+                exit(6)
             uniques.update(node)
             if sorted(updatenode.items()) == sorted(uniques.items()):
                 print("Nothing to do here")
@@ -193,14 +216,16 @@ class connapp:
 
 
     def _func_profile(self, args):
+        if not self.case:
+            args.data[0] = args.data[0].lower()
         if args.action == "del":
             matches = list(filter(lambda k: k == args.data[0], self.profiles))
             if len(matches) == 0:
-                print("ERROR NO MACHEO PROFILE")
-                return
+                print("{} not found".format(args.data[0]))
+                exit(1)
             if matches[0] == "default":
-                print("CANT DELETE DEFAULT PROFILE")
-                return
+                print("Can't delete default profile")
+                exit(5)
             question = [inquirer.Confirm("delete", message="Are you sure you want to delete {}?".format(matches[0]))]
             confirm = inquirer.prompt(question)
             if confirm["delete"]:
@@ -210,35 +235,35 @@ class connapp:
         elif args.action == "show":
             matches = list(filter(lambda k: k == args.data[0], self.profiles))
             if len(matches) == 0:
-                print("ERROR NO MACHEO PROFILE")
-                return
+                print("{} not found".format(args.data[0]))
+                exit(1)
             profile = self.config.profiles[matches[0]]
             print(yaml.dump(profile, Dumper=yaml.CDumper))
         elif args.action == "add":
             matches = list(filter(lambda k: k == args.data[0], self.profiles))
             if len(matches) > 0:
                 print("Profile {} Already exist".format(matches[0]))
-                return
+                exit(3)
             newprofile = self._questions_profiles(args.data[0])
             if newprofile == False:
-                return
+                exit(6)
             self.config._profiles_add(**newprofile)
             self.config.saveconfig(self.config.file)
             print("{} added succesfully".format(args.data[0]))
         elif args.action == "mod":
             matches = list(filter(lambda k: k == args.data[0], self.profiles))
             if len(matches) == 0:
-                print("ERROR NO MACHEO PROFILE")
-                return
+                print("{} not found".format(args.data[0]))
+                exit(1)
             profile = self.config.profiles[matches[0]]
             oldprofile = {"id": matches[0]}
             oldprofile.update(profile)
             edits = self._questions_edit()
             if edits == None:
-                return
+                exit(6)
             updateprofile = self._questions_profiles(matches[0], edit=edits)
             if not updateprofile:
-                return
+                exit(6)
             if sorted(updateprofile.items()) == sorted(oldprofile.items()):
                 print("Nothing to do here")
                 return
@@ -251,25 +276,28 @@ class connapp:
         if args.command == "ls":
             print(*getattr(self, args.data), sep="\n")
         elif args.command == "move" or args.command == "cp":
+            if not self.case:
+                args.data[0] = args.data[0].lower()
+                args.data[1] = args.data[1].lower()
             source = list(filter(lambda k: k == args.data[0], self.nodes))
             dest = list(filter(lambda k: k == args.data[1], self.nodes))
             if len(source) != 1:
-                print("ERROR NO MACHEO NODE {}".format(args.data[0]))
-                return
+                print("{} not found".format(args.data[0]))
+                exit(1)
             if len(dest) > 0:
-                print("{} ALREADY EXIST".format(args.data[1]))
-                return
+                print("Node {} Already exist".format(args.data[1]))
+                exit(3)
             nodefolder = args.data[1].partition("@")
             nodefolder = "@" + nodefolder[2]
             if nodefolder not in self.folders and nodefolder != "@":
-                print(nodefolder + " DONT EXIST")
-                return
+                print("{} not found".format(nodefolder))
+                exit(1)
             olduniques = self.config._explode_unique(args.data[0])
             newuniques = self.config._explode_unique(args.data[1])
             if newuniques == False:
                 print("Invalid node {}".format(args.data[1]))
-                return False
-            node = self._get_item(source[0])
+                exit(4)
+            node = self.config.getitem(source[0])
             newnode = {**newuniques, **node}
             self.config._connections_add(**newnode)
             if args.command == "move":
@@ -280,11 +308,60 @@ class connapp:
             if args.command == "cp":
                 print("{} copied succesfully to {}".format(args.data[0],args.data[1]))
         elif args.command == "bulk":
-            test = self._questions_bulk()
-            print(test)
+            newnodes = self._questions_bulk()
+            if newnodes == False:
+                exit(6)
+            if not self.case:
+                newnodes["location"] = newnodes["location"].lower()
+                newnodes["ids"] = newnodes["ids"].lower()
+            ids = newnodes["ids"].split(",")
+            hosts = newnodes["host"].split(",")
+            count = 0
+            for n in ids:
+                unique = n + newnodes["location"]
+                matches = list(filter(lambda k: k == unique, self.nodes))
+                reversematches = list(filter(lambda k: k == "@" + unique, self.folders))
+                if len(matches) > 0:
+                    print("Node {} already exist, ignoring it".format(unique))
+                    continue
+                if len(reversematches) > 0:
+                    print("Folder with name {} already exist, ignoring it".format(unique))
+                    continue
+                newnode = {"id": n}
+                if newnodes["location"] != "":
+                    location = self.config._explode_unique(newnodes["location"])
+                    newnode.update(location)
+                if len(hosts) > 1:
+                    index = ids.index(n)
+                    newnode["host"] = hosts[index]
+                else:
+                    newnode["host"] = hosts[0]
+                newnode["protocol"] = newnodes["protocol"]
+                newnode["port"] = newnodes["port"]
+                newnode["options"] = newnodes["options"]
+                newnode["logs"] = newnodes["logs"]
+                newnode["user"] = newnodes["user"]
+                newnode["password"] = newnodes["password"]
+                count +=1
+                self.config._connections_add(**newnode)
+                self.nodes = self._getallnodes()
+            if count > 0:
+                self.config.saveconfig(self.config.file)
+                print("Succesfully added {} nodes".format(count))
+            else:
+                print("0 nodes added")
         else:
-            print(args.command)
-            print(vars(args))
+            if args.command == "case":
+                if args.data[0] == "true":
+                    args.data[0] = True
+                elif args.data[0] == "false":
+                    args.data[0] = False
+            if args.command == "idletime":
+                if args.data[0] < 0:
+                    args.data[0] = 0
+            self.config.config[args.command] = args.data[0]
+            self.config.saveconfig(self.config.file)
+            print("Config saved")
 
     def _choose(self, list, name, action):
         questions = [inquirer.List(name, message="Pick {} to {}:".format(name,action), choices=list)]
@@ -362,7 +439,8 @@ class connapp:
         return True
 
     def _bulk_folder_validation(self, answers, current):
-
+        if not self.case:
+            current = current.lower()
         matches = list(filter(lambda k: k == current, self.folders))
         if current != "" and len(matches) == 0:
             raise inquirer.errors.ValidationError("", reason="Location {} don't exist".format(current))
@@ -394,7 +472,7 @@ class connapp:
 
     def _questions_nodes(self, unique, uniques = None, edit = None):
         try:
-            defaults = self._get_item(unique)
+            defaults = self.config.getitem(unique)
         except:
             defaults = { "host":"", "protocol":"", "port":"", "user":"", "options":"", "logs":"" }
         node = {}
@@ -447,23 +525,6 @@ class connapp:
         result = {**uniques, **answer, **node}
         result["type"] = "connection"
         return result
-
-    def _get_item(self, unique):
-            uniques = self.config._explode_unique(unique)
-            if unique.startswith("@"):
-                if uniques.keys() >= {"folder", "subfolder"}:
-                    folder = self.config.connections[uniques["folder"]][uniques["subfolder"]]
-                else:
-                    folder = self.config.connections[uniques["folder"]]
-                return folder
-            else:
-                if uniques.keys() >= {"folder", "subfolder"}:
-                    node = self.config.connections[uniques["folder"]][uniques["subfolder"]][uniques["id"]]
-                elif "folder" in uniques.keys():
-                    node = self.config.connections[uniques["folder"]][uniques["id"]]
-                else:
-                    node = self.config.connections[uniques["id"]]
-                return node
 
     def _questions_profiles(self, unique, edit = None):
         try:
@@ -549,12 +610,6 @@ class connapp:
         if not pat.match(arg_value):
             raise argparse.ArgumentTypeError
         return arg_value
-
-    class store_type(argparse.Action):
-        def __call__(self, parser, args, values, option_string=None):
-            setattr(args, "data", values)
-            delattr(args,self.dest)
-            setattr(args, "command", self.dest)
 
     def _help(self, type):
         if type == "node":

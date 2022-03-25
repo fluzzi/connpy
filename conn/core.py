@@ -45,11 +45,10 @@ class node:
             self.password = [password]
 
     def __passtx(self, passwords, *, keyfile=None):
-        keyfile = self.key
         dpass = []
         if keyfile is None:
             keyfile = self.key
-        else:
+        if keyfile is not None:
             key = RSA.import_key(open(keyfile).read())
             decryptor = PKCS1_OAEP.new(key)
         for passwd in passwords:
@@ -60,8 +59,7 @@ class node:
                     decrypted = decryptor.decrypt(ast.literal_eval(str(passwd))).decode("utf-8")
                     dpass.append(decrypted)
                 except:
-                    print("Missing or wrong key")
-                    exit(1)
+                    raise ValueError("Missing or corrupted key")
         return dpass
 
     
@@ -108,15 +106,18 @@ class node:
         connect = self._connect(debug = debug)
         if connect == True:
             print("Connected to " + self.unique + " at " + self.host + (":" if self.port != '' else '') + self.port + " via: " + self.protocol)
-            if debug:
-                self.child.logfile_read = None
-            elif 'logfile' in dir(self):
+            if 'logfile' in dir(self):
                 self.child.logfile_read = open(self.logfile, "wb")
+            elif debug:
+                self.child.logfile_read = None
             if 'missingtext' in dir(self):
                 print(self.child.after.decode(), end='')
             self.child.interact()
             if "logfile" in dir(self) and not debug:
                 self._logclean(self.logfile)
+        else:
+            print(connect)
+            exit(7)
 
     def run(self, commands,*, folder = '', prompt = '>$|#$|\$.$', stdout = False):
         connect = self._connect()
@@ -135,18 +136,15 @@ class node:
                 output = output + self.child.before.decode() + self.child.after.decode()
             self.child.expect(prompt)
             output = output + self.child.before.decode() + self.child.after.decode()
-            if folder == '':
-                if stdout == True:
-                    print(output)
-            else:
+            if stdout == True:
+                print(output)
+            if folder != '':
                 with open(folder + "/" + self.unique, "w") as f:
                     f.write(output)
                     f.close()
                     self._logclean(folder + "/" + self.unique)
             self.output = output
             return output
-
-            
 
     def _connect(self, debug = False):
         if self.protocol == "ssh":
@@ -182,8 +180,7 @@ class node:
                 passwords = []
             expects = ['[u|U]sername:', 'refused', 'supported', 'cipher', 'sage', 'timeout', 'unavailable', 'closed', '[p|P]assword:', '>$|#$|\$.$', 'suspend', pexpect.EOF, "No route to host"]
         else:
-            print("Invalid protocol: " + self.protocol)
-            return
+            raise ValueError("Invalid protocol: " + self.protocol)
         child = pexpect.spawn(cmd)
         if debug:
             child.logfile_read = sys.stdout.buffer
@@ -206,9 +203,8 @@ class node:
                                 self.missingtext = True
                                 break
                     case 1 | 2 | 3 | 4 | 5 | 6 | 7 | 12:
-                        print("Connection failed code:" + str(results))
                         child.close()
-                        return
+                        return "Connection failed code:" + str(results)
                     case 8:
                         if len(passwords) > 0:
                             child.sendline(passwords[i])

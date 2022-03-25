@@ -4,6 +4,7 @@ import yaml
 import os
 import re
 from Crypto.PublicKey import RSA
+from pathlib import Path
 
 
 #functions and classes
@@ -15,8 +16,8 @@ class configfile:
         self.defaultdir = home + '/.config/conn'
         self.defaultfile = self.defaultdir + '/config.yaml'
         self.defaultkey = self.defaultdir + '/.osk'
+        Path(self.defaultdir).mkdir(parents=True, exist_ok=True)
         if conf == None:
-            self.dir = self.defaultdir
             self.file = self.defaultfile
         else:
             self.file = conf
@@ -42,11 +43,12 @@ class configfile:
         return yaml.load(ymlconf.read(), Loader=yaml.CLoader)
 
     def createconfig(self, conf):
-        defaultconfig = {'config': {'case': False, 'frun': False, 'idletime': 30}, 'connections': {}, 'profiles': { "default": { "host":"", "protocol":"ssh", "port":"", "user":"", "password":"", "options":"", "logs":"" }}}
+        defaultconfig = {'config': {'case': False, 'idletime': 30}, 'connections': {}, 'profiles': { "default": { "host":"", "protocol":"ssh", "port":"", "user":"", "password":"", "options":"", "logs":"" }}}
         if not os.path.exists(conf):
             with open(conf, "w") as f:
                 yaml.dump(defaultconfig, f, explicit_start=True, Dumper=yaml.CDumper)
                 f.close()
+                os.chmod(conf, 0o600)
         ymlconf = open(conf)
         return yaml.load(ymlconf.read(), Loader=yaml.CLoader)
 
@@ -64,6 +66,7 @@ class configfile:
         with open(keyfile,'wb') as f:
             f.write(key.export_key('PEM'))
             f.close()
+            os.chmod(keyfile, 0o600)
 
     def _explode_unique(self, unique):
         uniques = unique.split("@")
@@ -83,6 +86,23 @@ class configfile:
         elif len(uniques) > 3:
             return False
         return result
+
+    def getitem(self, unique):
+            uniques = self._explode_unique(unique)
+            if unique.startswith("@"):
+                if uniques.keys() >= {"folder", "subfolder"}:
+                    folder = self.connections[uniques["folder"]][uniques["subfolder"]]
+                else:
+                    folder = self.connections[uniques["folder"]]
+                return folder
+            else:
+                if uniques.keys() >= {"folder", "subfolder"}:
+                    node = self.connections[uniques["folder"]][uniques["subfolder"]][uniques["id"]]
+                elif "folder" in uniques.keys():
+                    node = self.connections[uniques["folder"]][uniques["id"]]
+                else:
+                    node = self.connections[uniques["id"]]
+                return node
 
     def _connections_add(self,*, id, host, folder='', subfolder='', options='', logs='', password='', port='', protocol='', user='', type = "connection" ):
         if folder == '':
