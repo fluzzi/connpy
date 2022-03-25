@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 import conn
 
-conf = conn.configfile("test.yaml")
+conf = conn.configfile()
 # ***
 # conf._connections_del(id = "zab3mu", folder="teco")
 # conf._connections_add(id = "zzztest", folder="teco" ,host = "10.21.96.45", user="sarabada")

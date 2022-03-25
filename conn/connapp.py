@@ -94,11 +94,11 @@ class connapp:
                     matches = list(filter(lambda k: k.startswith(args.data), self.nodes))
             if len(matches) == 0:
                 print("{} not found".format(args.data))
-                exit(1)
+                exit(2)
             elif len(matches) > 1:
                 matches[0] = self._choose(matches,"node", "connect")
             if matches[0] == None:
-                exit(6)
+                exit(7)
             node = self.config.getitem(matches[0])
             node = self.node(matches[0],**node, config = self.config)
             if args.action == "debug":
@@ -108,14 +108,14 @@ class connapp:
         elif args.action == "del":
             if args.data == None:
                 print("Missing argument node")
-                exit(2)
+                exit(3)
             elif args.data.startswith("@"):
                 matches = list(filter(lambda k: k == args.data, self.folders))
             else:
                 matches = list(filter(lambda k: k == args.data, self.nodes))
             if len(matches) == 0:
                 print("{} not found".format(args.data))
-                exit(1)
+                exit(2)
             question = [inquirer.Confirm("delete", message="Are you sure you want to delete {}?".format(matches[0]))]
             confirm = inquirer.prompt(question)
             if confirm["delete"]:
@@ -129,7 +129,7 @@ class connapp:
         elif args.action == "add":
             if args.data == None:
                 print("Missing argument node")
-                exit(2)
+                exit(3)
             elif args.data.startswith("@"):
                 type = "folder"
                 matches = list(filter(lambda k: k == args.data, self.folders))
@@ -140,21 +140,21 @@ class connapp:
                 reversematches = list(filter(lambda k: k == "@" + args.data, self.folders))
             if len(matches) > 0:
                 print("{} already exist".format(matches[0]))
-                exit(3)
+                exit(4)
             if len(reversematches) > 0:
                 print("{} already exist".format(reversematches[0]))
-                exit(3)
+                exit(4)
             else:
                 if type == "folder":
                     uniques = self.config._explode_unique(args.data)
                     if uniques == False:
                         print("Invalid folder {}".format(args.data))
-                        exit(4)
+                        exit(5)
                     if "subfolder" in uniques.keys():
                         parent = "@" + uniques["folder"]
                         if parent not in self.folders:
                             print("Folder {} not found".format(uniques["folder"]))
-                            exit(1)
+                            exit(2)
                     self.config._folder_add(**uniques)
                     self.config.saveconfig(self.config.file)
                     print("{} added succesfully".format(args.data))
@@ -164,47 +164,47 @@ class connapp:
                     nodefolder = "@" + nodefolder[2]
                     if nodefolder not in self.folders and nodefolder != "@":
                         print(nodefolder + " not found")
-                        exit(1)
+                        exit(2)
                     uniques = self.config._explode_unique(args.data)
                     if uniques == False:
                         print("Invalid node {}".format(args.data))
-                        exit(4)
+                        exit(5)
                     print("You can use the configured setting in a profile using @profilename.")
                     print("You can also leave empty any value except hostname/IP.")
                     print("You can pass 1 or more passwords using comma separated @profiles")
                     print("You can use this variables on logging file name: ${id} ${unique} ${host} ${port} ${user} ${protocol}")
                     newnode = self._questions_nodes(args.data, uniques)
                     if newnode == False:
-                        exit(6)
+                        exit(7)
                     self.config._connections_add(**newnode)
                     self.config.saveconfig(self.config.file)
                     print("{} added succesfully".format(args.data))
         elif args.action == "show":
             if args.data == None:
                 print("Missing argument node")
-                exit(2)
+                exit(3)
             matches = list(filter(lambda k: k == args.data, self.nodes))
             if len(matches) == 0:
                 print("{} not found".format(args.data))
-                exit(1)
+                exit(2)
             node = self.config.getitem(matches[0])
             print(yaml.dump(node, Dumper=yaml.CDumper))
         elif args.action == "mod":
             if args.data == None:
                 print("Missing argument node")
-                exit(2)
+                exit(3)
             matches = list(filter(lambda k: k == args.data, self.nodes))
             if len(matches) == 0:
                 print("{} not found".format(args.data))
-                exit(1)
+                exit(2)
             node = self.config.getitem(matches[0])
             edits = self._questions_edit()
             if edits == None:
-                exit(6)
+                exit(7)
             uniques = self.config._explode_unique(args.data)
             updatenode = self._questions_nodes(args.data, uniques, edit=edits)
             if not updatenode:
-                exit(6)
+                exit(7)
             uniques.update(node)
             if sorted(updatenode.items()) == sorted(uniques.items()):
                 print("Nothing to do here")
@@ -222,10 +222,15 @@ class connapp:
             matches = list(filter(lambda k: k == args.data[0], self.profiles))
             if len(matches) == 0:
                 print("{} not found".format(args.data[0]))
-                exit(1)
+                exit(2)
             if matches[0] == "default":
                 print("Can't delete default profile")
-                exit(5)
+                exit(6)
+            usedprofile = self._profileused(matches[0])
+            if len(usedprofile) > 0:
+                print("Profile {} used in the following nodes:".format(matches[0]))
+                print(", ".join(usedprofile))
+                exit(8)
             question = [inquirer.Confirm("delete", message="Are you sure you want to delete {}?".format(matches[0]))]
             confirm = inquirer.prompt(question)
             if confirm["delete"]:
@@ -236,17 +241,17 @@ class connapp:
             matches = list(filter(lambda k: k == args.data[0], self.profiles))
             if len(matches) == 0:
                 print("{} not found".format(args.data[0]))
-                exit(1)
+                exit(2)
             profile = self.config.profiles[matches[0]]
             print(yaml.dump(profile, Dumper=yaml.CDumper))
         elif args.action == "add":
             matches = list(filter(lambda k: k == args.data[0], self.profiles))
             if len(matches) > 0:
                 print("Profile {} Already exist".format(matches[0]))
-                exit(3)
+                exit(4)
             newprofile = self._questions_profiles(args.data[0])
             if newprofile == False:
-                exit(6)
+                exit(7)
             self.config._profiles_add(**newprofile)
             self.config.saveconfig(self.config.file)
             print("{} added succesfully".format(args.data[0]))
@@ -254,16 +259,16 @@ class connapp:
             matches = list(filter(lambda k: k == args.data[0], self.profiles))
             if len(matches) == 0:
                 print("{} not found".format(args.data[0]))
-                exit(1)
+                exit(2)
             profile = self.config.profiles[matches[0]]
             oldprofile = {"id": matches[0]}
             oldprofile.update(profile)
             edits = self._questions_edit()
             if edits == None:
-                exit(6)
+                exit(7)
             updateprofile = self._questions_profiles(matches[0], edit=edits)
             if not updateprofile:
-                exit(6)
+                exit(7)
             if sorted(updateprofile.items()) == sorted(oldprofile.items()):
                 print("Nothing to do here")
                 return
@@ -283,20 +288,20 @@ class connapp:
             dest = list(filter(lambda k: k == args.data[1], self.nodes))
             if len(source) != 1:
                 print("{} not found".format(args.data[0]))
-                exit(1)
+                exit(2)
             if len(dest) > 0:
                 print("Node {} Already exist".format(args.data[1]))
-                exit(3)
+                exit(4)
             nodefolder = args.data[1].partition("@")
             nodefolder = "@" + nodefolder[2]
             if nodefolder not in self.folders and nodefolder != "@":
                 print("{} not found".format(nodefolder))
-                exit(1)
+                exit(2)
             olduniques = self.config._explode_unique(args.data[0])
             newuniques = self.config._explode_unique(args.data[1])
             if newuniques == False:
                 print("Invalid node {}".format(args.data[1]))
-                exit(4)
+                exit(5)
             node = self.config.getitem(source[0])
             newnode = {**newuniques, **node}
             self.config._connections_add(**newnode)
@@ -310,7 +315,7 @@ class connapp:
         elif args.command == "bulk":
             newnodes = self._questions_bulk()
             if newnodes == False:
-                exit(6)
+                exit(7)
             if not self.case:
                 newnodes["location"] = newnodes["location"].lower()
                 newnodes["ids"] = newnodes["ids"].lower()
@@ -515,10 +520,14 @@ class connapp:
             if answer["password"] == "Local Password":
                 passq = [inquirer.Password("password", message="Set Password")]
                 passa = inquirer.prompt(passq)
+                if passa == None:
+                    return False
                 answer["password"] = self.encrypt(passa["password"])
             elif answer["password"] == "Profiles":
                 passq = [(inquirer.Text("password", message="Set a @profile or a comma separated list of @profiles", validate=self._pass_validation))]
                 passa = inquirer.prompt(passq)
+                if passa == None:
+                    return False
                 answer["password"] = passa["password"].split(",")
             elif answer["password"] == "No Password":
                 answer["password"] = ""
@@ -637,6 +646,20 @@ class connapp:
             subfolders.extend(s)
         folders.extend(subfolders)
         return folders
+
+    def _profileused(self, profile):
+        nodes = []
+        layer1 = [k for k,v in self.config.connections.items() if isinstance(v, dict) and v["type"] == "connection" and ("@" + profile in v.values() or ( isinstance(v["password"],list) and "@" + profile in v["password"]))]
+        folders = [k for k,v in self.config.connections.items() if isinstance(v, dict) and v["type"] == "folder"]
+        nodes.extend(layer1)
+        for f in folders:
+            layer2 = [k + "@" + f for k,v in self.config.connections[f].items() if isinstance(v, dict) and v["type"] == "connection" and ("@" + profile in v.values() or ( isinstance(v["password"],list) and "@" + profile in v["password"]))]
+            nodes.extend(layer2)
+            subfolders = [k for k,v in self.config.connections[f].items() if isinstance(v, dict) and v["type"] == "subfolder"]
+            for s in subfolders:
+                layer3 = [k + "@" + s + "@" + f for k,v in self.config.connections[f][s].items() if isinstance(v, dict) and v["type"] == "connection" and ("@" + profile in v.values() or ( isinstance(v["password"],list) and "@" + profile in v["password"]))]
+                nodes.extend(layer3)
+        return nodes
 
     def encrypt(self, password, keyfile=None):
         if keyfile is None:
