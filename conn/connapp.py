@@ -25,7 +25,7 @@ class connapp:
         defaultparser = argparse.ArgumentParser(prog = "conn", description = "SSH and Telnet connection manager", formatter_class=argparse.RawTextHelpFormatter)
         subparsers = defaultparser.add_subparsers(title="Commands")
         #NODEPARSER
-        nodeparser = subparsers.add_parser("node", help=self._help("node"),formatter_class=argparse.RawTextHelpFormatter) 
+        nodeparser = subparsers.add_parser("node",usage=self._help("usage"), help=self._help("node"),epilog=self._help("end"), formatter_class=argparse.RawTextHelpFormatter) 
         nodecrud = nodeparser.add_mutually_exclusive_group()
         nodeparser.add_argument("node", metavar="node|folder", nargs='?', default=None, action=self.store_type, type=self._type_node, help=self._help("node"))
         nodecrud.add_argument("--add", dest="action", action="store_const", help="Add new node[@subfolder][@folder] or [@subfolder]@folder", const="add", default="connect")
@@ -65,7 +65,7 @@ class connapp:
         configparser.add_argument("--keepalive", dest="idletime", nargs=1, action=self.store_type, help="Set keepalive time in seconds, 0 to disable", type=int, metavar="INT")
         configparser.set_defaults(func=self._func_others)
         #Set default subparser and tune arguments
-        commands = ["node", "-h", "--help", "profile", "mv", "move","copy", "cp", "bulk", "ls", "list", "config"]
+        commands = ["node", "profile", "mv", "move","copy", "cp", "bulk", "ls", "list", "config"]
         profilecmds = ["--add", "--del", "--rm", "--mod", "--edit", "--show"]
         if len(sys.argv) >= 3 and sys.argv[2] == "profile" and sys.argv[1] in profilecmds:
             sys.argv[2] = sys.argv[1]
@@ -623,6 +623,10 @@ class connapp:
     def _help(self, type):
         if type == "node":
             return "node[@subfolder][@folder]\nConnect to specific node or show all matching nodes\n[@subfolder][@folder]\nShow all available connections globaly or in specified path"
+        if type == "usage":
+            return "conn [-h] [--add | --del | --mod | --show | --debug] [node|folder]\n       conn {profile,move,mv,copy,cp,list,ls,bulk,config} ..."
+        if type == "end":
+            return "Commands:\n  profile        Manage profiles\n  move (mv)      Move node\n  copy (cp)      Copy node\n  list (ls)      List profiles, nodes or folders\n  bulk           Add nodes in bulk\n  config         Manage app config"
 
     def _getallnodes(self):
         nodes = []
