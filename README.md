@@ -10,8 +10,13 @@ pip install conn
 ```
 import conn
 router = conn.node("unique name","ip/hostname", user="username", password="password")
-router.run("show run")
+router.run(["term len 0","show run"])
 print(router.output)
+hasip = router.test("show ip int brief","1.1.1.1")
+if hasip:
+    print("Router have ip 1.1.1.1")
+else:
+    print("router don't have ip 1.1.1.1")
 ```
 
 ### Using manager configuration
