@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 import pathlib
 
-VERSION = '2.0.0' 
+VERSION = '2.0.2' 
 DESCRIPTION = 'Conn is a SSH/Telnet connection manager and automation module'
 
 here = pathlib.Path(__file__).parent.resolve()
@@ -29,5 +29,10 @@ setup(
             # "Operating System :: MacOS :: MacOS X",
             # "Operating System :: Microsoft :: Windows",
             "Operating System :: Unix"
-        ]
+        ],
+        entry_points={
+                            'console_scripts': [
+                                'conn=conn.__main__:main',
+                            ]
+                    }
 )

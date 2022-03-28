@@ -5,4 +5,4 @@ from .configfile import configfile
 from .connapp import connapp
 
 __version__ = "2.0"
-__all__ = [node, configfile, connapp]
+__all__ = ["node", "configfile", "connapp"]
