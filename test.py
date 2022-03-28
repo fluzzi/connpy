@@ -38,9 +38,14 @@ conf = conn.configfile()
 # ***
 conn.connapp(conf, conn.node)
 # ***
-# list = ["xr@home","ios@home","router228@bbva","router142@bbva"]
+# list = ["xr@home","ios@home","csr@home"]
+# list = ["huawei@home"]
 # for i in list:
     # data = conf.getitem(i)
     # routeri = conn.node(i,**data,config=conf)
-    # routeri.run(["term len 0","show run"], folder="test")
+    # result = routeri.test(["show ip int br"],"10.21.96.47")
+    # result = routeri.run(["set cli screen-length 0","show configuration"])
+    # result = routeri.run(["screen-length 0 temporary","display current-configuration"],prompt='>$')
+    # print(result)
+
 

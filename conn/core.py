@@ -119,7 +119,7 @@ class node:
             print(connect)
             exit(1)
 
-    def run(self, commands,*, folder = '', prompt = '>$|#$|\$.$', stdout = False):
+    def run(self, commands,*, folder = '', prompt = '>$|#$|\$$|>.$|#.$|\$.$', stdout = False):
         connect = self._connect()
         if connect == True:
             winsize = self.child.getwinsize()
@@ -136,6 +136,7 @@ class node:
                 output = output + self.child.before.decode() + self.child.after.decode()
             self.child.expect(prompt)
             output = output + self.child.before.decode() + self.child.after.decode()
+            self.child.close()
             if stdout == True:
                 print(output)
             if folder != '':
@@ -145,6 +146,35 @@ class node:
                     self._logclean(folder + "/" + self.unique)
             self.output = output
             return output
+        else:
+            return connect
+
+    def test(self, commands, expected, *, prompt = '>$|#$|\$$|>.$|#.$|\$.$'):
+        connect = self._connect()
+        if connect == True:
+            winsize = self.child.getwinsize()
+            self.child.setwinsize(65535,winsize[1])
+            output = ''
+            if isinstance(commands, list):
+                for c in commands:
+                    self.child.expect(prompt)
+                    self.child.sendline(c)
+                    output = output + self.child.before.decode() + self.child.after.decode()
+            else:
+                self.child.expect(prompt)
+                self.child.sendline(commands)
+                output = output + self.child.before.decode() + self.child.after.decode()
+            expects = [expected, prompt]
+            results = self.child.expect(expects)
+            output = output + self.child.before.decode() + self.child.after.decode()
+            self.output = output
+            match results:
+                case 0:
+                    self.child.close()
+                    return True
+                case 1:
+                    self.child.close()
+                    return False
         else:
             return connect
 
@@ -167,7 +197,7 @@ class node:
                 passwords = self.__passtx(self.password)
             else:
                 passwords = []
-            expects = ['yes/no', 'refused', 'supported', 'cipher', 'sage', 'timeout', 'unavailable', 'closed', '[p|P]assword:|[u|U]sername:', '>$|#$|\$.$', 'suspend', pexpect.EOF, "No route to host", "resolve hostname"]
+            expects = ['yes/no', 'refused', 'supported', 'cipher', 'sage', 'timeout', 'unavailable', 'closed', '[p|P]assword:|[u|U]sername:', '>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, "No route to host", "resolve hostname"]
         elif self.protocol == "telnet":
             cmd = "telnet " + self.host
             if self.port != '':
@@ -180,7 +210,7 @@ class node:
                 passwords = self.__passtx(self.password)
             else:
                 passwords = []
-            expects = ['[u|U]sername:', 'refused', 'supported', 'cipher', 'sage', 'timeout', 'unavailable', 'closed', '[p|P]assword:', '>$|#$|\$.$', 'suspend', pexpect.EOF, "No route to host", "resolve hostname"]
+            expects = ['[u|U]sername:', 'refused', 'supported', 'cipher', 'sage', 'timeout', 'unavailable', 'closed', '[p|P]assword:', '>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, "No route to host", "resolve hostname"]
         else:
             raise ValueError("Invalid protocol: " + self.protocol)
         child = pexpect.spawn(cmd)
