@@ -18,7 +18,7 @@ setup(
         long_description_content_type="text/markdown",
         url="https://github.com/fluzzi/connpy",
         packages=find_packages(),
-        install_requires=["inquirer","pexpect","pycryptodome","PyYAML"], # add any additional packages that 
+        install_requires=["inquirer","pexpect","pycryptodome"], # add any additional packages that 
         keywords=['networking', 'automation', 'ssh', 'telnet', 'connection manager'],
         classifiers= [
             "Development Status :: 4 - Beta",
