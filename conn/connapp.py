@@ -8,7 +8,7 @@ import ast
 import argparse
 import sys
 import inquirer
-import yaml
+import json
 
 #functions and classes
 
@@ -63,6 +63,7 @@ class connapp:
         configparser = subparsers.add_parser("config", help="Manage app config") 
         configparser.add_argument("--allow-uppercase", dest="case", nargs=1, action=self.store_type, help="Allow case sensitive names", choices=["true","false"])
         configparser.add_argument("--keepalive", dest="idletime", nargs=1, action=self.store_type, help="Set keepalive time in seconds, 0 to disable", type=int, metavar="INT")
+        configparser.add_argument("--completion", dest="completion", nargs=0, action=self.store_type, help="Get bash completion configuration for conn")
         configparser.set_defaults(func=self._func_others)
         #Set default subparser and tune arguments
         commands = ["node", "profile", "mv", "move","copy", "cp", "bulk", "ls", "list", "config"]
@@ -188,7 +189,13 @@ class connapp:
                 print("{} not found".format(args.data))
                 exit(2)
             node = self.config.getitem(matches[0])
-            print(yaml.dump(node, Dumper=yaml.CDumper))
+            for k, v in node.items():
+                if isinstance(v, str):
+                    print(k + ": " + v)
+                else:
+                    print(k + ":")
+                    for i in v:
+                        print("  - " + i)
         elif args.action == "mod":
             if args.data == None:
                 print("Missing argument node")
@@ -243,7 +250,13 @@ class connapp:
                 print("{} not found".format(args.data[0]))
                 exit(2)
             profile = self.config.profiles[matches[0]]
-            print(yaml.dump(profile, Dumper=yaml.CDumper))
+            for k, v in profile.items():
+                if isinstance(v, str):
+                    print(k + ": " + v)
+                else:
+                    print(k + ":")
+                    for i in v:
+                        print("  - " + i)
         elif args.action == "add":
             matches = list(filter(lambda k: k == args.data[0], self.profiles))
             if len(matches) > 0:
@@ -356,17 +369,20 @@ class connapp:
             else:
                 print("0 nodes added")
         else:
-            if args.command == "case":
-                if args.data[0] == "true":
-                    args.data[0] = True
-                elif args.data[0] == "false":
-                    args.data[0] = False
-            if args.command == "idletime":
-                if args.data[0] < 0:
-                    args.data[0] = 0
-            self.config.config[args.command] = args.data[0]
-            self.config.saveconfig(self.config.file)
-            print("Config saved")
+            if args.command == "completion":
+                print(self._help("completion"))
+            else:
+                if args.command == "case":
+                    if args.data[0] == "true":
+                        args.data[0] = True
+                    elif args.data[0] == "false":
+                        args.data[0] = False
+                if args.command == "idletime":
+                    if args.data[0] < 0:
+                        args.data[0] = 0
+                self.config.config[args.command] = args.data[0]
+                self.config.saveconfig(self.config.file)
+                print("Config saved")
 
     def _choose(self, list, name, action):
         questions = [inquirer.List(name, message="Pick {} to {}:".format(name,action), choices=list, carousel=True)]
@@ -627,6 +643,53 @@ class connapp:
             return "conn [-h] [--add | --del | --mod | --show | --debug] [node|folder]\n       conn {profile,move,mv,copy,cp,list,ls,bulk,config} ..."
         if type == "end":
             return "Commands:\n  profile        Manage profiles\n  move (mv)      Move node\n  copy (cp)      Copy node\n  list (ls)      List profiles, nodes or folders\n  bulk           Add nodes in bulk\n  config         Manage app config"
+        if type == "completion":
+            return '''
+#Here starts bash completion for conn
+#You need jq installed in order to use this
+_conn()
+{
+
+    DATADIR=$HOME/.config/conn
+    mapfile -t connections < <(jq -r ' .["connections"] | paths as $path | select(getpath($path) == "connection") | $path |  [map(select(. != "type"))[-1,-2,-3]] | map(select(. !=null)) | join("@")' $DATADIR/config.json)
+    mapfile -t folders < <(jq -r ' .["connections"] | paths as $path | select(getpath($path) == "folder" or getpath($path) == "subfolder") | $path | [map(select(. != "type"))[-1,-2]] | map(select(. !=null)) | join("@")' $DATADIR/config.json)
+        mapfile -t profiles < <(jq -r '.["profiles"] | keys[]' $DATADIR/config.json)
+  if [ "${#COMP_WORDS[@]}" = "2" ]; then
+          strings="--add --del --rm --edit --mod mv --show ls cp profile bulk config --help"
+          strings="$strings ${connections[@]} ${folders[@]/#/@}"
+          COMPREPLY=($(compgen -W "$strings" -- "${COMP_WORDS[1]}"))
+  fi
+  if [ "${#COMP_WORDS[@]}" = "3" ]; then
+          strings=""
+          if [ "${COMP_WORDS[1]}" = "profile" ]; then strings="--add --rm --del --edit --mod --show --help"; fi
+          if [ "${COMP_WORDS[1]}" = "config" ]; then strings="--allow-uppercase --keepalive --completion --help"; fi
+          if [[ "${COMP_WORDS[1]}" =~ ^--mod|--edit|--show|--add|--rm|--del$ ]]; then strings="profile"; fi
+          if [[ "${COMP_WORDS[1]}" =~ ^list|ls$ ]]; then strings="profiles nodes folders"; fi
+      if [[ "${COMP_WORDS[1]}" =~ ^bulk|mv|move|cp|copy$$ ]]; then strings="--help"; fi
+          if [[ "${COMP_WORDS[1]}" =~ ^--rm|--del$ ]]; then strings="$strings ${folders[@]/#/@}"; fi
+          if [[ "${COMP_WORDS[1]}" =~ ^--rm|--del|--mod|--edit|mv|move|cp|copy|--show$ ]]; then
+              strings="$strings ${connections[@]}"
+          fi
+          COMPREPLY=($(compgen -W "$strings" -- "${COMP_WORDS[2]}"))
+  fi
+  if [ "${#COMP_WORDS[@]}" = "4" ]; then
+          strings=""
+          if [ "${COMP_WORDS[1]}" = "profile" ]; then
+                if [[ "${COMP_WORDS[2]}" =~ ^--rm|--del|--mod|--edit|--show$ ]] ; then
+                          strings="$strings ${profiles[@]}"
+                fi
+          fi
+          if [ "${COMP_WORDS[2]}" = "profile" ]; then
+                if [[ "${COMP_WORDS[1]}" =~ ^--rm|--remove|--del|--mod|--edit|--show$ ]] ; then
+                          strings="$strings ${profiles[@]}"
+                fi
+          fi
+          COMPREPLY=($(compgen -W "$strings" -- "${COMP_WORDS[3]}"))
+  fi
+}
+complete -o nosort -F _conn conn
+
+        '''
 
     def _getallnodes(self):
         nodes = []
@@ -672,4 +735,4 @@ class connapp:
         publickey = key.publickey()
         encryptor = PKCS1_OAEP.new(publickey)
         password = encryptor.encrypt(password.encode("utf-8"))
-        return password
+        return str(password)

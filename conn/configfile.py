@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #Imports
-import yaml
+import json
 import os
 import re
 from Crypto.PublicKey import RSA
@@ -14,7 +14,7 @@ class configfile:
     def __init__(self, conf = None, *, key = None):
         home = os.path.expanduser("~")
         self.defaultdir = home + '/.config/conn'
-        self.defaultfile = self.defaultdir + '/config.yaml'
+        self.defaultfile = self.defaultdir + '/config.json'
         self.defaultkey = self.defaultdir + '/.osk'
         Path(self.defaultdir).mkdir(parents=True, exist_ok=True)
         if conf == None:
@@ -39,18 +39,18 @@ class configfile:
 
 
     def loadconfig(self, conf):
-        ymlconf = open(conf)
-        return yaml.load(ymlconf.read(), Loader=yaml.CLoader)
+        jsonconf = open(conf)
+        return json.load(jsonconf)
 
     def createconfig(self, conf):
         defaultconfig = {'config': {'case': False, 'idletime': 30}, 'connections': {}, 'profiles': { "default": { "host":"", "protocol":"ssh", "port":"", "user":"", "password":"", "options":"", "logs":"" }}}
         if not os.path.exists(conf):
             with open(conf, "w") as f:
-                yaml.dump(defaultconfig, f, explicit_start=True, Dumper=yaml.CDumper)
+                json.dump(defaultconfig, f, indent = 4)
                 f.close()
                 os.chmod(conf, 0o600)
-        ymlconf = open(conf)
-        return yaml.load(ymlconf.read(), Loader=yaml.CLoader)
+        jsonconf = open(conf)
+        return json.load(jsonconf)
 
     def saveconfig(self, conf):
         newconfig = {"config":{}, "connections": {}, "profiles": {}}
@@ -58,7 +58,7 @@ class configfile:
         newconfig["connections"] = self.connections
         newconfig["profiles"] = self.profiles
         with open(conf, "w") as f:
-            yaml.dump(newconfig, f, explicit_start=True, Dumper=yaml.CDumper)
+            json.dump(newconfig, f, indent = 4)
             f.close()
 
     def createkey(self, keyfile):

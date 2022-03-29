@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 #Imports
-import yaml
 import os
 import re
 import pexpect
@@ -52,11 +51,11 @@ class node:
             key = RSA.import_key(open(keyfile).read())
             decryptor = PKCS1_OAEP.new(key)
         for passwd in passwords:
-            if isinstance(passwd, str):
+            if not re.match('^b[\"\'].+[\"\']$', passwd):
                 dpass.append(passwd)
             else:
                 try:
-                    decrypted = decryptor.decrypt(ast.literal_eval(str(passwd))).decode("utf-8")
+                    decrypted = decryptor.decrypt(ast.literal_eval(passwd)).decode("utf-8")
                     dpass.append(decrypted)
                 except:
                     raise ValueError("Missing or corrupted key")
