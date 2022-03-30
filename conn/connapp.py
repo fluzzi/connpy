@@ -88,6 +88,10 @@ class connapp:
         if args.action == "connect" or args.action == "debug":
             if args.data == None:
                 matches = self.nodes
+                if len(matches) == 0:
+                    print("There are no nodes created")
+                    print("try: conn --help")
+                    exit(9)
             else:
                 if args.data.startswith("@"):
                     matches = list(filter(lambda k: args.data in k, self.nodes))
