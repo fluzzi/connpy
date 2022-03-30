@@ -104,6 +104,8 @@ class node:
     def interact(self, debug = False):
         connect = self._connect(debug = debug)
         if connect == True:
+            size = re.search('columns=([0-9]+).*lines=([0-9]+)',str(os.get_terminal_size()))
+            self.child.setwinsize(int(size.group(2)),int(size.group(1)))
             print("Connected to " + self.unique + " at " + self.host + (":" if self.port != '' else '') + self.port + " via: " + self.protocol)
             if 'logfile' in dir(self):
                 self.child.logfile_read = open(self.logfile, "wb")
@@ -121,21 +123,33 @@ class node:
     def run(self, commands,*, folder = '', prompt = '>$|#$|\$$|>.$|#.$|\$.$', stdout = False):
         connect = self._connect()
         if connect == True:
-            winsize = self.child.getwinsize()
-            self.child.setwinsize(65535,winsize[1])
+            expects = [prompt, pexpect.EOF]
             output = ''
             if isinstance(commands, list):
                 for c in commands:
-                    self.child.expect(prompt)
+                    result = self.child.expect(expects)
                     self.child.sendline(c)
-                    output = output + self.child.before.decode() + self.child.after.decode()
+                    match result:
+                        case 0:
+                            output = output + self.child.before.decode() + self.child.after.decode()
+                        case 1:
+                            output = output + self.child.before.decode()
             else:
-                self.child.expect(prompt)
+                result = self.child.expect(expects)
                 self.child.sendline(commands)
-                output = output + self.child.before.decode() + self.child.after.decode()
-            self.child.expect(prompt)
-            output = output + self.child.before.decode() + self.child.after.decode()
+                match result:
+                    case 0:
+                        output = output + self.child.before.decode() + self.child.after.decode()
+                    case 1:
+                        output = output + self.child.before.decode()
+            result = self.child.expect(expects)
+            match result:
+                case 0:
+                    output = output + self.child.before.decode() + self.child.after.decode()
+                case 1:
+                    output = output + self.child.before.decode()
             self.child.close()
+            output = output.lstrip()
             if stdout == True:
                 print(output)
             if folder != '':
@@ -146,35 +160,50 @@ class node:
             self.output = output
             return output
         else:
+            self.output = connect
             return connect
 
     def test(self, commands, expected, *, prompt = '>$|#$|\$$|>.$|#.$|\$.$'):
         connect = self._connect()
         if connect == True:
-            winsize = self.child.getwinsize()
-            self.child.setwinsize(65535,winsize[1])
+            expects = [prompt, pexpect.EOF]
             output = ''
             if isinstance(commands, list):
                 for c in commands:
-                    self.child.expect(prompt)
+                    result = self.child.expect(expects)
                     self.child.sendline(c)
-                    output = output + self.child.before.decode() + self.child.after.decode()
+                    match result:
+                        case 0:
+                            output = output + self.child.before.decode() + self.child.after.decode()
+                        case 1:
+                            output = output + self.child.before.decode()
             else:
-                self.child.expect(prompt)
+                self.child.expect(expects)
                 self.child.sendline(commands)
                 output = output + self.child.before.decode() + self.child.after.decode()
-            expects = [expected, prompt]
+            expects = [expected, prompt, pexpect.EOF]
             results = self.child.expect(expects)
-            output = output + self.child.before.decode() + self.child.after.decode()
-            self.output = output
             match results:
                 case 0:
                     self.child.close()
+                    self.test = True
+                    output = output + self.child.before.decode() + self.child.after.decode()
+                    output = output.lstrip()
+                    self.output = output
                     return True
-                case 1:
+                case 1 | 2:
                     self.child.close()
+                    self.test = False
+                    if results == 1:
+                        output = output + self.child.before.decode() + self.child.after.decode()
+                    elif results == 2:
+                        output = output + self.child.before.decode()
+                    output = output.lstrip()
+                    self.output = output
                     return False
         else:
+            self.test = None
+            self.output = connect
             return connect
 
     def _connect(self, debug = False):

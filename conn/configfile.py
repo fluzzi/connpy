@@ -87,14 +87,20 @@ class configfile:
             return False
         return result
 
-    def getitem(self, unique):
+    def getitem(self, unique, keys = None):
             uniques = self._explode_unique(unique)
             if unique.startswith("@"):
                 if uniques.keys() >= {"folder", "subfolder"}:
                     folder = self.connections[uniques["folder"]][uniques["subfolder"]]
                 else:
                     folder = self.connections[uniques["folder"]]
-                return folder
+                newfolder = folder.copy()
+                newfolder.pop("type")
+                if keys == None:
+                    return newfolder
+                else:
+                    f_newfolder = dict((k, newfolder[k]) for k in keys)
+                    return f_newfolder
             else:
                 if uniques.keys() >= {"folder", "subfolder"}:
                     node = self.connections[uniques["folder"]][uniques["subfolder"]][uniques["id"]]
@@ -102,7 +108,8 @@ class configfile:
                     node = self.connections[uniques["folder"]][uniques["id"]]
                 else:
                     node = self.connections[uniques["id"]]
-                return node
+                newnode = node.copy()
+                return newnode
 
     def _connections_add(self,*, id, host, folder='', subfolder='', options='', logs='', password='', port='', protocol='', user='', type = "connection" ):
         if folder == '':
