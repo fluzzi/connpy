@@ -27,8 +27,32 @@ device = conf.getitem("router@office")
 router = conn.node("unique name", **device, config=conf)
 result = router.run("show ip int brief")
 print(result)
-router.interact()
 ```
+### Running parallel tasks on multiple devices 
+```
+import conn
+conf = conn.configfile()
+#You can get the nodes from the config from a folder and fitlering in it
+nodes = conf.getitem("@office", ["router1", "router2", "router3"])
+#You can also get each node individually:
+nodes = {}
+nodes["router1"] = conf.getitem("router1@office")
+nodes["router2"] = conf.getitem("router2@office")
+nodes["router10"] = conf.getitem("router10@datacenter")
+#Also, you can create the nodes manually:
+nodes = {}
+nodes["router1"] = {"host": "1.1.1.1", "user": "username", "password": "password1"}
+nodes["router2"] = {"host": "1.1.1.2", "user": "username", "password": "password2"}
+nodes["router3"] = {"host": "1.1.1.2", "user": "username", "password": "password3"}
+#Finally you run some tasks on the nodes
+mynodes = conn.nodes(nodes, config = conf)
+result = mynodes.test(["show ip int br"], "1.1.1.2")
+for i in result:
+    print("---" + i + "---")
+    print(result[i])
+    print()
+```
+
 ## Connection manager usage
 ```
 usage: conn [-h] [--add | --del | --mod | --show | --debug] [node|folder]

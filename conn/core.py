@@ -9,6 +9,7 @@ import ast
 from time import sleep
 import datetime
 import sys
+import threading
 
 #functions and classes
 
@@ -186,14 +187,14 @@ class node:
             match results:
                 case 0:
                     self.child.close()
-                    self.test = True
+                    self.result = True
                     output = output + self.child.before.decode() + self.child.after.decode()
                     output = output.lstrip()
                     self.output = output
                     return True
                 case 1 | 2:
                     self.child.close()
-                    self.test = False
+                    self.result = False
                     if results == 1:
                         output = output + self.child.before.decode() + self.child.after.decode()
                     elif results == 2:
@@ -202,7 +203,7 @@ class node:
                     self.output = output
                     return False
         else:
-            self.test = None
+            self.result = None
             self.output = connect
             return connect
 
@@ -284,5 +285,64 @@ class node:
         self.child = child
         return True
 
+class nodes:
+    def __init__(self, nodes: dict, config = ''):
+        self.nodelist = []
+        self.config = config
+        for n in nodes:
+            self.nodelist.append(node(n, **nodes[n], config = config))
+    
+    def splitlist(self, lst, n):
+        for i in range(0, len(lst), n):
+            yield lst[i:i + n]
+
+
+    def run(self, commands,*, folder = None, prompt = None, stdout = None, parallel = 10):
+        args = {}
+        args["commands"] = commands
+        if folder != None:
+            args["folder"] = folder
+        if prompt != None:
+            args["prompt"] = prompt
+        if stdout != None:
+            args["stdout"] = stdout
+        output = {}
+        tasks = []
+        for n in self.nodelist:
+            tasks.append(threading.Thread(target=n.run, kwargs=args))
+        taskslist = list(self.splitlist(tasks, parallel))
+        for t in taskslist:
+            for i in t:
+                i.start()
+            for i in t:
+                i.join()
+        for i in self.nodelist:
+            output[i.id] = i.output
+        self.output = output
+        return output
+
+    def test(self, commands, expected, *, prompt = None, parallel = 10):
+        args = {}
+        args["commands"] = commands
+        args["expected"] = expected
+        if prompt != None:
+            args["prompt"] = prompt
+        output = {}
+        result = {}
+        tasks = []
+        for n in self.nodelist:
+            tasks.append(threading.Thread(target=n.test, kwargs=args))
+        taskslist = list(self.splitlist(tasks, parallel))
+        for t in taskslist:
+            for i in t:
+                i.start()
+            for i in t:
+                i.join()
+        for i in self.nodelist:
+            result[i.id] = i.result
+            output[i.id] = i.output
+        self.output = output
+        self.result = result
+        return result
 
 # script
