@@ -290,7 +290,10 @@ class nodes:
         self.nodelist = []
         self.config = config
         for n in nodes:
-            self.nodelist.append(node(n, **nodes[n], config = config))
+            this = node(n, **nodes[n], config = config)
+            self.nodelist.append(this)
+            setattr(self,n,this)
+
     
     def splitlist(self, lst, n):
         for i in range(0, len(lst), n):

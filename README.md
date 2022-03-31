@@ -51,6 +51,8 @@ for i in result:
     print("---" + i + "---")
     print(result[i])
     print()
+# Or for one specific node
+mynodes.router1.run(["term len 0". "show run"], folder = "/home/user/logs")
 ```
 
 ## Connection manager usage
