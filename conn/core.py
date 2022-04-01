@@ -130,25 +130,22 @@ class node:
                 for c in commands:
                     result = self.child.expect(expects)
                     self.child.sendline(c)
-                    match result:
-                        case 0:
-                            output = output + self.child.before.decode() + self.child.after.decode()
-                        case 1:
-                            output = output + self.child.before.decode()
+                    if result == 0:
+                        output = output + self.child.before.decode() + self.child.after.decode()
+                    if result == 1:
+                        output = output + self.child.before.decode()
             else:
                 result = self.child.expect(expects)
                 self.child.sendline(commands)
-                match result:
-                    case 0:
-                        output = output + self.child.before.decode() + self.child.after.decode()
-                    case 1:
-                        output = output + self.child.before.decode()
-            result = self.child.expect(expects)
-            match result:
-                case 0:
+                if result == 0:
                     output = output + self.child.before.decode() + self.child.after.decode()
-                case 1:
+                if result == 1:
                     output = output + self.child.before.decode()
+            result = self.child.expect(expects)
+            if result == 0:
+                output = output + self.child.before.decode() + self.child.after.decode()
+            if result == 1:
+                output = output + self.child.before.decode()
             self.child.close()
             output = output.lstrip()
             if stdout == True:
@@ -173,35 +170,33 @@ class node:
                 for c in commands:
                     result = self.child.expect(expects)
                     self.child.sendline(c)
-                    match result:
-                        case 0:
-                            output = output + self.child.before.decode() + self.child.after.decode()
-                        case 1:
-                            output = output + self.child.before.decode()
+                    if result == 0:
+                        output = output + self.child.before.decode() + self.child.after.decode()
+                    if result == 1:
+                        output = output + self.child.before.decode()
             else:
                 self.child.expect(expects)
                 self.child.sendline(commands)
                 output = output + self.child.before.decode() + self.child.after.decode()
             expects = [expected, prompt, pexpect.EOF]
             results = self.child.expect(expects)
-            match results:
-                case 0:
-                    self.child.close()
-                    self.result = True
+            if results == 0:
+                self.child.close()
+                self.result = True
+                output = output + self.child.before.decode() + self.child.after.decode()
+                output = output.lstrip()
+                self.output = output
+                return True
+            if results in [1, 2]:
+                self.child.close()
+                self.result = False
+                if results == 1:
                     output = output + self.child.before.decode() + self.child.after.decode()
-                    output = output.lstrip()
-                    self.output = output
-                    return True
-                case 1 | 2:
-                    self.child.close()
-                    self.result = False
-                    if results == 1:
-                        output = output + self.child.before.decode() + self.child.after.decode()
-                    elif results == 2:
-                        output = output + self.child.before.decode()
-                    output = output.lstrip()
-                    self.output = output
-                    return False
+                elif results == 2:
+                    output = output + self.child.before.decode()
+                output = output.lstrip()
+                self.output = output
+                return False
         else:
             self.result = None
             self.output = connect
@@ -253,32 +248,31 @@ class node:
         for i in range(0, loops):
             while True:
                 results = child.expect(expects)
-                match results:
-                    case 0:
-                        if self.protocol == "ssh":
-                            child.sendline('yes')
-                        elif self.protocol == "telnet":
-                            if self.user != '':
-                                child.sendline(self.user)
-                            else:
-                                self.missingtext = True
-                                break
-                    case 1 | 2 | 3 | 4 | 5 | 6 | 7 | 12 | 13:
-                        child.close()
-                        return "Connection failed code:" + str(results)
-                    case 8:
-                        if len(passwords) > 0:
-                            child.sendline(passwords[i])
+                if results == 0:
+                    if self.protocol == "ssh":
+                        child.sendline('yes')
+                    elif self.protocol == "telnet":
+                        if self.user != '':
+                            child.sendline(self.user)
                         else:
                             self.missingtext = True
-                        break
-                    case 9 | 11:
-                        endloop = True
-                        child.sendline()
-                        break
-                    case 10:
-                        child.sendline("\r")
-                        sleep(2)
+                            break
+                if results in  [1, 2, 3, 4, 5, 6, 7, 12, 13]:
+                    child.close()
+                    return "Connection failed code:" + str(results)
+                if results == 8:
+                    if len(passwords) > 0:
+                        child.sendline(passwords[i])
+                    else:
+                        self.missingtext = True
+                    break
+                if results in [9, 11]:
+                    endloop = True
+                    child.sendline()
+                    break
+                if results == 10:
+                    child.sendline("\r")
+                    sleep(2)
             if endloop:
                 break
         child.readline(0)
