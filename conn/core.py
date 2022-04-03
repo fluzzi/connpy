@@ -247,9 +247,8 @@ class node:
                            -- work for most nodes. Change it if your connection 
                            -- need some special symbol.
 
-        Returns: 
-
-            bool -> true if expected value is found after running the commands 
+        ### Returns: 
+            bool -- true if expected value is found after running the commands 
                     false if prompt is found before.
 
         '''
