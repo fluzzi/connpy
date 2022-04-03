@@ -16,37 +16,45 @@ import threading
 class node:
     ''' This class generates a node object. Containts all the information and methods to connect and interact with a device using ssh or telnet.
 
-    Attributes:  
+    ### Attributes:  
 
-        - output (str) -- Output of the commands you ran with run or test 
-                       -- method.  
-        - result(bool) -- True if expected value is found after running 
-                       -- the commands using test method.
+        - output (str): Output of the commands you ran with run or test 
+                        method.  
+
+        - result(bool): True if expected value is found after running 
+                        the commands using test method.
         '''
     
     def __init__(self, unique, host, options='', logs='', password='', port='', protocol='', user='', config=''):
         ''' 
             
-        Parameters:  
+        ### Parameters:  
 
-            - unique   (str) -- Unique name to assign to the node.  
-            - host     (str) -- IP address or hostname of the node.  
+            - unique (str): Unique name to assign to the node.
 
-        Optional Parameters:  
+            - host   (str): IP address or hostname of the node.
 
-            - options  (str) -- Additional options to pass the ssh/telnet for
-                             -- connection.  
-            - logs     (str) -- Path/file for storing the logs. You can use 
-                             -- ${unique},${host}, ${port}, ${user}, ${protocol} 
-                             -- as variables.  
-            - password (str) -- Encrypted or plaintext password.  
-            - port     (str) -- Port to connect to node, default 22 for ssh and 23 
-                             -- for telnet.  
-            - protocol (str) -- Select ssh or telnet. Default is ssh.  
-            - user     (str) -- Username to of the node.  
-            - config   (obj) -- Pass the object created with class configfile with 
-                             -- key for decryption and extra configuration if you 
-                             -- are using connection manager.  
+        ### Optional Parameters:  
+
+            - options  (str): Additional options to pass the ssh/telnet for
+                              connection.  
+
+            - logs     (str): Path/file for storing the logs. You can use 
+                              ${unique},${host}, ${port}, ${user}, ${protocol} 
+                              as variables.  
+
+            - password (str): Encrypted or plaintext password.  
+
+            - port     (str): Port to connect to node, default 22 for ssh and 23 
+                              for telnet.  
+
+            - protocol (str): Select ssh or telnet. Default is ssh.  
+
+            - user     (str): Username to of the node.  
+
+            - config   (obj): Pass the object created with class configfile with 
+                              key for decryption and extra configuration if you 
+                              are using connection manager.  
         '''
         if config == '':
             self.idletime = 0
@@ -140,10 +148,10 @@ class node:
         '''
         Allow user to interact with the node directly, mostly used by connection manager.
 
-        Optional Parameters:  
+        ### Optional Parameters:  
 
-            - debug (bool) -- If True, display all the connecting information 
-                           -- before interact. Default False.  
+            - debug (bool): If True, display all the connecting information 
+                            before interact. Default False.  
         '''
         connect = self._connect(debug = debug)
         if connect == True:
@@ -167,26 +175,28 @@ class node:
         '''
         Run a command or list of commands on the node and return the output.
 
-        Parameters:  
+        ### Parameters:  
 
-            - commands (str/list) -- Commands to run on the node. Should be 
-                                  -- str or a list of str.
+            - commands (str/list): Commands to run on the node. Should be 
+                                   str or a list of str.
 
-        Optional Named Parameters:  
+        ### Optional Named Parameters:  
 
-            - folder (str)  -- Path where output log should be stored, leave 
-                            -- empty to disable logging.  
-            - prompt (str)  -- Prompt to be expected after a command is finished 
-                            -- running. Usually linux uses  ">" or EOF while 
-                            -- routers use ">" or "#". The default value should 
-                            -- work for most nodes. Change it if your connection 
-                            -- need some special symbol.  
-            - stdout (bool) -- Set True to send the command output to stdout. 
-                            -- default False.
+            - folder (str): Path where output log should be stored, leave 
+                            empty to disable logging.  
 
-        Returns:  
+            - prompt (str): Prompt to be expected after a command is finished 
+                            running. Usually linux uses  ">" or EOF while 
+                            routers use ">" or "#". The default value should 
+                            work for most nodes. Change it if your connection 
+                            need some special symbol.  
 
-            str -> Output of the commands you ran on the node.
+            - stdout (bool):Set True to send the command output to stdout. 
+                            default False.
+
+        ### Returns:  
+
+            str: Output of the commands you ran on the node.
 
         '''
         connect = self._connect()
@@ -232,24 +242,25 @@ class node:
         '''
         Run a command or list of commands on the node, then check if expected value appears on the output after the last command.
 
-        Parameters:  
+        ### Parameters:  
 
-            - commands (str/list) -- Commands to run on the node. Should be
-                                  -- str or list of str.  
-            - expected (str)      -- Expected text to appear after running 
-                                  -- all the commands on the node.
+            - commands (str/list): Commands to run on the node. Should be
+                                   str or list of str.  
 
-        Optional Named Parameters: 
+            - expected (str)     : Expected text to appear after running 
+                                   all the commands on the node.
 
-            - prompt (str) -- Prompt to be expected after a command is finished
-                           -- running. Usually linux uses  ">" or EOF while 
-                           -- routers use ">" or "#". The default value should 
-                           -- work for most nodes. Change it if your connection 
-                           -- need some special symbol.
+        ### Optional Named Parameters: 
+
+            - prompt (str): Prompt to be expected after a command is finished
+                            running. Usually linux uses  ">" or EOF while 
+                            routers use ">" or "#". The default value should 
+                            work for most nodes. Change it if your connection 
+                            need some special symbol.
 
         ### Returns: 
-            bool -- true if expected value is found after running the commands 
-                    false if prompt is found before.
+            bool: true if expected value is found after running the commands 
+                  false if prompt is found before.
 
         '''
         connect = self._connect()
@@ -402,7 +413,7 @@ class nodes:
                             port(str), protocol(str), user(str).  
                             For reference on subkeys check node class.
 
-        Optional Parameters:  
+        ### Optional Parameters:  
 
             - config (obj): Pass the object created with class configfile with key 
                             for decryption and extra configuration if you are using 
@@ -426,17 +437,34 @@ class nodes:
         '''
         Run a command or list of commands on all the nodes in nodelist.
 
-        Parameters:  
-            commands (str/list): Commands to run on the node. Should be a str or a list of str.
+        ### Parameters:  
 
-        Optional Named Parameters:  
-            folder   (str): Path where output log should be stored, leave empty to disable logging.  
-            prompt   (str): Prompt to be expected after a command is finished running. Usually linux uses  ">" or EOF while routers use ">" or "#". The default value should work for most nodes. Change it if your connection need some special symbol.  
-            stdout   (bool): Set True to send the command output to stdout. default False.  
-            parallel (int): Number of nodes to run the commands simultaneously. Default is 10, if there are more nodes that this value, nodes are groups in groups with max this number of members.
+            commands (str/list): Commands to run on the node. Should be str or 
+                                 list of str.
 
-        Returns:  
-            dict: Dictionary formed by nodes unique as keys, Output of the commands you ran on the node as value.
+        ### Optional Named Parameters:  
+
+            folder   (str): Path where output log should be stored, leave empty 
+                            to disable logging.  
+
+            prompt   (str): Prompt to be expected after a command is finished 
+                            running. Usually linux uses  ">" or EOF while routers 
+                            use ">" or "#". The default value should work for 
+                            most nodes. Change it if your connection need some 
+                            special symbol.  
+
+            stdout  (bool): Set True to send the command output to stdout. 
+                            Default False.  
+
+            parallel (int): Number of nodes to run the commands simultaneously. 
+                            Default is 10, if there are more nodes that this 
+                            value, nodes are groups in groups with max this 
+                            number of members.
+
+        ###Returns:  
+
+            dict: Dictionary formed by nodes unique as keys, Output of the 
+                  commands you ran on the node as value.
 
         '''
         args = {}
@@ -466,15 +494,27 @@ class nodes:
         '''
         Run a command or list of commands on all the nodes in nodelist, then check if expected value appears on the output after the last command.
 
-        Parameters:  
-            commands (str/list): Commands to run on the node. Should be a str or a list of str.  
-            commands (str): Expected text to appear after running all the commands on the node.
+        ### Parameters:  
 
-        Optional Named Parameters:  
-            prompt   (str): Prompt to be expected after a command is finished running. Usually linux uses  ">" or EOF while routers use ">" or "#". The default value should work for most nodes. Change it if your connection need some special symbol.
+            commands (str/list): Commands to run on the node. Should be str or 
+                                 list of str.  
 
-        Returns:  
-            dict: Dictionary formed by nodes unique as keys, value is True if expected value is found after running the commands, False if prompt is found before.
+            expected (str)     : Expected text to appear after running all the 
+                                 commands on the node.
+
+        ### Optional Named Parameters:  
+
+            prompt (str): Prompt to be expected after a command is finished 
+                          running. Usually linux uses  ">" or EOF while 
+                          routers use ">" or "#". The default value should 
+                          work for most nodes. Change it if your connection 
+                          need some special symbol.
+
+        ### Returns:  
+
+            dict: Dictionary formed by nodes unique as keys, value is True if 
+                  expected value is found after running the commands, False 
+                  if prompt is found before.
 
         '''
         args = {}
