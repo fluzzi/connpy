@@ -9,15 +9,25 @@ import argparse
 import sys
 import inquirer
 import json
-from conn import *
+from .core import node
 
 
 #functions and classes
 
 class connapp:
-    # Class that starts the connection manager app.
-    def __init__(self, config, node):
-        #Define the parser for the arguments
+    ''' This class starts the connection manager app. It's normally used by connection manager but you can use it on a script to run the connection manager your way and use a different configfile and key.
+        '''
+
+    def __init__(self, config):
+        ''' 
+            
+        ### Parameters:  
+
+            - config (obj): Object generated with configfile class, it contains
+                            the nodes configuration and the methods to manage
+                            the config file.
+
+        '''
         self.node = node
         self.config = config
         self.nodes = self._getallnodes()
@@ -134,7 +144,7 @@ class connapp:
                     self.config._folder_del(**uniques)
                 else:
                     self.config._connections_del(**uniques)
-                self.config.saveconfig(self.config.file)
+                self.config._saveconfig(self.config.file)
                 print("{} deleted succesfully".format(matches[0]))
         elif args.action == "add":
             if args.data == None:
@@ -166,7 +176,7 @@ class connapp:
                             print("Folder {} not found".format(uniques["folder"]))
                             exit(2)
                     self.config._folder_add(**uniques)
-                    self.config.saveconfig(self.config.file)
+                    self.config._saveconfig(self.config.file)
                     print("{} added succesfully".format(args.data))
                         
                 if type == "node":
@@ -187,7 +197,7 @@ class connapp:
                     if newnode == False:
                         exit(7)
                     self.config._connections_add(**newnode)
-                    self.config.saveconfig(self.config.file)
+                    self.config._saveconfig(self.config.file)
                     print("{} added succesfully".format(args.data))
         elif args.action == "show":
             if args.data == None:
@@ -227,7 +237,7 @@ class connapp:
                 return
             else:
                 self.config._connections_add(**updatenode)
-                self.config.saveconfig(self.config.file)
+                self.config._saveconfig(self.config.file)
                 print("{} edited succesfully".format(args.data))
 
 
@@ -252,7 +262,7 @@ class connapp:
             confirm = inquirer.prompt(question)
             if confirm["delete"]:
                 self.config._profiles_del(id = matches[0])
-                self.config.saveconfig(self.config.file)
+                self.config._saveconfig(self.config.file)
                 print("{} deleted succesfully".format(matches[0]))
         elif args.action == "show":
             matches = list(filter(lambda k: k == args.data[0], self.profiles))
@@ -276,7 +286,7 @@ class connapp:
             if newprofile == False:
                 exit(7)
             self.config._profiles_add(**newprofile)
-            self.config.saveconfig(self.config.file)
+            self.config._saveconfig(self.config.file)
             print("{} added succesfully".format(args.data[0]))
         elif args.action == "mod":
             matches = list(filter(lambda k: k == args.data[0], self.profiles))
@@ -297,7 +307,7 @@ class connapp:
                 return
             else:
                 self.config._profiles_add(**updateprofile)
-                self.config.saveconfig(self.config.file)
+                self.config._saveconfig(self.config.file)
                 print("{} edited succesfully".format(args.data[0]))
     
     def _func_others(self, args):
@@ -331,7 +341,7 @@ class connapp:
             self.config._connections_add(**newnode)
             if args.command == "move":
                self.config._connections_del(**olduniques) 
-            self.config.saveconfig(self.config.file)
+            self.config._saveconfig(self.config.file)
             if args.command == "move":
                 print("{} moved succesfully to {}".format(args.data[0],args.data[1]))
             if args.command == "cp":
@@ -375,7 +385,7 @@ class connapp:
                 self.config._connections_add(**newnode)
                 self.nodes = self._getallnodes()
             if count > 0:
-                self.config.saveconfig(self.config.file)
+                self.config._saveconfig(self.config.file)
                 print("Succesfully added {} nodes".format(count))
             else:
                 print("0 nodes added")
@@ -392,7 +402,7 @@ class connapp:
                     if args.data[0] < 0:
                         args.data[0] = 0
                 self.config.config[args.command] = args.data[0]
-                self.config.saveconfig(self.config.file)
+                self.config._saveconfig(self.config.file)
                 print("Config saved")
 
     def _choose(self, list, name, action):
@@ -759,7 +769,23 @@ complete -o nosort -F _conn conn
         return nodes
 
     def encrypt(self, password, keyfile=None):
-        #Encrypt password using keyfile
+        '''
+        Encrypts password using RSA keyfile
+
+        ### Parameters:  
+
+            - password (str): Plaintext password to encrypt.
+
+        ### Optional Parameters:  
+
+            - keyfile  (str): Path/file to keyfile. Default is config keyfile.
+                              
+
+        ### Returns:  
+
+            str: Encrypted password.
+
+        '''
         if keyfile is None:
             keyfile = self.config.key
         key = RSA.import_key(open(keyfile).read())
@@ -768,9 +794,3 @@ complete -o nosort -F _conn conn
         password = encryptor.encrypt(password.encode("utf-8"))
         return str(password)
 
-def main():
-    conf = configfile()
-    connapp(conf, node)
-
-if __name__ == '__main__':
-    sys.exit(main())
