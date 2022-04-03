@@ -1,6 +1,18 @@
 #!/usr/bin/env python3
 '''
 ## Connection manager
+
+conn is a connection manager that allows you to store nodes to connect them fast and password free.
+
+### Features
+    - You can generate profiles and reference them from nodes using @profilename 
+      so you dont need to edit multiple nodes when changing password or other 
+      information.
+    - Nodes can be stored on @folder or @subfolder@folder to organize your 
+      devices. Then can be referenced using node@subfolder@folder or node@folder
+    - Much more!
+
+### Usage
 ```
 usage: conn [-h] [--add | --del | --mod | --show | --debug] [node|folder]
        conn {profile,move,mv,copy,cp,list,ls,bulk,config} ...
@@ -27,7 +39,7 @@ Commands:
   config         Manage app config
 ```
 
-####   Manage profiles
+###   Manage profiles
 ```
 usage: conn profile [-h] (--add | --del | --mod | --show) profile
 
@@ -42,7 +54,7 @@ options:
   --show         Show profile
 ```
 
-####   Examples
+###   Examples
 ```
    conn profile --add office-user
    conn --add @office
@@ -53,15 +65,68 @@ options:
    conn pc@office
    conn server
 ``` 
+
+## Automation module
+the automation module
+
+### Standalone module
+```
+import conn
+router = conn.node("unique name","ip/hostname", user="username", password="pass")
+router.run(["term len 0","show run"])
+print(router.output)
+hasip = router.test("show ip int brief","1.1.1.1")
+if hasip:
+    print("Router has ip 1.1.1.1")
+else:
+    print("router don't has ip 1.1.1.1")
+```
+
+### Using manager configuration
+```
+import conn
+conf = conn.configfile()
+device = conf.getitem("server@office")
+server = conn.node("unique name", **device, config=conf)
+result = server.run(["cd /", "ls -la"])
+print(result)
+```
+### Running parallel tasks 
+```
+import conn
+conf = conn.configfile()
+#You can get the nodes from the config from a folder and fitlering in it
+nodes = conf.getitem("@office", ["router1", "router2", "router3"])
+#You can also get each node individually:
+nodes = {}
+nodes["router1"] = conf.getitem("router1@office")
+nodes["router2"] = conf.getitem("router2@office")
+nodes["router10"] = conf.getitem("router10@datacenter")
+#Also, you can create the nodes manually:
+nodes = {}
+nodes["router1"] = {"host": "1.1.1.1", "user": "username", "password": "pass1"}
+nodes["router2"] = {"host": "1.1.1.2", "user": "username", "password": "pass2"}
+nodes["router3"] = {"host": "1.1.1.2", "user": "username", "password": "pass3"}
+#Finally you run some tasks on the nodes
+mynodes = conn.nodes(nodes, config = conf)
+result = mynodes.test(["show ip int br"], "1.1.1.2")
+for i in result:
+    print("---" + i + "---")
+    print(result[i])
+    print()
+# Or for one specific node
+mynodes.router1.run(["term len 0". "show run"], folder = "/home/user/logs")
+```
+
 '''
 from .core import node,nodes
 from .configfile import configfile
+from .connapp import connapp
 from pkg_resources import get_distribution
 
-__all__ = ["node", "nodes", "configfile"]
+__all__ = ["node", "nodes", "configfile", "connapp"]
 __version__ = "2.0.10"
 __author__ = "Federico Luzzi"
 __pdoc__ = {
     'core': False,
-    'connapp': False,
 }
