@@ -9,11 +9,12 @@ import argparse
 import sys
 import inquirer
 import json
+from conn import *
+
 
 #functions and classes
 
 class connapp:
-
     def __init__(self, config, node):
         self.node = node
         self.config = config
@@ -27,7 +28,7 @@ class connapp:
         #NODEPARSER
         nodeparser = subparsers.add_parser("node",usage=self._help("usage"), help=self._help("node"),epilog=self._help("end"), formatter_class=argparse.RawTextHelpFormatter) 
         nodecrud = nodeparser.add_mutually_exclusive_group()
-        nodeparser.add_argument("node", metavar="node|folder", nargs='?', default=None, action=self.store_type, type=self._type_node, help=self._help("node"))
+        nodeparser.add_argument("node", metavar="node|folder", nargs='?', default=None, action=self._store_type, type=self._type_node, help=self._help("node"))
         nodecrud.add_argument("--add", dest="action", action="store_const", help="Add new node[@subfolder][@folder] or [@subfolder]@folder", const="add", default="connect")
         nodecrud.add_argument("--del", "--rm", dest="action", action="store_const", help="Delete node[@subfolder][@folder] or [@subfolder]@folder", const="del", default="connect")
         nodecrud.add_argument("--mod", "--edit", dest="action", action="store_const", help="Modify node[@subfolder][@folder]", const="mod", default="connect")
@@ -36,7 +37,7 @@ class connapp:
         nodeparser.set_defaults(func=self._func_node)
         #PROFILEPARSER
         profileparser = subparsers.add_parser("profile", help="Manage profiles") 
-        profileparser.add_argument("profile", nargs=1, action=self.store_type, type=self._type_profile, help="Name of profile to manage")
+        profileparser.add_argument("profile", nargs=1, action=self._store_type, type=self._type_profile, help="Name of profile to manage")
         profilecrud = profileparser.add_mutually_exclusive_group(required=True)
         profilecrud.add_argument("--add", dest="action", action="store_const", help="Add new profile", const="add")
         profilecrud.add_argument("--del", "--rm", dest="action", action="store_const", help="Delete profile", const="del")
@@ -45,25 +46,25 @@ class connapp:
         profileparser.set_defaults(func=self._func_profile)
         #MOVEPARSER
         moveparser = subparsers.add_parser("move", aliases=["mv"], help="Move node") 
-        moveparser.add_argument("move", nargs=2, action=self.store_type, help="Move node[@subfolder][@folder] dest_node[@subfolder][@folder]", default="move", type=self._type_node)
+        moveparser.add_argument("move", nargs=2, action=self._store_type, help="Move node[@subfolder][@folder] dest_node[@subfolder][@folder]", default="move", type=self._type_node)
         moveparser.set_defaults(func=self._func_others)
         #COPYPARSER
         copyparser = subparsers.add_parser("copy", aliases=["cp"], help="Copy node") 
-        copyparser.add_argument("cp", nargs=2, action=self.store_type, help="Copy node[@subfolder][@folder] new_node[@subfolder][@folder]", default="cp", type=self._type_node)
+        copyparser.add_argument("cp", nargs=2, action=self._store_type, help="Copy node[@subfolder][@folder] new_node[@subfolder][@folder]", default="cp", type=self._type_node)
         copyparser.set_defaults(func=self._func_others)
         #LISTPARSER
         lsparser = subparsers.add_parser("list", aliases=["ls"], help="List profiles, nodes or folders") 
-        lsparser.add_argument("ls", action=self.store_type, choices=["profiles","nodes","folders"], help="List profiles, nodes or folders", default=False)
+        lsparser.add_argument("ls", action=self._store_type, choices=["profiles","nodes","folders"], help="List profiles, nodes or folders", default=False)
         lsparser.set_defaults(func=self._func_others)
         #BULKPARSER
         bulkparser = subparsers.add_parser("bulk", help="Add nodes in bulk") 
-        bulkparser.add_argument("bulk", const="bulk", nargs=0, action=self.store_type, help="Add nodes in bulk")
+        bulkparser.add_argument("bulk", const="bulk", nargs=0, action=self._store_type, help="Add nodes in bulk")
         bulkparser.set_defaults(func=self._func_others)
         #CONFIGPARSER
         configparser = subparsers.add_parser("config", help="Manage app config") 
-        configparser.add_argument("--allow-uppercase", dest="case", nargs=1, action=self.store_type, help="Allow case sensitive names", choices=["true","false"])
-        configparser.add_argument("--keepalive", dest="idletime", nargs=1, action=self.store_type, help="Set keepalive time in seconds, 0 to disable", type=int, metavar="INT")
-        configparser.add_argument("--completion", dest="completion", nargs=0, action=self.store_type, help="Get bash completion configuration for conn")
+        configparser.add_argument("--allow-uppercase", dest="case", nargs=1, action=self._store_type, help="Allow case sensitive names", choices=["true","false"])
+        configparser.add_argument("--keepalive", dest="idletime", nargs=1, action=self._store_type, help="Set keepalive time in seconds, 0 to disable", type=int, metavar="INT")
+        configparser.add_argument("--completion", dest="completion", nargs=0, action=self._store_type, help="Get bash completion configuration for conn")
         configparser.set_defaults(func=self._func_others)
         #Set default subparser and tune arguments
         commands = ["node", "profile", "mv", "move","copy", "cp", "bulk", "ls", "list", "config"]
@@ -76,7 +77,7 @@ class connapp:
         args = defaultparser.parse_args()
         args.func(args)
 
-    class store_type(argparse.Action):
+    class _store_type(argparse.Action):
         def __call__(self, parser, args, values, option_string=None):
             setattr(args, "data", values)
             delattr(args,self.dest)
@@ -740,3 +741,10 @@ complete -o nosort -F _conn conn
         encryptor = PKCS1_OAEP.new(publickey)
         password = encryptor.encrypt(password.encode("utf-8"))
         return str(password)
+
+def main():
+    conf = configfile()
+    connapp(conf, node)
+
+if __name__ == '__main__':
+    sys.exit(main())

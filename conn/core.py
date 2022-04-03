@@ -14,7 +14,40 @@ import threading
 #functions and classes
 
 class node:
-    def __init__(self, unique, host, options='', logs='', password='', port='', protocol='', type='', user='', config=''):
+    ''' This class generates a node object. Containts all the information and methods to connect and interact with a device using ssh or telnet.
+
+    Attributes:  
+
+        - output (str) -- Output of the commands you ran with run or test 
+                       -- method.  
+        - result(bool) -- True if expected value is found after running 
+                       -- the commands using test method.
+        '''
+    
+    def __init__(self, unique, host, options='', logs='', password='', port='', protocol='', user='', config=''):
+        ''' 
+            
+        Parameters:  
+
+            - unique   (str) -- Unique name to assign to the node.  
+            - host     (str) -- IP address or hostname of the node.  
+
+        Optional Parameters:  
+
+            - options  (str) -- Additional options to pass the ssh/telnet for
+                             -- connection.  
+            - logs     (str) -- Path/file for storing the logs. You can use 
+                             -- ${unique},${host}, ${port}, ${user}, ${protocol} 
+                             -- as variables.  
+            - password (str) -- Encrypted or plaintext password.  
+            - port     (str) -- Port to connect to node, default 22 for ssh and 23 
+                             -- for telnet.  
+            - protocol (str) -- Select ssh or telnet. Default is ssh.  
+            - user     (str) -- Username to of the node.  
+            - config   (obj) -- Pass the object created with class configfile with 
+                             -- key for decryption and extra configuration if you 
+                             -- are using connection manager.  
+        '''
         if config == '':
             self.idletime = 0
             self.key = None
@@ -22,7 +55,6 @@ class node:
             self.idletime = config.config["idletime"]
             self.key = config.key
         self.unique = unique
-        self.id = self.unique.split("@")[0]
         attr = {"host": host, "logs": logs, "options":options, "port": port, "protocol": protocol, "user": user}
         for key in attr:
             profile = re.search("^@(.*)", attr[key])
@@ -45,6 +77,7 @@ class node:
             self.password = [password]
 
     def __passtx(self, passwords, *, keyfile=None):
+        # decrypts passwords, used by other methdos.
         dpass = []
         if keyfile is None:
             keyfile = self.key
@@ -65,9 +98,9 @@ class node:
     
 
     def _logfile(self, logfile = None):
+        # translate logs variables and generate logs path.
         if logfile == None:
             logfile = self.logs
-        logfile = logfile.replace("${id}", self.id)
         logfile = logfile.replace("${unique}", self.unique)
         logfile = logfile.replace("${host}", self.host)
         logfile = logfile.replace("${port}", self.port)
@@ -80,13 +113,14 @@ class node:
         return logfile
 
     def _logclean(self, logfile, var = False):
+        #Remove special ascii characters and other stuff from logfile.
         if var == False:
             t = open(logfile, "r").read()
         else:
             t = logfile
         t = t.replace("\n","",1).replace("\a","")
         t = t.replace('\n\n', '\n')
-        t = re.sub('.\[K', '', t)
+        t = re.sub(r'.\[K', '', t)
         while True:
             tb = re.sub('.\b', '', t, count=1)
             if len(t) == len(tb):
@@ -103,6 +137,14 @@ class node:
             return t
 
     def interact(self, debug = False):
+        '''
+        Allow user to interact with the node directly, mostly used by connection manager.
+
+        Optional Parameters:  
+
+            - debug (bool) -- If True, display all the connecting information 
+                           -- before interact. Default False.  
+        '''
         connect = self._connect(debug = debug)
         if connect == True:
             size = re.search('columns=([0-9]+).*lines=([0-9]+)',str(os.get_terminal_size()))
@@ -121,7 +163,32 @@ class node:
             print(connect)
             exit(1)
 
-    def run(self, commands,*, folder = '', prompt = '>$|#$|\$$|>.$|#.$|\$.$', stdout = False):
+    def run(self, commands,*, folder = '', prompt = r'>$|#$|\$$|>.$|#.$|\$.$', stdout = False):
+        '''
+        Run a command or list of commands on the node and return the output.
+
+        Parameters:  
+
+            - commands (str/list) -- Commands to run on the node. Should be 
+                                  -- str or a list of str.
+
+        Optional Named Parameters:  
+
+            - folder (str)  -- Path where output log should be stored, leave 
+                            -- empty to disable logging.  
+            - prompt (str)  -- Prompt to be expected after a command is finished 
+                            -- running. Usually linux uses  ">" or EOF while 
+                            -- routers use ">" or "#". The default value should 
+                            -- work for most nodes. Change it if your connection 
+                            -- need some special symbol.  
+            - stdout (bool) -- Set True to send the command output to stdout. 
+                            -- default False.
+
+        Returns:  
+
+            str -> Output of the commands you ran on the node.
+
+        '''
         connect = self._connect()
         if connect == True:
             expects = [prompt, pexpect.EOF]
@@ -161,7 +228,31 @@ class node:
             self.output = connect
             return connect
 
-    def test(self, commands, expected, *, prompt = '>$|#$|\$$|>.$|#.$|\$.$'):
+    def test(self, commands, expected, *, prompt = r'>$|#$|\$$|>.$|#.$|\$.$'):
+        '''
+        Run a command or list of commands on the node, then check if expected value appears on the output after the last command.
+
+        Parameters:  
+
+            - commands (str/list) -- Commands to run on the node. Should be
+                                  -- str or list of str.  
+            - expected (str)      -- Expected text to appear after running 
+                                  -- all the commands on the node.
+
+        Optional Named Parameters: 
+
+            - prompt (str) -- Prompt to be expected after a command is finished
+                           -- running. Usually linux uses  ">" or EOF while 
+                           -- routers use ">" or "#". The default value should 
+                           -- work for most nodes. Change it if your connection 
+                           -- need some special symbol.
+
+        Returns: 
+
+            bool -> true if expected value is found after running the commands 
+                    false if prompt is found before.
+
+        '''
         connect = self._connect()
         if connect == True:
             expects = [prompt, pexpect.EOF]
@@ -203,6 +294,7 @@ class node:
             return connect
 
     def _connect(self, debug = False):
+        # Method to connect to the node, it parse all the information, create the ssh/telnet command and login to the node.
         if self.protocol == "ssh":
             cmd = "ssh"
             if self.idletime > 0:
@@ -221,7 +313,7 @@ class node:
                 passwords = self.__passtx(self.password)
             else:
                 passwords = []
-            expects = ['yes/no', 'refused', 'supported', 'cipher', 'sage', 'timeout', 'unavailable', 'closed', '[p|P]assword:|[u|U]sername:', '>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, "No route to host", "resolve hostname"]
+            expects = ['yes/no', 'refused', 'supported', 'cipher', 'sage', 'timeout', 'unavailable', 'closed', '[p|P]assword:|[u|U]sername:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, "No route to host", "resolve hostname", "no matching host key"]
         elif self.protocol == "telnet":
             cmd = "telnet " + self.host
             if self.port != '':
@@ -234,7 +326,7 @@ class node:
                 passwords = self.__passtx(self.password)
             else:
                 passwords = []
-            expects = ['[u|U]sername:', 'refused', 'supported', 'cipher', 'sage', 'timeout', 'unavailable', 'closed', '[p|P]assword:', '>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, "No route to host", "resolve hostname"]
+            expects = ['[u|U]sername:', 'refused', 'supported', 'cipher', 'sage', 'timeout', 'unavailable', 'closed', '[p|P]assword:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, "No route to host", "resolve hostname", "no matching host key"]
         else:
             raise ValueError("Invalid protocol: " + self.protocol)
         child = pexpect.spawn(cmd)
@@ -257,7 +349,7 @@ class node:
                         else:
                             self.missingtext = True
                             break
-                if results in  [1, 2, 3, 4, 5, 6, 7, 12, 13]:
+                if results in  [1, 2, 3, 4, 5, 6, 7, 12, 13, 14]:
                     child.close()
                     return "Connection failed code:" + str(results)
                 if results == 8:
@@ -280,7 +372,43 @@ class node:
         return True
 
 class nodes:
+    ''' This class generates a nodes object. Contains a list of node class objects and methods to run multiple tasks on nodes simultaneously.
+
+    ### Attributes:  
+
+        - nodelist (list): List of node class objects passed to the init 
+                           function.  
+
+        - output   (dict): Dictionary formed by nodes unique as keys, 
+                           output of the commands you ran on the node as 
+                           value. Created after running methods run or test.  
+
+        - result   (dict): Dictionary formed by nodes unique as keys, value 
+                           is True if expected value is found after running 
+                           the commands, False if prompt is found before. 
+                           Created after running method test.  
+
+        - <unique> (obj):  For each item in nodelist, there is an attribute
+                           generated with the node unique.
+        '''
+
     def __init__(self, nodes: dict, config = ''):
+        ''' 
+        ### Parameters:  
+
+            - nodes (dict): Dictionary formed by node information:  
+                            Keys: Unique name for each node.  
+                            Mandatory Subkeys: host(str).  
+                            Optional Subkeys: options(str), logs(str), password(str),
+                            port(str), protocol(str), user(str).  
+                            For reference on subkeys check node class.
+
+        Optional Parameters:  
+
+            - config (obj): Pass the object created with class configfile with key 
+                            for decryption and extra configuration if you are using 
+                            connection manager.
+        '''
         self.nodelist = []
         self.config = config
         for n in nodes:
@@ -289,12 +417,29 @@ class nodes:
             setattr(self,n,this)
 
     
-    def splitlist(self, lst, n):
+    def _splitlist(self, lst, n):
+        #split a list in lists of n members.
         for i in range(0, len(lst), n):
             yield lst[i:i + n]
 
 
     def run(self, commands,*, folder = None, prompt = None, stdout = None, parallel = 10):
+        '''
+        Run a command or list of commands on all the nodes in nodelist.
+
+        Parameters:  
+            commands (str/list): Commands to run on the node. Should be a str or a list of str.
+
+        Optional Named Parameters:  
+            folder   (str): Path where output log should be stored, leave empty to disable logging.  
+            prompt   (str): Prompt to be expected after a command is finished running. Usually linux uses  ">" or EOF while routers use ">" or "#". The default value should work for most nodes. Change it if your connection need some special symbol.  
+            stdout   (bool): Set True to send the command output to stdout. default False.  
+            parallel (int): Number of nodes to run the commands simultaneously. Default is 10, if there are more nodes that this value, nodes are groups in groups with max this number of members.
+
+        Returns:  
+            dict: Dictionary formed by nodes unique as keys, Output of the commands you ran on the node as value.
+
+        '''
         args = {}
         args["commands"] = commands
         if folder != None:
@@ -307,18 +452,32 @@ class nodes:
         tasks = []
         for n in self.nodelist:
             tasks.append(threading.Thread(target=n.run, kwargs=args))
-        taskslist = list(self.splitlist(tasks, parallel))
+        taskslist = list(self._splitlist(tasks, parallel))
         for t in taskslist:
             for i in t:
                 i.start()
             for i in t:
                 i.join()
         for i in self.nodelist:
-            output[i.id] = i.output
+            output[i.unique] = i.output
         self.output = output
         return output
 
     def test(self, commands, expected, *, prompt = None, parallel = 10):
+        '''
+        Run a command or list of commands on all the nodes in nodelist, then check if expected value appears on the output after the last command.
+
+        Parameters:  
+            commands (str/list): Commands to run on the node. Should be a str or a list of str.  
+            commands (str): Expected text to appear after running all the commands on the node.
+
+        Optional Named Parameters:  
+            prompt   (str): Prompt to be expected after a command is finished running. Usually linux uses  ">" or EOF while routers use ">" or "#". The default value should work for most nodes. Change it if your connection need some special symbol.
+
+        Returns:  
+            dict: Dictionary formed by nodes unique as keys, value is True if expected value is found after running the commands, False if prompt is found before.
+
+        '''
         args = {}
         args["commands"] = commands
         args["expected"] = expected
@@ -329,15 +488,15 @@ class nodes:
         tasks = []
         for n in self.nodelist:
             tasks.append(threading.Thread(target=n.test, kwargs=args))
-        taskslist = list(self.splitlist(tasks, parallel))
+        taskslist = list(self._splitlist(tasks, parallel))
         for t in taskslist:
             for i in t:
                 i.start()
             for i in t:
                 i.join()
         for i in self.nodelist:
-            result[i.id] = i.result
-            output[i.id] = i.output
+            result[i.unique] = i.result
+            output[i.unique] = i.output
         self.output = output
         self.result = result
         return result

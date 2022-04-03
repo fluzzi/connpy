@@ -96,6 +96,9 @@ class configfile:
                     folder = self.connections[uniques["folder"]]
                 newfolder = folder.copy()
                 newfolder.pop("type")
+                for node in newfolder.keys():
+                    if "type" in newfolder[node].keys():
+                        newfolder[node].pop("type")
                 if keys == None:
                     return newfolder
                 else:
@@ -109,6 +112,7 @@ class configfile:
                 else:
                     node = self.connections[uniques["id"]]
                 newnode = node.copy()
+                newnode.pop("type")
                 return newnode
 
     def _connections_add(self,*, id, host, folder='', subfolder='', options='', logs='', password='', port='', protocol='', user='', type = "connection" ):
