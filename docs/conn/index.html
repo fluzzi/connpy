@@ -5,7 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
 <meta name="generator" content="pdoc 0.10.0" />
 <title>conn API documentation</title>
-<meta name="description" content="" />
+<meta name="description" content="Connection manager
+```
+usage: conn [-h] [--add | --del | --mod | --show | --debug] [node|folder]
+conn …" />
 <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/sanitize.min.css" integrity="sha256-PK9q560IAAa6WVRRh76LtCaI8pjTJ2z11v0miyNNjrs=" crossorigin>
 <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/typography.min.css" integrity="sha256-7l/o7C8jubJiy74VsKTidCy1yBkRtiUGbVkYBylBqUg=" crossorigin>
 <link rel="stylesheet preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/styles/fundation.min.css" crossorigin>
@@ -22,12 +25,113 @@
 <h1 class="title">Package <code>conn</code></h1>
 </header>
 <section id="section-intro">
+<h2 id="connection-manager">Connection manager</h2>
+<pre><code>usage: conn [-h] [--add | --del | --mod | --show | --debug] [node|folder]
+       conn {profile,move,mv,copy,cp,list,ls,bulk,config} ...
+
+positional arguments:
+  node|folder    node[@subfolder][@folder]
+                 Connect to specific node or show all matching nodes
+                 [@subfolder][@folder]
+                 Show all available connections globaly or in specified path
+Options:
+  -h, --help     show this help message and exit
+  --add          Add new node[@subfolder][@folder] or [@subfolder]@folder
+  --del, --rm    Delete node[@subfolder][@folder] or [@subfolder]@folder
+  --mod, --edit  Modify node[@subfolder][@folder]
+  --show         Show node[@subfolder][@folder]
+  --debug, -d    Display all conections steps
+
+Commands:
+  profile        Manage profiles
+  move (mv)      Move node
+  copy (cp)      Copy node
+  list (ls)      List profiles, nodes or folders
+  bulk           Add nodes in bulk
+  config         Manage app config
+</code></pre>
+<h4 id="manage-profiles">Manage profiles</h4>
+<pre><code>usage: conn profile [-h] (--add | --del | --mod | --show) profile
+
+positional arguments:
+  profile        Name of profile to manage
+
+options:
+  -h, --help     show this help message and exit
+  --add          Add new profile
+  --del, --rm    Delete profile
+  --mod, --edit  Modify profile
+  --show         Show profile
+</code></pre>
+<h4 id="examples">Examples</h4>
+<pre><code>   conn profile --add office-user
+   conn --add @office
+   conn --add @datacenter@office
+   conn --add server@datacenter@office
+   conn --add pc@office
+   conn --show server@datacenter@office
+   conn pc@office
+   conn server
+</code></pre>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">#!/usr/bin/env python3
 &#39;&#39;&#39;
+## Connection manager
+```
+usage: conn [-h] [--add | --del | --mod | --show | --debug] [node|folder]
+       conn {profile,move,mv,copy,cp,list,ls,bulk,config} ...
+
+positional arguments:
+  node|folder    node[@subfolder][@folder]
+                 Connect to specific node or show all matching nodes
+                 [@subfolder][@folder]
+                 Show all available connections globaly or in specified path
+Options:
+  -h, --help     show this help message and exit
+  --add          Add new node[@subfolder][@folder] or [@subfolder]@folder
+  --del, --rm    Delete node[@subfolder][@folder] or [@subfolder]@folder
+  --mod, --edit  Modify node[@subfolder][@folder]
+  --show         Show node[@subfolder][@folder]
+  --debug, -d    Display all conections steps
+
+Commands:
+  profile        Manage profiles
+  move (mv)      Move node
+  copy (cp)      Copy node
+  list (ls)      List profiles, nodes or folders
+  bulk           Add nodes in bulk
+  config         Manage app config
+```
+
+####   Manage profiles
+```
+usage: conn profile [-h] (--add | --del | --mod | --show) profile
+
+positional arguments:
+  profile        Name of profile to manage
+
+options:
+  -h, --help     show this help message and exit
+  --add          Add new profile
+  --del, --rm    Delete profile
+  --mod, --edit  Modify profile
+  --show         Show profile
+```
+
+####   Examples
+```
+   conn profile --add office-user
+   conn --add @office
+   conn --add @datacenter@office
+   conn --add server@datacenter@office
+   conn --add pc@office
+   conn --show server@datacenter@office
+   conn pc@office
+   conn server
+``` 
 &#39;&#39;&#39;
 from .core import node,nodes
 from .configfile import configfile
@@ -1345,7 +1449,13 @@ expected (str)     : Expected text to appear after running all the
 <nav id="sidebar">
 <h1>Index</h1>
 <div class="toc">
-<ul></ul>
+<ul>
+<li><a href="#connection-manager">Connection manager</a><ul>
+<li><a href="#manage-profiles">Manage profiles</a></li>
+<li><a href="#examples">Examples</a></li>
+</ul>
+</li>
+</ul>
 </div>
 <ul id="index">
 <li><h3><a href="#header-classes">Classes</a></h3>

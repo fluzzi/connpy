@@ -15,7 +15,9 @@ from conn import *
 #functions and classes
 
 class connapp:
+    # Class that starts the connection manager app.
     def __init__(self, config, node):
+        #Define the parser for the arguments
         self.node = node
         self.config = config
         self.nodes = self._getallnodes()
@@ -78,12 +80,14 @@ class connapp:
         args.func(args)
 
     class _store_type(argparse.Action):
+        #Custom store type for cli app.
         def __call__(self, parser, args, values, option_string=None):
             setattr(args, "data", values)
             delattr(args,self.dest)
             setattr(args, "command", self.dest)
 
     def _func_node(self, args):
+        #Function called when connecting or managing nodes.
         if not self.case and args.data != None:
             args.data = args.data.lower()
         if args.action == "connect" or args.action == "debug":
@@ -228,6 +232,7 @@ class connapp:
 
 
     def _func_profile(self, args):
+        #Function called when managing profiles
         if not self.case:
             args.data[0] = args.data[0].lower()
         if args.action == "del":
@@ -296,6 +301,7 @@ class connapp:
                 print("{} edited succesfully".format(args.data[0]))
     
     def _func_others(self, args):
+        #Function called when using other commands
         if args.command == "ls":
             print(*getattr(self, args.data), sep="\n")
         elif args.command == "move" or args.command == "cp":
@@ -390,6 +396,7 @@ class connapp:
                 print("Config saved")
 
     def _choose(self, list, name, action):
+        #Generates an inquirer list to pick
         questions = [inquirer.List(name, message="Pick {} to {}:".format(name,action), choices=list, carousel=True)]
         answer = inquirer.prompt(questions)
         if answer == None:
@@ -398,6 +405,7 @@ class connapp:
             return answer[name]
 
     def _host_validation(self, answers, current, regex = "^.+$"):
+        #Validate hostname in inquirer when managing nodes
         if not re.match(regex, current):
             raise inquirer.errors.ValidationError("", reason="Host cannot be empty")
         if current.startswith("@"):
@@ -406,11 +414,13 @@ class connapp:
         return True
 
     def _profile_protocol_validation(self, answers, current, regex = "(^ssh$|^telnet$|^$)"):
+        #Validate protocol in inquirer when managing profiles
         if not re.match(regex, current):
             raise inquirer.errors.ValidationError("", reason="Pick between ssh, telnet or leave empty")
         return True
 
     def _protocol_validation(self, answers, current, regex = "(^ssh$|^telnet$|^$|^@.+$)"):
+        #Validate protocol in inquirer when managing nodes
         if not re.match(regex, current):
             raise inquirer.errors.ValidationError("", reason="Pick between ssh, telnet, leave empty or @profile")
         if current.startswith("@"):
@@ -419,6 +429,7 @@ class connapp:
         return True
 
     def _profile_port_validation(self, answers, current, regex = "(^[0-9]*$)"):
+        #Validate port in inquirer when managing profiles
         if not re.match(regex, current):
             raise inquirer.errors.ValidationError("", reason="Pick a port between 1-65535, @profile o leave empty")
         try:
@@ -430,6 +441,7 @@ class connapp:
         return True
 
     def _port_validation(self, answers, current, regex = "(^[0-9]*$|^@.+$)"):
+        #Validate port in inquirer when managing nodes
         if not re.match(regex, current):
             raise inquirer.errors.ValidationError("", reason="Pick a port between 1-65535, @profile or leave empty")
         try:
@@ -444,6 +456,7 @@ class connapp:
         return True
 
     def _pass_validation(self, answers, current, regex = "(^@.+$)"):
+        #Validate password in inquirer
         profiles = current.split(",")
         for i in profiles:
             if not re.match(regex, i) or i[1:] not in self.profiles:
@@ -451,12 +464,14 @@ class connapp:
         return True
 
     def _default_validation(self, answers, current):
+        #Default validation type used in multiples questions in inquirer
         if current.startswith("@"):
             if current[1:] not in self.profiles:
                 raise inquirer.errors.ValidationError("", reason="Profile {} don't exist".format(current))
         return True
 
     def _bulk_node_validation(self, answers, current, regex = "^[0-9a-zA-Z_.,$#-]+$"):
+        #Validation of nodes when running bulk command
         if not re.match(regex, current):
             raise inquirer.errors.ValidationError("", reason="Host cannot be empty")
         if current.startswith("@"):
@@ -465,6 +480,7 @@ class connapp:
         return True
 
     def _bulk_folder_validation(self, answers, current):
+        #Validation of folders when running bulk command
         if not self.case:
             current = current.lower()
         matches = list(filter(lambda k: k == current, self.folders))
@@ -473,6 +489,7 @@ class connapp:
         return True
 
     def _bulk_host_validation(self, answers, current, regex = "^.+$"):
+        #Validate hostname when running bulk command
         if not re.match(regex, current):
             raise inquirer.errors.ValidationError("", reason="Host cannot be empty")
         if current.startswith("@"):
@@ -485,6 +502,7 @@ class connapp:
         return True
 
     def _questions_edit(self):
+        #Inquirer questions when editing nodes or profiles
         questions = []
         questions.append(inquirer.Confirm("host", message="Edit Hostname/IP?"))
         questions.append(inquirer.Confirm("protocol", message="Edit Protocol?"))
@@ -497,6 +515,7 @@ class connapp:
         return answers
 
     def _questions_nodes(self, unique, uniques = None, edit = None):
+        #Questions when adding or editing nodes
         try:
             defaults = self.config.getitem(unique)
         except:
@@ -557,6 +576,7 @@ class connapp:
         return result
 
     def _questions_profiles(self, unique, edit = None):
+        #Questions when adding or editing profiles
         try:
             defaults = self.config.profiles[unique]
         except:
@@ -604,6 +624,7 @@ class connapp:
         return result
 
     def _questions_bulk(self):
+        #Questions when using bulk command
         questions = []
         questions.append(inquirer.Text("ids", message="add a comma separated list of nodes to add", validate=self._bulk_node_validation))
         questions.append(inquirer.Text("location", message="Add a @folder, @subfolder@folder or leave empty", validate=self._bulk_folder_validation))
@@ -642,6 +663,7 @@ class connapp:
         return arg_value
 
     def _help(self, type):
+        #Store text for help and other commands
         if type == "node":
             return "node[@subfolder][@folder]\nConnect to specific node or show all matching nodes\n[@subfolder][@folder]\nShow all available connections globaly or in specified path"
         if type == "usage":
@@ -697,6 +719,7 @@ complete -o nosort -F _conn conn
         '''
 
     def _getallnodes(self):
+        #get all nodes on configfile
         nodes = []
         layer1 = [k for k,v in self.config.connections.items() if isinstance(v, dict) and v["type"] == "connection"]
         folders = [k for k,v in self.config.connections.items() if isinstance(v, dict) and v["type"] == "folder"]
@@ -711,6 +734,7 @@ complete -o nosort -F _conn conn
         return nodes
 
     def _getallfolders(self):
+        #get all folders on configfile
         folders = ["@" + k for k,v in self.config.connections.items() if isinstance(v, dict) and v["type"] == "folder"]
         subfolders = []
         for f in folders:
@@ -720,6 +744,7 @@ complete -o nosort -F _conn conn
         return folders
 
     def _profileused(self, profile):
+        #Check if profile is used before deleting it
         nodes = []
         layer1 = [k for k,v in self.config.connections.items() if isinstance(v, dict) and v["type"] == "connection" and ("@" + profile in v.values() or ( isinstance(v["password"],list) and "@" + profile in v["password"]))]
         folders = [k for k,v in self.config.connections.items() if isinstance(v, dict) and v["type"] == "folder"]
@@ -734,6 +759,7 @@ complete -o nosort -F _conn conn
         return nodes
 
     def encrypt(self, password, keyfile=None):
+        #Encrypt password using keyfile
         if keyfile is None:
             keyfile = self.config.key
         key = RSA.import_key(open(keyfile).read())
