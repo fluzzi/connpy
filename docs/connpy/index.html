@@ -84,7 +84,7 @@ options:
 <p>the automation module</p>
 <h3 id="standalone-module">Standalone module</h3>
 <pre><code>import connpy
-router = connpy.node(&quot;unique name&quot;,&quot;ip/hostname&quot;, user=&quot;username&quot;, password=&quot;pass&quot;)
+router = connpy.node(&quot;unique name&quot;,&quot;ip/hostname&quot;, user=&quot;user&quot;, password=&quot;pass&quot;)
 router.run([&quot;term len 0&quot;,&quot;show run&quot;])
 print(router.output)
 hasip = router.test(&quot;show ip int brief&quot;,&quot;1.1.1.1&quot;)
@@ -204,7 +204,7 @@ the automation module
 ### Standalone module
 ```
 import connpy
-router = connpy.node(&#34;unique name&#34;,&#34;ip/hostname&#34;, user=&#34;username&#34;, password=&#34;pass&#34;)
+router = connpy.node(&#34;unique name&#34;,&#34;ip/hostname&#34;, user=&#34;user&#34;, password=&#34;pass&#34;)
 router.run([&#34;term len 0&#34;,&#34;show run&#34;])
 print(router.output)
 hasip = router.test(&#34;show ip int brief&#34;,&#34;1.1.1.1&#34;)
