@@ -701,7 +701,7 @@ _conn()
           if [ "${COMP_WORDS[1]}" = "config" ]; then strings="--allow-uppercase --keepalive --completion --help"; fi
           if [[ "${COMP_WORDS[1]}" =~ ^--mod|--edit|-e|--show|-s|--add|-a|--rm|--del|-r$ ]]; then strings="profile"; fi
           if [[ "${COMP_WORDS[1]}" =~ ^list|ls$ ]]; then strings="profiles nodes folders"; fi
-      if [[ "${COMP_WORDS[1]}" =~ ^bulk|mv|move|cp|copy$$ ]]; then strings="--help"; fi
+      if [[ "${COMP_WORDS[1]}" =~ ^bulk|mv|move|cp|copy$ ]]; then strings="--help"; fi
           if [[ "${COMP_WORDS[1]}" =~ ^--rm|--del|-r$ ]]; then strings="$strings ${folders[@]/#/@}"; fi
           if [[ "${COMP_WORDS[1]}" =~ ^--rm|--del|-r|--mod|--edit|-e|mv|move|cp|copy|--show|-s$ ]]; then
               strings="$strings ${connections[@]}"
