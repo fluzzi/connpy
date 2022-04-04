@@ -125,7 +125,7 @@ from .connapp import connapp
 from pkg_resources import get_distribution
 
 __all__ = ["node", "nodes", "configfile", "connapp"]
-__version__ = "2.0.10"
+__version__ = "2.0.0"
 __author__ = "Federico Luzzi"
 __pdoc__ = {
     'core': False,
