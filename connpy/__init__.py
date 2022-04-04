@@ -2,7 +2,7 @@
 '''
 ## Connection manager
 
-conn is a connection manager that allows you to store nodes to connect them fast and password free.
+Connpy is a connection manager that allows you to store nodes to connect them fast and password free.
 
 ### Features
     - You can generate profiles and reference them from nodes using @profilename 
@@ -71,8 +71,8 @@ the automation module
 
 ### Standalone module
 ```
-import conn
-router = conn.node("unique name","ip/hostname", user="username", password="pass")
+import connpy
+router = connpy.node("unique name","ip/hostname", user="username", password="pass")
 router.run(["term len 0","show run"])
 print(router.output)
 hasip = router.test("show ip int brief","1.1.1.1")
@@ -84,17 +84,17 @@ else:
 
 ### Using manager configuration
 ```
-import conn
-conf = conn.configfile()
+import connpy
+conf = connpy.configfile()
 device = conf.getitem("server@office")
-server = conn.node("unique name", **device, config=conf)
+server = connpy.node("unique name", **device, config=conf)
 result = server.run(["cd /", "ls -la"])
 print(result)
 ```
 ### Running parallel tasks 
 ```
-import conn
-conf = conn.configfile()
+import connpy
+conf = connpy.configfile()
 #You can get the nodes from the config from a folder and fitlering in it
 nodes = conf.getitem("@office", ["router1", "router2", "router3"])
 #You can also get each node individually:
@@ -108,7 +108,7 @@ nodes["router1"] = {"host": "1.1.1.1", "user": "username", "password": "pass1"}
 nodes["router2"] = {"host": "1.1.1.2", "user": "username", "password": "pass2"}
 nodes["router3"] = {"host": "1.1.1.2", "user": "username", "password": "pass3"}
 #Finally you run some tasks on the nodes
-mynodes = conn.nodes(nodes, config = conf)
+mynodes = connpy.nodes(nodes, config = conf)
 result = mynodes.test(["show ip int br"], "1.1.1.2")
 for i in result:
     print("---" + i + "---")

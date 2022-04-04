@@ -1,15 +1,16 @@
 # Conn
 
-Conn is a ssh and telnet connection manager and automation module
+Connpy is a ssh and telnet connection manager and automation module
 
 ## Installation
 
-pip install conn
+pip install connpy
+
 ## Automation module usage
 ### Standalone module
 ```
-import conn
-router = conn.node("unique name","ip/hostname", user="username", password="password")
+import connpy
+router = connpy.node("unique name","ip/hostname", user="username", password="password")
 router.run(["term len 0","show run"])
 print(router.output)
 hasip = router.test("show ip int brief","1.1.1.1")
@@ -21,17 +22,17 @@ else:
 
 ### Using manager configuration
 ```
-import conn
-conf = conn.configfile()
+import connpy
+conf = connpy.configfile()
 device = conf.getitem("router@office")
-router = conn.node("unique name", **device, config=conf)
+router = connpy.node("unique name", **device, config=conf)
 result = router.run("show ip int brief")
 print(result)
 ```
 ### Running parallel tasks on multiple devices 
 ```
-import conn
-conf = conn.configfile()
+import connpy
+conf = connpy.configfile()
 #You can get the nodes from the config from a folder and fitlering in it
 nodes = conf.getitem("@office", ["router1", "router2", "router3"])
 #You can also get each node individually:
@@ -45,7 +46,7 @@ nodes["router1"] = {"host": "1.1.1.1", "user": "username", "password": "password
 nodes["router2"] = {"host": "1.1.1.2", "user": "username", "password": "password2"}
 nodes["router3"] = {"host": "1.1.1.2", "user": "username", "password": "password3"}
 #Finally you run some tasks on the nodes
-mynodes = conn.nodes(nodes, config = conf)
+mynodes = connpy.nodes(nodes, config = conf)
 result = mynodes.test(["show ip int br"], "1.1.1.2")
 for i in result:
     print("---" + i + "---")
