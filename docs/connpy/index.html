@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
 <meta name="generator" content="pdoc 0.10.0" />
-<title>conn API documentation</title>
+<title>connpy API documentation</title>
 <meta name="description" content="Connection manager …" />
 <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/sanitize.min.css" integrity="sha256-PK9q560IAAa6WVRRh76LtCaI8pjTJ2z11v0miyNNjrs=" crossorigin>
 <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/typography.min.css" integrity="sha256-7l/o7C8jubJiy74VsKTidCy1yBkRtiUGbVkYBylBqUg=" crossorigin>
@@ -19,11 +19,11 @@
 <main>
 <article id="content">
 <header>
-<h1 class="title">Package <code>conn</code></h1>
+<h1 class="title">Package <code>connpy</code></h1>
 </header>
 <section id="section-intro">
 <h2 id="connection-manager">Connection manager</h2>
-<p>conn is a connection manager that allows you to store nodes to connect them fast and password free.</p>
+<p>Connpy is a connection manager that allows you to store nodes to connect them fast and password free.</p>
 <h3 id="features">Features</h3>
 <pre><code>- You can generate profiles and reference them from nodes using @profilename 
   so you dont need to edit multiple nodes when changing password or other 
@@ -83,8 +83,8 @@ options:
 <h2 id="automation-module">Automation module</h2>
 <p>the automation module</p>
 <h3 id="standalone-module">Standalone module</h3>
-<pre><code>import conn
-router = conn.node(&quot;unique name&quot;,&quot;ip/hostname&quot;, user=&quot;username&quot;, password=&quot;pass&quot;)
+<pre><code>import connpy
+router = connpy.node(&quot;unique name&quot;,&quot;ip/hostname&quot;, user=&quot;username&quot;, password=&quot;pass&quot;)
 router.run([&quot;term len 0&quot;,&quot;show run&quot;])
 print(router.output)
 hasip = router.test(&quot;show ip int brief&quot;,&quot;1.1.1.1&quot;)
@@ -94,16 +94,16 @@ else:
     print(&quot;router don't has ip 1.1.1.1&quot;)
 </code></pre>
 <h3 id="using-manager-configuration">Using manager configuration</h3>
-<pre><code>import conn
-conf = conn.configfile()
+<pre><code>import connpy
+conf = connpy.configfile()
 device = conf.getitem(&quot;server@office&quot;)
-server = conn.node(&quot;unique name&quot;, **device, config=conf)
+server = connpy.node(&quot;unique name&quot;, **device, config=conf)
 result = server.run([&quot;cd /&quot;, &quot;ls -la&quot;])
 print(result)
 </code></pre>
 <h3 id="running-parallel-tasks">Running parallel tasks</h3>
-<pre><code>import conn
-conf = conn.configfile()
+<pre><code>import connpy
+conf = connpy.configfile()
 #You can get the nodes from the config from a folder and fitlering in it
 nodes = conf.getitem(&quot;@office&quot;, [&quot;router1&quot;, &quot;router2&quot;, &quot;router3&quot;])
 #You can also get each node individually:
@@ -117,7 +117,7 @@ nodes[&quot;router1&quot;] = {&quot;host&quot;: &quot;1.1.1.1&quot;, &quot;user&
 nodes[&quot;router2&quot;] = {&quot;host&quot;: &quot;1.1.1.2&quot;, &quot;user&quot;: &quot;username&quot;, &quot;password&quot;: &quot;pass2&quot;}
 nodes[&quot;router3&quot;] = {&quot;host&quot;: &quot;1.1.1.2&quot;, &quot;user&quot;: &quot;username&quot;, &quot;password&quot;: &quot;pass3&quot;}
 #Finally you run some tasks on the nodes
-mynodes = conn.nodes(nodes, config = conf)
+mynodes = connpy.nodes(nodes, config = conf)
 result = mynodes.test([&quot;show ip int br&quot;], &quot;1.1.1.2&quot;)
 for i in result:
     print(&quot;---&quot; + i + &quot;---&quot;)
@@ -134,7 +134,7 @@ mynodes.router1.run([&quot;term len 0&quot;. &quot;show run&quot;], folder = &qu
 &#39;&#39;&#39;
 ## Connection manager
 
-conn is a connection manager that allows you to store nodes to connect them fast and password free.
+Connpy is a connection manager that allows you to store nodes to connect them fast and password free.
 
 ### Features
     - You can generate profiles and reference them from nodes using @profilename 
@@ -203,8 +203,8 @@ the automation module
 
 ### Standalone module
 ```
-import conn
-router = conn.node(&#34;unique name&#34;,&#34;ip/hostname&#34;, user=&#34;username&#34;, password=&#34;pass&#34;)
+import connpy
+router = connpy.node(&#34;unique name&#34;,&#34;ip/hostname&#34;, user=&#34;username&#34;, password=&#34;pass&#34;)
 router.run([&#34;term len 0&#34;,&#34;show run&#34;])
 print(router.output)
 hasip = router.test(&#34;show ip int brief&#34;,&#34;1.1.1.1&#34;)
@@ -216,17 +216,17 @@ else:
 
 ### Using manager configuration
 ```
-import conn
-conf = conn.configfile()
+import connpy
+conf = connpy.configfile()
 device = conf.getitem(&#34;server@office&#34;)
-server = conn.node(&#34;unique name&#34;, **device, config=conf)
+server = connpy.node(&#34;unique name&#34;, **device, config=conf)
 result = server.run([&#34;cd /&#34;, &#34;ls -la&#34;])
 print(result)
 ```
 ### Running parallel tasks 
 ```
-import conn
-conf = conn.configfile()
+import connpy
+conf = connpy.configfile()
 #You can get the nodes from the config from a folder and fitlering in it
 nodes = conf.getitem(&#34;@office&#34;, [&#34;router1&#34;, &#34;router2&#34;, &#34;router3&#34;])
 #You can also get each node individually:
@@ -240,7 +240,7 @@ nodes[&#34;router1&#34;] = {&#34;host&#34;: &#34;1.1.1.1&#34;, &#34;user&#34;: &
 nodes[&#34;router2&#34;] = {&#34;host&#34;: &#34;1.1.1.2&#34;, &#34;user&#34;: &#34;username&#34;, &#34;password&#34;: &#34;pass2&#34;}
 nodes[&#34;router3&#34;] = {&#34;host&#34;: &#34;1.1.1.2&#34;, &#34;user&#34;: &#34;username&#34;, &#34;password&#34;: &#34;pass3&#34;}
 #Finally you run some tasks on the nodes
-mynodes = conn.nodes(nodes, config = conf)
+mynodes = connpy.nodes(nodes, config = conf)
 result = mynodes.test([&#34;show ip int br&#34;], &#34;1.1.1.2&#34;)
 for i in result:
     print(&#34;---&#34; + i + &#34;---&#34;)
@@ -273,7 +273,7 @@ __pdoc__ = {
 <section>
 <h2 class="section-title" id="header-classes">Classes</h2>
 <dl>
-<dt id="conn.configfile"><code class="flex name class">
+<dt id="connpy.configfile"><code class="flex name class">
 <span>class <span class="ident">configfile</span></span>
 <span>(</span><span>conf=None, key=None)</span>
 </code></dt>
@@ -522,7 +522,7 @@ __pdoc__ = {
 </details>
 <h3>Methods</h3>
 <dl>
-<dt id="conn.configfile.getitem"><code class="name flex">
+<dt id="connpy.configfile.getitem"><code class="name flex">
 <span>def <span class="ident">getitem</span></span>(<span>self, unique, keys=None)</span>
 </code></dt>
 <dd>
@@ -595,7 +595,7 @@ __pdoc__ = {
 </dd>
 </dl>
 </dd>
-<dt id="conn.connapp"><code class="flex name class">
+<dt id="connpy.connapp"><code class="flex name class">
 <span>class <span class="ident">connapp</span></span>
 <span>(</span><span>config)</span>
 </code></dt>
@@ -1392,7 +1392,7 @@ complete -o nosort -F _conn conn
 </details>
 <h3>Methods</h3>
 <dl>
-<dt id="conn.connapp.encrypt"><code class="name flex">
+<dt id="connpy.connapp.encrypt"><code class="name flex">
 <span>def <span class="ident">encrypt</span></span>(<span>self, password, keyfile=None)</span>
 </code></dt>
 <dd>
@@ -1439,7 +1439,7 @@ complete -o nosort -F _conn conn
 </dd>
 </dl>
 </dd>
-<dt id="conn.node"><code class="flex name class">
+<dt id="connpy.node"><code class="flex name class">
 <span>class <span class="ident">node</span></span>
 <span>(</span><span>unique, host, options='', logs='', password='', port='', protocol='', user='', config='')</span>
 </code></dt>
@@ -1852,7 +1852,7 @@ complete -o nosort -F _conn conn
 </details>
 <h3>Methods</h3>
 <dl>
-<dt id="conn.node.interact"><code class="name flex">
+<dt id="connpy.node.interact"><code class="name flex">
 <span>def <span class="ident">interact</span></span>(<span>self, debug=False)</span>
 </code></dt>
 <dd>
@@ -1893,7 +1893,7 @@ complete -o nosort -F _conn conn
         exit(1)</code></pre>
 </details>
 </dd>
-<dt id="conn.node.run"><code class="name flex">
+<dt id="connpy.node.run"><code class="name flex">
 <span>def <span class="ident">run</span></span>(<span>self, commands, *, folder='', prompt=&#x27;&gt;$|#$|\\$$|&gt;.$|#.$|\\$.$&#x27;, stdout=False)</span>
 </code></dt>
 <dd>
@@ -1990,7 +1990,7 @@ complete -o nosort -F _conn conn
         return connect</code></pre>
 </details>
 </dd>
-<dt id="conn.node.test"><code class="name flex">
+<dt id="connpy.node.test"><code class="name flex">
 <span>def <span class="ident">test</span></span>(<span>self, commands, expected, *, prompt=&#x27;&gt;$|#$|\\$$|&gt;.$|#.$|\\$.$&#x27;)</span>
 </code></dt>
 <dd>
@@ -2085,7 +2085,7 @@ complete -o nosort -F _conn conn
 </dd>
 </dl>
 </dd>
-<dt id="conn.nodes"><code class="flex name class">
+<dt id="connpy.nodes"><code class="flex name class">
 <span>class <span class="ident">nodes</span></span>
 <span>(</span><span>nodes: dict, config='')</span>
 </code></dt>
@@ -2285,7 +2285,7 @@ complete -o nosort -F _conn conn
 </details>
 <h3>Methods</h3>
 <dl>
-<dt id="conn.nodes.run"><code class="name flex">
+<dt id="connpy.nodes.run"><code class="name flex">
 <span>def <span class="ident">run</span></span>(<span>self, commands, *, folder=None, prompt=None, stdout=None, parallel=10)</span>
 </code></dt>
 <dd>
@@ -2378,7 +2378,7 @@ parallel (int): Number of nodes to run the commands simultaneously.
     return output</code></pre>
 </details>
 </dd>
-<dt id="conn.nodes.test"><code class="name flex">
+<dt id="connpy.nodes.test"><code class="name flex">
 <span>def <span class="ident">test</span></span>(<span>self, commands, expected, *, prompt=None, parallel=10)</span>
 </code></dt>
 <dd>
@@ -2485,30 +2485,30 @@ expected (str)     : Expected text to appear after running all the
 <li><h3><a href="#header-classes">Classes</a></h3>
 <ul>
 <li>
-<h4><code><a title="conn.configfile" href="#conn.configfile">configfile</a></code></h4>
+<h4><code><a title="connpy.configfile" href="#connpy.configfile">configfile</a></code></h4>
 <ul class="">
-<li><code><a title="conn.configfile.getitem" href="#conn.configfile.getitem">getitem</a></code></li>
+<li><code><a title="connpy.configfile.getitem" href="#connpy.configfile.getitem">getitem</a></code></li>
 </ul>
 </li>
 <li>
-<h4><code><a title="conn.connapp" href="#conn.connapp">connapp</a></code></h4>
+<h4><code><a title="connpy.connapp" href="#connpy.connapp">connapp</a></code></h4>
 <ul class="">
-<li><code><a title="conn.connapp.encrypt" href="#conn.connapp.encrypt">encrypt</a></code></li>
+<li><code><a title="connpy.connapp.encrypt" href="#connpy.connapp.encrypt">encrypt</a></code></li>
 </ul>
 </li>
 <li>
-<h4><code><a title="conn.node" href="#conn.node">node</a></code></h4>
+<h4><code><a title="connpy.node" href="#connpy.node">node</a></code></h4>
 <ul class="">
-<li><code><a title="conn.node.interact" href="#conn.node.interact">interact</a></code></li>
-<li><code><a title="conn.node.run" href="#conn.node.run">run</a></code></li>
-<li><code><a title="conn.node.test" href="#conn.node.test">test</a></code></li>
+<li><code><a title="connpy.node.interact" href="#connpy.node.interact">interact</a></code></li>
+<li><code><a title="connpy.node.run" href="#connpy.node.run">run</a></code></li>
+<li><code><a title="connpy.node.test" href="#connpy.node.test">test</a></code></li>
 </ul>
 </li>
 <li>
-<h4><code><a title="conn.nodes" href="#conn.nodes">nodes</a></code></h4>
+<h4><code><a title="connpy.nodes" href="#connpy.nodes">nodes</a></code></h4>
 <ul class="">
-<li><code><a title="conn.nodes.run" href="#conn.nodes.run">run</a></code></li>
-<li><code><a title="conn.nodes.test" href="#conn.nodes.test">test</a></code></li>
+<li><code><a title="connpy.nodes.run" href="#connpy.nodes.run">run</a></code></li>
+<li><code><a title="connpy.nodes.test" href="#connpy.nodes.test">test</a></code></li>
 </ul>
 </li>
 </ul>

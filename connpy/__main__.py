@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import sys
-from conn import *
+from connpy import *
 
 def main():
     conf = configfile()
