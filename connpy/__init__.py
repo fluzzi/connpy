@@ -23,12 +23,12 @@ positional arguments:
                  [@subfolder][@folder]
                  Show all available connections globaly or in specified path
 Options:
-  -h, --help     show this help message and exit
-  --add          Add new node[@subfolder][@folder] or [@subfolder]@folder
-  --del, --rm    Delete node[@subfolder][@folder] or [@subfolder]@folder
-  --mod, --edit  Modify node[@subfolder][@folder]
-  --show         Show node[@subfolder][@folder]
-  --debug, -d    Display all conections steps
+  -h, --help         show this help message and exit
+  -a, --add          Add new node[@subfolder][@folder] or [@subfolder]@folder
+  -r, --del, --rm    Delete node[@subfolder][@folder] or [@subfolder]@folder
+  -e, --mod, --edit  Modify node[@subfolder][@folder]
+  -s, --show         Show node[@subfolder][@folder]
+  -d, --debug        Display all conections steps
 
 Commands:
   profile        Manage profiles
@@ -47,11 +47,12 @@ positional arguments:
   profile        Name of profile to manage
 
 options:
-  -h, --help     show this help message and exit
-  --add          Add new profile
-  --del, --rm    Delete profile
-  --mod, --edit  Modify profile
-  --show         Show profile
+  -h, --help         show this help message and exit
+  -a, --add          Add new profile
+  -r, --del, --rm    Delete profile
+  -e, --mod, --edit  Modify profile
+  -s, --show         Show profile
+
 ```
 
 ###   Examples
