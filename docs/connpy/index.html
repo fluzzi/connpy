@@ -91,7 +91,7 @@ hasip = router.test(&quot;show ip int brief&quot;,&quot;1.1.1.1&quot;)
 if hasip:
     print(&quot;Router has ip 1.1.1.1&quot;)
 else:
-    print(&quot;router don't has ip 1.1.1.1&quot;)
+    print(&quot;router does not have ip 1.1.1.1&quot;)
 </code></pre>
 <h3 id="using-manager-configuration">Using manager configuration</h3>
 <pre><code>import connpy
@@ -211,7 +211,7 @@ hasip = router.test(&#34;show ip int brief&#34;,&#34;1.1.1.1&#34;)
 if hasip:
     print(&#34;Router has ip 1.1.1.1&#34;)
 else:
-    print(&#34;router don&#39;t has ip 1.1.1.1&#34;)
+    print(&#34;router does not have ip 1.1.1.1&#34;)
 ```
 
 ### Using manager configuration
@@ -257,7 +257,7 @@ from .connapp import connapp
 from pkg_resources import get_distribution
 
 __all__ = [&#34;node&#34;, &#34;nodes&#34;, &#34;configfile&#34;, &#34;connapp&#34;]
-__version__ = &#34;2.0.10&#34;
+__version__ = &#34;2.0.0&#34;
 __author__ = &#34;Federico Luzzi&#34;
 __pdoc__ = {
     &#39;core&#39;: False,
