@@ -1322,6 +1322,11 @@ _conn()
                           strings=&#34;$strings ${profiles[@]}&#34;
                 fi
           fi
+          if [ &#34;${COMP_WORDS[1]}&#34; = &#34;config&#34; ]; then
+                if [[ &#34;${COMP_WORDS[2]}&#34; = &#34;--completion&#34; ]] ; then
+                          strings=&#34;bash zsh&#34;
+                fi
+          fi
           COMPREPLY=($(compgen -W &#34;$strings&#34; -- &#34;${COMP_WORDS[3]}&#34;))
   fi
 }
@@ -1378,6 +1383,11 @@ _conn()
           if [ &#34;${COMP_WORDS[3]}&#34; = &#34;profile&#34; ]; then
                 if [[ &#34;${COMP_WORDS[2]}&#34; =~ &#39;--rm|--del|-r|--mod|--edit|-e|--show|-s&#39; ]] ; then
                           strings=&#34;$strings ${profiles[@]}&#34;
+                fi
+          fi
+          if [ &#34;${COMP_WORDS[2]}&#34; = &#34;config&#34; ]; then
+                if [[ &#34;${COMP_WORDS[3]}&#34; = &#39;--completion&#39; ]] ; then
+                          strings=&#34;bash zsh&#34;
                 fi
           fi
 
