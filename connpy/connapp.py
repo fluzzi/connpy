@@ -723,6 +723,11 @@ _conn()
                           strings="$strings ${profiles[@]}"
                 fi
           fi
+          if [ "${COMP_WORDS[1]}" = "config" ]; then
+                if [[ "${COMP_WORDS[2]}" = "--completion" ]] ; then
+                          strings="bash zsh"
+                fi
+          fi
           COMPREPLY=($(compgen -W "$strings" -- "${COMP_WORDS[3]}"))
   fi
 }
@@ -779,6 +784,11 @@ _conn()
           if [ "${COMP_WORDS[3]}" = "profile" ]; then
                 if [[ "${COMP_WORDS[2]}" =~ '--rm|--del|-r|--mod|--edit|-e|--show|-s' ]] ; then
                           strings="$strings ${profiles[@]}"
+                fi
+          fi
+          if [ "${COMP_WORDS[2]}" = "config" ]; then
+                if [[ "${COMP_WORDS[3]}" = '--completion' ]] ; then
+                          strings="bash zsh"
                 fi
           fi
 
