@@ -72,7 +72,7 @@ the automation module
 ### Standalone module
 ```
 import connpy
-router = connpy.node("unique name","ip/hostname", user="username", password="pass")
+router = connpy.node("unique name","ip/hostname", user="user", password="pass")
 router.run(["term len 0","show run"])
 print(router.output)
 hasip = router.test("show ip int brief","1.1.1.1")
