@@ -17,7 +17,7 @@ hasip = router.test("show ip int brief","1.1.1.1")
 if hasip:
     print("Router has ip 1.1.1.1")
 else:
-    print("router don't has ip 1.1.1.1")
+    print("router does not have ip 1.1.1.1")
 ```
 
 ### Using manager configuration
