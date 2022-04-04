@@ -1300,7 +1300,7 @@ _conn()
           if [ &#34;${COMP_WORDS[1]}&#34; = &#34;config&#34; ]; then strings=&#34;--allow-uppercase --keepalive --completion --help&#34;; fi
           if [[ &#34;${COMP_WORDS[1]}&#34; =~ ^--mod|--edit|-e|--show|-s|--add|-a|--rm|--del|-r$ ]]; then strings=&#34;profile&#34;; fi
           if [[ &#34;${COMP_WORDS[1]}&#34; =~ ^list|ls$ ]]; then strings=&#34;profiles nodes folders&#34;; fi
-      if [[ &#34;${COMP_WORDS[1]}&#34; =~ ^bulk|mv|move|cp|copy$$ ]]; then strings=&#34;--help&#34;; fi
+      if [[ &#34;${COMP_WORDS[1]}&#34; =~ ^bulk|mv|move|cp|copy$ ]]; then strings=&#34;--help&#34;; fi
           if [[ &#34;${COMP_WORDS[1]}&#34; =~ ^--rm|--del|-r$ ]]; then strings=&#34;$strings ${folders[@]/#/@}&#34;; fi
           if [[ &#34;${COMP_WORDS[1]}&#34; =~ ^--rm|--del|-r|--mod|--edit|-e|mv|move|cp|copy|--show|-s$ ]]; then
               strings=&#34;$strings ${connections[@]}&#34;
