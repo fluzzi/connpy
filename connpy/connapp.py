@@ -8,7 +8,6 @@ import ast
 import argparse
 import sys
 import inquirer
-import json
 from .core import node
 
 
