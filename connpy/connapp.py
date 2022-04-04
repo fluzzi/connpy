@@ -79,7 +79,7 @@ class connapp:
         configparser.set_defaults(func=self._func_others)
         #Set default subparser and tune arguments
         commands = ["node", "profile", "mv", "move","copy", "cp", "bulk", "ls", "list", "config"]
-        profilecmds = ["--add", "--del", "--rm", "--mod", "--edit", "--show"]
+        profilecmds = ["--add", "-a", "--del", "--rm",  "-r", "--mod", "--edit", "-e", "--show", "-s"]
         if len(sys.argv) >= 3 and sys.argv[2] == "profile" and sys.argv[1] in profilecmds:
             sys.argv[2] = sys.argv[1]
             sys.argv[1] = "profile"
@@ -699,11 +699,11 @@ _conn()
           strings=""
           if [ "${COMP_WORDS[1]}" = "profile" ]; then strings="--add --rm --del --edit --mod --show --help"; fi
           if [ "${COMP_WORDS[1]}" = "config" ]; then strings="--allow-uppercase --keepalive --completion --help"; fi
-          if [[ "${COMP_WORDS[1]}" =~ ^--mod|--edit|--show|--add|--rm|--del$ ]]; then strings="profile"; fi
+          if [[ "${COMP_WORDS[1]}" =~ ^--mod|--edit|-e|--show|-s|--add|-a|--rm|--del|-r$ ]]; then strings="profile"; fi
           if [[ "${COMP_WORDS[1]}" =~ ^list|ls$ ]]; then strings="profiles nodes folders"; fi
       if [[ "${COMP_WORDS[1]}" =~ ^bulk|mv|move|cp|copy$$ ]]; then strings="--help"; fi
-          if [[ "${COMP_WORDS[1]}" =~ ^--rm|--del$ ]]; then strings="$strings ${folders[@]/#/@}"; fi
-          if [[ "${COMP_WORDS[1]}" =~ ^--rm|--del|--mod|--edit|mv|move|cp|copy|--show$ ]]; then
+          if [[ "${COMP_WORDS[1]}" =~ ^--rm|--del|-r$ ]]; then strings="$strings ${folders[@]/#/@}"; fi
+          if [[ "${COMP_WORDS[1]}" =~ ^--rm|--del|-r|--mod|--edit|-e|mv|move|cp|copy|--show|-s$ ]]; then
               strings="$strings ${connections[@]}"
           fi
           COMPREPLY=($(compgen -W "$strings" -- "${COMP_WORDS[2]}"))
@@ -711,12 +711,12 @@ _conn()
   if [ "${#COMP_WORDS[@]}" = "4" ]; then
           strings=""
           if [ "${COMP_WORDS[1]}" = "profile" ]; then
-                if [[ "${COMP_WORDS[2]}" =~ ^--rm|--del|--mod|--edit|--show$ ]] ; then
+                if [[ "${COMP_WORDS[2]}" =~ ^--rm|--del|-r|--mod|--edit|-e|--show|-s$ ]] ; then
                           strings="$strings ${profiles[@]}"
                 fi
           fi
           if [ "${COMP_WORDS[2]}" = "profile" ]; then
-                if [[ "${COMP_WORDS[1]}" =~ ^--rm|--remove|--del|--mod|--edit|--show$ ]] ; then
+                if [[ "${COMP_WORDS[1]}" =~ ^--rm|--del|-r|--mod|--edit|-e|--show|-s$ ]] ; then
                           strings="$strings ${profiles[@]}"
                 fi
           fi
