@@ -75,7 +75,7 @@ class connapp:
         configparser = subparsers.add_parser("config", help="Manage app config") 
         configparser.add_argument("--allow-uppercase", dest="case", nargs=1, action=self._store_type, help="Allow case sensitive names", choices=["true","false"])
         configparser.add_argument("--keepalive", dest="idletime", nargs=1, action=self._store_type, help="Set keepalive time in seconds, 0 to disable", type=int, metavar="INT")
-        configparser.add_argument("--completion", dest="completion", nargs=0, action=self._store_type, help="Get bash completion configuration for conn")
+        configparser.add_argument("--completion", dest="completion", nargs=1, choices=["bash","zsh"], action=self._store_type, help="Get terminal completion configuration for conn")
         configparser.set_defaults(func=self._func_others)
         #Set default subparser and tune arguments
         commands = ["node", "profile", "mv", "move","copy", "cp", "bulk", "ls", "list", "config"]
@@ -390,7 +390,10 @@ class connapp:
                 print("0 nodes added")
         else:
             if args.command == "completion":
-                print(self._help("completion"))
+                if args.data[0] == "bash":
+                    print(self._help("bashcompletion"))
+                elif args.data[0] == "zsh":
+                    print(self._help("zshcompletion"))
             else:
                 if args.command == "case":
                     if args.data[0] == "true":
@@ -679,7 +682,7 @@ class connapp:
             return "conn [-h] [--add | --del | --mod | --show | --debug] [node|folder]\n       conn {profile,move,mv,copy,cp,list,ls,bulk,config} ..."
         if type == "end":
             return "Commands:\n  profile        Manage profiles\n  move (mv)      Move node\n  copy (cp)      Copy node\n  list (ls)      List profiles, nodes or folders\n  bulk           Add nodes in bulk\n  config         Manage app config"
-        if type == "completion":
+        if type == "bashcompletion":
             return '''
 #Here starts bash completion for conn
 #You need jq installed in order to use this
@@ -691,7 +694,7 @@ _conn()
     mapfile -t folders < <(jq -r ' .["connections"] | paths as $path | select(getpath($path) == "folder" or getpath($path) == "subfolder") | $path | [map(select(. != "type"))[-1,-2]] | map(select(. !=null)) | join("@")' $DATADIR/config.json)
         mapfile -t profiles < <(jq -r '.["profiles"] | keys[]' $DATADIR/config.json)
   if [ "${#COMP_WORDS[@]}" = "2" ]; then
-          strings="--add --del --rm --edit --mod mv --show ls cp profile bulk config --help"
+          strings="--add --del --rm --edit --mod --show mv move ls list cp copy profile bulk config --help"
           strings="$strings ${connections[@]} ${folders[@]/#/@}"
           COMPREPLY=($(compgen -W "$strings" -- "${COMP_WORDS[1]}"))
   fi
@@ -699,11 +702,11 @@ _conn()
           strings=""
           if [ "${COMP_WORDS[1]}" = "profile" ]; then strings="--add --rm --del --edit --mod --show --help"; fi
           if [ "${COMP_WORDS[1]}" = "config" ]; then strings="--allow-uppercase --keepalive --completion --help"; fi
-          if [[ "${COMP_WORDS[1]}" =~ ^--mod|--edit|-e|--show|-s|--add|-a|--rm|--del|-r$ ]]; then strings="profile"; fi
-          if [[ "${COMP_WORDS[1]}" =~ ^list|ls$ ]]; then strings="profiles nodes folders"; fi
-      if [[ "${COMP_WORDS[1]}" =~ ^bulk|mv|move|cp|copy$ ]]; then strings="--help"; fi
-          if [[ "${COMP_WORDS[1]}" =~ ^--rm|--del|-r$ ]]; then strings="$strings ${folders[@]/#/@}"; fi
-          if [[ "${COMP_WORDS[1]}" =~ ^--rm|--del|-r|--mod|--edit|-e|mv|move|cp|copy|--show|-s$ ]]; then
+          if [[ "${COMP_WORDS[1]}" =~ --mod|--edit|-e|--show|-s|--add|-a|--rm|--del|-r ]]; then strings="profile"; fi
+          if [[ "${COMP_WORDS[1]}" =~ list|ls ]]; then strings="profiles nodes folders"; fi
+          if [[ "${COMP_WORDS[1]}" =~ bulk|mv|move|cp|copy ]]; then strings="--help"; fi
+          if [[ "${COMP_WORDS[1]}" =~ --rm|--del|-r ]]; then strings="$strings ${folders[@]/#/@}"; fi
+          if [[ "${COMP_WORDS[1]}" =~ --rm|--del|-r|--mod|--edit|-e|mv|move|cp|copy|--show|-s ]]; then
               strings="$strings ${connections[@]}"
           fi
           COMPREPLY=($(compgen -W "$strings" -- "${COMP_WORDS[2]}"))
@@ -711,12 +714,12 @@ _conn()
   if [ "${#COMP_WORDS[@]}" = "4" ]; then
           strings=""
           if [ "${COMP_WORDS[1]}" = "profile" ]; then
-                if [[ "${COMP_WORDS[2]}" =~ ^--rm|--del|-r|--mod|--edit|-e|--show|-s$ ]] ; then
+                if [[ "${COMP_WORDS[2]}" =~ --rm|--del|-r|--mod|--edit|-e|--show|-s ]] ; then
                           strings="$strings ${profiles[@]}"
                 fi
           fi
           if [ "${COMP_WORDS[2]}" = "profile" ]; then
-                if [[ "${COMP_WORDS[1]}" =~ ^--rm|--del|-r|--mod|--edit|-e|--show|-s$ ]] ; then
+                if [[ "${COMP_WORDS[1]}" =~ --rm|--del|-r|--mod|--edit|-e|--show|-s ]] ; then
                           strings="$strings ${profiles[@]}"
                 fi
           fi
@@ -724,8 +727,67 @@ _conn()
   fi
 }
 complete -o nosort -F _conn conn
+complete -o nosort -F _conn connpy
 
         '''
+        if type == "zshcompletion":
+            return '''
+#Here starts zsh completion for conn
+#You need jq installed in order to use this
+
+autoload -U compinit && compinit
+_conn()
+{
+    DATADIR=$HOME/.config/conn
+    local COMP_WORDS num
+    COMP_WORDS=( $words )
+    num=${#COMP_WORDS[@]}
+    if [[ $words =~ '.* $' ]]; then
+        num=$(($num + 1))
+    fi
+    x=`jq -r ' .["connections"] | paths as $path | select(getpath($path) == "connection") | $path |  [map(select(. != "type"))[-1,-2,-3]] | map(select(. !=null)) | join("@")' /home/fluzzi32/.config/conn/config.json`
+    connections=( $x )
+    x=`jq -r ' .["connections"] | paths as $path | select(getpath($path) == "folder" or getpath($path) == "subfolder") | $path | [map(select(. != "type"))[-1,-2]] | map(select(. !=null)) | join("@")' $DATADIR/config.json | sed -e 's/^/@/'`
+    folders=( $x )
+    x=`jq -r '.["profiles"] | keys[]' $DATADIR/config.json`
+    profiles=( $x )
+  if [ "${num}" = "2" ]; then
+          strings="--add --del --rm --edit --mod --show mv move ls list cp copy profile bulk config --help"
+          strings="$strings ${connections[@]} ${folders[@]}"
+          compadd "$@" -- `echo $strings`
+  fi
+  if [ "${num}" = "3" ]; then
+          strings=""
+          if [ "${COMP_WORDS[2]}" = "profile" ]; then strings="--add --rm --del --edit --mod --show --help"; fi
+          if [ "${COMP_WORDS[2]}" = "config" ]; then strings="--allow-uppercase --keepalive --completion --help"; fi
+          if [[ "${COMP_WORDS[2]}" =~ '--mod|--edit|-e|--show|-s|--add|-a|--rm|--del|-r' ]]; then strings="profile"; fi
+          if [[ "${COMP_WORDS[2]}" =~ 'list|ls' ]]; then strings="profiles nodes folders"; fi
+          if [[ "${COMP_WORDS[2]}" =~ 'bulk|mv|move|cp|copy' ]]; then strings="--help"; fi
+          if [[ "${COMP_WORDS[2]}" =~ '--rm|--del|-r' ]]; then strings="$strings ${folders[@]}"; fi
+          if [[ "${COMP_WORDS[2]}" =~ '--rm|--del|-r|--mod|--edit|-e|mv|move|cp|copy|--show|-s' ]]; then
+              strings="$strings ${connections[@]}"
+          fi
+          compadd "$@" -- `echo $strings`
+  fi
+  if [ "${num}" = "4" ]; then
+          strings=""
+          if [ "${COMP_WORDS[2]}" = "profile" ]; then
+                if [[ "${COMP_WORDS[3]}" =~ '--rm|--del|-r|--mod|--edit|-e|--show|-s' ]] ; then
+                          strings="$strings ${profiles[@]}"
+                fi
+          fi
+          if [ "${COMP_WORDS[3]}" = "profile" ]; then
+                if [[ "${COMP_WORDS[2]}" =~ '--rm|--del|-r|--mod|--edit|-e|--show|-s' ]] ; then
+                          strings="$strings ${profiles[@]}"
+                fi
+          fi
+
+          compadd "$@" -- `echo $strings`
+  fi
+}
+compdef _conn conn
+compdef _conn connpy
+            '''
 
     def _getallnodes(self):
         #get all nodes on configfile
