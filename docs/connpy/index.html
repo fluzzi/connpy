@@ -678,7 +678,7 @@ __pdoc__ = {
         configparser.set_defaults(func=self._func_others)
         #Set default subparser and tune arguments
         commands = [&#34;node&#34;, &#34;profile&#34;, &#34;mv&#34;, &#34;move&#34;,&#34;copy&#34;, &#34;cp&#34;, &#34;bulk&#34;, &#34;ls&#34;, &#34;list&#34;, &#34;config&#34;]
-        profilecmds = [&#34;--add&#34;, &#34;--del&#34;, &#34;--rm&#34;, &#34;--mod&#34;, &#34;--edit&#34;, &#34;--show&#34;]
+        profilecmds = [&#34;--add&#34;, &#34;-a&#34;, &#34;--del&#34;, &#34;--rm&#34;,  &#34;-r&#34;, &#34;--mod&#34;, &#34;--edit&#34;, &#34;-e&#34;, &#34;--show&#34;, &#34;-s&#34;]
         if len(sys.argv) &gt;= 3 and sys.argv[2] == &#34;profile&#34; and sys.argv[1] in profilecmds:
             sys.argv[2] = sys.argv[1]
             sys.argv[1] = &#34;profile&#34;
@@ -1298,11 +1298,11 @@ _conn()
           strings=&#34;&#34;
           if [ &#34;${COMP_WORDS[1]}&#34; = &#34;profile&#34; ]; then strings=&#34;--add --rm --del --edit --mod --show --help&#34;; fi
           if [ &#34;${COMP_WORDS[1]}&#34; = &#34;config&#34; ]; then strings=&#34;--allow-uppercase --keepalive --completion --help&#34;; fi
-          if [[ &#34;${COMP_WORDS[1]}&#34; =~ ^--mod|--edit|--show|--add|--rm|--del$ ]]; then strings=&#34;profile&#34;; fi
+          if [[ &#34;${COMP_WORDS[1]}&#34; =~ ^--mod|--edit|-e|--show|-s|--add|-a|--rm|--del|-r$ ]]; then strings=&#34;profile&#34;; fi
           if [[ &#34;${COMP_WORDS[1]}&#34; =~ ^list|ls$ ]]; then strings=&#34;profiles nodes folders&#34;; fi
       if [[ &#34;${COMP_WORDS[1]}&#34; =~ ^bulk|mv|move|cp|copy$$ ]]; then strings=&#34;--help&#34;; fi
-          if [[ &#34;${COMP_WORDS[1]}&#34; =~ ^--rm|--del$ ]]; then strings=&#34;$strings ${folders[@]/#/@}&#34;; fi
-          if [[ &#34;${COMP_WORDS[1]}&#34; =~ ^--rm|--del|--mod|--edit|mv|move|cp|copy|--show$ ]]; then
+          if [[ &#34;${COMP_WORDS[1]}&#34; =~ ^--rm|--del|-r$ ]]; then strings=&#34;$strings ${folders[@]/#/@}&#34;; fi
+          if [[ &#34;${COMP_WORDS[1]}&#34; =~ ^--rm|--del|-r|--mod|--edit|-e|mv|move|cp|copy|--show|-s$ ]]; then
               strings=&#34;$strings ${connections[@]}&#34;
           fi
           COMPREPLY=($(compgen -W &#34;$strings&#34; -- &#34;${COMP_WORDS[2]}&#34;))
@@ -1310,12 +1310,12 @@ _conn()
   if [ &#34;${#COMP_WORDS[@]}&#34; = &#34;4&#34; ]; then
           strings=&#34;&#34;
           if [ &#34;${COMP_WORDS[1]}&#34; = &#34;profile&#34; ]; then
-                if [[ &#34;${COMP_WORDS[2]}&#34; =~ ^--rm|--del|--mod|--edit|--show$ ]] ; then
+                if [[ &#34;${COMP_WORDS[2]}&#34; =~ ^--rm|--del|-r|--mod|--edit|-e|--show|-s$ ]] ; then
                           strings=&#34;$strings ${profiles[@]}&#34;
                 fi
           fi
           if [ &#34;${COMP_WORDS[2]}&#34; = &#34;profile&#34; ]; then
-                if [[ &#34;${COMP_WORDS[1]}&#34; =~ ^--rm|--remove|--del|--mod|--edit|--show$ ]] ; then
+                if [[ &#34;${COMP_WORDS[1]}&#34; =~ ^--rm|--del|-r|--mod|--edit|-e|--show|-s$ ]] ; then
                           strings=&#34;$strings ${profiles[@]}&#34;
                 fi
           fi
