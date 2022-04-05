@@ -155,9 +155,14 @@ class configfile:
                 folder = self.connections[uniques["folder"]]
             newfolder = folder.copy()
             newfolder.pop("type")
-            for node in newfolder.keys():
+            for node in folder.keys():
+                if node == "type":
+                    continue
                 if "type" in newfolder[node].keys():
-                    newfolder[node].pop("type")
+                    if newfolder[node]["type"] == "subfolder":
+                        newfolder.pop(node)
+                    else:
+                        newfolder[node].pop("type")
             if keys == None:
                 return newfolder
             else:
