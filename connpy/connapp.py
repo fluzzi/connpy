@@ -690,9 +690,11 @@ _conn()
 {
 
     DATADIR=$HOME/.config/conn
+    command -v jq >/dev/null 2>&1 && {
     mapfile -t connections < <(jq -r ' .["connections"] | paths as $path | select(getpath($path) == "connection") | $path |  [map(select(. != "type"))[-1,-2,-3]] | map(select(. !=null)) | join("@")' $DATADIR/config.json)
     mapfile -t folders < <(jq -r ' .["connections"] | paths as $path | select(getpath($path) == "folder" or getpath($path) == "subfolder") | $path | [map(select(. != "type"))[-1,-2]] | map(select(. !=null)) | join("@")' $DATADIR/config.json)
-        mapfile -t profiles < <(jq -r '.["profiles"] | keys[]' $DATADIR/config.json)
+    mapfile -t profiles < <(jq -r '.["profiles"] | keys[]' $DATADIR/config.json)
+    }
   if [ "${#COMP_WORDS[@]}" = "2" ]; then
           strings="--add --del --rm --edit --mod --show mv move ls list cp copy profile bulk config --help"
           strings="$strings ${connections[@]} ${folders[@]/#/@}"
@@ -733,7 +735,6 @@ _conn()
 }
 complete -o nosort -F _conn conn
 complete -o nosort -F _conn connpy
-
         '''
         if type == "zshcompletion":
             return '''
@@ -750,12 +751,14 @@ _conn()
     if [[ $words =~ '.* $' ]]; then
         num=$(($num + 1))
     fi
-    x=`jq -r ' .["connections"] | paths as $path | select(getpath($path) == "connection") | $path |  [map(select(. != "type"))[-1,-2,-3]] | map(select(. !=null)) | join("@")' /home/fluzzi32/.config/conn/config.json`
+    command -v jq >/dev/null 2>&1 && {
+    x=`jq -r ' .["connections"] | paths as $path | select(getpath($path) == "connection") | $path |  [map(select(. != "type"))[-1,-2,-3]] | map(select(. !=null)) | join("@")'  $DATADIR/config.json`
     connections=( $x )
     x=`jq -r ' .["connections"] | paths as $path | select(getpath($path) == "folder" or getpath($path) == "subfolder") | $path | [map(select(. != "type"))[-1,-2]] | map(select(. !=null)) | join("@")' $DATADIR/config.json | sed -e 's/^/@/'`
     folders=( $x )
     x=`jq -r '.["profiles"] | keys[]' $DATADIR/config.json`
     profiles=( $x )
+    }
   if [ "${num}" = "2" ]; then
           strings="--add --del --rm --edit --mod --show mv move ls list cp copy profile bulk config --help"
           strings="$strings ${connections[@]} ${folders[@]}"
