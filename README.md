@@ -76,6 +76,7 @@ positional arguments:
   -e, --mod, --edit  Modify node[@subfolder][@folder]
   -s, --show         Show node[@subfolder][@folder]
   -d, --debug        Display all conections steps
+  -v, --version      Show version
 
 ```
 
