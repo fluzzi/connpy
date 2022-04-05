@@ -458,9 +458,14 @@ __pdoc__ = {
                 folder = self.connections[uniques[&#34;folder&#34;]]
             newfolder = folder.copy()
             newfolder.pop(&#34;type&#34;)
-            for node in newfolder.keys():
+            for node in folder.keys():
+                if node == &#34;type&#34;:
+                    continue
                 if &#34;type&#34; in newfolder[node].keys():
-                    newfolder[node].pop(&#34;type&#34;)
+                    if newfolder[node][&#34;type&#34;] == &#34;subfolder&#34;:
+                        newfolder.pop(node)
+                    else:
+                        newfolder[node].pop(&#34;type&#34;)
             if keys == None:
                 return newfolder
             else:
@@ -575,9 +580,14 @@ __pdoc__ = {
             folder = self.connections[uniques[&#34;folder&#34;]]
         newfolder = folder.copy()
         newfolder.pop(&#34;type&#34;)
-        for node in newfolder.keys():
+        for node in folder.keys():
+            if node == &#34;type&#34;:
+                continue
             if &#34;type&#34; in newfolder[node].keys():
-                newfolder[node].pop(&#34;type&#34;)
+                if newfolder[node][&#34;type&#34;] == &#34;subfolder&#34;:
+                    newfolder.pop(node)
+                else:
+                    newfolder[node].pop(&#34;type&#34;)
         if keys == None:
             return newfolder
         else:
