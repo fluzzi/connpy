@@ -259,7 +259,7 @@ from .connapp import connapp
 from pkg_resources import get_distribution
 
 __all__ = [&#34;node&#34;, &#34;nodes&#34;, &#34;configfile&#34;, &#34;connapp&#34;]
-__version__ = &#34;2.0.1&#34;
+__version__ = &#34;2.0.2&#34;
 __author__ = &#34;Federico Luzzi&#34;
 __pdoc__ = {
     &#39;core&#39;: False,
@@ -1289,9 +1289,11 @@ _conn()
 {
 
     DATADIR=$HOME/.config/conn
+    command -v jq &gt;/dev/null 2&gt;&amp;1 &amp;&amp; {
     mapfile -t connections &lt; &lt;(jq -r &#39; .[&#34;connections&#34;] | paths as $path | select(getpath($path) == &#34;connection&#34;) | $path |  [map(select(. != &#34;type&#34;))[-1,-2,-3]] | map(select(. !=null)) | join(&#34;@&#34;)&#39; $DATADIR/config.json)
     mapfile -t folders &lt; &lt;(jq -r &#39; .[&#34;connections&#34;] | paths as $path | select(getpath($path) == &#34;folder&#34; or getpath($path) == &#34;subfolder&#34;) | $path | [map(select(. != &#34;type&#34;))[-1,-2]] | map(select(. !=null)) | join(&#34;@&#34;)&#39; $DATADIR/config.json)
-        mapfile -t profiles &lt; &lt;(jq -r &#39;.[&#34;profiles&#34;] | keys[]&#39; $DATADIR/config.json)
+    mapfile -t profiles &lt; &lt;(jq -r &#39;.[&#34;profiles&#34;] | keys[]&#39; $DATADIR/config.json)
+    }
   if [ &#34;${#COMP_WORDS[@]}&#34; = &#34;2&#34; ]; then
           strings=&#34;--add --del --rm --edit --mod --show mv move ls list cp copy profile bulk config --help&#34;
           strings=&#34;$strings ${connections[@]} ${folders[@]/#/@}&#34;
@@ -1332,7 +1334,6 @@ _conn()
 }
 complete -o nosort -F _conn conn
 complete -o nosort -F _conn connpy
-
         &#39;&#39;&#39;
         if type == &#34;zshcompletion&#34;:
             return &#39;&#39;&#39;
@@ -1349,12 +1350,14 @@ _conn()
     if [[ $words =~ &#39;.* $&#39; ]]; then
         num=$(($num + 1))
     fi
-    x=`jq -r &#39; .[&#34;connections&#34;] | paths as $path | select(getpath($path) == &#34;connection&#34;) | $path |  [map(select(. != &#34;type&#34;))[-1,-2,-3]] | map(select(. !=null)) | join(&#34;@&#34;)&#39; /home/fluzzi32/.config/conn/config.json`
+    command -v jq &gt;/dev/null 2&gt;&amp;1 &amp;&amp; {
+    x=`jq -r &#39; .[&#34;connections&#34;] | paths as $path | select(getpath($path) == &#34;connection&#34;) | $path |  [map(select(. != &#34;type&#34;))[-1,-2,-3]] | map(select(. !=null)) | join(&#34;@&#34;)&#39;  $DATADIR/config.json`
     connections=( $x )
     x=`jq -r &#39; .[&#34;connections&#34;] | paths as $path | select(getpath($path) == &#34;folder&#34; or getpath($path) == &#34;subfolder&#34;) | $path | [map(select(. != &#34;type&#34;))[-1,-2]] | map(select(. !=null)) | join(&#34;@&#34;)&#39; $DATADIR/config.json | sed -e &#39;s/^/@/&#39;`
     folders=( $x )
     x=`jq -r &#39;.[&#34;profiles&#34;] | keys[]&#39; $DATADIR/config.json`
     profiles=( $x )
+    }
   if [ &#34;${num}&#34; = &#34;2&#34; ]; then
           strings=&#34;--add --del --rm --edit --mod --show mv move ls list cp copy profile bulk config --help&#34;
           strings=&#34;$strings ${connections[@]} ${folders[@]}&#34;
