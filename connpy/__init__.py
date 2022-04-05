@@ -29,6 +29,7 @@ Options:
   -e, --mod, --edit  Modify node[@subfolder][@folder]
   -s, --show         Show node[@subfolder][@folder]
   -d, --debug        Display all conections steps
+  -v, --version      Show version
 
 Commands:
   profile        Manage profiles
@@ -123,10 +124,10 @@ mynodes.router1.run(["term len 0". "show run"], folder = "/home/user/logs")
 from .core import node,nodes
 from .configfile import configfile
 from .connapp import connapp
+from ._version import __version__
 from pkg_resources import get_distribution
 
 __all__ = ["node", "nodes", "configfile", "connapp"]
-__version__ = "2.0.3"
 __author__ = "Federico Luzzi"
 __pdoc__ = {
     'core': False,

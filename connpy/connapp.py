@@ -9,6 +9,7 @@ import argparse
 import sys
 import inquirer
 from .core import node
+from ._version import __version__
 
 
 #functions and classes
@@ -45,6 +46,7 @@ class connapp:
         nodecrud.add_argument("-e","--mod", "--edit", dest="action", action="store_const", help="Modify node[@subfolder][@folder]", const="mod", default="connect")
         nodecrud.add_argument("-s","--show", dest="action", action="store_const", help="Show node[@subfolder][@folder]", const="show", default="connect")
         nodecrud.add_argument("-d","--debug", dest="action", action="store_const", help="Display all conections steps", const="debug", default="connect")
+        nodecrud.add_argument("-v","--version", dest="action", action="store_const", help="Show version", const="version", default="connect")
         nodeparser.set_defaults(func=self._func_node)
         #PROFILEPARSER
         profileparser = subparsers.add_parser("profile", help="Manage profiles") 
@@ -99,6 +101,8 @@ class connapp:
         #Function called when connecting or managing nodes.
         if not self.case and args.data != None:
             args.data = args.data.lower()
+        if args.action == "version":
+            print(__version__)
         if args.action == "connect" or args.action == "debug":
             if args.data == None:
                 matches = self.nodes
