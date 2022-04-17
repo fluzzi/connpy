@@ -1,8 +1,8 @@
 # Conn
-[![](https://img.shields.io/pypi/v/connpy.svg)](https://pypi.org/pypi/connpy/)
-[![](https://img.shields.io/pypi/pyversions/connpy.svg)](https://pypi.org/pypi/connpy/)
-[![](https://img.shields.io/pypi/l/connpy.svg)](https://github.com/fluzzi/connpy/blob/main/LICENSE)
-[![](https://img.shields.io/pypi/dm/connpy.svg)](https://pypi.org/pypi/connpy/)
+[![](https://img.shields.io/pypi/v/connpy.svg?style=flat-square)](https://pypi.org/pypi/connpy/)
+[![](https://img.shields.io/pypi/pyversions/connpy.svg?style=flat-square)](https://pypi.org/pypi/connpy/)
+[![](https://img.shields.io/pypi/l/connpy.svg?style=flat-square)](https://github.com/fluzzi/connpy/blob/main/LICENSE)
+[![](https://img.shields.io/pypi/dm/connpy.svg?style=flat-square)](https://pypi.org/pypi/connpy/)
 
 Connpy is a ssh and telnet connection manager and automation module
 
