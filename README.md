@@ -62,8 +62,7 @@ mynodes.router1.run(["term len 0". "show run"], folder = "/home/user/logs")
 
 ## Connection manager 
 ### Features
-    - You can generate profiles and reference them from nodes using @profilename 
-      so you dont need to edit multiple nodes when changing password or other 
+    - You can generate profiles and reference them from nodes using @profilename so you dont need to edit multiple nodes when changing password or other 
       information.
     - Nodes can be stored on @folder or @subfolder@folder to organize your 
       devices. Then can be referenced using node@subfolder@folder or node@folder
