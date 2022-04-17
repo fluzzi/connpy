@@ -60,7 +60,19 @@ for i in result:
 mynodes.router1.run(["term len 0". "show run"], folder = "/home/user/logs")
 ```
 
-## Connection manager usage
+## Connection manager 
+### Features
+```
+    - You can generate profiles and reference them from nodes using @profilename 
+      so you dont need to edit multiple nodes when changing password or other 
+      information.
+    - Nodes can be stored on @folder or @subfolder@folder to organize your 
+      devices. Then can be referenced using node@subfolder@folder or node@folder
+    - If you have too many nodes. Get completion script using: conn config 
+      --completion, or use fzf installing pyfzf and running conn -f
+    - Much more!
+```
+### Usage:
 ```
 usage: conn [-h] [--add | --del | --mod | --show | --debug] [node|folder]
        conn {profile,move,mv,copy,cp,list,ls,bulk,config} ...
@@ -72,7 +84,7 @@ positional arguments:
                  Show all available connections globaly or in specified path
 ```
 
-####        Options:
+### Options:
 ```
   -h, --help         show this help message and exit
   -a, --add          Add new node[@subfolder][@folder] or [@subfolder]@folder
@@ -84,7 +96,7 @@ positional arguments:
 
 ```
 
-####    Commands:
+### Commands:
 ```
   profile        Manage profiles
   move (mv)      Move node
@@ -94,7 +106,7 @@ positional arguments:
   config         Manage app config
 ```
 
-####   Manage profiles:
+### Manage profiles:
 ```
 usage: conn profile [-h] (--add | --del | --mod | --show) profile
 
