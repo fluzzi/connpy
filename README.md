@@ -62,7 +62,6 @@ mynodes.router1.run(["term len 0". "show run"], folder = "/home/user/logs")
 
 ## Connection manager 
 ### Features
-```
     - You can generate profiles and reference them from nodes using @profilename 
       so you dont need to edit multiple nodes when changing password or other 
       information.
@@ -71,7 +70,7 @@ mynodes.router1.run(["term len 0". "show run"], folder = "/home/user/logs")
     - If you have too many nodes. Get completion script using: conn config 
       --completion, or use fzf installing pyfzf and running conn -f
     - Much more!
-```
+
 ### Usage:
 ```
 usage: conn [-h] [--add | --del | --mod | --show | --debug] [node|folder]
@@ -122,7 +121,7 @@ options:
 
 ```
 
-####   Examples:
+### Examples:
 ```
    conn profile --add office-user
    conn --add @office
