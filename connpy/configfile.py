@@ -79,7 +79,7 @@ class configfile:
 
     def _createconfig(self, conf):
         #Create config file
-        defaultconfig = {'config': {'case': False, 'idletime': 30}, 'connections': {}, 'profiles': { "default": { "host":"", "protocol":"ssh", "port":"", "user":"", "password":"", "options":"", "logs":"" }}}
+        defaultconfig = {'config': {'case': False, 'idletime': 30, 'fzf': False}, 'connections': {}, 'profiles': { "default": { "host":"", "protocol":"ssh", "port":"", "user":"", "password":"", "options":"", "logs":"" }}}
         if not os.path.exists(conf):
             with open(conf, "w") as f:
                 json.dump(defaultconfig, f, indent = 4)
