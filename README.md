@@ -67,7 +67,7 @@ mynodes.router1.run(["term len 0". "show run"], folder = "/home/user/logs")
     - Nodes can be stored on @folder or @subfolder@folder to organize your devices. Then can 
       be referenced using node@subfolder@folder or node@folder
     - If you have too many nodes. Get completion script using: conn config --completion.
-      Or use fzf installing pyfzf and running conn -f
+      Or use fzf installing pyfzf and running conn config --fzf true
     - Much more!
 
 ### Usage:
@@ -85,13 +85,12 @@ positional arguments:
 ### Options:
 ```
   -h, --help         show this help message and exit
+  -v, --version      Show version
   -a, --add          Add new node[@subfolder][@folder] or [@subfolder]@folder
   -r, --del, --rm    Delete node[@subfolder][@folder] or [@subfolder]@folder
   -e, --mod, --edit  Modify node[@subfolder][@folder]
   -s, --show         Show node[@subfolder][@folder]
   -d, --debug        Display all conections steps
-  -v, --version      Show version
-
 ```
 
 ### Commands:
