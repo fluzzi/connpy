@@ -1,5 +1,5 @@
 inquirer~=2.9.2
 pexpect~=4.8.0
 pycryptodome~=3.14.1
-setuptools~=59.4.0
-myst-parser
+pyfzf~=0.3.1
+setuptools~=59.5.0

@@ -23,6 +23,11 @@ class node:
 
         - result(bool): True if expected value is found after running 
                         the commands using test method.
+
+        - status (int): 0 if the method run or test run succesfully.
+                        1 if connection failed.
+                        2 if expect timeouts without prompt or EOF.
+
         '''
     
     def __init__(self, unique, host, options='', logs='', password='', port='', protocol='', user='', config=''):
@@ -171,14 +176,23 @@ class node:
             print(connect)
             exit(1)
 
-    def run(self, commands,*, folder = '', prompt = r'>$|#$|\$$|>.$|#.$|\$.$', stdout = False):
+    def run(self, commands, vars = None,*, folder = '', prompt = r'>$|#$|\$$|>.$|#.$|\$.$', stdout = False, timeout = 10):
         '''
         Run a command or list of commands on the node and return the output.
 
         ### Parameters:  
 
             - commands (str/list): Commands to run on the node. Should be 
-                                   str or a list of str.
+                                   str or a list of str. You can use variables
+                                   as {varname} and defining them in optional
+                                   parameter vars.
+
+        ### Optional Parameters:  
+
+            - vars  (dict): Dictionary containing the definition of variables
+                            used in commands parameter.
+                            Keys: Variable names.
+                            Values: strings.
 
         ### Optional Named Parameters:  
 
@@ -194,35 +208,42 @@ class node:
             - stdout (bool):Set True to send the command output to stdout. 
                             default False.
 
+            - timeout (int):Time in seconds for expect to wait for prompt/EOF.
+                            default 10.
+
         ### Returns:  
 
             str: Output of the commands you ran on the node.
 
         '''
-        connect = self._connect()
+        connect = self._connect(timeout = timeout)
         if connect == True:
-            expects = [prompt, pexpect.EOF]
+            expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
             output = ''
-            if isinstance(commands, list):
-                for c in commands:
-                    result = self.child.expect(expects)
-                    self.child.sendline(c)
-                    if result == 0:
-                        output = output + self.child.before.decode() + self.child.after.decode()
-                    if result == 1:
-                        output = output + self.child.before.decode()
-            else:
-                result = self.child.expect(expects)
-                self.child.sendline(commands)
+            if not isinstance(commands, list):
+                commands = [commands]
+            for c in commands:
+                if vars is not None:
+                    c = c.format(**vars)
+                result = self.child.expect(expects, timeout = timeout)
+                self.child.sendline(c)
                 if result == 0:
                     output = output + self.child.before.decode() + self.child.after.decode()
                 if result == 1:
                     output = output + self.child.before.decode()
-            result = self.child.expect(expects)
+                if result == 2:
+                    self.output = output + self.child.before.decode()
+                    self.status = 2
+                    return self.output
+            result = self.child.expect(expects, timeout = timeout)
             if result == 0:
                 output = output + self.child.before.decode() + self.child.after.decode()
             if result == 1:
                 output = output + self.child.before.decode()
+            if result == 2:
+                self.output = output + self.child.before.decode()
+                self.status = 2
+                return self.output
             self.child.close()
             output = output.lstrip()
             if stdout == True:
@@ -233,22 +254,35 @@ class node:
                     f.close()
                     self._logclean(folder + "/" + self.unique)
             self.output = output
+            self.status = 0
             return output
         else:
             self.output = connect
+            self.status = 1
             return connect
 
-    def test(self, commands, expected, *, prompt = r'>$|#$|\$$|>.$|#.$|\$.$'):
+    def test(self, commands, expected, vars = None,*, prompt = r'>$|#$|\$$|>.$|#.$|\$.$', timeout = 10):
         '''
         Run a command or list of commands on the node, then check if expected value appears on the output after the last command.
 
         ### Parameters:  
 
             - commands (str/list): Commands to run on the node. Should be
-                                   str or list of str.  
+                                   str or a list of str. You can use variables
+                                   as {varname} and defining them in optional
+                                   parameter vars.
 
             - expected (str)     : Expected text to appear after running 
-                                   all the commands on the node.
+                                   all the commands on the node.You can use
+                                   variables as {varname} and defining them
+                                   in optional parameter vars.
+
+        ### Optional Parameters:  
+
+            - vars  (dict): Dictionary containing the definition of variables
+                            used in commands and expected parameters.
+                            Keys: Variable names.
+                            Values: strings.
 
         ### Optional Named Parameters: 
 
@@ -258,38 +292,47 @@ class node:
                             work for most nodes. Change it if your connection 
                             need some special symbol.
 
+            - timeout (int):Time in seconds for expect to wait for prompt/EOF.
+                            default 10.
+
         ### Returns: 
             bool: true if expected value is found after running the commands 
                   false if prompt is found before.
 
         '''
-        connect = self._connect()
+        connect = self._connect(timeout = timeout)
         if connect == True:
-            expects = [prompt, pexpect.EOF]
+            expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
             output = ''
-            if isinstance(commands, list):
-                for c in commands:
-                    result = self.child.expect(expects)
-                    self.child.sendline(c)
-                    if result == 0:
-                        output = output + self.child.before.decode() + self.child.after.decode()
-                    if result == 1:
-                        output = output + self.child.before.decode()
-            else:
-                self.child.expect(expects)
-                self.child.sendline(commands)
-                output = output + self.child.before.decode() + self.child.after.decode()
-            expects = [expected, prompt, pexpect.EOF]
-            results = self.child.expect(expects)
+            if not isinstance(commands, list):
+                commands = [commands]
+            for c in commands:
+                if vars is not None:
+                    c = c.format(**vars)
+                result = self.child.expect(expects, timeout = timeout)
+                self.child.sendline(c)
+                if result == 0:
+                    output = output + self.child.before.decode() + self.child.after.decode()
+                if result == 1:
+                    output = output + self.child.before.decode()
+                if result == 2:
+                    self.result = None
+                    self.output = output + self.child.before.decode()
+                    self.status = 2
+                    return self.output
+            if vars is not None:
+                expected = expected.format(**vars)
+            expects = [expected, prompt, pexpect.EOF, pexpect.TIMEOUT]
+            results = self.child.expect(expects, timeout = timeout)
+            self.child.close()
             if results == 0:
-                self.child.close()
                 self.result = True
                 output = output + self.child.before.decode() + self.child.after.decode()
                 output = output.lstrip()
                 self.output = output
+                self.status = 0
                 return True
             if results in [1, 2]:
-                self.child.close()
                 self.result = False
                 if results == 1:
                     output = output + self.child.before.decode() + self.child.after.decode()
@@ -297,13 +340,22 @@ class node:
                     output = output + self.child.before.decode()
                 output = output.lstrip()
                 self.output = output
+                self.status = 0
                 return False
+            if results == 3:
+                self.result = None
+                output = output + self.child.before.decode()
+                output = output.lstrip()
+                self.output = output
+                self.status = 2
+                return output
         else:
             self.result = None
             self.output = connect
+            self.status = 1
             return connect
 
-    def _connect(self, debug = False):
+    def _connect(self, debug = False, timeout = 10):
         # Method to connect to the node, it parse all the information, create the ssh/telnet command and login to the node.
         if self.protocol == "ssh":
             cmd = "ssh"
@@ -323,7 +375,7 @@ class node:
                 passwords = self.__passtx(self.password)
             else:
                 passwords = []
-            expects = ['yes/no', 'refused', 'supported', 'cipher', 'sage', 'timeout', 'unavailable', 'closed', '[p|P]assword:|[u|U]sername:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, "No route to host", "resolve hostname", "no matching host key"]
+            expects = ['yes/no', 'refused', 'supported', 'cipher', 'sage', 'timeout', 'unavailable', 'closed', '[p|P]assword:|[u|U]sername:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching host key"]
         elif self.protocol == "telnet":
             cmd = "telnet " + self.host
             if self.port != '':
@@ -336,11 +388,12 @@ class node:
                 passwords = self.__passtx(self.password)
             else:
                 passwords = []
-            expects = ['[u|U]sername:', 'refused', 'supported', 'cipher', 'sage', 'timeout', 'unavailable', 'closed', '[p|P]assword:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, "No route to host", "resolve hostname", "no matching host key"]
+            expects = ['[u|U]sername:', 'refused', 'supported', 'cipher', 'sage', 'timeout', 'unavailable', 'closed', '[p|P]assword:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching host key"]
         else:
             raise ValueError("Invalid protocol: " + self.protocol)
         child = pexpect.spawn(cmd)
         if debug:
+            print(cmd)
             child.logfile_read = sys.stdout.buffer
         if len(passwords) > 0:
             loops = len(passwords)
@@ -349,7 +402,7 @@ class node:
         endloop = False
         for i in range(0, loops):
             while True:
-                results = child.expect(expects)
+                results = child.expect(expects, timeout=timeout)
                 if results == 0:
                     if self.protocol == "ssh":
                         child.sendline('yes')
@@ -359,7 +412,7 @@ class node:
                         else:
                             self.missingtext = True
                             break
-                if results in  [1, 2, 3, 4, 5, 6, 7, 12, 13, 14]:
+                if results in  [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15]:
                     child.close()
                     return "Connection failed code:" + str(results)
                 if results == 8:
@@ -398,6 +451,11 @@ class nodes:
                            the commands, False if prompt is found before. 
                            Created after running method test.  
 
+        - status   (dict): Dictionary formed by nodes unique as keys, value: 
+                           0 if method run or test ended succesfully.
+                           1 if connection failed.
+                           2 if expect timeouts without prompt or EOF.
+
         - <unique> (obj):  For each item in nodelist, there is an attribute
                            generated with the node unique.
         '''
@@ -433,33 +491,46 @@ class nodes:
             yield lst[i:i + n]
 
 
-    def run(self, commands,*, folder = None, prompt = None, stdout = None, parallel = 10):
+    def run(self, commands, vars = None,*, folder = None, prompt = None, stdout = None, parallel = 10, timeout = None):
         '''
         Run a command or list of commands on all the nodes in nodelist.
 
         ### Parameters:  
 
-            commands (str/list): Commands to run on the node. Should be str or 
-                                 list of str.
+            - commands (str/list): Commands to run on the nodes. Should be str or 
+                                   list of str. You can use variables as {varname}
+                                   and defining them in optional parameter vars.
+
+        ### Optional Parameters:  
+
+            - vars  (dict): Dictionary containing the definition of variables for
+                            each node, used in commands parameter.
+                            Keys should be formed by nodes unique names. Use
+                            special key name __global__ for global variables.
+                            Subkeys: Variable names.
+                            Values: strings.
 
         ### Optional Named Parameters:  
 
-            folder   (str): Path where output log should be stored, leave empty 
-                            to disable logging.  
+            - folder   (str): Path where output log should be stored, leave empty 
+                              to disable logging.  
 
-            prompt   (str): Prompt to be expected after a command is finished 
-                            running. Usually linux uses  ">" or EOF while routers 
-                            use ">" or "#". The default value should work for 
-                            most nodes. Change it if your connection need some 
-                            special symbol.  
+            - prompt   (str): Prompt to be expected after a command is finished 
+                              running. Usually linux uses  ">" or EOF while routers 
+                              use ">" or "#". The default value should work for 
+                              most nodes. Change it if your connection need some 
+                              special symbol.  
 
-            stdout  (bool): Set True to send the command output to stdout. 
-                            Default False.  
+            - stdout  (bool): Set True to send the command output to stdout. 
+                              Default False.  
 
-            parallel (int): Number of nodes to run the commands simultaneously. 
-                            Default is 10, if there are more nodes that this 
-                            value, nodes are groups in groups with max this 
-                            number of members.
+            - parallel (int): Number of nodes to run the commands simultaneously. 
+                              Default is 10, if there are more nodes that this 
+                              value, nodes are groups in groups with max this 
+                              number of members.
+            
+            - timeout  (int): Time in seconds for expect to wait for prompt/EOF.
+                              default 10.
 
         ###Returns:  
 
@@ -468,6 +539,7 @@ class nodes:
 
         '''
         args = {}
+        nodesargs = {}
         args["commands"] = commands
         if folder != None:
             args["folder"] = folder
@@ -475,10 +547,20 @@ class nodes:
             args["prompt"] = prompt
         if stdout != None:
             args["stdout"] = stdout
+        if timeout != None:
+            args["timeout"] = timeout
         output = {}
+        status = {}
         tasks = []
         for n in self.nodelist:
-            tasks.append(threading.Thread(target=n.run, kwargs=args))
+            nodesargs[n.unique] = args.copy()
+            if vars != None:
+                nodesargs[n.unique]["vars"] = {}
+                if "__global__" in vars.keys():
+                    nodesargs[n.unique]["vars"].update(vars["__global__"])
+                if n.unique in vars.keys():
+                    nodesargs[n.unique]["vars"].update(vars[n.unique])
+            tasks.append(threading.Thread(target=n.run, kwargs=nodesargs[n.unique]))
         taskslist = list(self._splitlist(tasks, parallel))
         for t in taskslist:
             for i in t:
@@ -487,28 +569,48 @@ class nodes:
                 i.join()
         for i in self.nodelist:
             output[i.unique] = i.output
+            status[i.unique] = i.status
         self.output = output
+        self.status = status
         return output
 
-    def test(self, commands, expected, *, prompt = None, parallel = 10):
+    def test(self, commands, expected, vars = None,*, prompt = None, parallel = 10, timeout = None):
         '''
         Run a command or list of commands on all the nodes in nodelist, then check if expected value appears on the output after the last command.
 
         ### Parameters:  
 
-            commands (str/list): Commands to run on the node. Should be str or 
-                                 list of str.  
+            - commands (str/list): Commands to run on the node. Should be str or 
+                                   list of str.  
 
-            expected (str)     : Expected text to appear after running all the 
-                                 commands on the node.
+            - expected (str)     : Expected text to appear after running all the 
+                                   commands on the node.
+
+        ### Optional Parameters:  
+
+            - vars  (dict): Dictionary containing the definition of variables for
+                            each node, used in commands and expected parameters.
+                            Keys should be formed by nodes unique names. Use
+                            special key name __global__ for global variables.
+                            Subkeys: Variable names.
+                            Values: strings.
 
         ### Optional Named Parameters:  
 
-            prompt (str): Prompt to be expected after a command is finished 
-                          running. Usually linux uses  ">" or EOF while 
-                          routers use ">" or "#". The default value should 
-                          work for most nodes. Change it if your connection 
-                          need some special symbol.
+            - prompt   (str): Prompt to be expected after a command is finished 
+                              running. Usually linux uses  ">" or EOF while 
+                              routers use ">" or "#". The default value should 
+                              work for most nodes. Change it if your connection 
+                              need some special symbol.
+
+
+            - parallel (int): Number of nodes to run the commands simultaneously. 
+                              Default is 10, if there are more nodes that this 
+                              value, nodes are groups in groups with max this 
+                              number of members.
+
+            - timeout  (int): Time in seconds for expect to wait for prompt/EOF.
+                              default 10.
 
         ### Returns:  
 
@@ -518,15 +620,26 @@ class nodes:
 
         '''
         args = {}
+        nodesargs = {}
         args["commands"] = commands
         args["expected"] = expected
         if prompt != None:
             args["prompt"] = prompt
+        if timeout != None:
+            args["timeout"] = timeout
         output = {}
         result = {}
+        status = {}
         tasks = []
         for n in self.nodelist:
-            tasks.append(threading.Thread(target=n.test, kwargs=args))
+            nodesargs[n.unique] = args.copy()
+            if vars != None:
+                nodesargs[n.unique]["vars"] = {}
+                if "__global__" in vars.keys():
+                    nodesargs[n.unique]["vars"].update(vars["__global__"])
+                if n.unique in vars.keys():
+                    nodesargs[n.unique]["vars"].update(vars[n.unique])
+            tasks.append(threading.Thread(target=n.test, kwargs=nodesargs[n.unique]))
         taskslist = list(self._splitlist(tasks, parallel))
         for t in taskslist:
             for i in t:
@@ -536,8 +649,10 @@ class nodes:
         for i in self.nodelist:
             result[i.unique] = i.result
             output[i.unique] = i.output
+            status[i.unique] = i.status
         self.output = output
         self.result = result
+        self.status = status
         return result
 
 # script
