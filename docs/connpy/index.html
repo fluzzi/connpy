@@ -130,6 +130,28 @@ for i in result:
 # Or for one specific node
 mynodes.router1.run([&quot;term len 0&quot;. &quot;show run&quot;], folder = &quot;/home/user/logs&quot;)
 </code></pre>
+<h3 id="using-variables">Using variables</h3>
+<pre><code>import connpy
+config = connpy.configfile()
+nodes = config.getitem(&quot;@office&quot;, [&quot;router1&quot;, &quot;router2&quot;, &quot;router3&quot;])
+commands = []
+commands.append(&quot;config t&quot;)
+commands.append(&quot;interface lo {id}&quot;)
+commands.append(&quot;ip add {ip} {mask}&quot;)
+commands.append(&quot;end&quot;)
+variables = {}
+variables[&quot;router1&quot;] = {&quot;ip&quot;: &quot;10.57.57.1&quot;}
+variables[&quot;router2&quot;] = {&quot;ip&quot;: &quot;10.57.57.2&quot;}
+variables[&quot;router3&quot;] = {&quot;ip&quot;: &quot;10.57.57.3&quot;}
+variables[&quot;__global__&quot;] = {&quot;id&quot;: &quot;57&quot;}
+variables[&quot;__global__&quot;][&quot;mask&quot;] =  &quot;255.255.255.255&quot;
+expected = &quot;!&quot;
+routers = connpy.nodes(nodes, config = config)
+routers.run(commands, variables)
+routers.test(&quot;ping {ip}&quot;, expected, variables)
+for key in routers.result:
+    print(key, ' ---&gt; ', (&quot;pass&quot; if routers.result[key] else &quot;fail&quot;))
+</code></pre>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -257,7 +279,29 @@ for i in result:
 # Or for one specific node
 mynodes.router1.run([&#34;term len 0&#34;. &#34;show run&#34;], folder = &#34;/home/user/logs&#34;)
 ```
-
+### Using variables
+```
+import connpy
+config = connpy.configfile()
+nodes = config.getitem(&#34;@office&#34;, [&#34;router1&#34;, &#34;router2&#34;, &#34;router3&#34;])
+commands = []
+commands.append(&#34;config t&#34;)
+commands.append(&#34;interface lo {id}&#34;)
+commands.append(&#34;ip add {ip} {mask}&#34;)
+commands.append(&#34;end&#34;)
+variables = {}
+variables[&#34;router1&#34;] = {&#34;ip&#34;: &#34;10.57.57.1&#34;}
+variables[&#34;router2&#34;] = {&#34;ip&#34;: &#34;10.57.57.2&#34;}
+variables[&#34;router3&#34;] = {&#34;ip&#34;: &#34;10.57.57.3&#34;}
+variables[&#34;__global__&#34;] = {&#34;id&#34;: &#34;57&#34;}
+variables[&#34;__global__&#34;][&#34;mask&#34;] =  &#34;255.255.255.255&#34;
+expected = &#34;!&#34;
+routers = connpy.nodes(nodes, config = config)
+routers.run(commands, variables)
+routers.test(&#34;ping {ip}&#34;, expected, variables)
+for key in routers.result:
+    print(key, &#39; ---&gt; &#39;, (&#34;pass&#34; if routers.result[key] else &#34;fail&#34;))
+```
 &#39;&#39;&#39;
 from .core import node,nodes
 from .configfile import configfile
@@ -1474,6 +1518,10 @@ compdef _conn connpy
 
 - result(bool): True if expected value is found after running 
                 the commands using test method.
+
+- status (int): 0 if the method run or test run succesfully.
+                1 if connection failed.
+                2 if expect timeouts without prompt or EOF.
 </code></pre>
 <h3 id="parameters">Parameters:</h3>
 <pre><code>- unique (str): Unique name to assign to the node.
@@ -1515,6 +1563,11 @@ compdef _conn connpy
 
         - result(bool): True if expected value is found after running 
                         the commands using test method.
+
+        - status (int): 0 if the method run or test run succesfully.
+                        1 if connection failed.
+                        2 if expect timeouts without prompt or EOF.
+
         &#39;&#39;&#39;
     
     def __init__(self, unique, host, options=&#39;&#39;, logs=&#39;&#39;, password=&#39;&#39;, port=&#39;&#39;, protocol=&#39;&#39;, user=&#39;&#39;, config=&#39;&#39;):
@@ -1663,14 +1716,23 @@ compdef _conn connpy
             print(connect)
             exit(1)
 
-    def run(self, commands,*, folder = &#39;&#39;, prompt = r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, stdout = False):
+    def run(self, commands, vars = None,*, folder = &#39;&#39;, prompt = r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, stdout = False, timeout = 10):
         &#39;&#39;&#39;
         Run a command or list of commands on the node and return the output.
 
         ### Parameters:  
 
             - commands (str/list): Commands to run on the node. Should be 
-                                   str or a list of str.
+                                   str or a list of str. You can use variables
+                                   as {varname} and defining them in optional
+                                   parameter vars.
+
+        ### Optional Parameters:  
+
+            - vars  (dict): Dictionary containing the definition of variables
+                            used in commands parameter.
+                            Keys: Variable names.
+                            Values: strings.
 
         ### Optional Named Parameters:  
 
@@ -1686,35 +1748,42 @@ compdef _conn connpy
             - stdout (bool):Set True to send the command output to stdout. 
                             default False.
 
+            - timeout (int):Time in seconds for expect to wait for prompt/EOF.
+                            default 10.
+
         ### Returns:  
 
             str: Output of the commands you ran on the node.
 
         &#39;&#39;&#39;
-        connect = self._connect()
+        connect = self._connect(timeout = timeout)
         if connect == True:
-            expects = [prompt, pexpect.EOF]
+            expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
             output = &#39;&#39;
-            if isinstance(commands, list):
-                for c in commands:
-                    result = self.child.expect(expects)
-                    self.child.sendline(c)
-                    if result == 0:
-                        output = output + self.child.before.decode() + self.child.after.decode()
-                    if result == 1:
-                        output = output + self.child.before.decode()
-            else:
-                result = self.child.expect(expects)
-                self.child.sendline(commands)
+            if not isinstance(commands, list):
+                commands = [commands]
+            for c in commands:
+                if vars is not None:
+                    c = c.format(**vars)
+                result = self.child.expect(expects, timeout = timeout)
+                self.child.sendline(c)
                 if result == 0:
                     output = output + self.child.before.decode() + self.child.after.decode()
                 if result == 1:
                     output = output + self.child.before.decode()
-            result = self.child.expect(expects)
+                if result == 2:
+                    self.output = output + self.child.before.decode()
+                    self.status = 2
+                    return self.output
+            result = self.child.expect(expects, timeout = timeout)
             if result == 0:
                 output = output + self.child.before.decode() + self.child.after.decode()
             if result == 1:
                 output = output + self.child.before.decode()
+            if result == 2:
+                self.output = output + self.child.before.decode()
+                self.status = 2
+                return self.output
             self.child.close()
             output = output.lstrip()
             if stdout == True:
@@ -1725,22 +1794,35 @@ compdef _conn connpy
                     f.close()
                     self._logclean(folder + &#34;/&#34; + self.unique)
             self.output = output
+            self.status = 0
             return output
         else:
             self.output = connect
+            self.status = 1
             return connect
 
-    def test(self, commands, expected, *, prompt = r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;):
+    def test(self, commands, expected, vars = None,*, prompt = r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, timeout = 10):
         &#39;&#39;&#39;
         Run a command or list of commands on the node, then check if expected value appears on the output after the last command.
 
         ### Parameters:  
 
             - commands (str/list): Commands to run on the node. Should be
-                                   str or list of str.  
+                                   str or a list of str. You can use variables
+                                   as {varname} and defining them in optional
+                                   parameter vars.
 
             - expected (str)     : Expected text to appear after running 
-                                   all the commands on the node.
+                                   all the commands on the node.You can use
+                                   variables as {varname} and defining them
+                                   in optional parameter vars.
+
+        ### Optional Parameters:  
+
+            - vars  (dict): Dictionary containing the definition of variables
+                            used in commands and expected parameters.
+                            Keys: Variable names.
+                            Values: strings.
 
         ### Optional Named Parameters: 
 
@@ -1750,38 +1832,47 @@ compdef _conn connpy
                             work for most nodes. Change it if your connection 
                             need some special symbol.
 
+            - timeout (int):Time in seconds for expect to wait for prompt/EOF.
+                            default 10.
+
         ### Returns: 
             bool: true if expected value is found after running the commands 
                   false if prompt is found before.
 
         &#39;&#39;&#39;
-        connect = self._connect()
+        connect = self._connect(timeout = timeout)
         if connect == True:
-            expects = [prompt, pexpect.EOF]
+            expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
             output = &#39;&#39;
-            if isinstance(commands, list):
-                for c in commands:
-                    result = self.child.expect(expects)
-                    self.child.sendline(c)
-                    if result == 0:
-                        output = output + self.child.before.decode() + self.child.after.decode()
-                    if result == 1:
-                        output = output + self.child.before.decode()
-            else:
-                self.child.expect(expects)
-                self.child.sendline(commands)
-                output = output + self.child.before.decode() + self.child.after.decode()
-            expects = [expected, prompt, pexpect.EOF]
-            results = self.child.expect(expects)
+            if not isinstance(commands, list):
+                commands = [commands]
+            for c in commands:
+                if vars is not None:
+                    c = c.format(**vars)
+                result = self.child.expect(expects, timeout = timeout)
+                self.child.sendline(c)
+                if result == 0:
+                    output = output + self.child.before.decode() + self.child.after.decode()
+                if result == 1:
+                    output = output + self.child.before.decode()
+                if result == 2:
+                    self.result = None
+                    self.output = output + self.child.before.decode()
+                    self.status = 2
+                    return self.output
+            if vars is not None:
+                expected = expected.format(**vars)
+            expects = [expected, prompt, pexpect.EOF, pexpect.TIMEOUT]
+            results = self.child.expect(expects, timeout = timeout)
+            self.child.close()
             if results == 0:
-                self.child.close()
                 self.result = True
                 output = output + self.child.before.decode() + self.child.after.decode()
                 output = output.lstrip()
                 self.output = output
+                self.status = 0
                 return True
             if results in [1, 2]:
-                self.child.close()
                 self.result = False
                 if results == 1:
                     output = output + self.child.before.decode() + self.child.after.decode()
@@ -1789,13 +1880,22 @@ compdef _conn connpy
                     output = output + self.child.before.decode()
                 output = output.lstrip()
                 self.output = output
+                self.status = 0
                 return False
+            if results == 3:
+                self.result = None
+                output = output + self.child.before.decode()
+                output = output.lstrip()
+                self.output = output
+                self.status = 2
+                return output
         else:
             self.result = None
             self.output = connect
+            self.status = 1
             return connect
 
-    def _connect(self, debug = False):
+    def _connect(self, debug = False, timeout = 10):
         # Method to connect to the node, it parse all the information, create the ssh/telnet command and login to the node.
         if self.protocol == &#34;ssh&#34;:
             cmd = &#34;ssh&#34;
@@ -1815,7 +1915,7 @@ compdef _conn connpy
                 passwords = self.__passtx(self.password)
             else:
                 passwords = []
-            expects = [&#39;yes/no&#39;, &#39;refused&#39;, &#39;supported&#39;, &#39;cipher&#39;, &#39;sage&#39;, &#39;timeout&#39;, &#39;unavailable&#39;, &#39;closed&#39;, &#39;[p|P]assword:|[u|U]sername:&#39;, r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, &#39;suspend&#39;, pexpect.EOF, &#34;No route to host&#34;, &#34;resolve hostname&#34;, &#34;no matching host key&#34;]
+            expects = [&#39;yes/no&#39;, &#39;refused&#39;, &#39;supported&#39;, &#39;cipher&#39;, &#39;sage&#39;, &#39;timeout&#39;, &#39;unavailable&#39;, &#39;closed&#39;, &#39;[p|P]assword:|[u|U]sername:&#39;, r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, &#39;suspend&#39;, pexpect.EOF, pexpect.TIMEOUT, &#34;No route to host&#34;, &#34;resolve hostname&#34;, &#34;no matching host key&#34;]
         elif self.protocol == &#34;telnet&#34;:
             cmd = &#34;telnet &#34; + self.host
             if self.port != &#39;&#39;:
@@ -1828,11 +1928,12 @@ compdef _conn connpy
                 passwords = self.__passtx(self.password)
             else:
                 passwords = []
-            expects = [&#39;[u|U]sername:&#39;, &#39;refused&#39;, &#39;supported&#39;, &#39;cipher&#39;, &#39;sage&#39;, &#39;timeout&#39;, &#39;unavailable&#39;, &#39;closed&#39;, &#39;[p|P]assword:&#39;, r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, &#39;suspend&#39;, pexpect.EOF, &#34;No route to host&#34;, &#34;resolve hostname&#34;, &#34;no matching host key&#34;]
+            expects = [&#39;[u|U]sername:&#39;, &#39;refused&#39;, &#39;supported&#39;, &#39;cipher&#39;, &#39;sage&#39;, &#39;timeout&#39;, &#39;unavailable&#39;, &#39;closed&#39;, &#39;[p|P]assword:&#39;, r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, &#39;suspend&#39;, pexpect.EOF, pexpect.TIMEOUT, &#34;No route to host&#34;, &#34;resolve hostname&#34;, &#34;no matching host key&#34;]
         else:
             raise ValueError(&#34;Invalid protocol: &#34; + self.protocol)
         child = pexpect.spawn(cmd)
         if debug:
+            print(cmd)
             child.logfile_read = sys.stdout.buffer
         if len(passwords) &gt; 0:
             loops = len(passwords)
@@ -1841,7 +1942,7 @@ compdef _conn connpy
         endloop = False
         for i in range(0, loops):
             while True:
-                results = child.expect(expects)
+                results = child.expect(expects, timeout=timeout)
                 if results == 0:
                     if self.protocol == &#34;ssh&#34;:
                         child.sendline(&#39;yes&#39;)
@@ -1851,7 +1952,7 @@ compdef _conn connpy
                         else:
                             self.missingtext = True
                             break
-                if results in  [1, 2, 3, 4, 5, 6, 7, 12, 13, 14]:
+                if results in  [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15]:
                     child.close()
                     return &#34;Connection failed code:&#34; + str(results)
                 if results == 8:
@@ -1917,13 +2018,21 @@ compdef _conn connpy
 </details>
 </dd>
 <dt id="connpy.node.run"><code class="name flex">
-<span>def <span class="ident">run</span></span>(<span>self, commands, *, folder='', prompt=&#x27;&gt;$|#$|\\$$|&gt;.$|#.$|\\$.$&#x27;, stdout=False)</span>
+<span>def <span class="ident">run</span></span>(<span>self, commands, vars=None, *, folder='', prompt=&#x27;&gt;$|#$|\\$$|&gt;.$|#.$|\\$.$&#x27;, stdout=False, timeout=10)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Run a command or list of commands on the node and return the output.</p>
 <h3 id="parameters">Parameters:</h3>
 <pre><code>- commands (str/list): Commands to run on the node. Should be 
-                       str or a list of str.
+                       str or a list of str. You can use variables
+                       as {varname} and defining them in optional
+                       parameter vars.
+</code></pre>
+<h3 id="optional-parameters">Optional Parameters:</h3>
+<pre><code>- vars  (dict): Dictionary containing the definition of variables
+                used in commands parameter.
+                Keys: Variable names.
+                Values: strings.
 </code></pre>
 <h3 id="optional-named-parameters">Optional Named Parameters:</h3>
 <pre><code>- folder (str): Path where output log should be stored, leave 
@@ -1937,6 +2046,9 @@ compdef _conn connpy
 
 - stdout (bool):Set True to send the command output to stdout. 
                 default False.
+
+- timeout (int):Time in seconds for expect to wait for prompt/EOF.
+                default 10.
 </code></pre>
 <h3 id="returns">Returns:</h3>
 <pre><code>str: Output of the commands you ran on the node.
@@ -1945,14 +2057,23 @@ compdef _conn connpy
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def run(self, commands,*, folder = &#39;&#39;, prompt = r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, stdout = False):
+<pre><code class="python">def run(self, commands, vars = None,*, folder = &#39;&#39;, prompt = r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, stdout = False, timeout = 10):
     &#39;&#39;&#39;
     Run a command or list of commands on the node and return the output.
 
     ### Parameters:  
 
         - commands (str/list): Commands to run on the node. Should be 
-                               str or a list of str.
+                               str or a list of str. You can use variables
+                               as {varname} and defining them in optional
+                               parameter vars.
+
+    ### Optional Parameters:  
+
+        - vars  (dict): Dictionary containing the definition of variables
+                        used in commands parameter.
+                        Keys: Variable names.
+                        Values: strings.
 
     ### Optional Named Parameters:  
 
@@ -1968,35 +2089,42 @@ compdef _conn connpy
         - stdout (bool):Set True to send the command output to stdout. 
                         default False.
 
+        - timeout (int):Time in seconds for expect to wait for prompt/EOF.
+                        default 10.
+
     ### Returns:  
 
         str: Output of the commands you ran on the node.
 
     &#39;&#39;&#39;
-    connect = self._connect()
+    connect = self._connect(timeout = timeout)
     if connect == True:
-        expects = [prompt, pexpect.EOF]
+        expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
         output = &#39;&#39;
-        if isinstance(commands, list):
-            for c in commands:
-                result = self.child.expect(expects)
-                self.child.sendline(c)
-                if result == 0:
-                    output = output + self.child.before.decode() + self.child.after.decode()
-                if result == 1:
-                    output = output + self.child.before.decode()
-        else:
-            result = self.child.expect(expects)
-            self.child.sendline(commands)
+        if not isinstance(commands, list):
+            commands = [commands]
+        for c in commands:
+            if vars is not None:
+                c = c.format(**vars)
+            result = self.child.expect(expects, timeout = timeout)
+            self.child.sendline(c)
             if result == 0:
                 output = output + self.child.before.decode() + self.child.after.decode()
             if result == 1:
                 output = output + self.child.before.decode()
-        result = self.child.expect(expects)
+            if result == 2:
+                self.output = output + self.child.before.decode()
+                self.status = 2
+                return self.output
+        result = self.child.expect(expects, timeout = timeout)
         if result == 0:
             output = output + self.child.before.decode() + self.child.after.decode()
         if result == 1:
             output = output + self.child.before.decode()
+        if result == 2:
+            self.output = output + self.child.before.decode()
+            self.status = 2
+            return self.output
         self.child.close()
         output = output.lstrip()
         if stdout == True:
@@ -2007,23 +2135,35 @@ compdef _conn connpy
                 f.close()
                 self._logclean(folder + &#34;/&#34; + self.unique)
         self.output = output
+        self.status = 0
         return output
     else:
         self.output = connect
+        self.status = 1
         return connect</code></pre>
 </details>
 </dd>
 <dt id="connpy.node.test"><code class="name flex">
-<span>def <span class="ident">test</span></span>(<span>self, commands, expected, *, prompt=&#x27;&gt;$|#$|\\$$|&gt;.$|#.$|\\$.$&#x27;)</span>
+<span>def <span class="ident">test</span></span>(<span>self, commands, expected, vars=None, *, prompt=&#x27;&gt;$|#$|\\$$|&gt;.$|#.$|\\$.$&#x27;, timeout=10)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Run a command or list of commands on the node, then check if expected value appears on the output after the last command.</p>
 <h3 id="parameters">Parameters:</h3>
 <pre><code>- commands (str/list): Commands to run on the node. Should be
-                       str or list of str.
+                       str or a list of str. You can use variables
+                       as {varname} and defining them in optional
+                       parameter vars.
 
 - expected (str)     : Expected text to appear after running 
-                       all the commands on the node.
+                       all the commands on the node.You can use
+                       variables as {varname} and defining them
+                       in optional parameter vars.
+</code></pre>
+<h3 id="optional-parameters">Optional Parameters:</h3>
+<pre><code>- vars  (dict): Dictionary containing the definition of variables
+                used in commands and expected parameters.
+                Keys: Variable names.
+                Values: strings.
 </code></pre>
 <h3 id="optional-named-parameters">Optional Named Parameters:</h3>
 <pre><code>- prompt (str): Prompt to be expected after a command is finished
@@ -2031,6 +2171,9 @@ compdef _conn connpy
                 routers use "&gt;" or "#". The default value should 
                 work for most nodes. Change it if your connection 
                 need some special symbol.
+
+- timeout (int):Time in seconds for expect to wait for prompt/EOF.
+                default 10.
 </code></pre>
 <h3 id="returns">Returns:</h3>
 <pre><code>bool: true if expected value is found after running the commands 
@@ -2040,17 +2183,28 @@ compdef _conn connpy
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def test(self, commands, expected, *, prompt = r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;):
+<pre><code class="python">def test(self, commands, expected, vars = None,*, prompt = r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, timeout = 10):
     &#39;&#39;&#39;
     Run a command or list of commands on the node, then check if expected value appears on the output after the last command.
 
     ### Parameters:  
 
         - commands (str/list): Commands to run on the node. Should be
-                               str or list of str.  
+                               str or a list of str. You can use variables
+                               as {varname} and defining them in optional
+                               parameter vars.
 
         - expected (str)     : Expected text to appear after running 
-                               all the commands on the node.
+                               all the commands on the node.You can use
+                               variables as {varname} and defining them
+                               in optional parameter vars.
+
+    ### Optional Parameters:  
+
+        - vars  (dict): Dictionary containing the definition of variables
+                        used in commands and expected parameters.
+                        Keys: Variable names.
+                        Values: strings.
 
     ### Optional Named Parameters: 
 
@@ -2060,38 +2214,47 @@ compdef _conn connpy
                         work for most nodes. Change it if your connection 
                         need some special symbol.
 
+        - timeout (int):Time in seconds for expect to wait for prompt/EOF.
+                        default 10.
+
     ### Returns: 
         bool: true if expected value is found after running the commands 
               false if prompt is found before.
 
     &#39;&#39;&#39;
-    connect = self._connect()
+    connect = self._connect(timeout = timeout)
     if connect == True:
-        expects = [prompt, pexpect.EOF]
+        expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
         output = &#39;&#39;
-        if isinstance(commands, list):
-            for c in commands:
-                result = self.child.expect(expects)
-                self.child.sendline(c)
-                if result == 0:
-                    output = output + self.child.before.decode() + self.child.after.decode()
-                if result == 1:
-                    output = output + self.child.before.decode()
-        else:
-            self.child.expect(expects)
-            self.child.sendline(commands)
-            output = output + self.child.before.decode() + self.child.after.decode()
-        expects = [expected, prompt, pexpect.EOF]
-        results = self.child.expect(expects)
+        if not isinstance(commands, list):
+            commands = [commands]
+        for c in commands:
+            if vars is not None:
+                c = c.format(**vars)
+            result = self.child.expect(expects, timeout = timeout)
+            self.child.sendline(c)
+            if result == 0:
+                output = output + self.child.before.decode() + self.child.after.decode()
+            if result == 1:
+                output = output + self.child.before.decode()
+            if result == 2:
+                self.result = None
+                self.output = output + self.child.before.decode()
+                self.status = 2
+                return self.output
+        if vars is not None:
+            expected = expected.format(**vars)
+        expects = [expected, prompt, pexpect.EOF, pexpect.TIMEOUT]
+        results = self.child.expect(expects, timeout = timeout)
+        self.child.close()
         if results == 0:
-            self.child.close()
             self.result = True
             output = output + self.child.before.decode() + self.child.after.decode()
             output = output.lstrip()
             self.output = output
+            self.status = 0
             return True
         if results in [1, 2]:
-            self.child.close()
             self.result = False
             if results == 1:
                 output = output + self.child.before.decode() + self.child.after.decode()
@@ -2099,10 +2262,19 @@ compdef _conn connpy
                 output = output + self.child.before.decode()
             output = output.lstrip()
             self.output = output
+            self.status = 0
             return False
+        if results == 3:
+            self.result = None
+            output = output + self.child.before.decode()
+            output = output.lstrip()
+            self.output = output
+            self.status = 2
+            return output
     else:
         self.result = None
         self.output = connect
+        self.status = 1
         return connect</code></pre>
 </details>
 </dd>
@@ -2126,6 +2298,11 @@ compdef _conn connpy
                    is True if expected value is found after running 
                    the commands, False if prompt is found before. 
                    Created after running method test.
+
+- status   (dict): Dictionary formed by nodes unique as keys, value: 
+                   0 if method run or test ended succesfully.
+                   1 if connection failed.
+                   2 if expect timeouts without prompt or EOF.
 
 - &lt;unique&gt; (obj):  For each item in nodelist, there is an attribute
                    generated with the node unique.
@@ -2164,6 +2341,11 @@ compdef _conn connpy
                            the commands, False if prompt is found before. 
                            Created after running method test.  
 
+        - status   (dict): Dictionary formed by nodes unique as keys, value: 
+                           0 if method run or test ended succesfully.
+                           1 if connection failed.
+                           2 if expect timeouts without prompt or EOF.
+
         - &lt;unique&gt; (obj):  For each item in nodelist, there is an attribute
                            generated with the node unique.
         &#39;&#39;&#39;
@@ -2199,33 +2381,46 @@ compdef _conn connpy
             yield lst[i:i + n]
 
 
-    def run(self, commands,*, folder = None, prompt = None, stdout = None, parallel = 10):
+    def run(self, commands, vars = None,*, folder = None, prompt = None, stdout = None, parallel = 10, timeout = None):
         &#39;&#39;&#39;
         Run a command or list of commands on all the nodes in nodelist.
 
         ### Parameters:  
 
-            commands (str/list): Commands to run on the node. Should be str or 
-                                 list of str.
+            - commands (str/list): Commands to run on the nodes. Should be str or 
+                                   list of str. You can use variables as {varname}
+                                   and defining them in optional parameter vars.
+
+        ### Optional Parameters:  
+
+            - vars  (dict): Dictionary containing the definition of variables for
+                            each node, used in commands parameter.
+                            Keys should be formed by nodes unique names. Use
+                            special key name __global__ for global variables.
+                            Subkeys: Variable names.
+                            Values: strings.
 
         ### Optional Named Parameters:  
 
-            folder   (str): Path where output log should be stored, leave empty 
-                            to disable logging.  
+            - folder   (str): Path where output log should be stored, leave empty 
+                              to disable logging.  
 
-            prompt   (str): Prompt to be expected after a command is finished 
-                            running. Usually linux uses  &#34;&gt;&#34; or EOF while routers 
-                            use &#34;&gt;&#34; or &#34;#&#34;. The default value should work for 
-                            most nodes. Change it if your connection need some 
-                            special symbol.  
+            - prompt   (str): Prompt to be expected after a command is finished 
+                              running. Usually linux uses  &#34;&gt;&#34; or EOF while routers 
+                              use &#34;&gt;&#34; or &#34;#&#34;. The default value should work for 
+                              most nodes. Change it if your connection need some 
+                              special symbol.  
 
-            stdout  (bool): Set True to send the command output to stdout. 
-                            Default False.  
+            - stdout  (bool): Set True to send the command output to stdout. 
+                              Default False.  
 
-            parallel (int): Number of nodes to run the commands simultaneously. 
-                            Default is 10, if there are more nodes that this 
-                            value, nodes are groups in groups with max this 
-                            number of members.
+            - parallel (int): Number of nodes to run the commands simultaneously. 
+                              Default is 10, if there are more nodes that this 
+                              value, nodes are groups in groups with max this 
+                              number of members.
+            
+            - timeout  (int): Time in seconds for expect to wait for prompt/EOF.
+                              default 10.
 
         ###Returns:  
 
@@ -2234,6 +2429,7 @@ compdef _conn connpy
 
         &#39;&#39;&#39;
         args = {}
+        nodesargs = {}
         args[&#34;commands&#34;] = commands
         if folder != None:
             args[&#34;folder&#34;] = folder
@@ -2241,10 +2437,20 @@ compdef _conn connpy
             args[&#34;prompt&#34;] = prompt
         if stdout != None:
             args[&#34;stdout&#34;] = stdout
+        if timeout != None:
+            args[&#34;timeout&#34;] = timeout
         output = {}
+        status = {}
         tasks = []
         for n in self.nodelist:
-            tasks.append(threading.Thread(target=n.run, kwargs=args))
+            nodesargs[n.unique] = args.copy()
+            if vars != None:
+                nodesargs[n.unique][&#34;vars&#34;] = {}
+                if &#34;__global__&#34; in vars.keys():
+                    nodesargs[n.unique][&#34;vars&#34;].update(vars[&#34;__global__&#34;])
+                if n.unique in vars.keys():
+                    nodesargs[n.unique][&#34;vars&#34;].update(vars[n.unique])
+            tasks.append(threading.Thread(target=n.run, kwargs=nodesargs[n.unique]))
         taskslist = list(self._splitlist(tasks, parallel))
         for t in taskslist:
             for i in t:
@@ -2253,28 +2459,48 @@ compdef _conn connpy
                 i.join()
         for i in self.nodelist:
             output[i.unique] = i.output
+            status[i.unique] = i.status
         self.output = output
+        self.status = status
         return output
 
-    def test(self, commands, expected, *, prompt = None, parallel = 10):
+    def test(self, commands, expected, vars = None,*, prompt = None, parallel = 10, timeout = None):
         &#39;&#39;&#39;
         Run a command or list of commands on all the nodes in nodelist, then check if expected value appears on the output after the last command.
 
         ### Parameters:  
 
-            commands (str/list): Commands to run on the node. Should be str or 
-                                 list of str.  
+            - commands (str/list): Commands to run on the node. Should be str or 
+                                   list of str.  
 
-            expected (str)     : Expected text to appear after running all the 
-                                 commands on the node.
+            - expected (str)     : Expected text to appear after running all the 
+                                   commands on the node.
+
+        ### Optional Parameters:  
+
+            - vars  (dict): Dictionary containing the definition of variables for
+                            each node, used in commands and expected parameters.
+                            Keys should be formed by nodes unique names. Use
+                            special key name __global__ for global variables.
+                            Subkeys: Variable names.
+                            Values: strings.
 
         ### Optional Named Parameters:  
 
-            prompt (str): Prompt to be expected after a command is finished 
-                          running. Usually linux uses  &#34;&gt;&#34; or EOF while 
-                          routers use &#34;&gt;&#34; or &#34;#&#34;. The default value should 
-                          work for most nodes. Change it if your connection 
-                          need some special symbol.
+            - prompt   (str): Prompt to be expected after a command is finished 
+                              running. Usually linux uses  &#34;&gt;&#34; or EOF while 
+                              routers use &#34;&gt;&#34; or &#34;#&#34;. The default value should 
+                              work for most nodes. Change it if your connection 
+                              need some special symbol.
+
+
+            - parallel (int): Number of nodes to run the commands simultaneously. 
+                              Default is 10, if there are more nodes that this 
+                              value, nodes are groups in groups with max this 
+                              number of members.
+
+            - timeout  (int): Time in seconds for expect to wait for prompt/EOF.
+                              default 10.
 
         ### Returns:  
 
@@ -2284,15 +2510,26 @@ compdef _conn connpy
 
         &#39;&#39;&#39;
         args = {}
+        nodesargs = {}
         args[&#34;commands&#34;] = commands
         args[&#34;expected&#34;] = expected
         if prompt != None:
             args[&#34;prompt&#34;] = prompt
+        if timeout != None:
+            args[&#34;timeout&#34;] = timeout
         output = {}
         result = {}
+        status = {}
         tasks = []
         for n in self.nodelist:
-            tasks.append(threading.Thread(target=n.test, kwargs=args))
+            nodesargs[n.unique] = args.copy()
+            if vars != None:
+                nodesargs[n.unique][&#34;vars&#34;] = {}
+                if &#34;__global__&#34; in vars.keys():
+                    nodesargs[n.unique][&#34;vars&#34;].update(vars[&#34;__global__&#34;])
+                if n.unique in vars.keys():
+                    nodesargs[n.unique][&#34;vars&#34;].update(vars[n.unique])
+            tasks.append(threading.Thread(target=n.test, kwargs=nodesargs[n.unique]))
         taskslist = list(self._splitlist(tasks, parallel))
         for t in taskslist:
             for i in t:
@@ -2302,38 +2539,52 @@ compdef _conn connpy
         for i in self.nodelist:
             result[i.unique] = i.result
             output[i.unique] = i.output
+            status[i.unique] = i.status
         self.output = output
         self.result = result
+        self.status = status
         return result</code></pre>
 </details>
 <h3>Methods</h3>
 <dl>
 <dt id="connpy.nodes.run"><code class="name flex">
-<span>def <span class="ident">run</span></span>(<span>self, commands, *, folder=None, prompt=None, stdout=None, parallel=10)</span>
+<span>def <span class="ident">run</span></span>(<span>self, commands, vars=None, *, folder=None, prompt=None, stdout=None, parallel=10, timeout=None)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Run a command or list of commands on all the nodes in nodelist.</p>
 <h3 id="parameters">Parameters:</h3>
-<pre><code>commands (str/list): Commands to run on the node. Should be str or 
-                     list of str.
+<pre><code>- commands (str/list): Commands to run on the nodes. Should be str or 
+                       list of str. You can use variables as {varname}
+                       and defining them in optional parameter vars.
+</code></pre>
+<h3 id="optional-parameters">Optional Parameters:</h3>
+<pre><code>- vars  (dict): Dictionary containing the definition of variables for
+                each node, used in commands parameter.
+                Keys should be formed by nodes unique names. Use
+                special key name __global__ for global variables.
+                Subkeys: Variable names.
+                Values: strings.
 </code></pre>
 <h3 id="optional-named-parameters">Optional Named Parameters:</h3>
-<pre><code>folder   (str): Path where output log should be stored, leave empty 
-                to disable logging.
+<pre><code>- folder   (str): Path where output log should be stored, leave empty 
+                  to disable logging.
 
-prompt   (str): Prompt to be expected after a command is finished 
-                running. Usually linux uses  "&gt;" or EOF while routers 
-                use "&gt;" or "#". The default value should work for 
-                most nodes. Change it if your connection need some 
-                special symbol.
+- prompt   (str): Prompt to be expected after a command is finished 
+                  running. Usually linux uses  "&gt;" or EOF while routers 
+                  use "&gt;" or "#". The default value should work for 
+                  most nodes. Change it if your connection need some 
+                  special symbol.
 
-stdout  (bool): Set True to send the command output to stdout. 
-                Default False.
+- stdout  (bool): Set True to send the command output to stdout. 
+                  Default False.
 
-parallel (int): Number of nodes to run the commands simultaneously. 
-                Default is 10, if there are more nodes that this 
-                value, nodes are groups in groups with max this 
-                number of members.
+- parallel (int): Number of nodes to run the commands simultaneously. 
+                  Default is 10, if there are more nodes that this 
+                  value, nodes are groups in groups with max this 
+                  number of members.
+
+- timeout  (int): Time in seconds for expect to wait for prompt/EOF.
+                  default 10.
 </code></pre>
 <h3 id="returns">Returns:</h3>
 <pre><code>dict: Dictionary formed by nodes unique as keys, Output of the 
@@ -2343,33 +2594,46 @@ parallel (int): Number of nodes to run the commands simultaneously.
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def run(self, commands,*, folder = None, prompt = None, stdout = None, parallel = 10):
+<pre><code class="python">def run(self, commands, vars = None,*, folder = None, prompt = None, stdout = None, parallel = 10, timeout = None):
     &#39;&#39;&#39;
     Run a command or list of commands on all the nodes in nodelist.
 
     ### Parameters:  
 
-        commands (str/list): Commands to run on the node. Should be str or 
-                             list of str.
+        - commands (str/list): Commands to run on the nodes. Should be str or 
+                               list of str. You can use variables as {varname}
+                               and defining them in optional parameter vars.
+
+    ### Optional Parameters:  
+
+        - vars  (dict): Dictionary containing the definition of variables for
+                        each node, used in commands parameter.
+                        Keys should be formed by nodes unique names. Use
+                        special key name __global__ for global variables.
+                        Subkeys: Variable names.
+                        Values: strings.
 
     ### Optional Named Parameters:  
 
-        folder   (str): Path where output log should be stored, leave empty 
-                        to disable logging.  
+        - folder   (str): Path where output log should be stored, leave empty 
+                          to disable logging.  
 
-        prompt   (str): Prompt to be expected after a command is finished 
-                        running. Usually linux uses  &#34;&gt;&#34; or EOF while routers 
-                        use &#34;&gt;&#34; or &#34;#&#34;. The default value should work for 
-                        most nodes. Change it if your connection need some 
-                        special symbol.  
+        - prompt   (str): Prompt to be expected after a command is finished 
+                          running. Usually linux uses  &#34;&gt;&#34; or EOF while routers 
+                          use &#34;&gt;&#34; or &#34;#&#34;. The default value should work for 
+                          most nodes. Change it if your connection need some 
+                          special symbol.  
 
-        stdout  (bool): Set True to send the command output to stdout. 
-                        Default False.  
+        - stdout  (bool): Set True to send the command output to stdout. 
+                          Default False.  
 
-        parallel (int): Number of nodes to run the commands simultaneously. 
-                        Default is 10, if there are more nodes that this 
-                        value, nodes are groups in groups with max this 
-                        number of members.
+        - parallel (int): Number of nodes to run the commands simultaneously. 
+                          Default is 10, if there are more nodes that this 
+                          value, nodes are groups in groups with max this 
+                          number of members.
+        
+        - timeout  (int): Time in seconds for expect to wait for prompt/EOF.
+                          default 10.
 
     ###Returns:  
 
@@ -2378,6 +2642,7 @@ parallel (int): Number of nodes to run the commands simultaneously.
 
     &#39;&#39;&#39;
     args = {}
+    nodesargs = {}
     args[&#34;commands&#34;] = commands
     if folder != None:
         args[&#34;folder&#34;] = folder
@@ -2385,10 +2650,20 @@ parallel (int): Number of nodes to run the commands simultaneously.
         args[&#34;prompt&#34;] = prompt
     if stdout != None:
         args[&#34;stdout&#34;] = stdout
+    if timeout != None:
+        args[&#34;timeout&#34;] = timeout
     output = {}
+    status = {}
     tasks = []
     for n in self.nodelist:
-        tasks.append(threading.Thread(target=n.run, kwargs=args))
+        nodesargs[n.unique] = args.copy()
+        if vars != None:
+            nodesargs[n.unique][&#34;vars&#34;] = {}
+            if &#34;__global__&#34; in vars.keys():
+                nodesargs[n.unique][&#34;vars&#34;].update(vars[&#34;__global__&#34;])
+            if n.unique in vars.keys():
+                nodesargs[n.unique][&#34;vars&#34;].update(vars[n.unique])
+        tasks.append(threading.Thread(target=n.run, kwargs=nodesargs[n.unique]))
     taskslist = list(self._splitlist(tasks, parallel))
     for t in taskslist:
         for i in t:
@@ -2397,28 +2672,47 @@ parallel (int): Number of nodes to run the commands simultaneously.
             i.join()
     for i in self.nodelist:
         output[i.unique] = i.output
+        status[i.unique] = i.status
     self.output = output
+    self.status = status
     return output</code></pre>
 </details>
 </dd>
 <dt id="connpy.nodes.test"><code class="name flex">
-<span>def <span class="ident">test</span></span>(<span>self, commands, expected, *, prompt=None, parallel=10)</span>
+<span>def <span class="ident">test</span></span>(<span>self, commands, expected, vars=None, *, prompt=None, parallel=10, timeout=None)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Run a command or list of commands on all the nodes in nodelist, then check if expected value appears on the output after the last command.</p>
 <h3 id="parameters">Parameters:</h3>
-<pre><code>commands (str/list): Commands to run on the node. Should be str or 
-                     list of str.
+<pre><code>- commands (str/list): Commands to run on the node. Should be str or 
+                       list of str.
 
-expected (str)     : Expected text to appear after running all the 
-                     commands on the node.
+- expected (str)     : Expected text to appear after running all the 
+                       commands on the node.
+</code></pre>
+<h3 id="optional-parameters">Optional Parameters:</h3>
+<pre><code>- vars  (dict): Dictionary containing the definition of variables for
+                each node, used in commands and expected parameters.
+                Keys should be formed by nodes unique names. Use
+                special key name __global__ for global variables.
+                Subkeys: Variable names.
+                Values: strings.
 </code></pre>
 <h3 id="optional-named-parameters">Optional Named Parameters:</h3>
-<pre><code>prompt (str): Prompt to be expected after a command is finished 
-              running. Usually linux uses  "&gt;" or EOF while 
-              routers use "&gt;" or "#". The default value should 
-              work for most nodes. Change it if your connection 
-              need some special symbol.
+<pre><code>- prompt   (str): Prompt to be expected after a command is finished 
+                  running. Usually linux uses  "&gt;" or EOF while 
+                  routers use "&gt;" or "#". The default value should 
+                  work for most nodes. Change it if your connection 
+                  need some special symbol.
+
+
+- parallel (int): Number of nodes to run the commands simultaneously. 
+                  Default is 10, if there are more nodes that this 
+                  value, nodes are groups in groups with max this 
+                  number of members.
+
+- timeout  (int): Time in seconds for expect to wait for prompt/EOF.
+                  default 10.
 </code></pre>
 <h3 id="returns">Returns:</h3>
 <pre><code>dict: Dictionary formed by nodes unique as keys, value is True if 
@@ -2429,25 +2723,43 @@ expected (str)     : Expected text to appear after running all the
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def test(self, commands, expected, *, prompt = None, parallel = 10):
+<pre><code class="python">def test(self, commands, expected, vars = None,*, prompt = None, parallel = 10, timeout = None):
     &#39;&#39;&#39;
     Run a command or list of commands on all the nodes in nodelist, then check if expected value appears on the output after the last command.
 
     ### Parameters:  
 
-        commands (str/list): Commands to run on the node. Should be str or 
-                             list of str.  
+        - commands (str/list): Commands to run on the node. Should be str or 
+                               list of str.  
 
-        expected (str)     : Expected text to appear after running all the 
-                             commands on the node.
+        - expected (str)     : Expected text to appear after running all the 
+                               commands on the node.
+
+    ### Optional Parameters:  
+
+        - vars  (dict): Dictionary containing the definition of variables for
+                        each node, used in commands and expected parameters.
+                        Keys should be formed by nodes unique names. Use
+                        special key name __global__ for global variables.
+                        Subkeys: Variable names.
+                        Values: strings.
 
     ### Optional Named Parameters:  
 
-        prompt (str): Prompt to be expected after a command is finished 
-                      running. Usually linux uses  &#34;&gt;&#34; or EOF while 
-                      routers use &#34;&gt;&#34; or &#34;#&#34;. The default value should 
-                      work for most nodes. Change it if your connection 
-                      need some special symbol.
+        - prompt   (str): Prompt to be expected after a command is finished 
+                          running. Usually linux uses  &#34;&gt;&#34; or EOF while 
+                          routers use &#34;&gt;&#34; or &#34;#&#34;. The default value should 
+                          work for most nodes. Change it if your connection 
+                          need some special symbol.
+
+
+        - parallel (int): Number of nodes to run the commands simultaneously. 
+                          Default is 10, if there are more nodes that this 
+                          value, nodes are groups in groups with max this 
+                          number of members.
+
+        - timeout  (int): Time in seconds for expect to wait for prompt/EOF.
+                          default 10.
 
     ### Returns:  
 
@@ -2457,15 +2769,26 @@ expected (str)     : Expected text to appear after running all the
 
     &#39;&#39;&#39;
     args = {}
+    nodesargs = {}
     args[&#34;commands&#34;] = commands
     args[&#34;expected&#34;] = expected
     if prompt != None:
         args[&#34;prompt&#34;] = prompt
+    if timeout != None:
+        args[&#34;timeout&#34;] = timeout
     output = {}
     result = {}
+    status = {}
     tasks = []
     for n in self.nodelist:
-        tasks.append(threading.Thread(target=n.test, kwargs=args))
+        nodesargs[n.unique] = args.copy()
+        if vars != None:
+            nodesargs[n.unique][&#34;vars&#34;] = {}
+            if &#34;__global__&#34; in vars.keys():
+                nodesargs[n.unique][&#34;vars&#34;].update(vars[&#34;__global__&#34;])
+            if n.unique in vars.keys():
+                nodesargs[n.unique][&#34;vars&#34;].update(vars[n.unique])
+        tasks.append(threading.Thread(target=n.test, kwargs=nodesargs[n.unique]))
     taskslist = list(self._splitlist(tasks, parallel))
     for t in taskslist:
         for i in t:
@@ -2475,8 +2798,10 @@ expected (str)     : Expected text to appear after running all the
     for i in self.nodelist:
         result[i.unique] = i.result
         output[i.unique] = i.output
+        status[i.unique] = i.status
     self.output = output
     self.result = result
+    self.status = status
     return result</code></pre>
 </details>
 </dd>
@@ -2500,6 +2825,7 @@ expected (str)     : Expected text to appear after running all the
 <li><a href="#standalone-module">Standalone module</a></li>
 <li><a href="#using-manager-configuration">Using manager configuration</a></li>
 <li><a href="#running-parallel-tasks">Running parallel tasks</a></li>
+<li><a href="#using-variables">Using variables</a></li>
 </ul>
 </li>
 </ul>
