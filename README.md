@@ -59,6 +59,29 @@ for i in result:
 # Or for one specific node
 mynodes.router1.run(["term len 0". "show run"], folder = "/home/user/logs")
 ```
+### Using variables
+```
+import connpy
+config = connpy.configfile()
+nodes = config.getitem("@office", ["router1", "router2", "router3"])
+commands = []
+commands.append("config t")
+commands.append("interface lo {id}")
+commands.append("ip add {ip} {mask}")
+commands.append("end")
+variables = {}
+variables["router1"] = {"ip": "10.57.57.1"}
+variables["router2"] = {"ip": "10.57.57.2"}
+variables["router3"] = {"ip": "10.57.57.3"}
+variables["__global__"] = {"id": "57"}
+variables["__global__"]["mask"] =  "255.255.255.255"
+expected = "!"
+routers = connpy.nodes(nodes, config = config)
+routers.run(commands, variables)
+routers.test("ping {ip}", expected, variables)
+for key in routers.result:
+    print(key, ' ---> ', ("pass" if routers.result[key] else "fail"))
+```
 
 ## Connection manager 
 ### Features
