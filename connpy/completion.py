@@ -39,7 +39,7 @@ def main():
     wordsnumber = int(sys.argv[1])
     words = sys.argv[3:]
     if wordsnumber == 2:
-        strings=["--add", "--del", "--rm", "--edit", "--mod", "--show", "mv", "move", "ls", "list", "cp", "copy", "profile", "bulk", "config", "--help"]
+        strings=["--add", "--del", "--rm", "--edit", "--mod", "--show", "mv", "move", "ls", "list", "cp", "copy", "profile", "run", "bulk", "config", "--help"]
         strings.extend(nodes)
         strings.extend(folders)
 
@@ -53,11 +53,11 @@ def main():
             strings=["profile"]
         if words[0] in ["list", "ls"]:
             strings=["profiles", "nodes", "folders"]
-        if words[0] in ["bulk", "mv", "cp", "copy"]:
+        if words[0] in ["bulk", "mv", "cp", "copy", "run"]:
             strings=["--help"]
         if words[0] in ["--rm", "--del", "-r"]:
             strings.extend(folders)
-        if words[0] in ["--rm", "--del", "-r", "--mod", "--edit", "-e", "--show", "-s", "mv", "move", "cp", "copy"]:
+        if words[0] in ["--rm", "--del", "-r", "--mod", "--edit", "-e", "--show", "-s", "mv", "move", "cp", "copy", "run"]:
             strings.extend(nodes)
 
     elif wordsnumber == 4:

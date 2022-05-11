@@ -58,6 +58,7 @@ Commands:
   copy (cp)      Copy node
   list (ls)      List profiles, nodes or folders
   bulk           Add nodes in bulk
+  run            Run scripts or commands on nodes
   config         Manage app config
 </code></pre>
 <h3 id="manage-profiles">Manage profiles</h3>
@@ -140,9 +141,9 @@ commands.append(&quot;interface lo {id}&quot;)
 commands.append(&quot;ip add {ip} {mask}&quot;)
 commands.append(&quot;end&quot;)
 variables = {}
-variables[&quot;router1&quot;] = {&quot;ip&quot;: &quot;10.57.57.1&quot;}
-variables[&quot;router2&quot;] = {&quot;ip&quot;: &quot;10.57.57.2&quot;}
-variables[&quot;router3&quot;] = {&quot;ip&quot;: &quot;10.57.57.3&quot;}
+variables[&quot;router1@office&quot;] = {&quot;ip&quot;: &quot;10.57.57.1&quot;}
+variables[&quot;router2@office&quot;] = {&quot;ip&quot;: &quot;10.57.57.2&quot;}
+variables[&quot;router3@office&quot;] = {&quot;ip&quot;: &quot;10.57.57.3&quot;}
 variables[&quot;__global__&quot;] = {&quot;id&quot;: &quot;57&quot;}
 variables[&quot;__global__&quot;][&quot;mask&quot;] =  &quot;255.255.255.255&quot;
 expected = &quot;!&quot;
@@ -197,6 +198,7 @@ Commands:
   copy (cp)      Copy node
   list (ls)      List profiles, nodes or folders
   bulk           Add nodes in bulk
+  run            Run scripts or commands on nodes
   config         Manage app config
 ```
 
@@ -290,9 +292,9 @@ commands.append(&#34;interface lo {id}&#34;)
 commands.append(&#34;ip add {ip} {mask}&#34;)
 commands.append(&#34;end&#34;)
 variables = {}
-variables[&#34;router1&#34;] = {&#34;ip&#34;: &#34;10.57.57.1&#34;}
-variables[&#34;router2&#34;] = {&#34;ip&#34;: &#34;10.57.57.2&#34;}
-variables[&#34;router3&#34;] = {&#34;ip&#34;: &#34;10.57.57.3&#34;}
+variables[&#34;router1@office&#34;] = {&#34;ip&#34;: &#34;10.57.57.1&#34;}
+variables[&#34;router2@office&#34;] = {&#34;ip&#34;: &#34;10.57.57.2&#34;}
+variables[&#34;router3@office&#34;] = {&#34;ip&#34;: &#34;10.57.57.3&#34;}
 variables[&#34;__global__&#34;] = {&#34;id&#34;: &#34;57&#34;}
 variables[&#34;__global__&#34;][&#34;mask&#34;] =  &#34;255.255.255.255&#34;
 expected = &#34;!&#34;
@@ -507,7 +509,7 @@ __pdoc__ = {
                 folder = self.connections[uniques[&#34;folder&#34;]][uniques[&#34;subfolder&#34;]]
             else:
                 folder = self.connections[uniques[&#34;folder&#34;]]
-            newfolder = folder.copy()
+            newfolder = deepcopy(folder)
             newfolder.pop(&#34;type&#34;)
             for node in folder.keys():
                 if node == &#34;type&#34;:
@@ -518,9 +520,11 @@ __pdoc__ = {
                     else:
                         newfolder[node].pop(&#34;type&#34;)
             if keys == None:
+                newfolder = {&#34;{}{}&#34;.format(k,unique):v for k,v in newfolder.items()}
                 return newfolder
             else:
                 f_newfolder = dict((k, newfolder[k]) for k in keys)
+                f_newfolder = {&#34;{}{}&#34;.format(k,unique):v for k,v in f_newfolder.items()}
                 return f_newfolder
         else:
             if uniques.keys() &gt;= {&#34;folder&#34;, &#34;subfolder&#34;}:
@@ -529,7 +533,7 @@ __pdoc__ = {
                 node = self.connections[uniques[&#34;folder&#34;]][uniques[&#34;id&#34;]]
             else:
                 node = self.connections[uniques[&#34;id&#34;]]
-            newnode = node.copy()
+            newnode = deepcopy(node)
             newnode.pop(&#34;type&#34;)
             return newnode
 
@@ -629,7 +633,7 @@ __pdoc__ = {
             folder = self.connections[uniques[&#34;folder&#34;]][uniques[&#34;subfolder&#34;]]
         else:
             folder = self.connections[uniques[&#34;folder&#34;]]
-        newfolder = folder.copy()
+        newfolder = deepcopy(folder)
         newfolder.pop(&#34;type&#34;)
         for node in folder.keys():
             if node == &#34;type&#34;:
@@ -640,9 +644,11 @@ __pdoc__ = {
                 else:
                     newfolder[node].pop(&#34;type&#34;)
         if keys == None:
+            newfolder = {&#34;{}{}&#34;.format(k,unique):v for k,v in newfolder.items()}
             return newfolder
         else:
             f_newfolder = dict((k, newfolder[k]) for k in keys)
+            f_newfolder = {&#34;{}{}&#34;.format(k,unique):v for k,v in f_newfolder.items()}
             return f_newfolder
     else:
         if uniques.keys() &gt;= {&#34;folder&#34;, &#34;subfolder&#34;}:
@@ -651,7 +657,7 @@ __pdoc__ = {
             node = self.connections[uniques[&#34;folder&#34;]][uniques[&#34;id&#34;]]
         else:
             node = self.connections[uniques[&#34;id&#34;]]
-        newnode = node.copy()
+        newnode = deepcopy(node)
         newnode.pop(&#34;type&#34;)
         return newnode</code></pre>
 </details>
@@ -688,6 +694,7 @@ __pdoc__ = {
 
         &#39;&#39;&#39;
         self.node = node
+        self.connnodes = nodes
         self.config = config
         self.nodes = self._getallnodes()
         self.folders = self._getallfolders()
@@ -736,6 +743,11 @@ __pdoc__ = {
         bulkparser = subparsers.add_parser(&#34;bulk&#34;, help=&#34;Add nodes in bulk&#34;) 
         bulkparser.add_argument(&#34;bulk&#34;, const=&#34;bulk&#34;, nargs=0, action=self._store_type, help=&#34;Add nodes in bulk&#34;)
         bulkparser.set_defaults(func=self._func_others)
+        #RUNPARSER
+        runparser = subparsers.add_parser(&#34;run&#34;, help=&#34;Run scripts or commands on nodes&#34;, formatter_class=argparse.RawTextHelpFormatter) 
+        runparser.add_argument(&#34;run&#34;, nargs=&#39;+&#39;, action=self._store_type, help=self._help(&#34;run&#34;), default=&#34;run&#34;, type=self._type_node)
+        runparser.add_argument(&#34;-g&#34;,&#34;--generate&#34;, dest=&#34;action&#34;, action=&#34;store_const&#34;, help=&#34;Generate yaml file template&#34;, const=&#34;generate&#34;, default=&#34;run&#34;)
+        runparser.set_defaults(func=self._func_run)
         #CONFIGPARSER
         configparser = subparsers.add_parser(&#34;config&#34;, help=&#34;Manage app config&#34;) 
         configcrud = configparser.add_mutually_exclusive_group(required=True)
@@ -744,8 +756,8 @@ __pdoc__ = {
         configcrud.add_argument(&#34;--keepalive&#34;, dest=&#34;idletime&#34;, nargs=1, action=self._store_type, help=&#34;Set keepalive time in seconds, 0 to disable&#34;, type=int, metavar=&#34;INT&#34;)
         configcrud.add_argument(&#34;--completion&#34;, dest=&#34;completion&#34;, nargs=1, choices=[&#34;bash&#34;,&#34;zsh&#34;], action=self._store_type, help=&#34;Get terminal completion configuration for conn&#34;)
         configparser.set_defaults(func=self._func_others)
-        #Set default subparser and tune arguments
-        commands = [&#34;node&#34;, &#34;profile&#34;, &#34;mv&#34;, &#34;move&#34;,&#34;copy&#34;, &#34;cp&#34;, &#34;bulk&#34;, &#34;ls&#34;, &#34;list&#34;, &#34;config&#34;]
+        #Manage sys arguments
+        commands = [&#34;node&#34;, &#34;profile&#34;, &#34;mv&#34;, &#34;move&#34;,&#34;copy&#34;, &#34;cp&#34;, &#34;bulk&#34;, &#34;ls&#34;, &#34;list&#34;, &#34;run&#34;, &#34;config&#34;]
         profilecmds = [&#34;--add&#34;, &#34;-a&#34;, &#34;--del&#34;, &#34;--rm&#34;,  &#34;-r&#34;, &#34;--mod&#34;, &#34;--edit&#34;, &#34;-e&#34;, &#34;--show&#34;, &#34;-s&#34;]
         if len(sys.argv) &gt;= 3 and sys.argv[2] == &#34;profile&#34; and sys.argv[1] in profilecmds:
             sys.argv[2] = sys.argv[1]
@@ -1081,6 +1093,128 @@ __pdoc__ = {
                 self.config._saveconfig(self.config.file)
                 print(&#34;Config saved&#34;)
 
+    def _func_run(self, args):
+        if len(args.data) &gt; 1:
+            command = &#34; &#34;.join(args.data[1:])
+            command = command.split(&#34;-&#34;)
+            matches = list(filter(lambda k: k == args.data[0], self.nodes))
+            if len(matches) == 0:
+                print(&#34;{} not found&#34;.format(args.data[0]))
+                exit(2)
+            node = self.config.getitem(matches[0])
+            node = self.node(matches[0],**node, config = self.config)
+            node.run(command)
+            print(node.output)
+        else:
+            if args.action == &#34;generate&#34;:
+                if os.path.exists(args.data[0]):
+                    print(&#34;File {} already exists&#34;.format(args.data[0]))
+                    exit(14)
+                else:
+                    with open(args.data[0], &#34;w&#34;) as file:
+                        file.write(self._help(&#34;generate&#34;))
+                        file.close()
+                    print(&#34;File {} generated succesfully&#34;.format(args.data[0]))
+                    exit()
+            try:
+                with open(args.data[0]) as file:
+                    scripts = yaml.load(file, Loader=yaml.FullLoader)
+            except:
+                print(&#34;failed reading file {}&#34;.format(args.data[0]))
+                exit(10)
+            for script in scripts[&#34;tasks&#34;]:
+                nodes = {}
+                args = {}
+                try:
+                    action = script[&#34;action&#34;]
+                except:
+                    print(&#34;Action is mandatory&#34;)
+                    exit(11)
+                try:
+                    nodelist = script[&#34;nodes&#34;]
+                except:
+                    print(&#34;Nodes list is mandatory&#34;)
+                    exit(11)
+                # try:
+                for i in nodelist:
+                    if isinstance(i, dict):
+                        name = list(i.keys())[0]
+                        this = self.config.getitem(name, i[name])
+                        nodes.update(this)
+                    elif i.startswith(&#34;@&#34;):
+                        this = self.config.getitem(i)
+                        nodes.update(this)
+                    else:
+                        this = self.config.getitem(i)
+                        nodes[i] = this
+                nodes = self.connnodes(nodes, config = self.config)
+                # except:
+                    # print(&#34;Failed getting nodes&#34;)
+                    # exit(12)
+                try:
+                    args[&#34;commands&#34;] = script[&#34;commands&#34;]
+                except:
+                    print(&#34;Commands list is mandatory&#34;)
+                    exit(11)
+                if action == &#34;test&#34;:
+                    try:
+                        args[&#34;expected&#34;] = script[&#34;expected&#34;]
+                    except:
+                        print(&#34;Expected is mandatory with action &#39;test&#39;&#34;)
+                        exit(11)
+                try:
+                    args[&#34;vars&#34;] = script[&#34;variables&#34;]
+                except:
+                    pass
+                try:
+                    output = script[&#34;output&#34;]
+                except:
+                    print(&#34;output is mandatory&#34;)
+                    exit(11)
+                stdout = False
+                if output is None:
+                    pass
+                elif output == &#34;stdout&#34;:
+                    stdout = True
+                elif isinstance(output, str) and action == &#34;run&#34;:
+                    args[&#34;folder&#34;] = output
+                try:
+                    options = script[&#34;options&#34;]
+                except:
+                    options = None
+                if options is not None:
+                    thisoptions = {k: v for k, v in options.items() if k in [&#34;prompt&#34;, &#34;parallel&#34;, &#34;timeout&#34;]}
+                    print(thisoptions)
+                    args.update(thisoptions)
+                size = str(os.get_terminal_size())
+                p = re.search(r&#39;.*columns=([0-9]+)&#39;, size)
+                columns = int(p.group(1))
+                if action == &#34;run&#34;:
+                    nodes.run(**args)
+                    print(script[&#34;name&#34;].upper() + &#34;-&#34; * (columns - len(script[&#34;name&#34;])))
+                    for i in nodes.status.keys():
+                        print(&#34;   &#34; + i + &#34; &#34; + &#34;-&#34; * (columns - len(i) - 13) + (&#34; PASS(0)&#34; if nodes.status[i] == 0 else &#34; FAIL({})&#34;.format(nodes.status[i])))
+                        if stdout:
+                            for line in nodes.output[i].splitlines():
+                                print(&#34;      &#34; + line)
+                elif action == &#34;test&#34;:
+                    nodes.test(**args)
+                    print(script[&#34;name&#34;].upper() + &#34;-&#34; * (columns - len(script[&#34;name&#34;])))
+                    for i in nodes.status.keys():
+                        print(&#34;   &#34; + i + &#34; &#34; + &#34;-&#34; * (columns - len(i) - 13) + (&#34; PASS(0)&#34; if nodes.status[i] == 0 else &#34; FAIL({})&#34;.format(nodes.status[i])))
+                        if nodes.status[i] == 0:
+                            try:
+                                myexpected = args[&#34;expected&#34;].format(**args[&#34;vars&#34;][i])
+                            except:
+                                myexpected = args[&#34;expected&#34;]
+                            print(&#34;     TEST for &#39;{}&#39; --&gt; &#34;.format(myexpected) + str(nodes.result[i]).upper())
+                        if stdout:
+                            for line in nodes.output[i].splitlines():
+                                print(&#34;      &#34; + line)
+                else:
+                    print(&#34;Wrong action &#39;{}&#39;&#34;.format(action))
+                    exit(13)
+
     def _choose(self, list, name, action):
         #Generates an inquirer list to pick
         if FzfPrompt and self.fzf:
@@ -1363,7 +1497,7 @@ __pdoc__ = {
         if type == &#34;usage&#34;:
             return &#34;conn [-h] [--add | --del | --mod | --show | --debug] [node|folder]\n       conn {profile,move,mv,copy,cp,list,ls,bulk,config} ...&#34;
         if type == &#34;end&#34;:
-            return &#34;Commands:\n  profile        Manage profiles\n  move (mv)      Move node\n  copy (cp)      Copy node\n  list (ls)      List profiles, nodes or folders\n  bulk           Add nodes in bulk\n  config         Manage app config&#34;
+            return &#34;Commands:\n  profile        Manage profiles\n  move (mv)      Move node\n  copy (cp)      Copy node\n  list (ls)      List profiles, nodes or folders\n  bulk           Add nodes in bulk\n  run            Run scripts or commands on nodes\n  config         Manage app config&#34;
         if type == &#34;bashcompletion&#34;:
             return &#39;&#39;&#39;
 #Here starts bash completion for conn
@@ -1390,6 +1524,78 @@ compdef _conn conn
 compdef _conn connpy
 #Here ends zsh completion for conn
             &#39;&#39;&#39;
+        if type == &#34;run&#34;:
+            return &#34;node[@subfolder][@folder] commmand to run\nRun the specific command on the node and print output\n/path/to/file.yaml\nUse a yaml file to run an automation script&#34;
+        if type == &#34;generate&#34;:
+            return &#39;&#39;&#39;---
+tasks:
+- name: &#34;Config&#34;
+
+  action: &#39;run&#39; #Action can be test or run. Mandatory
+
+  nodes: #List of nodes to work on. Mandatory
+  - &#39;router1@office&#39; #You can add specific nodes
+  - &#39;@aws&#39;  #entire folders or subfolders
+  - &#39;@office&#39;:   #or filter inside a filder or subfolder
+    - &#39;router2&#39;
+    - &#39;router7&#39;
+
+  commands: #List of commands to send, use {name} to pass variables
+  - &#39;term len 0&#39;
+  - &#39;conf t&#39;
+  - &#39;interface {if}&#39;
+  - &#39;ip address 10.100.100.{id} 255.255.255.255&#39;
+  - &#39;{commit}&#39;
+  - &#39;end&#39;
+
+  variables: #Variables to use on commands and expected. Optional
+    __global__: #Global variables to use on all nodes, fallback if missing in the node.
+      commit: &#39;&#39;
+      if: &#39;loopback100&#39;
+    router1@office:
+      id: 1
+    router2@office:
+      id: 2
+      commit: &#39;commit&#39;
+    router3@office:
+      id: 3
+    vrouter1@aws:
+      id: 4
+    vrouterN@aws:
+      id: 5
+  
+  output: /home/user/logs #Type of output, if null you only get Connection and test result. Choices are: null,stdout,/path/to/folder. Folder path only works on &#39;run&#39; action.
+  
+  options:
+    prompt: r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39; #Optional prompt to check on your devices, default should work on most devices.
+    parallel: 10 #Optional number of nodes to run commands on parallel. Default 10.
+    timeout: 20 #Optional time to wait in seconds for prompt, expected or EOF. Default 20. 
+
+- name: &#34;TestConfig&#34;
+  action: &#39;test&#39;
+  nodes:
+  - &#39;router1@office&#39;
+  - &#39;@aws&#39;
+  - &#39;@office&#39;:
+    - &#39;router2&#39;
+    - &#39;router7&#39;
+  commands:
+  - &#39;ping 10.100.100.{id}&#39;
+  expected: &#39;!&#39; #Expected text to find when running test action. Mandatory for &#39;test&#39;
+  variables:
+    router1@office:
+      id: 1
+    router2@office:
+      id: 2
+      commit: &#39;commit&#39;
+    router3@office:
+      id: 3
+    vrouter1@aws:
+      id: 4
+    vrouterN@aws:
+      id: 5
+  output: null
+...&#39;&#39;&#39;
 
     def _getallnodes(self):
         #get all nodes on configfile
@@ -1895,16 +2101,16 @@ compdef _conn connpy
             self.status = 1
             return connect
 
-    def _connect(self, debug = False, timeout = 10):
+    def _connect(self, debug = False, timeout = 20):
         # Method to connect to the node, it parse all the information, create the ssh/telnet command and login to the node.
         if self.protocol == &#34;ssh&#34;:
             cmd = &#34;ssh&#34;
             if self.idletime &gt; 0:
                 cmd = cmd + &#34; -o ServerAliveInterval=&#34; + str(self.idletime)
             if self.user == &#39;&#39;:
-                cmd = cmd + &#34; -t {}&#34;.format(self.host)
+                cmd = cmd + &#34; {}&#34;.format(self.host)
             else:
-                cmd = cmd + &#34; -t {}&#34;.format(&#34;@&#34;.join([self.user,self.host]))
+                cmd = cmd + &#34; {}&#34;.format(&#34;@&#34;.join([self.user,self.host]))
             if self.port != &#39;&#39;:
                 cmd = cmd + &#34; -p &#34; + self.port
             if self.options != &#39;&#39;:
@@ -2420,7 +2626,7 @@ compdef _conn connpy
                               number of members.
             
             - timeout  (int): Time in seconds for expect to wait for prompt/EOF.
-                              default 10.
+                              default 20.
 
         ###Returns:  
 
@@ -2443,7 +2649,7 @@ compdef _conn connpy
         status = {}
         tasks = []
         for n in self.nodelist:
-            nodesargs[n.unique] = args.copy()
+            nodesargs[n.unique] = deepcopy(args)
             if vars != None:
                 nodesargs[n.unique][&#34;vars&#34;] = {}
                 if &#34;__global__&#34; in vars.keys():
@@ -2500,7 +2706,7 @@ compdef _conn connpy
                               number of members.
 
             - timeout  (int): Time in seconds for expect to wait for prompt/EOF.
-                              default 10.
+                              default 20.
 
         ### Returns:  
 
@@ -2522,7 +2728,7 @@ compdef _conn connpy
         status = {}
         tasks = []
         for n in self.nodelist:
-            nodesargs[n.unique] = args.copy()
+            nodesargs[n.unique] = deepcopy(args)
             if vars != None:
                 nodesargs[n.unique][&#34;vars&#34;] = {}
                 if &#34;__global__&#34; in vars.keys():
@@ -2584,7 +2790,7 @@ compdef _conn connpy
                   number of members.
 
 - timeout  (int): Time in seconds for expect to wait for prompt/EOF.
-                  default 10.
+                  default 20.
 </code></pre>
 <h3 id="returns">Returns:</h3>
 <pre><code>dict: Dictionary formed by nodes unique as keys, Output of the 
@@ -2633,7 +2839,7 @@ compdef _conn connpy
                           number of members.
         
         - timeout  (int): Time in seconds for expect to wait for prompt/EOF.
-                          default 10.
+                          default 20.
 
     ###Returns:  
 
@@ -2656,7 +2862,7 @@ compdef _conn connpy
     status = {}
     tasks = []
     for n in self.nodelist:
-        nodesargs[n.unique] = args.copy()
+        nodesargs[n.unique] = deepcopy(args)
         if vars != None:
             nodesargs[n.unique][&#34;vars&#34;] = {}
             if &#34;__global__&#34; in vars.keys():
@@ -2712,7 +2918,7 @@ compdef _conn connpy
                   number of members.
 
 - timeout  (int): Time in seconds for expect to wait for prompt/EOF.
-                  default 10.
+                  default 20.
 </code></pre>
 <h3 id="returns">Returns:</h3>
 <pre><code>dict: Dictionary formed by nodes unique as keys, value is True if 
@@ -2759,7 +2965,7 @@ compdef _conn connpy
                           number of members.
 
         - timeout  (int): Time in seconds for expect to wait for prompt/EOF.
-                          default 10.
+                          default 20.
 
     ### Returns:  
 
@@ -2781,7 +2987,7 @@ compdef _conn connpy
     status = {}
     tasks = []
     for n in self.nodelist:
-        nodesargs[n.unique] = args.copy()
+        nodesargs[n.unique] = deepcopy(args)
         if vars != None:
             nodesargs[n.unique][&#34;vars&#34;] = {}
             if &#34;__global__&#34; in vars.keys():

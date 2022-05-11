@@ -1,0 +1,70 @@
+---
+tasks:
+- name: "Config"
+
+  action: 'run' #Action can be test or run. Mandatory
+
+  nodes: #List of nodes to work on. Mandatory
+  - 'router1@office' #You can add specific nodes
+  - '@aws'  #entire folders or subfolders
+  - '@office':   #or filter inside a filder or subfolder
+    - 'router2'
+    - 'router7'
+
+  commands: #List of commands to send, use {name} to pass variables
+  - 'term len 0'
+  - 'conf t'
+  - 'interface {if}'
+  - 'ip address 10.100.100.{id} 255.255.255.255'
+  - '{commit}'
+  - 'end'
+
+  variables: #Variables to use on commands and expected. Optional
+    __global__: #Global variables to use on all nodes, fallback if missing in the node.
+      commit: ''
+      if: 'loopback100'
+    router1@office:
+      id: 1
+    router2@office:
+      id: 2
+      commit: 'commit'
+    router3@office:
+      id: 3
+    vrouter1@aws:
+      id: 4
+    vrouterN@aws:
+      id: 5
+  
+  output: /home/user/logs #Type of output, if null you only get Connection and test result. Choices are: null,stdout,/path/to/folder. Folder path only works on 'run' action.
+  
+  options:
+    prompt: r'>$|#$|\$$|>.$|#.$|\$.$' #Optional prompt to check on your devices, default should work on most devices.
+    parallel: 10 #Optional number of nodes to run commands on parallel. Default 10.
+    timeout: 20 #Optional time to wait in seconds for prompt, expected or EOF. Default 20. 
+
+- name: "TestConfig"
+  action: 'test'
+  nodes:
+  - 'router1@office'
+  - '@aws'
+  - '@office':
+    - 'router2'
+    - 'router7'
+  commands:
+  - 'ping 10.100.100.{id}'
+  expected: '!' #Expected text to find when running test action. Mandatory for 'test'
+  variables:
+    router1@office:
+      id: 1
+    router2@office:
+      id: 2
+      commit: 'commit'
+    router3@office:
+      id: 3
+    vrouter1@aws:
+      id: 4
+    vrouterN@aws:
+      id: 5
+  output: null
+...
+

@@ -5,6 +5,7 @@ import os
 import re
 from Crypto.PublicKey import RSA
 from pathlib import Path
+from copy import deepcopy
 
 
 #functions and classes
@@ -153,7 +154,7 @@ class configfile:
                 folder = self.connections[uniques["folder"]][uniques["subfolder"]]
             else:
                 folder = self.connections[uniques["folder"]]
-            newfolder = folder.copy()
+            newfolder = deepcopy(folder)
             newfolder.pop("type")
             for node in folder.keys():
                 if node == "type":
@@ -164,9 +165,11 @@ class configfile:
                     else:
                         newfolder[node].pop("type")
             if keys == None:
+                newfolder = {"{}{}".format(k,unique):v for k,v in newfolder.items()}
                 return newfolder
             else:
                 f_newfolder = dict((k, newfolder[k]) for k in keys)
+                f_newfolder = {"{}{}".format(k,unique):v for k,v in f_newfolder.items()}
                 return f_newfolder
         else:
             if uniques.keys() >= {"folder", "subfolder"}:
@@ -175,7 +178,7 @@ class configfile:
                 node = self.connections[uniques["folder"]][uniques["id"]]
             else:
                 node = self.connections[uniques["id"]]
-            newnode = node.copy()
+            newnode = deepcopy(node)
             newnode.pop("type")
             return newnode
 
