@@ -10,6 +10,7 @@ from time import sleep
 import datetime
 import sys
 import threading
+from copy import deepcopy
 
 #functions and classes
 
@@ -355,16 +356,16 @@ class node:
             self.status = 1
             return connect
 
-    def _connect(self, debug = False, timeout = 10):
+    def _connect(self, debug = False, timeout = 20):
         # Method to connect to the node, it parse all the information, create the ssh/telnet command and login to the node.
         if self.protocol == "ssh":
             cmd = "ssh"
             if self.idletime > 0:
                 cmd = cmd + " -o ServerAliveInterval=" + str(self.idletime)
             if self.user == '':
-                cmd = cmd + " -t {}".format(self.host)
+                cmd = cmd + " {}".format(self.host)
             else:
-                cmd = cmd + " -t {}".format("@".join([self.user,self.host]))
+                cmd = cmd + " {}".format("@".join([self.user,self.host]))
             if self.port != '':
                 cmd = cmd + " -p " + self.port
             if self.options != '':
@@ -530,7 +531,7 @@ class nodes:
                               number of members.
             
             - timeout  (int): Time in seconds for expect to wait for prompt/EOF.
-                              default 10.
+                              default 20.
 
         ###Returns:  
 
@@ -553,7 +554,7 @@ class nodes:
         status = {}
         tasks = []
         for n in self.nodelist:
-            nodesargs[n.unique] = args.copy()
+            nodesargs[n.unique] = deepcopy(args)
             if vars != None:
                 nodesargs[n.unique]["vars"] = {}
                 if "__global__" in vars.keys():
@@ -610,7 +611,7 @@ class nodes:
                               number of members.
 
             - timeout  (int): Time in seconds for expect to wait for prompt/EOF.
-                              default 10.
+                              default 20.
 
         ### Returns:  
 
@@ -632,7 +633,7 @@ class nodes:
         status = {}
         tasks = []
         for n in self.nodelist:
-            nodesargs[n.unique] = args.copy()
+            nodesargs[n.unique] = deepcopy(args)
             if vars != None:
                 nodesargs[n.unique]["vars"] = {}
                 if "__global__" in vars.keys():

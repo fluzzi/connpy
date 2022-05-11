@@ -8,8 +8,9 @@ import ast
 import argparse
 import sys
 import inquirer
-from .core import node
+from .core import node,nodes
 from ._version import __version__
+import yaml
 try:
     from pyfzf.pyfzf import FzfPrompt
 except:
@@ -33,6 +34,7 @@ class connapp:
 
         '''
         self.node = node
+        self.connnodes = nodes
         self.config = config
         self.nodes = self._getallnodes()
         self.folders = self._getallfolders()
@@ -81,6 +83,11 @@ class connapp:
         bulkparser = subparsers.add_parser("bulk", help="Add nodes in bulk") 
         bulkparser.add_argument("bulk", const="bulk", nargs=0, action=self._store_type, help="Add nodes in bulk")
         bulkparser.set_defaults(func=self._func_others)
+        #RUNPARSER
+        runparser = subparsers.add_parser("run", help="Run scripts or commands on nodes", formatter_class=argparse.RawTextHelpFormatter) 
+        runparser.add_argument("run", nargs='+', action=self._store_type, help=self._help("run"), default="run", type=self._type_node)
+        runparser.add_argument("-g","--generate", dest="action", action="store_const", help="Generate yaml file template", const="generate", default="run")
+        runparser.set_defaults(func=self._func_run)
         #CONFIGPARSER
         configparser = subparsers.add_parser("config", help="Manage app config") 
         configcrud = configparser.add_mutually_exclusive_group(required=True)
@@ -89,8 +96,8 @@ class connapp:
         configcrud.add_argument("--keepalive", dest="idletime", nargs=1, action=self._store_type, help="Set keepalive time in seconds, 0 to disable", type=int, metavar="INT")
         configcrud.add_argument("--completion", dest="completion", nargs=1, choices=["bash","zsh"], action=self._store_type, help="Get terminal completion configuration for conn")
         configparser.set_defaults(func=self._func_others)
-        #Set default subparser and tune arguments
-        commands = ["node", "profile", "mv", "move","copy", "cp", "bulk", "ls", "list", "config"]
+        #Manage sys arguments
+        commands = ["node", "profile", "mv", "move","copy", "cp", "bulk", "ls", "list", "run", "config"]
         profilecmds = ["--add", "-a", "--del", "--rm",  "-r", "--mod", "--edit", "-e", "--show", "-s"]
         if len(sys.argv) >= 3 and sys.argv[2] == "profile" and sys.argv[1] in profilecmds:
             sys.argv[2] = sys.argv[1]
@@ -426,6 +433,128 @@ class connapp:
                 self.config._saveconfig(self.config.file)
                 print("Config saved")
 
+    def _func_run(self, args):
+        if len(args.data) > 1:
+            command = " ".join(args.data[1:])
+            command = command.split("-")
+            matches = list(filter(lambda k: k == args.data[0], self.nodes))
+            if len(matches) == 0:
+                print("{} not found".format(args.data[0]))
+                exit(2)
+            node = self.config.getitem(matches[0])
+            node = self.node(matches[0],**node, config = self.config)
+            node.run(command)
+            print(node.output)
+        else:
+            if args.action == "generate":
+                if os.path.exists(args.data[0]):
+                    print("File {} already exists".format(args.data[0]))
+                    exit(14)
+                else:
+                    with open(args.data[0], "w") as file:
+                        file.write(self._help("generate"))
+                        file.close()
+                    print("File {} generated succesfully".format(args.data[0]))
+                    exit()
+            try:
+                with open(args.data[0]) as file:
+                    scripts = yaml.load(file, Loader=yaml.FullLoader)
+            except:
+                print("failed reading file {}".format(args.data[0]))
+                exit(10)
+            for script in scripts["tasks"]:
+                nodes = {}
+                args = {}
+                try:
+                    action = script["action"]
+                except:
+                    print("Action is mandatory")
+                    exit(11)
+                try:
+                    nodelist = script["nodes"]
+                except:
+                    print("Nodes list is mandatory")
+                    exit(11)
+                # try:
+                for i in nodelist:
+                    if isinstance(i, dict):
+                        name = list(i.keys())[0]
+                        this = self.config.getitem(name, i[name])
+                        nodes.update(this)
+                    elif i.startswith("@"):
+                        this = self.config.getitem(i)
+                        nodes.update(this)
+                    else:
+                        this = self.config.getitem(i)
+                        nodes[i] = this
+                nodes = self.connnodes(nodes, config = self.config)
+                # except:
+                    # print("Failed getting nodes")
+                    # exit(12)
+                try:
+                    args["commands"] = script["commands"]
+                except:
+                    print("Commands list is mandatory")
+                    exit(11)
+                if action == "test":
+                    try:
+                        args["expected"] = script["expected"]
+                    except:
+                        print("Expected is mandatory with action 'test'")
+                        exit(11)
+                try:
+                    args["vars"] = script["variables"]
+                except:
+                    pass
+                try:
+                    output = script["output"]
+                except:
+                    print("output is mandatory")
+                    exit(11)
+                stdout = False
+                if output is None:
+                    pass
+                elif output == "stdout":
+                    stdout = True
+                elif isinstance(output, str) and action == "run":
+                    args["folder"] = output
+                try:
+                    options = script["options"]
+                except:
+                    options = None
+                if options is not None:
+                    thisoptions = {k: v for k, v in options.items() if k in ["prompt", "parallel", "timeout"]}
+                    print(thisoptions)
+                    args.update(thisoptions)
+                size = str(os.get_terminal_size())
+                p = re.search(r'.*columns=([0-9]+)', size)
+                columns = int(p.group(1))
+                if action == "run":
+                    nodes.run(**args)
+                    print(script["name"].upper() + "-" * (columns - len(script["name"])))
+                    for i in nodes.status.keys():
+                        print("   " + i + " " + "-" * (columns - len(i) - 13) + (" PASS(0)" if nodes.status[i] == 0 else " FAIL({})".format(nodes.status[i])))
+                        if stdout:
+                            for line in nodes.output[i].splitlines():
+                                print("      " + line)
+                elif action == "test":
+                    nodes.test(**args)
+                    print(script["name"].upper() + "-" * (columns - len(script["name"])))
+                    for i in nodes.status.keys():
+                        print("   " + i + " " + "-" * (columns - len(i) - 13) + (" PASS(0)" if nodes.status[i] == 0 else " FAIL({})".format(nodes.status[i])))
+                        if nodes.status[i] == 0:
+                            try:
+                                myexpected = args["expected"].format(**args["vars"][i])
+                            except:
+                                myexpected = args["expected"]
+                            print("     TEST for '{}' --> ".format(myexpected) + str(nodes.result[i]).upper())
+                        if stdout:
+                            for line in nodes.output[i].splitlines():
+                                print("      " + line)
+                else:
+                    print("Wrong action '{}'".format(action))
+                    exit(13)
+
     def _choose(self, list, name, action):
         #Generates an inquirer list to pick
         if FzfPrompt and self.fzf:
@@ -708,7 +837,7 @@ class connapp:
         if type == "usage":
             return "conn [-h] [--add | --del | --mod | --show | --debug] [node|folder]\n       conn {profile,move,mv,copy,cp,list,ls,bulk,config} ..."
         if type == "end":
-            return "Commands:\n  profile        Manage profiles\n  move (mv)      Move node\n  copy (cp)      Copy node\n  list (ls)      List profiles, nodes or folders\n  bulk           Add nodes in bulk\n  config         Manage app config"
+            return "Commands:\n  profile        Manage profiles\n  move (mv)      Move node\n  copy (cp)      Copy node\n  list (ls)      List profiles, nodes or folders\n  bulk           Add nodes in bulk\n  run            Run scripts or commands on nodes\n  config         Manage app config"
         if type == "bashcompletion":
             return '''
 #Here starts bash completion for conn
@@ -735,6 +864,78 @@ compdef _conn conn
 compdef _conn connpy
 #Here ends zsh completion for conn
             '''
+        if type == "run":
+            return "node[@subfolder][@folder] commmand to run\nRun the specific command on the node and print output\n/path/to/file.yaml\nUse a yaml file to run an automation script"
+        if type == "generate":
+            return '''---
+tasks:
+- name: "Config"
+
+  action: 'run' #Action can be test or run. Mandatory
+
+  nodes: #List of nodes to work on. Mandatory
+  - 'router1@office' #You can add specific nodes
+  - '@aws'  #entire folders or subfolders
+  - '@office':   #or filter inside a filder or subfolder
+    - 'router2'
+    - 'router7'
+
+  commands: #List of commands to send, use {name} to pass variables
+  - 'term len 0'
+  - 'conf t'
+  - 'interface {if}'
+  - 'ip address 10.100.100.{id} 255.255.255.255'
+  - '{commit}'
+  - 'end'
+
+  variables: #Variables to use on commands and expected. Optional
+    __global__: #Global variables to use on all nodes, fallback if missing in the node.
+      commit: ''
+      if: 'loopback100'
+    router1@office:
+      id: 1
+    router2@office:
+      id: 2
+      commit: 'commit'
+    router3@office:
+      id: 3
+    vrouter1@aws:
+      id: 4
+    vrouterN@aws:
+      id: 5
+  
+  output: /home/user/logs #Type of output, if null you only get Connection and test result. Choices are: null,stdout,/path/to/folder. Folder path only works on 'run' action.
+  
+  options:
+    prompt: r'>$|#$|\$$|>.$|#.$|\$.$' #Optional prompt to check on your devices, default should work on most devices.
+    parallel: 10 #Optional number of nodes to run commands on parallel. Default 10.
+    timeout: 20 #Optional time to wait in seconds for prompt, expected or EOF. Default 20. 
+
+- name: "TestConfig"
+  action: 'test'
+  nodes:
+  - 'router1@office'
+  - '@aws'
+  - '@office':
+    - 'router2'
+    - 'router7'
+  commands:
+  - 'ping 10.100.100.{id}'
+  expected: '!' #Expected text to find when running test action. Mandatory for 'test'
+  variables:
+    router1@office:
+      id: 1
+    router2@office:
+      id: 2
+      commit: 'commit'
+    router3@office:
+      id: 3
+    vrouter1@aws:
+      id: 4
+    vrouterN@aws:
+      id: 5
+  output: null
+...'''
 
     def _getallnodes(self):
         #get all nodes on configfile

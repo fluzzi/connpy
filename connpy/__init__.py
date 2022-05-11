@@ -39,6 +39,7 @@ Commands:
   copy (cp)      Copy node
   list (ls)      List profiles, nodes or folders
   bulk           Add nodes in bulk
+  run            Run scripts or commands on nodes
   config         Manage app config
 ```
 
@@ -132,9 +133,9 @@ commands.append("interface lo {id}")
 commands.append("ip add {ip} {mask}")
 commands.append("end")
 variables = {}
-variables["router1"] = {"ip": "10.57.57.1"}
-variables["router2"] = {"ip": "10.57.57.2"}
-variables["router3"] = {"ip": "10.57.57.3"}
+variables["router1@office"] = {"ip": "10.57.57.1"}
+variables["router2@office"] = {"ip": "10.57.57.2"}
+variables["router3@office"] = {"ip": "10.57.57.3"}
 variables["__global__"] = {"id": "57"}
 variables["__global__"]["mask"] =  "255.255.255.255"
 expected = "!"
