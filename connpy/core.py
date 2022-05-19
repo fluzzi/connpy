@@ -133,7 +133,8 @@ class node:
             t = open(logfile, "r").read()
         else:
             t = logfile
-        t = t.replace("\n","",1).replace("\a","")
+        t = t.replace("\n","",1)
+        t = t.replace("\a","")
         t = t.replace('\n\n', '\n')
         t = re.sub(r'.\[K', '', t)
         while True:
@@ -144,6 +145,7 @@ class node:
         ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/ ]*[@-~])')
         t = ansi_escape.sub('', t)
         t = t.lstrip(" \n\r")
+        t = t.replace("\r","")
         if var == False:
             d = open(logfile, "w")
             d.write(t)
