@@ -704,6 +704,17 @@ __pdoc__ = {
             self.fzf = self.config.config[&#34;fzf&#34;]
         except:
             self.fzf = False
+
+
+    def start(self,argv = sys.argv[1:]):
+        &#39;&#39;&#39; 
+            
+        ### Parameters:  
+
+            - argv (list): List of arguments to pass to the app.
+                           Default: sys.argv[1:]
+
+        &#39;&#39;&#39; 
         #DEFAULTPARSER
         defaultparser = argparse.ArgumentParser(prog = &#34;conn&#34;, description = &#34;SSH and Telnet connection manager&#34;, formatter_class=argparse.RawTextHelpFormatter)
         subparsers = defaultparser.add_subparsers(title=&#34;Commands&#34;)
@@ -759,13 +770,13 @@ __pdoc__ = {
         #Manage sys arguments
         commands = [&#34;node&#34;, &#34;profile&#34;, &#34;mv&#34;, &#34;move&#34;,&#34;copy&#34;, &#34;cp&#34;, &#34;bulk&#34;, &#34;ls&#34;, &#34;list&#34;, &#34;run&#34;, &#34;config&#34;]
         profilecmds = [&#34;--add&#34;, &#34;-a&#34;, &#34;--del&#34;, &#34;--rm&#34;,  &#34;-r&#34;, &#34;--mod&#34;, &#34;--edit&#34;, &#34;-e&#34;, &#34;--show&#34;, &#34;-s&#34;]
-        if len(sys.argv) &gt;= 3 and sys.argv[2] == &#34;profile&#34; and sys.argv[1] in profilecmds:
-            sys.argv[2] = sys.argv[1]
-            sys.argv[1] = &#34;profile&#34;
-        if len(sys.argv) &lt; 2 or sys.argv[1] not in commands:
-            sys.argv.insert(1,&#34;node&#34;)
-        args = defaultparser.parse_args()
-        args.func(args)
+        if len(argv) &gt;= 2 and argv[1] == &#34;profile&#34; and argv[0] in profilecmds:
+            argv[1] = argv[0]
+            argv[0] = &#34;profile&#34;
+        if len(argv) &lt; 1 or argv[0] not in commands:
+            argv.insert(0,&#34;node&#34;)
+        args = defaultparser.parse_args(argv)
+        return args.func(args)
 
     class _store_type(argparse.Action):
         #Custom store type for cli app.
@@ -912,6 +923,7 @@ __pdoc__ = {
             if not updatenode:
                 exit(7)
             uniques.update(node)
+            uniques[&#34;type&#34;] = &#34;connection&#34;
             if sorted(updatenode.items()) == sorted(uniques.items()):
                 print(&#34;Nothing to do here&#34;)
                 return
@@ -1206,9 +1218,14 @@ __pdoc__ = {
                             try:
                                 myexpected = args[&#34;expected&#34;].format(**args[&#34;vars&#34;][i])
                             except:
-                                myexpected = args[&#34;expected&#34;]
+                                try:
+                                    myexpected = args[&#34;expected&#34;].format(**args[&#34;vars&#34;][&#34;__global__&#34;])
+                                except:
+                                    myexpected = args[&#34;expected&#34;]
                             print(&#34;     TEST for &#39;{}&#39; --&gt; &#34;.format(myexpected) + str(nodes.result[i]).upper())
                         if stdout:
+                            if nodes.status[i] == 0:
+                                print(&#34;     &#34; + &#34;-&#34; * (len(myexpected) + 16 + len(str(nodes.result[i]))))
                             for line in nodes.output[i].splitlines():
                                 print(&#34;      &#34; + line)
                 else:
@@ -1710,6 +1727,91 @@ tasks:
     return str(password)</code></pre>
 </details>
 </dd>
+<dt id="connpy.connapp.start"><code class="name flex">
+<span>def <span class="ident">start</span></span>(<span>self, argv=['-f', '-o', 'docs', '-c', "hljs_style='greyscale'", 'connpy', '--html'])</span>
+</code></dt>
+<dd>
+<div class="desc"><h3 id="parameters">Parameters:</h3>
+<pre><code>- argv (list): List of arguments to pass to the app.
+               Default: sys.argv[1:]
+</code></pre></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def start(self,argv = sys.argv[1:]):
+    &#39;&#39;&#39; 
+        
+    ### Parameters:  
+
+        - argv (list): List of arguments to pass to the app.
+                       Default: sys.argv[1:]
+
+    &#39;&#39;&#39; 
+    #DEFAULTPARSER
+    defaultparser = argparse.ArgumentParser(prog = &#34;conn&#34;, description = &#34;SSH and Telnet connection manager&#34;, formatter_class=argparse.RawTextHelpFormatter)
+    subparsers = defaultparser.add_subparsers(title=&#34;Commands&#34;)
+    #NODEPARSER
+    nodeparser = subparsers.add_parser(&#34;node&#34;,usage=self._help(&#34;usage&#34;), help=self._help(&#34;node&#34;),epilog=self._help(&#34;end&#34;), formatter_class=argparse.RawTextHelpFormatter) 
+    nodecrud = nodeparser.add_mutually_exclusive_group()
+    nodeparser.add_argument(&#34;node&#34;, metavar=&#34;node|folder&#34;, nargs=&#39;?&#39;, default=None, action=self._store_type, type=self._type_node, help=self._help(&#34;node&#34;))
+    nodecrud.add_argument(&#34;-v&#34;,&#34;--version&#34;, dest=&#34;action&#34;, action=&#34;store_const&#34;, help=&#34;Show version&#34;, const=&#34;version&#34;, default=&#34;connect&#34;)
+    nodecrud.add_argument(&#34;-a&#34;,&#34;--add&#34;, dest=&#34;action&#34;, action=&#34;store_const&#34;, help=&#34;Add new node[@subfolder][@folder] or [@subfolder]@folder&#34;, const=&#34;add&#34;, default=&#34;connect&#34;)
+    nodecrud.add_argument(&#34;-r&#34;,&#34;--del&#34;, &#34;--rm&#34;, dest=&#34;action&#34;, action=&#34;store_const&#34;, help=&#34;Delete node[@subfolder][@folder] or [@subfolder]@folder&#34;, const=&#34;del&#34;, default=&#34;connect&#34;)
+    nodecrud.add_argument(&#34;-e&#34;,&#34;--mod&#34;, &#34;--edit&#34;, dest=&#34;action&#34;, action=&#34;store_const&#34;, help=&#34;Modify node[@subfolder][@folder]&#34;, const=&#34;mod&#34;, default=&#34;connect&#34;)
+    nodecrud.add_argument(&#34;-s&#34;,&#34;--show&#34;, dest=&#34;action&#34;, action=&#34;store_const&#34;, help=&#34;Show node[@subfolder][@folder]&#34;, const=&#34;show&#34;, default=&#34;connect&#34;)
+    nodecrud.add_argument(&#34;-d&#34;,&#34;--debug&#34;, dest=&#34;action&#34;, action=&#34;store_const&#34;, help=&#34;Display all conections steps&#34;, const=&#34;debug&#34;, default=&#34;connect&#34;)
+    nodeparser.set_defaults(func=self._func_node)
+    #PROFILEPARSER
+    profileparser = subparsers.add_parser(&#34;profile&#34;, help=&#34;Manage profiles&#34;) 
+    profileparser.add_argument(&#34;profile&#34;, nargs=1, action=self._store_type, type=self._type_profile, help=&#34;Name of profile to manage&#34;)
+    profilecrud = profileparser.add_mutually_exclusive_group(required=True)
+    profilecrud.add_argument(&#34;-a&#34;, &#34;--add&#34;, dest=&#34;action&#34;, action=&#34;store_const&#34;, help=&#34;Add new profile&#34;, const=&#34;add&#34;)
+    profilecrud.add_argument(&#34;-r&#34;, &#34;--del&#34;, &#34;--rm&#34;, dest=&#34;action&#34;, action=&#34;store_const&#34;, help=&#34;Delete profile&#34;, const=&#34;del&#34;)
+    profilecrud.add_argument(&#34;-e&#34;, &#34;--mod&#34;, &#34;--edit&#34;, dest=&#34;action&#34;, action=&#34;store_const&#34;, help=&#34;Modify profile&#34;, const=&#34;mod&#34;)
+    profilecrud.add_argument(&#34;-s&#34;, &#34;--show&#34;, dest=&#34;action&#34;, action=&#34;store_const&#34;, help=&#34;Show profile&#34;, const=&#34;show&#34;)
+    profileparser.set_defaults(func=self._func_profile)
+    #MOVEPARSER
+    moveparser = subparsers.add_parser(&#34;move&#34;, aliases=[&#34;mv&#34;], help=&#34;Move node&#34;) 
+    moveparser.add_argument(&#34;move&#34;, nargs=2, action=self._store_type, help=&#34;Move node[@subfolder][@folder] dest_node[@subfolder][@folder]&#34;, default=&#34;move&#34;, type=self._type_node)
+    moveparser.set_defaults(func=self._func_others)
+    #COPYPARSER
+    copyparser = subparsers.add_parser(&#34;copy&#34;, aliases=[&#34;cp&#34;], help=&#34;Copy node&#34;) 
+    copyparser.add_argument(&#34;cp&#34;, nargs=2, action=self._store_type, help=&#34;Copy node[@subfolder][@folder] new_node[@subfolder][@folder]&#34;, default=&#34;cp&#34;, type=self._type_node)
+    copyparser.set_defaults(func=self._func_others)
+    #LISTPARSER
+    lsparser = subparsers.add_parser(&#34;list&#34;, aliases=[&#34;ls&#34;], help=&#34;List profiles, nodes or folders&#34;) 
+    lsparser.add_argument(&#34;ls&#34;, action=self._store_type, choices=[&#34;profiles&#34;,&#34;nodes&#34;,&#34;folders&#34;], help=&#34;List profiles, nodes or folders&#34;, default=False)
+    lsparser.set_defaults(func=self._func_others)
+    #BULKPARSER
+    bulkparser = subparsers.add_parser(&#34;bulk&#34;, help=&#34;Add nodes in bulk&#34;) 
+    bulkparser.add_argument(&#34;bulk&#34;, const=&#34;bulk&#34;, nargs=0, action=self._store_type, help=&#34;Add nodes in bulk&#34;)
+    bulkparser.set_defaults(func=self._func_others)
+    #RUNPARSER
+    runparser = subparsers.add_parser(&#34;run&#34;, help=&#34;Run scripts or commands on nodes&#34;, formatter_class=argparse.RawTextHelpFormatter) 
+    runparser.add_argument(&#34;run&#34;, nargs=&#39;+&#39;, action=self._store_type, help=self._help(&#34;run&#34;), default=&#34;run&#34;, type=self._type_node)
+    runparser.add_argument(&#34;-g&#34;,&#34;--generate&#34;, dest=&#34;action&#34;, action=&#34;store_const&#34;, help=&#34;Generate yaml file template&#34;, const=&#34;generate&#34;, default=&#34;run&#34;)
+    runparser.set_defaults(func=self._func_run)
+    #CONFIGPARSER
+    configparser = subparsers.add_parser(&#34;config&#34;, help=&#34;Manage app config&#34;) 
+    configcrud = configparser.add_mutually_exclusive_group(required=True)
+    configcrud.add_argument(&#34;--allow-uppercase&#34;, dest=&#34;case&#34;, nargs=1, action=self._store_type, help=&#34;Allow case sensitive names&#34;, choices=[&#34;true&#34;,&#34;false&#34;])
+    configcrud.add_argument(&#34;--fzf&#34;, dest=&#34;fzf&#34;, nargs=1, action=self._store_type, help=&#34;Use fzf for lists&#34;, choices=[&#34;true&#34;,&#34;false&#34;])
+    configcrud.add_argument(&#34;--keepalive&#34;, dest=&#34;idletime&#34;, nargs=1, action=self._store_type, help=&#34;Set keepalive time in seconds, 0 to disable&#34;, type=int, metavar=&#34;INT&#34;)
+    configcrud.add_argument(&#34;--completion&#34;, dest=&#34;completion&#34;, nargs=1, choices=[&#34;bash&#34;,&#34;zsh&#34;], action=self._store_type, help=&#34;Get terminal completion configuration for conn&#34;)
+    configparser.set_defaults(func=self._func_others)
+    #Manage sys arguments
+    commands = [&#34;node&#34;, &#34;profile&#34;, &#34;mv&#34;, &#34;move&#34;,&#34;copy&#34;, &#34;cp&#34;, &#34;bulk&#34;, &#34;ls&#34;, &#34;list&#34;, &#34;run&#34;, &#34;config&#34;]
+    profilecmds = [&#34;--add&#34;, &#34;-a&#34;, &#34;--del&#34;, &#34;--rm&#34;,  &#34;-r&#34;, &#34;--mod&#34;, &#34;--edit&#34;, &#34;-e&#34;, &#34;--show&#34;, &#34;-s&#34;]
+    if len(argv) &gt;= 2 and argv[1] == &#34;profile&#34; and argv[0] in profilecmds:
+        argv[1] = argv[0]
+        argv[0] = &#34;profile&#34;
+    if len(argv) &lt; 1 or argv[0] not in commands:
+        argv.insert(0,&#34;node&#34;)
+    args = defaultparser.parse_args(argv)
+    return args.func(args)</code></pre>
+</details>
+</dd>
 </dl>
 </dd>
 <dt id="connpy.node"><code class="flex name class">
@@ -1887,6 +1989,7 @@ tasks:
             t = tb
         ansi_escape = re.compile(r&#39;\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/ ]*[@-~])&#39;)
         t = ansi_escape.sub(&#39;&#39;, t)
+        t = t.lstrip(&#34; \n\r&#34;)
         if var == False:
             d = open(logfile, &#34;w&#34;)
             d.write(t)
@@ -1963,9 +2066,11 @@ tasks:
 
         &#39;&#39;&#39;
         connect = self._connect(timeout = timeout)
+        now = datetime.datetime.now().strftime(&#39;%Y-%m-%d_%H%M%S&#39;)
         if connect == True:
             expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
             output = &#39;&#39;
+            status = &#39;&#39;
             if not isinstance(commands, list):
                 commands = [commands]
             for c in commands:
@@ -1978,33 +2083,41 @@ tasks:
                 if result == 1:
                     output = output + self.child.before.decode()
                 if result == 2:
-                    self.output = output + self.child.before.decode()
-                    self.status = 2
-                    return self.output
-            result = self.child.expect(expects, timeout = timeout)
-            if result == 0:
-                output = output + self.child.before.decode() + self.child.after.decode()
-            if result == 1:
-                output = output + self.child.before.decode()
-            if result == 2:
-                self.output = output + self.child.before.decode()
-                self.status = 2
-                return self.output
+                    output = output + self.child.before.decode()
+                    status = 2
+                    break
+            if not status == 2:
+                result = self.child.expect(expects, timeout = timeout)
+                if result == 0:
+                    output = output + self.child.before.decode() + self.child.after.decode()
+                if result == 1:
+                    output = output + self.child.before.decode()
+                if result == 2:
+                    output = output + self.child.before.decode()
+                    status = 2
             self.child.close()
-            output = output.lstrip()
+            output = self._logclean(output, True)
             if stdout == True:
                 print(output)
             if folder != &#39;&#39;:
-                with open(folder + &#34;/&#34; + self.unique, &#34;w&#34;) as f:
+                with open(folder + &#34;/&#34; + self.unique + &#34;_&#34; + now + &#34;.txt&#34;, &#34;w&#34;) as f:
                     f.write(output)
                     f.close()
-                    self._logclean(folder + &#34;/&#34; + self.unique)
             self.output = output
-            self.status = 0
+            if status == 2:
+                self.status = 2
+            else:
+                self.status = 0
             return output
         else:
             self.output = connect
             self.status = 1
+            if stdout == True:
+                print(connect)
+            if folder != &#39;&#39;:
+                with open(folder + &#34;/&#34; + self.unique + &#34;_&#34; + now + &#34;.txt&#34;, &#34;w&#34;) as f:
+                    f.write(connect)
+                    f.close()
             return connect
 
     def test(self, commands, expected, vars = None,*, prompt = r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, timeout = 10):
@@ -2062,8 +2175,9 @@ tasks:
                 if result == 1:
                     output = output + self.child.before.decode()
                 if result == 2:
+                    output = output + self.child.before.decode()
                     self.result = None
-                    self.output = output + self.child.before.decode()
+                    self.output = self._logclean(output, True)
                     self.status = 2
                     return self.output
             if vars is not None:
@@ -2074,7 +2188,7 @@ tasks:
             if results == 0:
                 self.result = True
                 output = output + self.child.before.decode() + self.child.after.decode()
-                output = output.lstrip()
+                output = self._logclean(output, True)
                 self.output = output
                 self.status = 0
                 return True
@@ -2084,14 +2198,14 @@ tasks:
                     output = output + self.child.before.decode() + self.child.after.decode()
                 elif results == 2:
                     output = output + self.child.before.decode()
-                output = output.lstrip()
+                output = self._logclean(output, True)
                 self.output = output
                 self.status = 0
                 return False
             if results == 3:
                 self.result = None
                 output = output + self.child.before.decode()
-                output = output.lstrip()
+                output = self._logclean(output, True)
                 self.output = output
                 self.status = 2
                 return output
@@ -2304,9 +2418,11 @@ tasks:
 
     &#39;&#39;&#39;
     connect = self._connect(timeout = timeout)
+    now = datetime.datetime.now().strftime(&#39;%Y-%m-%d_%H%M%S&#39;)
     if connect == True:
         expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
         output = &#39;&#39;
+        status = &#39;&#39;
         if not isinstance(commands, list):
             commands = [commands]
         for c in commands:
@@ -2319,33 +2435,41 @@ tasks:
             if result == 1:
                 output = output + self.child.before.decode()
             if result == 2:
-                self.output = output + self.child.before.decode()
-                self.status = 2
-                return self.output
-        result = self.child.expect(expects, timeout = timeout)
-        if result == 0:
-            output = output + self.child.before.decode() + self.child.after.decode()
-        if result == 1:
-            output = output + self.child.before.decode()
-        if result == 2:
-            self.output = output + self.child.before.decode()
-            self.status = 2
-            return self.output
+                output = output + self.child.before.decode()
+                status = 2
+                break
+        if not status == 2:
+            result = self.child.expect(expects, timeout = timeout)
+            if result == 0:
+                output = output + self.child.before.decode() + self.child.after.decode()
+            if result == 1:
+                output = output + self.child.before.decode()
+            if result == 2:
+                output = output + self.child.before.decode()
+                status = 2
         self.child.close()
-        output = output.lstrip()
+        output = self._logclean(output, True)
         if stdout == True:
             print(output)
         if folder != &#39;&#39;:
-            with open(folder + &#34;/&#34; + self.unique, &#34;w&#34;) as f:
+            with open(folder + &#34;/&#34; + self.unique + &#34;_&#34; + now + &#34;.txt&#34;, &#34;w&#34;) as f:
                 f.write(output)
                 f.close()
-                self._logclean(folder + &#34;/&#34; + self.unique)
         self.output = output
-        self.status = 0
+        if status == 2:
+            self.status = 2
+        else:
+            self.status = 0
         return output
     else:
         self.output = connect
         self.status = 1
+        if stdout == True:
+            print(connect)
+        if folder != &#39;&#39;:
+            with open(folder + &#34;/&#34; + self.unique + &#34;_&#34; + now + &#34;.txt&#34;, &#34;w&#34;) as f:
+                f.write(connect)
+                f.close()
         return connect</code></pre>
 </details>
 </dd>
@@ -2444,8 +2568,9 @@ tasks:
             if result == 1:
                 output = output + self.child.before.decode()
             if result == 2:
+                output = output + self.child.before.decode()
                 self.result = None
-                self.output = output + self.child.before.decode()
+                self.output = self._logclean(output, True)
                 self.status = 2
                 return self.output
         if vars is not None:
@@ -2456,7 +2581,7 @@ tasks:
         if results == 0:
             self.result = True
             output = output + self.child.before.decode() + self.child.after.decode()
-            output = output.lstrip()
+            output = self._logclean(output, True)
             self.output = output
             self.status = 0
             return True
@@ -2466,14 +2591,14 @@ tasks:
                 output = output + self.child.before.decode() + self.child.after.decode()
             elif results == 2:
                 output = output + self.child.before.decode()
-            output = output.lstrip()
+            output = self._logclean(output, True)
             self.output = output
             self.status = 0
             return False
         if results == 3:
             self.result = None
             output = output + self.child.before.decode()
-            output = output.lstrip()
+            output = self._logclean(output, True)
             self.output = output
             self.status = 2
             return output
@@ -2639,6 +2764,7 @@ tasks:
         args[&#34;commands&#34;] = commands
         if folder != None:
             args[&#34;folder&#34;] = folder
+            Path(folder).mkdir(parents=True, exist_ok=True)
         if prompt != None:
             args[&#34;prompt&#34;] = prompt
         if stdout != None:
@@ -2852,6 +2978,7 @@ tasks:
     args[&#34;commands&#34;] = commands
     if folder != None:
         args[&#34;folder&#34;] = folder
+        Path(folder).mkdir(parents=True, exist_ok=True)
     if prompt != None:
         args[&#34;prompt&#34;] = prompt
     if stdout != None:
@@ -3049,6 +3176,7 @@ tasks:
 <h4><code><a title="connpy.connapp" href="#connpy.connapp">connapp</a></code></h4>
 <ul class="">
 <li><code><a title="connpy.connapp.encrypt" href="#connpy.connapp.encrypt">encrypt</a></code></li>
+<li><code><a title="connpy.connapp.start" href="#connpy.connapp.start">start</a></code></li>
 </ul>
 </li>
 <li>

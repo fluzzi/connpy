@@ -4,7 +4,8 @@ from connpy import *
 
 def main():
     conf = configfile()
-    connapp(conf)
+    app = connapp(conf)
+    app.start()
 
 if __name__ == '__main__':
     sys.exit(main())
