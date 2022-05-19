@@ -44,6 +44,17 @@ class connapp:
             self.fzf = self.config.config["fzf"]
         except:
             self.fzf = False
+
+
+    def start(self,argv = sys.argv[1:]):
+        ''' 
+            
+        ### Parameters:  
+
+            - argv (list): List of arguments to pass to the app.
+                           Default: sys.argv[1:]
+
+        ''' 
         #DEFAULTPARSER
         defaultparser = argparse.ArgumentParser(prog = "conn", description = "SSH and Telnet connection manager", formatter_class=argparse.RawTextHelpFormatter)
         subparsers = defaultparser.add_subparsers(title="Commands")
@@ -99,13 +110,13 @@ class connapp:
         #Manage sys arguments
         commands = ["node", "profile", "mv", "move","copy", "cp", "bulk", "ls", "list", "run", "config"]
         profilecmds = ["--add", "-a", "--del", "--rm",  "-r", "--mod", "--edit", "-e", "--show", "-s"]
-        if len(sys.argv) >= 3 and sys.argv[2] == "profile" and sys.argv[1] in profilecmds:
-            sys.argv[2] = sys.argv[1]
-            sys.argv[1] = "profile"
-        if len(sys.argv) < 2 or sys.argv[1] not in commands:
-            sys.argv.insert(1,"node")
-        args = defaultparser.parse_args()
-        args.func(args)
+        if len(argv) >= 2 and argv[1] == "profile" and argv[0] in profilecmds:
+            argv[1] = argv[0]
+            argv[0] = "profile"
+        if len(argv) < 1 or argv[0] not in commands:
+            argv.insert(0,"node")
+        args = defaultparser.parse_args(argv)
+        return args.func(args)
 
     class _store_type(argparse.Action):
         #Custom store type for cli app.
@@ -252,6 +263,7 @@ class connapp:
             if not updatenode:
                 exit(7)
             uniques.update(node)
+            uniques["type"] = "connection"
             if sorted(updatenode.items()) == sorted(uniques.items()):
                 print("Nothing to do here")
                 return
@@ -546,9 +558,14 @@ class connapp:
                             try:
                                 myexpected = args["expected"].format(**args["vars"][i])
                             except:
-                                myexpected = args["expected"]
+                                try:
+                                    myexpected = args["expected"].format(**args["vars"]["__global__"])
+                                except:
+                                    myexpected = args["expected"]
                             print("     TEST for '{}' --> ".format(myexpected) + str(nodes.result[i]).upper())
                         if stdout:
+                            if nodes.status[i] == 0:
+                                print("     " + "-" * (len(myexpected) + 16 + len(str(nodes.result[i]))))
                             for line in nodes.output[i].splitlines():
                                 print("      " + line)
                 else:

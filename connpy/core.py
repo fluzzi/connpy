@@ -10,6 +10,7 @@ from time import sleep
 import datetime
 import sys
 import threading
+from pathlib import Path
 from copy import deepcopy
 
 #functions and classes
@@ -142,6 +143,7 @@ class node:
             t = tb
         ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/ ]*[@-~])')
         t = ansi_escape.sub('', t)
+        t = t.lstrip(" \n\r")
         if var == False:
             d = open(logfile, "w")
             d.write(t)
@@ -218,9 +220,11 @@ class node:
 
         '''
         connect = self._connect(timeout = timeout)
+        now = datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S')
         if connect == True:
             expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
             output = ''
+            status = ''
             if not isinstance(commands, list):
                 commands = [commands]
             for c in commands:
@@ -233,33 +237,41 @@ class node:
                 if result == 1:
                     output = output + self.child.before.decode()
                 if result == 2:
-                    self.output = output + self.child.before.decode()
-                    self.status = 2
-                    return self.output
-            result = self.child.expect(expects, timeout = timeout)
-            if result == 0:
-                output = output + self.child.before.decode() + self.child.after.decode()
-            if result == 1:
-                output = output + self.child.before.decode()
-            if result == 2:
-                self.output = output + self.child.before.decode()
-                self.status = 2
-                return self.output
+                    output = output + self.child.before.decode()
+                    status = 2
+                    break
+            if not status == 2:
+                result = self.child.expect(expects, timeout = timeout)
+                if result == 0:
+                    output = output + self.child.before.decode() + self.child.after.decode()
+                if result == 1:
+                    output = output + self.child.before.decode()
+                if result == 2:
+                    output = output + self.child.before.decode()
+                    status = 2
             self.child.close()
-            output = output.lstrip()
+            output = self._logclean(output, True)
             if stdout == True:
                 print(output)
             if folder != '':
-                with open(folder + "/" + self.unique, "w") as f:
+                with open(folder + "/" + self.unique + "_" + now + ".txt", "w") as f:
                     f.write(output)
                     f.close()
-                    self._logclean(folder + "/" + self.unique)
             self.output = output
-            self.status = 0
+            if status == 2:
+                self.status = 2
+            else:
+                self.status = 0
             return output
         else:
             self.output = connect
             self.status = 1
+            if stdout == True:
+                print(connect)
+            if folder != '':
+                with open(folder + "/" + self.unique + "_" + now + ".txt", "w") as f:
+                    f.write(connect)
+                    f.close()
             return connect
 
     def test(self, commands, expected, vars = None,*, prompt = r'>$|#$|\$$|>.$|#.$|\$.$', timeout = 10):
@@ -317,8 +329,9 @@ class node:
                 if result == 1:
                     output = output + self.child.before.decode()
                 if result == 2:
+                    output = output + self.child.before.decode()
                     self.result = None
-                    self.output = output + self.child.before.decode()
+                    self.output = self._logclean(output, True)
                     self.status = 2
                     return self.output
             if vars is not None:
@@ -329,7 +342,7 @@ class node:
             if results == 0:
                 self.result = True
                 output = output + self.child.before.decode() + self.child.after.decode()
-                output = output.lstrip()
+                output = self._logclean(output, True)
                 self.output = output
                 self.status = 0
                 return True
@@ -339,14 +352,14 @@ class node:
                     output = output + self.child.before.decode() + self.child.after.decode()
                 elif results == 2:
                     output = output + self.child.before.decode()
-                output = output.lstrip()
+                output = self._logclean(output, True)
                 self.output = output
                 self.status = 0
                 return False
             if results == 3:
                 self.result = None
                 output = output + self.child.before.decode()
-                output = output.lstrip()
+                output = self._logclean(output, True)
                 self.output = output
                 self.status = 2
                 return output
@@ -544,6 +557,7 @@ class nodes:
         args["commands"] = commands
         if folder != None:
             args["folder"] = folder
+            Path(folder).mkdir(parents=True, exist_ok=True)
         if prompt != None:
             args["prompt"] = prompt
         if stdout != None:
