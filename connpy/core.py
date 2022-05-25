@@ -6,12 +6,13 @@ import pexpect
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 import ast
-from time import sleep
+from time import sleep,time
 import datetime
 import sys
 import threading
 from pathlib import Path
 from copy import deepcopy
+import io
 
 #functions and classes
 
@@ -154,6 +155,22 @@ class node:
         else:
             return t
 
+    def _filter(self, a):
+        #Set time for last input when using interact
+        self.lastinput = time()
+        return a
+
+    def _keepalive(self):
+        #Send keepalive ctrl+e when idletime passed without new inputs on interact
+        self.lastinput = time()
+        t = threading.currentThread()
+        while True:
+            if time() - self.lastinput >= self.idletime:
+                self.child.sendcontrol("e")
+                self.lastinput = time()
+            sleep(1)
+
+
     def interact(self, debug = False):
         '''
         Allow user to interact with the node directly, mostly used by connection manager.
@@ -169,14 +186,24 @@ class node:
             self.child.setwinsize(int(size.group(2)),int(size.group(1)))
             print("Connected to " + self.unique + " at " + self.host + (":" if self.port != '' else '') + self.port + " via: " + self.protocol)
             if 'logfile' in dir(self):
-                self.child.logfile_read = open(self.logfile, "wb")
-            elif debug:
-                self.child.logfile_read = None
+                if not 'mylog' in dir(self):
+                    self.mylog = io.BytesIO()
+                self.child.logfile_read = self.mylog
             if 'missingtext' in dir(self):
                 print(self.child.after.decode(), end='')
-            self.child.interact()
-            if "logfile" in dir(self) and not debug:
-                self._logclean(self.logfile)
+            if self.idletime > 0:
+                x = threading.Thread(target=self._keepalive)
+                x.daemon = True
+                x.start()
+            if debug:
+                print(self.mylog.getvalue().decode())
+            self.child.interact(input_filter=self._filter)
+            if "logfile" in dir(self):
+                output = self._logclean(self.mylog.getvalue().decode(), True)
+                with open(self.logfile, "w") as f:
+                    f.write(output)
+                    f.close()
+
         else:
             print(connect)
             exit(1)
@@ -229,30 +256,19 @@ class node:
             status = ''
             if not isinstance(commands, list):
                 commands = [commands]
+            self.mylog = io.BytesIO()
+            self.child.logfile_read = self.mylog
             for c in commands:
                 if vars is not None:
                     c = c.format(**vars)
                 result = self.child.expect(expects, timeout = timeout)
                 self.child.sendline(c)
-                if result == 0:
-                    output = output + self.child.before.decode() + self.child.after.decode()
-                if result == 1:
-                    output = output + self.child.before.decode()
                 if result == 2:
-                    output = output + self.child.before.decode()
-                    status = 2
                     break
-            if not status == 2:
+            if not result == 2:
                 result = self.child.expect(expects, timeout = timeout)
-                if result == 0:
-                    output = output + self.child.before.decode() + self.child.after.decode()
-                if result == 1:
-                    output = output + self.child.before.decode()
-                if result == 2:
-                    output = output + self.child.before.decode()
-                    status = 2
             self.child.close()
-            output = self._logclean(output, True)
+            output = self._logclean(self.mylog.getvalue().decode(), True)
             if stdout == True:
                 print(output)
             if folder != '':
@@ -260,7 +276,7 @@ class node:
                     f.write(output)
                     f.close()
             self.output = output
-            if status == 2:
+            if result == 2:
                 self.status = 2
             else:
                 self.status = 0
@@ -321,48 +337,34 @@ class node:
             output = ''
             if not isinstance(commands, list):
                 commands = [commands]
+            self.mylog = io.BytesIO()
+            self.child.logfile_read = self.mylog
             for c in commands:
                 if vars is not None:
                     c = c.format(**vars)
                 result = self.child.expect(expects, timeout = timeout)
                 self.child.sendline(c)
-                if result == 0:
-                    output = output + self.child.before.decode() + self.child.after.decode()
-                if result == 1:
-                    output = output + self.child.before.decode()
                 if result == 2:
-                    output = output + self.child.before.decode()
-                    self.result = None
-                    self.output = self._logclean(output, True)
-                    self.status = 2
-                    return self.output
-            if vars is not None:
-                expected = expected.format(**vars)
-            expects = [expected, prompt, pexpect.EOF, pexpect.TIMEOUT]
-            results = self.child.expect(expects, timeout = timeout)
+                    result = 3
+                    break
+            if not result == 3:
+                if vars is not None:
+                    expected = expected.format(**vars)
+                expects = [expected, prompt, pexpect.EOF, pexpect.TIMEOUT]
+                result = self.child.expect(expects, timeout = timeout)
             self.child.close()
-            if results == 0:
+            output = self._logclean(self.mylog.getvalue().decode(), True)
+            self.output = output
+            if result == 0:
                 self.result = True
-                output = output + self.child.before.decode() + self.child.after.decode()
-                output = self._logclean(output, True)
-                self.output = output
                 self.status = 0
                 return True
-            if results in [1, 2]:
+            if result in [1, 2]:
                 self.result = False
-                if results == 1:
-                    output = output + self.child.before.decode() + self.child.after.decode()
-                elif results == 2:
-                    output = output + self.child.before.decode()
-                output = self._logclean(output, True)
-                self.output = output
                 self.status = 0
                 return False
-            if results == 3:
+            if result == 3:
                 self.result = None
-                output = output + self.child.before.decode()
-                output = self._logclean(output, True)
-                self.output = output
                 self.status = 2
                 return output
         else:
@@ -410,7 +412,8 @@ class node:
         child = pexpect.spawn(cmd)
         if debug:
             print(cmd)
-            child.logfile_read = sys.stdout.buffer
+            self.mylog = io.BytesIO()
+            child.logfile_read = self.mylog
         if len(passwords) > 0:
             loops = len(passwords)
         else:
