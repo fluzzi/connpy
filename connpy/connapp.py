@@ -893,7 +893,7 @@ tasks:
   nodes: #List of nodes to work on. Mandatory
   - 'router1@office' #You can add specific nodes
   - '@aws'  #entire folders or subfolders
-  - '@office':   #or filter inside a filder or subfolder
+  - '@office':   #or filter inside a folder or subfolder
     - 'router2'
     - 'router7'
 
