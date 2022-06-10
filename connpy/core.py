@@ -92,13 +92,14 @@ class node:
         else:
             self.password = [password]
 
-    def __passtx(self, passwords, *, keyfile=None):
+    def _passtx(self, passwords, *, keyfile=None):
         # decrypts passwords, used by other methdos.
         dpass = []
         if keyfile is None:
             keyfile = self.key
         if keyfile is not None:
-            key = RSA.import_key(open(keyfile).read())
+            with open(keyfile) as f:
+                key = RSA.import_key(f.read())
             decryptor = PKCS1_OAEP.new(key)
         for passwd in passwords:
             if not re.match('^b[\"\'].+[\"\']$', passwd):
@@ -147,6 +148,8 @@ class node:
         t = ansi_escape.sub('', t)
         t = t.lstrip(" \n\r")
         t = t.replace("\r","")
+        t = t.replace("\x0E","")
+        t = t.replace("\x0F","")
         if var == False:
             d = open(logfile, "w")
             d.write(t)
@@ -163,7 +166,7 @@ class node:
     def _keepalive(self):
         #Send keepalive ctrl+e when idletime passed without new inputs on interact
         self.lastinput = time()
-        t = threading.currentThread()
+        t = threading.current_thread()
         while True:
             if time() - self.lastinput >= self.idletime:
                 self.child.sendcontrol("e")
@@ -208,7 +211,7 @@ class node:
             print(connect)
             exit(1)
 
-    def run(self, commands, vars = None,*, folder = '', prompt = r'>$|#$|\$$|>.$|#.$|\$.$', stdout = False, timeout = 10):
+    def run(self, commands, vars = None,*, folder = '', prompt = r'>$|#$|\$$|>.$|#.$|\$.$', stdout = False, timeout = 20):
         '''
         Run a command or list of commands on the node and return the output.
 
@@ -241,7 +244,7 @@ class node:
                             default False.
 
             - timeout (int):Time in seconds for expect to wait for prompt/EOF.
-                            default 10.
+                            default 20.
 
         ### Returns:  
 
@@ -292,7 +295,7 @@ class node:
                     f.close()
             return connect
 
-    def test(self, commands, expected, vars = None,*, prompt = r'>$|#$|\$$|>.$|#.$|\$.$', timeout = 10):
+    def test(self, commands, expected, vars = None,*, prompt = r'>$|#$|\$$|>.$|#.$|\$.$', timeout = 20):
         '''
         Run a command or list of commands on the node, then check if expected value appears on the output after the last command.
 
@@ -324,7 +327,7 @@ class node:
                             need some special symbol.
 
             - timeout (int):Time in seconds for expect to wait for prompt/EOF.
-                            default 10.
+                            default 20.
 
         ### Returns: 
             bool: true if expected value is found after running the commands 
@@ -390,7 +393,7 @@ class node:
             if self.logs != '':
                 self.logfile = self._logfile()
             if self.password[0] != '':
-                passwords = self.__passtx(self.password)
+                passwords = self._passtx(self.password)
             else:
                 passwords = []
             expects = ['yes/no', 'refused', 'supported', 'cipher', 'sage', 'timeout', 'unavailable', 'closed', '[p|P]assword:|[u|U]sername:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching host key"]
@@ -403,7 +406,7 @@ class node:
             if self.logs != '':
                 self.logfile = self._logfile()
             if self.password[0] != '':
-                passwords = self.__passtx(self.password)
+                passwords = self._passtx(self.password)
             else:
                 passwords = []
             expects = ['[u|U]sername:', 'refused', 'supported', 'cipher', 'sage', 'timeout', 'unavailable', 'closed', '[p|P]assword:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching host key"]

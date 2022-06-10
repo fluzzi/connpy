@@ -69,14 +69,18 @@ class configfile:
         self.profiles = config["profiles"]
         if not os.path.exists(self.key):
             self._createkey(self.key)
-        self.privatekey = RSA.import_key(open(self.key).read())
+        with open(self.key) as f:
+            self.privatekey = RSA.import_key(f.read())
+            f.close()
         self.publickey = self.privatekey.publickey()
 
 
     def _loadconfig(self, conf):
         #Loads config file
         jsonconf = open(conf)
-        return json.load(jsonconf)
+        jsondata = json.load(jsonconf)
+        jsonconf.close()
+        return jsondata
 
     def _createconfig(self, conf):
         #Create config file
@@ -87,7 +91,9 @@ class configfile:
                 f.close()
                 os.chmod(conf, 0o600)
         jsonconf = open(conf)
-        return json.load(jsonconf)
+        jsondata = json.load(jsonconf)
+        jsonconf.close()
+        return jsondata
 
     def _saveconfig(self, conf):
         #Save config file
@@ -106,6 +112,7 @@ class configfile:
             f.write(key.export_key('PEM'))
             f.close()
             os.chmod(keyfile, 0o600)
+        return key
 
     def _explode_unique(self, unique):
         #Divide unique name into folder, subfolder and id
