@@ -129,448 +129,458 @@ class connapp:
         #Function called when connecting or managing nodes.
         if not self.case and args.data != None:
             args.data = args.data.lower()
-        if args.action == "version":
-            print(__version__)
-        if args.action == "connect" or args.action == "debug":
-            if args.data == None:
-                matches = self.nodes
-                if len(matches) == 0:
-                    print("There are no nodes created")
-                    print("try: conn --help")
-                    exit(9)
-            else:
-                if args.data.startswith("@"):
-                    matches = list(filter(lambda k: args.data in k, self.nodes))
-                else:
-                    matches = list(filter(lambda k: k.startswith(args.data), self.nodes))
+        actions = {"version": self._version, "connect": self._connect, "debug": self._connect, "add": self._add, "del": self._del, "mod": self._mod, "show": self._show}
+        return actions.get(args.action)(args)
+
+    def _version(self, args):
+        print(__version__)
+
+    def _connect(self, args):
+        if args.data == None:
+            matches = self.nodes
             if len(matches) == 0:
-                print("{} not found".format(args.data))
-                exit(2)
-            elif len(matches) > 1:
-                matches[0] = self._choose(matches,"node", "connect")
-            if matches[0] == None:
-                exit(7)
-            node = self.config.getitem(matches[0])
-            node = self.node(matches[0],**node, config = self.config)
-            if args.action == "debug":
-                node.interact(debug = True)
+                print("There are no nodes created")
+                print("try: conn --help")
+                exit(9)
+        else:
+            if args.data.startswith("@"):
+                matches = list(filter(lambda k: args.data in k, self.nodes))
             else:
-                node.interact()
-        elif args.action == "del":
-            if args.data == None:
-                print("Missing argument node")
-                exit(3)
-            elif args.data.startswith("@"):
-                matches = list(filter(lambda k: k == args.data, self.folders))
+                matches = list(filter(lambda k: k.startswith(args.data), self.nodes))
+        if len(matches) == 0:
+            print("{} not found".format(args.data))
+            exit(2)
+        elif len(matches) > 1:
+            matches[0] = self._choose(matches,"node", "connect")
+        if matches[0] == None:
+            exit(7)
+        node = self.config.getitem(matches[0])
+        node = self.node(matches[0],**node, config = self.config)
+        if args.action == "debug":
+            node.interact(debug = True)
+        else:
+            node.interact()
+
+    def _del(self, args):
+        if args.data == None:
+            print("Missing argument node")
+            exit(3)
+        elif args.data.startswith("@"):
+            matches = list(filter(lambda k: k == args.data, self.folders))
+        else:
+            matches = list(filter(lambda k: k == args.data, self.nodes))
+        if len(matches) == 0:
+            print("{} not found".format(args.data))
+            exit(2)
+        question = [inquirer.Confirm("delete", message="Are you sure you want to delete {}?".format(matches[0]))]
+        confirm = inquirer.prompt(question)
+        if confirm == None:
+            exit(7)
+        if confirm["delete"]:
+            uniques = self.config._explode_unique(matches[0])
+            if args.data.startswith("@"):
+                self.config._folder_del(**uniques)
             else:
-                matches = list(filter(lambda k: k == args.data, self.nodes))
-            if len(matches) == 0:
-                print("{} not found".format(args.data))
-                exit(2)
-            question = [inquirer.Confirm("delete", message="Are you sure you want to delete {}?".format(matches[0]))]
-            confirm = inquirer.prompt(question)
-            if confirm["delete"]:
-                uniques = self.config._explode_unique(matches[0])
-                if args.data.startswith("@"):
-                    self.config._folder_del(**uniques)
-                else:
-                    self.config._connections_del(**uniques)
-                self.config._saveconfig(self.config.file)
-                print("{} deleted succesfully".format(matches[0]))
-        elif args.action == "add":
-            if args.data == None:
-                print("Missing argument node")
-                exit(3)
-            elif args.data.startswith("@"):
-                type = "folder"
-                matches = list(filter(lambda k: k == args.data, self.folders))
-                reversematches = list(filter(lambda k: "@" + k == args.data, self.nodes))
-            else:
-                type = "node"
-                matches = list(filter(lambda k: k == args.data, self.nodes))
-                reversematches = list(filter(lambda k: k == "@" + args.data, self.folders))
-            if len(matches) > 0:
-                print("{} already exist".format(matches[0]))
-                exit(4)
-            if len(reversematches) > 0:
-                print("{} already exist".format(reversematches[0]))
-                exit(4)
-            else:
-                if type == "folder":
-                    uniques = self.config._explode_unique(args.data)
-                    if uniques == False:
-                        print("Invalid folder {}".format(args.data))
-                        exit(5)
-                    if "subfolder" in uniques.keys():
-                        parent = "@" + uniques["folder"]
-                        if parent not in self.folders:
-                            print("Folder {} not found".format(uniques["folder"]))
-                            exit(2)
-                    self.config._folder_add(**uniques)
-                    self.config._saveconfig(self.config.file)
-                    print("{} added succesfully".format(args.data))
-                        
-                if type == "node":
-                    nodefolder = args.data.partition("@")
-                    nodefolder = "@" + nodefolder[2]
-                    if nodefolder not in self.folders and nodefolder != "@":
-                        print(nodefolder + " not found")
+                self.config._connections_del(**uniques)
+            self.config._saveconfig(self.config.file)
+            print("{} deleted succesfully".format(matches[0]))
+
+    def _add(self, args):
+        if args.data == None:
+            print("Missing argument node")
+            exit(3)
+        elif args.data.startswith("@"):
+            type = "folder"
+            matches = list(filter(lambda k: k == args.data, self.folders))
+            reversematches = list(filter(lambda k: "@" + k == args.data, self.nodes))
+        else:
+            type = "node"
+            matches = list(filter(lambda k: k == args.data, self.nodes))
+            reversematches = list(filter(lambda k: k == "@" + args.data, self.folders))
+        if len(matches) > 0:
+            print("{} already exist".format(matches[0]))
+            exit(4)
+        if len(reversematches) > 0:
+            print("{} already exist".format(reversematches[0]))
+            exit(4)
+        else:
+            if type == "folder":
+                uniques = self.config._explode_unique(args.data)
+                if uniques == False:
+                    print("Invalid folder {}".format(args.data))
+                    exit(5)
+                if "subfolder" in uniques.keys():
+                    parent = "@" + uniques["folder"]
+                    if parent not in self.folders:
+                        print("Folder {} not found".format(uniques["folder"]))
                         exit(2)
-                    uniques = self.config._explode_unique(args.data)
-                    if uniques == False:
-                        print("Invalid node {}".format(args.data))
-                        exit(5)
-                    print("You can use the configured setting in a profile using @profilename.")
-                    print("You can also leave empty any value except hostname/IP.")
-                    print("You can pass 1 or more passwords using comma separated @profiles")
-                    print("You can use this variables on logging file name: ${id} ${unique} ${host} ${port} ${user} ${protocol}")
-                    newnode = self._questions_nodes(args.data, uniques)
-                    if newnode == False:
-                        exit(7)
-                    self.config._connections_add(**newnode)
-                    self.config._saveconfig(self.config.file)
-                    print("{} added succesfully".format(args.data))
-        elif args.action == "show":
-            if args.data == None:
-                print("Missing argument node")
-                exit(3)
-            matches = list(filter(lambda k: k == args.data, self.nodes))
-            if len(matches) == 0:
-                print("{} not found".format(args.data))
-                exit(2)
-            node = self.config.getitem(matches[0])
-            for k, v in node.items():
-                if isinstance(v, str):
-                    print(k + ": " + v)
-                else:
-                    print(k + ":")
-                    for i in v:
-                        print("  - " + i)
-        elif args.action == "mod":
-            if args.data == None:
-                print("Missing argument node")
-                exit(3)
-            matches = list(filter(lambda k: k == args.data, self.nodes))
-            if len(matches) == 0:
-                print("{} not found".format(args.data))
-                exit(2)
-            node = self.config.getitem(matches[0])
-            edits = self._questions_edit()
-            if edits == None:
-                exit(7)
-            uniques = self.config._explode_unique(args.data)
-            updatenode = self._questions_nodes(args.data, uniques, edit=edits)
-            if not updatenode:
-                exit(7)
-            uniques.update(node)
-            uniques["type"] = "connection"
-            if sorted(updatenode.items()) == sorted(uniques.items()):
-                print("Nothing to do here")
-                return
-            else:
-                self.config._connections_add(**updatenode)
+                self.config._folder_add(**uniques)
                 self.config._saveconfig(self.config.file)
-                print("{} edited succesfully".format(args.data))
+                print("{} added succesfully".format(args.data))
+            if type == "node":
+                nodefolder = args.data.partition("@")
+                nodefolder = "@" + nodefolder[2]
+                if nodefolder not in self.folders and nodefolder != "@":
+                    print(nodefolder + " not found")
+                    exit(2)
+                uniques = self.config._explode_unique(args.data)
+                if uniques == False:
+                    print("Invalid node {}".format(args.data))
+                    exit(5)
+                print("You can use the configured setting in a profile using @profilename.")
+                print("You can also leave empty any value except hostname/IP.")
+                print("You can pass 1 or more passwords using comma separated @profiles")
+                print("You can use this variables on logging file name: ${id} ${unique} ${host} ${port} ${user} ${protocol}")
+                newnode = self._questions_nodes(args.data, uniques)
+                if newnode == False:
+                    exit(7)
+                self.config._connections_add(**newnode)
+                self.config._saveconfig(self.config.file)
+                print("{} added succesfully".format(args.data))
+
+    def _show(self, args):
+        if args.data == None:
+            print("Missing argument node")
+            exit(3)
+        matches = list(filter(lambda k: k == args.data, self.nodes))
+        if len(matches) == 0:
+            print("{} not found".format(args.data))
+            exit(2)
+        node = self.config.getitem(matches[0])
+        for k, v in node.items():
+            if isinstance(v, str):
+                print(k + ": " + v)
+            else:
+                print(k + ":")
+                for i in v:
+                    print("  - " + i)
+
+    def _mod(self, args):
+        if args.data == None:
+            print("Missing argument node")
+            exit(3)
+        matches = list(filter(lambda k: k == args.data, self.nodes))
+        if len(matches) == 0:
+            print("{} not found".format(args.data))
+            exit(2)
+        node = self.config.getitem(matches[0])
+        edits = self._questions_edit()
+        if edits == None:
+            exit(7)
+        uniques = self.config._explode_unique(args.data)
+        updatenode = self._questions_nodes(args.data, uniques, edit=edits)
+        if not updatenode:
+            exit(7)
+        uniques.update(node)
+        uniques["type"] = "connection"
+        if sorted(updatenode.items()) == sorted(uniques.items()):
+            print("Nothing to do here")
+            return
+        else:
+            self.config._connections_add(**updatenode)
+            self.config._saveconfig(self.config.file)
+            print("{} edited succesfully".format(args.data))
 
 
     def _func_profile(self, args):
         #Function called when managing profiles
         if not self.case:
             args.data[0] = args.data[0].lower()
-        if args.action == "del":
-            matches = list(filter(lambda k: k == args.data[0], self.profiles))
-            if len(matches) == 0:
-                print("{} not found".format(args.data[0]))
-                exit(2)
-            if matches[0] == "default":
-                print("Can't delete default profile")
-                exit(6)
-            usedprofile = self._profileused(matches[0])
-            if len(usedprofile) > 0:
-                print("Profile {} used in the following nodes:".format(matches[0]))
-                print(", ".join(usedprofile))
-                exit(8)
-            question = [inquirer.Confirm("delete", message="Are you sure you want to delete {}?".format(matches[0]))]
-            confirm = inquirer.prompt(question)
-            if confirm["delete"]:
-                self.config._profiles_del(id = matches[0])
-                self.config._saveconfig(self.config.file)
-                print("{} deleted succesfully".format(matches[0]))
-        elif args.action == "show":
-            matches = list(filter(lambda k: k == args.data[0], self.profiles))
-            if len(matches) == 0:
-                print("{} not found".format(args.data[0]))
-                exit(2)
-            profile = self.config.profiles[matches[0]]
-            for k, v in profile.items():
-                if isinstance(v, str):
-                    print(k + ": " + v)
-                else:
-                    print(k + ":")
-                    for i in v:
-                        print("  - " + i)
-        elif args.action == "add":
-            matches = list(filter(lambda k: k == args.data[0], self.profiles))
-            if len(matches) > 0:
-                print("Profile {} Already exist".format(matches[0]))
-                exit(4)
-            newprofile = self._questions_profiles(args.data[0])
-            if newprofile == False:
-                exit(7)
-            self.config._profiles_add(**newprofile)
+        actions = {"add": self._profile_add, "del": self._profile_del, "mod": self._profile_mod, "show": self._profile_show}
+        return actions.get(args.action)(args)
+
+    def _profile_del(self, args):
+        matches = list(filter(lambda k: k == args.data[0], self.profiles))
+        if len(matches) == 0:
+            print("{} not found".format(args.data[0]))
+            exit(2)
+        if matches[0] == "default":
+            print("Can't delete default profile")
+            exit(6)
+        usedprofile = self._profileused(matches[0])
+        if len(usedprofile) > 0:
+            print("Profile {} used in the following nodes:".format(matches[0]))
+            print(", ".join(usedprofile))
+            exit(8)
+        question = [inquirer.Confirm("delete", message="Are you sure you want to delete {}?".format(matches[0]))]
+        confirm = inquirer.prompt(question)
+        if confirm["delete"]:
+            self.config._profiles_del(id = matches[0])
             self.config._saveconfig(self.config.file)
-            print("{} added succesfully".format(args.data[0]))
-        elif args.action == "mod":
-            matches = list(filter(lambda k: k == args.data[0], self.profiles))
-            if len(matches) == 0:
-                print("{} not found".format(args.data[0]))
-                exit(2)
-            profile = self.config.profiles[matches[0]]
-            oldprofile = {"id": matches[0]}
-            oldprofile.update(profile)
-            edits = self._questions_edit()
-            if edits == None:
-                exit(7)
-            updateprofile = self._questions_profiles(matches[0], edit=edits)
-            if not updateprofile:
-                exit(7)
-            if sorted(updateprofile.items()) == sorted(oldprofile.items()):
-                print("Nothing to do here")
-                return
+            print("{} deleted succesfully".format(matches[0]))
+
+    def _profile_show(self, args):
+        matches = list(filter(lambda k: k == args.data[0], self.profiles))
+        if len(matches) == 0:
+            print("{} not found".format(args.data[0]))
+            exit(2)
+        profile = self.config.profiles[matches[0]]
+        for k, v in profile.items():
+            if isinstance(v, str):
+                print(k + ": " + v)
             else:
-                self.config._profiles_add(**updateprofile)
-                self.config._saveconfig(self.config.file)
-                print("{} edited succesfully".format(args.data[0]))
+                print(k + ":")
+                for i in v:
+                    print("  - " + i)
+
+    def _profile_add(self, args):
+        matches = list(filter(lambda k: k == args.data[0], self.profiles))
+        if len(matches) > 0:
+            print("Profile {} Already exist".format(matches[0]))
+            exit(4)
+        newprofile = self._questions_profiles(args.data[0])
+        if newprofile == False:
+            exit(7)
+        self.config._profiles_add(**newprofile)
+        self.config._saveconfig(self.config.file)
+        print("{} added succesfully".format(args.data[0]))
+
+    def _profile_mod(self, args):
+        matches = list(filter(lambda k: k == args.data[0], self.profiles))
+        if len(matches) == 0:
+            print("{} not found".format(args.data[0]))
+            exit(2)
+        profile = self.config.profiles[matches[0]]
+        oldprofile = {"id": matches[0]}
+        oldprofile.update(profile)
+        edits = self._questions_edit()
+        if edits == None:
+            exit(7)
+        updateprofile = self._questions_profiles(matches[0], edit=edits)
+        if not updateprofile:
+            exit(7)
+        if sorted(updateprofile.items()) == sorted(oldprofile.items()):
+            print("Nothing to do here")
+            return
+        else:
+            self.config._profiles_add(**updateprofile)
+            self.config._saveconfig(self.config.file)
+            print("{} edited succesfully".format(args.data[0]))
     
     def _func_others(self, args):
         #Function called when using other commands
-        if args.command == "ls":
-            print(*getattr(self, args.data), sep="\n")
-        elif args.command == "move" or args.command == "cp":
-            if not self.case:
-                args.data[0] = args.data[0].lower()
-                args.data[1] = args.data[1].lower()
-            source = list(filter(lambda k: k == args.data[0], self.nodes))
-            dest = list(filter(lambda k: k == args.data[1], self.nodes))
-            if len(source) != 1:
-                print("{} not found".format(args.data[0]))
-                exit(2)
-            if len(dest) > 0:
-                print("Node {} Already exist".format(args.data[1]))
-                exit(4)
-            nodefolder = args.data[1].partition("@")
-            nodefolder = "@" + nodefolder[2]
-            if nodefolder not in self.folders and nodefolder != "@":
-                print("{} not found".format(nodefolder))
-                exit(2)
-            olduniques = self.config._explode_unique(args.data[0])
-            newuniques = self.config._explode_unique(args.data[1])
-            if newuniques == False:
-                print("Invalid node {}".format(args.data[1]))
-                exit(5)
-            node = self.config.getitem(source[0])
-            newnode = {**newuniques, **node}
+        actions = {"ls": self._ls, "move": self._mvcp, "cp": self._mvcp, "bulk": self._bulk, "completion": self._completion, "case": self._case, "fzf": self._fzf, "idletime": self._idletime}
+        return actions.get(args.command)(args)
+
+    def _ls(self, args):
+        print(*getattr(self, args.data), sep="\n")
+
+    def _mvcp(self, args):
+        if not self.case:
+            args.data[0] = args.data[0].lower()
+            args.data[1] = args.data[1].lower()
+        source = list(filter(lambda k: k == args.data[0], self.nodes))
+        dest = list(filter(lambda k: k == args.data[1], self.nodes))
+        if len(source) != 1:
+            print("{} not found".format(args.data[0]))
+            exit(2)
+        if len(dest) > 0:
+            print("Node {} Already exist".format(args.data[1]))
+            exit(4)
+        nodefolder = args.data[1].partition("@")
+        nodefolder = "@" + nodefolder[2]
+        if nodefolder not in self.folders and nodefolder != "@":
+            print("{} not found".format(nodefolder))
+            exit(2)
+        olduniques = self.config._explode_unique(args.data[0])
+        newuniques = self.config._explode_unique(args.data[1])
+        if newuniques == False:
+            print("Invalid node {}".format(args.data[1]))
+            exit(5)
+        node = self.config.getitem(source[0])
+        newnode = {**newuniques, **node}
+        self.config._connections_add(**newnode)
+        if args.command == "move":
+           self.config._connections_del(**olduniques) 
+        self.config._saveconfig(self.config.file)
+        action = "moved" if args.command == "move" else "copied"
+        print("{} {} succesfully to {}".format(args.data[0],action, args.data[1]))
+
+    def _bulk(self, args):
+        newnodes = self._questions_bulk()
+        if newnodes == False:
+            exit(7)
+        if not self.case:
+            newnodes["location"] = newnodes["location"].lower()
+            newnodes["ids"] = newnodes["ids"].lower()
+        ids = newnodes["ids"].split(",")
+        hosts = newnodes["host"].split(",")
+        count = 0
+        for n in ids:
+            unique = n + newnodes["location"]
+            matches = list(filter(lambda k: k == unique, self.nodes))
+            reversematches = list(filter(lambda k: k == "@" + unique, self.folders))
+            if len(matches) > 0:
+                print("Node {} already exist, ignoring it".format(unique))
+                continue
+            if len(reversematches) > 0:
+                print("Folder with name {} already exist, ignoring it".format(unique))
+                continue
+            newnode = {"id": n}
+            if newnodes["location"] != "":
+                location = self.config._explode_unique(newnodes["location"])
+                newnode.update(location)
+            if len(hosts) > 1:
+                index = ids.index(n)
+                newnode["host"] = hosts[index]
+            else:
+                newnode["host"] = hosts[0]
+            newnode["protocol"] = newnodes["protocol"]
+            newnode["port"] = newnodes["port"]
+            newnode["options"] = newnodes["options"]
+            newnode["logs"] = newnodes["logs"]
+            newnode["user"] = newnodes["user"]
+            newnode["password"] = newnodes["password"]
+            count +=1
             self.config._connections_add(**newnode)
-            if args.command == "move":
-               self.config._connections_del(**olduniques) 
+            self.nodes = self._getallnodes()
+        if count > 0:
             self.config._saveconfig(self.config.file)
-            if args.command == "move":
-                print("{} moved succesfully to {}".format(args.data[0],args.data[1]))
-            if args.command == "cp":
-                print("{} copied succesfully to {}".format(args.data[0],args.data[1]))
-        elif args.command == "bulk":
-            newnodes = self._questions_bulk()
-            if newnodes == False:
-                exit(7)
-            if not self.case:
-                newnodes["location"] = newnodes["location"].lower()
-                newnodes["ids"] = newnodes["ids"].lower()
-            ids = newnodes["ids"].split(",")
-            hosts = newnodes["host"].split(",")
-            count = 0
-            for n in ids:
-                unique = n + newnodes["location"]
-                matches = list(filter(lambda k: k == unique, self.nodes))
-                reversematches = list(filter(lambda k: k == "@" + unique, self.folders))
-                if len(matches) > 0:
-                    print("Node {} already exist, ignoring it".format(unique))
-                    continue
-                if len(reversematches) > 0:
-                    print("Folder with name {} already exist, ignoring it".format(unique))
-                    continue
-                newnode = {"id": n}
-                if newnodes["location"] != "":
-                    location = self.config._explode_unique(newnodes["location"])
-                    newnode.update(location)
-                if len(hosts) > 1:
-                    index = ids.index(n)
-                    newnode["host"] = hosts[index]
-                else:
-                    newnode["host"] = hosts[0]
-                newnode["protocol"] = newnodes["protocol"]
-                newnode["port"] = newnodes["port"]
-                newnode["options"] = newnodes["options"]
-                newnode["logs"] = newnodes["logs"]
-                newnode["user"] = newnodes["user"]
-                newnode["password"] = newnodes["password"]
-                count +=1
-                self.config._connections_add(**newnode)
-                self.nodes = self._getallnodes()
-            if count > 0:
-                self.config._saveconfig(self.config.file)
-                print("Succesfully added {} nodes".format(count))
-            else:
-                print("0 nodes added")
+            print("Succesfully added {} nodes".format(count))
         else:
-            if args.command == "completion":
-                if args.data[0] == "bash":
-                    print(self._help("bashcompletion"))
-                elif args.data[0] == "zsh":
-                    print(self._help("zshcompletion"))
-            else:
-                if args.command == "case":
-                    if args.data[0] == "true":
-                        args.data[0] = True
-                    elif args.data[0] == "false":
-                        args.data[0] = False
-                if args.command == "fzf":
-                    if args.data[0] == "true":
-                        args.data[0] = True
-                    elif args.data[0] == "false":
-                        args.data[0] = False
-                if args.command == "idletime":
-                    if args.data[0] < 0:
-                        args.data[0] = 0
-                self.config.config[args.command] = args.data[0]
-                self.config._saveconfig(self.config.file)
-                print("Config saved")
+            print("0 nodes added")
+
+    def _completion(self, args):
+        if args.data[0] == "bash":
+            print(self._help("bashcompletion"))
+        elif args.data[0] == "zsh":
+            print(self._help("zshcompletion"))
+
+    def _case(self, args):
+        if args.data[0] == "true":
+            args.data[0] = True
+        elif args.data[0] == "false":
+            args.data[0] = False
+        self._change_settings(args.command, args.data[0])
+
+    def _fzf(self, args):
+        if args.data[0] == "true":
+            args.data[0] = True
+        elif args.data[0] == "false":
+            args.data[0] = False
+        self._change_settings(args.command, args.data[0])
+
+    def _idletime(self, args):
+        if args.data[0] < 0:
+            args.data[0] = 0
+        self._change_settings(args.command, args.data[0])
+
+    def _change_settings(self, name, value):
+        self.config.config[name] = value
+        self.config._saveconfig(self.config.file)
+        print("Config saved")
 
     def _func_run(self, args):
         if len(args.data) > 1:
-            command = " ".join(args.data[1:])
-            command = command.split("-")
-            matches = list(filter(lambda k: k == args.data[0], self.nodes))
-            if len(matches) == 0:
-                print("{} not found".format(args.data[0]))
-                exit(2)
-            node = self.config.getitem(matches[0])
-            node = self.node(matches[0],**node, config = self.config)
-            node.run(command)
-            print(node.output)
+            args.action = "noderun"
+        actions = {"noderun": self._node_run, "generate": self._yaml_generate, "run": self._yaml_run}
+        return actions.get(args.action)(args)
+
+    def _node_run(self, args):
+        command = " ".join(args.data[1:])
+        command = command.split("-")
+        matches = list(filter(lambda k: k == args.data[0], self.nodes))
+        if len(matches) == 0:
+            print("{} not found".format(args.data[0]))
+            exit(2)
+        node = self.config.getitem(matches[0])
+        node = self.node(matches[0],**node, config = self.config)
+        node.run(command)
+        print(node.output)
+
+    def _yaml_generate(self, args):
+        if os.path.exists(args.data[0]):
+            print("File {} already exists".format(args.data[0]))
+            exit(14)
         else:
-            if args.action == "generate":
-                if os.path.exists(args.data[0]):
-                    print("File {} already exists".format(args.data[0]))
-                    exit(14)
-                else:
-                    with open(args.data[0], "w") as file:
-                        file.write(self._help("generate"))
-                        file.close()
-                    print("File {} generated succesfully".format(args.data[0]))
-                    exit()
+            with open(args.data[0], "w") as file:
+                file.write(self._help("generate"))
+                file.close()
+            print("File {} generated succesfully".format(args.data[0]))
+            exit()
+
+    def _yaml_run(self, args):
+        try:
+            with open(args.data[0]) as file:
+                scripts = yaml.load(file, Loader=yaml.FullLoader)
+        except:
+            print("failed reading file {}".format(args.data[0]))
+            exit(10)
+        for script in scripts["tasks"]:
+            nodes = {}
+            args = {}
             try:
-                with open(args.data[0]) as file:
-                    scripts = yaml.load(file, Loader=yaml.FullLoader)
-            except:
-                print("failed reading file {}".format(args.data[0]))
-                exit(10)
-            for script in scripts["tasks"]:
-                nodes = {}
-                args = {}
-                try:
-                    action = script["action"]
-                except:
-                    print("Action is mandatory")
-                    exit(11)
-                try:
-                    nodelist = script["nodes"]
-                except:
-                    print("Nodes list is mandatory")
-                    exit(11)
-                # try:
-                for i in nodelist:
-                    if isinstance(i, dict):
-                        name = list(i.keys())[0]
-                        this = self.config.getitem(name, i[name])
-                        nodes.update(this)
-                    elif i.startswith("@"):
-                        this = self.config.getitem(i)
-                        nodes.update(this)
-                    else:
-                        this = self.config.getitem(i)
-                        nodes[i] = this
-                nodes = self.connnodes(nodes, config = self.config)
-                # except:
-                    # print("Failed getting nodes")
-                    # exit(12)
-                try:
-                    args["commands"] = script["commands"]
-                except:
-                    print("Commands list is mandatory")
-                    exit(11)
+                action = script["action"]
+                nodelist = script["nodes"]
+                args["commands"] = script["commands"]
+                output = script["output"]
                 if action == "test":
-                    try:
-                        args["expected"] = script["expected"]
-                    except:
-                        print("Expected is mandatory with action 'test'")
-                        exit(11)
-                try:
-                    args["vars"] = script["variables"]
-                except:
-                    pass
-                try:
-                    output = script["output"]
-                except:
-                    print("output is mandatory")
-                    exit(11)
-                stdout = False
-                if output is None:
-                    pass
-                elif output == "stdout":
-                    stdout = True
-                elif isinstance(output, str) and action == "run":
-                    args["folder"] = output
-                try:
-                    options = script["options"]
-                except:
-                    options = None
-                if options is not None:
-                    thisoptions = {k: v for k, v in options.items() if k in ["prompt", "parallel", "timeout"]}
-                    print(thisoptions)
-                    args.update(thisoptions)
-                size = str(os.get_terminal_size())
-                p = re.search(r'.*columns=([0-9]+)', size)
-                columns = int(p.group(1))
-                if action == "run":
-                    nodes.run(**args)
-                    print(script["name"].upper() + "-" * (columns - len(script["name"])))
-                    for i in nodes.status.keys():
-                        print("   " + i + " " + "-" * (columns - len(i) - 13) + (" PASS(0)" if nodes.status[i] == 0 else " FAIL({})".format(nodes.status[i])))
-                        if stdout:
-                            for line in nodes.output[i].splitlines():
-                                print("      " + line)
-                elif action == "test":
-                    nodes.test(**args)
-                    print(script["name"].upper() + "-" * (columns - len(script["name"])))
-                    for i in nodes.status.keys():
-                        print("   " + i + " " + "-" * (columns - len(i) - 13) + (" PASS(0)" if nodes.status[i] == 0 else " FAIL({})".format(nodes.status[i])))
-                        if nodes.status[i] == 0:
-                            try:
-                                myexpected = args["expected"].format(**args["vars"][i])
-                            except:
-                                try:
-                                    myexpected = args["expected"].format(**args["vars"]["__global__"])
-                                except:
-                                    myexpected = args["expected"]
-                            print("     TEST for '{}' --> ".format(myexpected) + str(nodes.result[i]).upper())
-                        if stdout:
-                            if nodes.status[i] == 0:
-                                print("     " + "-" * (len(myexpected) + 16 + len(str(nodes.result[i]))))
-                            for line in nodes.output[i].splitlines():
-                                print("      " + line)
+                    args["expected"] = script["expected"]
+            except KeyError as e:
+                print("'{}' is mandatory".format(e.args[0]))
+                exit(11)
+            for i in nodelist:
+                if isinstance(i, dict):
+                    name = list(i.keys())[0]
+                    this = self.config.getitem(name, i[name])
+                    nodes.update(this)
+                elif i.startswith("@"):
+                    this = self.config.getitem(i)
+                    nodes.update(this)
                 else:
-                    print("Wrong action '{}'".format(action))
-                    exit(13)
+                    this = self.config.getitem(i)
+                    nodes[i] = this
+            nodes = self.connnodes(nodes, config = self.config)
+            stdout = False
+            if output is None:
+                pass
+            elif output == "stdout":
+                stdout = True
+            elif isinstance(output, str) and action == "run":
+                args["folder"] = output
+            try:
+                args["vars"] = script["variables"]
+            except:
+                pass
+            try:
+                options = script["options"]
+                thisoptions = {k: v for k, v in options.items() if k in ["prompt", "parallel", "timeout"]}
+                args.update(thisoptions)
+            except:
+                options = None
+            size = str(os.get_terminal_size())
+            p = re.search(r'.*columns=([0-9]+)', size)
+            columns = int(p.group(1))
+            if action == "run":
+                nodes.run(**args)
+                print(script["name"].upper() + "-" * (columns - len(script["name"])))
+                for i in nodes.status.keys():
+                    print("   " + i + " " + "-" * (columns - len(i) - 13) + (" PASS(0)" if nodes.status[i] == 0 else " FAIL({})".format(nodes.status[i])))
+                    if stdout:
+                        for line in nodes.output[i].splitlines():
+                            print("      " + line)
+            elif action == "test":
+                nodes.test(**args)
+                print(script["name"].upper() + "-" * (columns - len(script["name"])))
+                for i in nodes.status.keys():
+                    print("   " + i + " " + "-" * (columns - len(i) - 13) + (" PASS(0)" if nodes.status[i] == 0 else " FAIL({})".format(nodes.status[i])))
+                    if nodes.status[i] == 0:
+                        try:
+                            myexpected = args["expected"].format(**args["vars"][i])
+                        except:
+                            try:
+                                myexpected = args["expected"].format(**args["vars"]["__global__"])
+                            except:
+                                myexpected = args["expected"]
+                        print("     TEST for '{}' --> ".format(myexpected) + str(nodes.result[i]).upper())
+                    if stdout:
+                        if nodes.status[i] == 0:
+                            print("     " + "-" * (len(myexpected) + 16 + len(str(nodes.result[i]))))
+                        for line in nodes.output[i].splitlines():
+                            print("      " + line)
+            else:
+                print("Wrong action '{}'".format(action))
+                exit(13)
 
     def _choose(self, list, name, action):
         #Generates an inquirer list to pick
@@ -1014,7 +1024,9 @@ tasks:
         '''
         if keyfile is None:
             keyfile = self.config.key
-        key = RSA.import_key(open(keyfile).read())
+        with open(keyfile) as f:
+            key = RSA.import_key(f.read())
+            f.close()
         publickey = key.publickey()
         encryptor = PKCS1_OAEP.new(publickey)
         password = encryptor.encrypt(password.encode("utf-8"))
