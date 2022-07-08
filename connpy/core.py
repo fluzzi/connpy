@@ -139,11 +139,8 @@ class node:
         t = t.replace("\a","")
         t = t.replace('\n\n', '\n')
         t = re.sub(r'.\[K', '', t)
-        while True:
-            tb = re.sub('.\b', '', t, count=1)
-            if len(t) == len(tb):
-                break
-            t = tb
+        while t.find("\b") != -1:
+            t = re.sub('[^\b]\b', '', t)
         ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/ ]*[@-~])')
         t = ansi_escape.sub('', t)
         t = t.lstrip(" \n\r")
