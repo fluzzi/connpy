@@ -208,7 +208,7 @@ class node:
             print(connect)
             exit(1)
 
-    def run(self, commands, vars = None,*, folder = '', prompt = r'>$|#$|\$$|>.$|#.$|\$.$', stdout = False, timeout = 20):
+    def run(self, commands, vars = None,*, folder = '', prompt = r'>$|#$|\$$|>.$|#.$|\$.$', stdout = False, timeout = 10):
         '''
         Run a command or list of commands on the node and return the output.
 
@@ -292,7 +292,7 @@ class node:
                     f.close()
             return connect
 
-    def test(self, commands, expected, vars = None,*, prompt = r'>$|#$|\$$|>.$|#.$|\$.$', timeout = 20):
+    def test(self, commands, expected, vars = None,*, prompt = r'>$|#$|\$$|>.$|#.$|\$.$', timeout = 10):
         '''
         Run a command or list of commands on the node, then check if expected value appears on the output after the last command.
 
@@ -373,7 +373,7 @@ class node:
             self.status = 1
             return connect
 
-    def _connect(self, debug = False, timeout = 20):
+    def _connect(self, debug = False, timeout = 10, max_attempts = 3):
         # Method to connect to the node, it parse all the information, create the ssh/telnet command and login to the node.
         if self.protocol == "ssh":
             cmd = "ssh"
@@ -393,7 +393,7 @@ class node:
                 passwords = self._passtx(self.password)
             else:
                 passwords = []
-            expects = ['yes/no', 'refused', 'supported', 'cipher', 'sagenotinuse', 'timeout', 'unavailable', 'closed', '[p|P]assword:|[u|U]sername:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching host key"]
+            expects = ['yes/no', 'refused', 'supported', 'cipher', 'ssh-keygen.*\"', 'timeout', 'unavailable', 'closed', '[p|P]assword:|[u|U]sername:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching host key"]
         elif self.protocol == "telnet":
             cmd = "telnet " + self.host
             if self.port != '':
@@ -406,48 +406,62 @@ class node:
                 passwords = self._passtx(self.password)
             else:
                 passwords = []
-            expects = ['[u|U]sername:', 'refused', 'supported', 'cipher', 'sagenotinuse', 'timeout', 'unavailable', 'closed', '[p|P]assword:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching host key"]
+            expects = ['[u|U]sername:', 'refused', 'supported', 'cipher', 'ssh-keygen.*\"', 'timeout', 'unavailable', 'closed', '[p|P]assword:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching host key"]
         else:
             raise ValueError("Invalid protocol: " + self.protocol)
-        child = pexpect.spawn(cmd)
-        if debug:
-            print(cmd)
-            self.mylog = io.BytesIO()
-            child.logfile_read = self.mylog
-        if len(passwords) > 0:
-            loops = len(passwords)
-        else:
-            loops = 1
-        endloop = False
-        for i in range(0, loops):
-            while True:
-                results = child.expect(expects, timeout=timeout)
-                if results == 0:
-                    if self.protocol == "ssh":
-                        child.sendline('yes')
-                    elif self.protocol == "telnet":
-                        if self.user != '':
-                            child.sendline(self.user)
+        attempts = 1
+        while attempts <= max_attempts:
+            child = pexpect.spawn(cmd)
+            if debug:
+                print(cmd)
+                self.mylog = io.BytesIO()
+                child.logfile_read = self.mylog
+            if len(passwords) > 0:
+                loops = len(passwords)
+            else:
+                loops = 1
+            endloop = False
+            for i in range(0, loops):
+                while True:
+                    results = child.expect(expects, timeout=timeout)
+                    if results == 0:
+                        if self.protocol == "ssh":
+                            child.sendline('yes')
+                        elif self.protocol == "telnet":
+                            if self.user != '':
+                                child.sendline(self.user)
+                            else:
+                                self.missingtext = True
+                                break
+                    if results == 4:
+                        child.terminate()
+                        return "Connection failed code:" + str(results) + "\n" + child.after.decode()
+                    if results in  [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15]:
+                        child.terminate()
+                        if results == 12 and attempts != max_attempts:
+                            attempts += 1
+                            endloop = True
+                            break
+                        else:
+                            return "Connection failed code:" + str(results)
+                    if results == 8:
+                        if len(passwords) > 0:
+                            child.sendline(passwords[i])
                         else:
                             self.missingtext = True
-                            break
-                if results in  [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15]:
-                    child.close()
-                    return "Connection failed code:" + str(results)
-                if results == 8:
-                    if len(passwords) > 0:
-                        child.sendline(passwords[i])
-                    else:
-                        self.missingtext = True
+                        break
+                    if results in [9, 11]:
+                        endloop = True
+                        child.sendline()
+                        break
+                    if results == 10:
+                        child.sendline("\r")
+                        sleep(2)
+                if endloop:
                     break
-                if results in [9, 11]:
-                    endloop = True
-                    child.sendline()
-                    break
-                if results == 10:
-                    child.sendline("\r")
-                    sleep(2)
-            if endloop:
+            if results == 12:
+                continue
+            else:
                 break
         child.readline(0)
         self.child = child
