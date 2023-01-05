@@ -96,7 +96,7 @@ class connapp:
         bulkparser.set_defaults(func=self._func_others)
         #RUNPARSER
         runparser = subparsers.add_parser("run", help="Run scripts or commands on nodes", formatter_class=argparse.RawTextHelpFormatter) 
-        runparser.add_argument("run", nargs='+', action=self._store_type, help=self._help("run"), default="run", type=self._type_node)
+        runparser.add_argument("run", nargs='+', action=self._store_type, help=self._help("run"), default="run")
         runparser.add_argument("-g","--generate", dest="action", action="store_const", help="Generate yaml file template", const="generate", default="run")
         runparser.set_defaults(func=self._func_run)
         #CONFIGPARSER
