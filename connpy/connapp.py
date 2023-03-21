@@ -586,6 +586,8 @@ class connapp:
         #Generates an inquirer list to pick
         if FzfPrompt and self.fzf:
             fzf = FzfPrompt(executable_path="fzf-tmux")
+            if not self.case:
+                fzf = FzfPrompt(executable_path="fzf-tmux -i")
             answer = fzf.prompt(list, fzf_options="-d 25%")
             if len(answer) == 0:
                 return
