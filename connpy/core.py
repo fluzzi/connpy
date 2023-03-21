@@ -241,7 +241,7 @@ class node:
                             default False.
 
             - timeout (int):Time in seconds for expect to wait for prompt/EOF.
-                            default 20.
+                            default 10.
 
         ### Returns:  
 
@@ -324,7 +324,7 @@ class node:
                             need some special symbol.
 
             - timeout (int):Time in seconds for expect to wait for prompt/EOF.
-                            default 20.
+                            default 10.
 
         ### Returns: 
             bool: true if expected value is found after running the commands 
@@ -563,7 +563,7 @@ class nodes:
                               number of members.
             
             - timeout  (int): Time in seconds for expect to wait for prompt/EOF.
-                              default 20.
+                              default 10.
 
         ###Returns:  
 
@@ -644,7 +644,7 @@ class nodes:
                               number of members.
 
             - timeout  (int): Time in seconds for expect to wait for prompt/EOF.
-                              default 20.
+                              default 10.
 
         ### Returns:  
 

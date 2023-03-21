@@ -1253,6 +1253,8 @@ __pdoc__ = {
         #Generates an inquirer list to pick
         if FzfPrompt and self.fzf:
             fzf = FzfPrompt(executable_path=&#34;fzf-tmux&#34;)
+            if not self.case:
+                fzf = FzfPrompt(executable_path=&#34;fzf-tmux -i&#34;)
             answer = fzf.prompt(list, fzf_options=&#34;-d 25%&#34;)
             if len(answer) == 0:
                 return
@@ -2107,7 +2109,7 @@ tasks:
                             default False.
 
             - timeout (int):Time in seconds for expect to wait for prompt/EOF.
-                            default 20.
+                            default 10.
 
         ### Returns:  
 
@@ -2190,7 +2192,7 @@ tasks:
                             need some special symbol.
 
             - timeout (int):Time in seconds for expect to wait for prompt/EOF.
-                            default 20.
+                            default 10.
 
         ### Returns: 
             bool: true if expected value is found after running the commands 
@@ -2417,7 +2419,7 @@ tasks:
                 default False.
 
 - timeout (int):Time in seconds for expect to wait for prompt/EOF.
-                default 20.
+                default 10.
 </code></pre>
 <h3 id="returns">Returns:</h3>
 <pre><code>str: Output of the commands you ran on the node.
@@ -2459,7 +2461,7 @@ tasks:
                         default False.
 
         - timeout (int):Time in seconds for expect to wait for prompt/EOF.
-                        default 20.
+                        default 10.
 
     ### Returns:  
 
@@ -2541,7 +2543,7 @@ tasks:
                 need some special symbol.
 
 - timeout (int):Time in seconds for expect to wait for prompt/EOF.
-                default 20.
+                default 10.
 </code></pre>
 <h3 id="returns">Returns:</h3>
 <pre><code>bool: true if expected value is found after running the commands 
@@ -2583,7 +2585,7 @@ tasks:
                         need some special symbol.
 
         - timeout (int):Time in seconds for expect to wait for prompt/EOF.
-                        default 20.
+                        default 10.
 
     ### Returns: 
         bool: true if expected value is found after running the commands 
@@ -2775,7 +2777,7 @@ tasks:
                               number of members.
             
             - timeout  (int): Time in seconds for expect to wait for prompt/EOF.
-                              default 20.
+                              default 10.
 
         ###Returns:  
 
@@ -2856,7 +2858,7 @@ tasks:
                               number of members.
 
             - timeout  (int): Time in seconds for expect to wait for prompt/EOF.
-                              default 20.
+                              default 10.
 
         ### Returns:  
 
@@ -2940,7 +2942,7 @@ tasks:
                   number of members.
 
 - timeout  (int): Time in seconds for expect to wait for prompt/EOF.
-                  default 20.
+                  default 10.
 </code></pre>
 <h3 id="returns">Returns:</h3>
 <pre><code>dict: Dictionary formed by nodes unique as keys, Output of the 
@@ -2989,7 +2991,7 @@ tasks:
                           number of members.
         
         - timeout  (int): Time in seconds for expect to wait for prompt/EOF.
-                          default 20.
+                          default 10.
 
     ###Returns:  
 
@@ -3069,7 +3071,7 @@ tasks:
                   number of members.
 
 - timeout  (int): Time in seconds for expect to wait for prompt/EOF.
-                  default 20.
+                  default 10.
 </code></pre>
 <h3 id="returns">Returns:</h3>
 <pre><code>dict: Dictionary formed by nodes unique as keys, value is True if 
@@ -3116,7 +3118,7 @@ tasks:
                           number of members.
 
         - timeout  (int): Time in seconds for expect to wait for prompt/EOF.
-                          default 20.
+                          default 10.
 
     ### Returns:  
 
