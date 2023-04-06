@@ -10,11 +10,15 @@ import sys
 import inquirer
 from .core import node,nodes
 from ._version import __version__
+from .api import *
 import yaml
 try:
     from pyfzf.pyfzf import FzfPrompt
 except:
     FzfPrompt = None
+home = os.path.expanduser("~")
+defaultdir = home + '/.config/conn'
+
 
 
 #functions and classes
@@ -99,6 +103,12 @@ class connapp:
         runparser.add_argument("run", nargs='+', action=self._store_type, help=self._help("run"), default="run")
         runparser.add_argument("-g","--generate", dest="action", action="store_const", help="Generate yaml file template", const="generate", default="run")
         runparser.set_defaults(func=self._func_run)
+        #APIPARSER
+        apiparser = subparsers.add_parser("api", help="Start and stop connpy api") 
+        apicrud = apiparser.add_mutually_exclusive_group(required=True)
+        apicrud.add_argument("--start", dest="start", nargs="?", action=self._store_type, help="Start connpy api", default="desfaultdir")
+        apicrud.add_argument("--stop", dest="stop", nargs=0, action=self._store_type, help="Stop conppy api")
+        apiparser.set_defaults(func=self._func_api)
         #CONFIGPARSER
         configparser = subparsers.add_parser("config", help="Manage app config") 
         configcrud = configparser.add_mutually_exclusive_group(required=True)
@@ -108,7 +118,7 @@ class connapp:
         configcrud.add_argument("--completion", dest="completion", nargs=1, choices=["bash","zsh"], action=self._store_type, help="Get terminal completion configuration for conn")
         configparser.set_defaults(func=self._func_others)
         #Manage sys arguments
-        commands = ["node", "profile", "mv", "move","copy", "cp", "bulk", "ls", "list", "run", "config"]
+        commands = ["node", "profile", "mv", "move","copy", "cp", "bulk", "ls", "list", "run", "config", "api"]
         profilecmds = ["--add", "-a", "--del", "--rm",  "-r", "--mod", "--edit", "-e", "--show", "-s"]
         if len(argv) >= 2 and argv[1] == "profile" and argv[0] in profilecmds:
             argv[1] = argv[0]
@@ -475,6 +485,18 @@ class connapp:
             args.action = "noderun"
         actions = {"noderun": self._node_run, "generate": self._yaml_generate, "run": self._yaml_run}
         return actions.get(args.action)(args)
+
+    def _func_api(self, args):
+        if args.command == "start":
+            if args.data == None:
+                args.data = defaultdir
+            else:
+                if not os.path.isdir(args.data):
+                    raise argparse.ArgumentTypeError(f"readable_dir:{args.data} is not a valid path")
+            start_api(args.data)
+        if args.command == "stop":
+            stop_api()
+        return
 
     def _node_run(self, args):
         command = " ".join(args.data[1:])
