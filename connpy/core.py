@@ -393,7 +393,7 @@ class node:
                 passwords = self._passtx(self.password)
             else:
                 passwords = []
-            expects = ['yes/no', 'refused', 'supported', 'cipher', 'ssh-keygen.*\"', 'timeout', 'unavailable', 'closed', '[p|P]assword:|[u|U]sername:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching host key"]
+            expects = ['yes/no', 'refused', 'supported', 'cipher', 'ssh-keygen.*\"', 'timeout', 'unavailable', 'closed', '[p|P]assword:|[u|U]sername:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching"]
         elif self.protocol == "telnet":
             cmd = "telnet " + self.host
             if self.port != '':
@@ -406,7 +406,7 @@ class node:
                 passwords = self._passtx(self.password)
             else:
                 passwords = []
-            expects = ['[u|U]sername:', 'refused', 'supported', 'cipher', 'ssh-keygen.*\"', 'timeout', 'unavailable', 'closed', '[p|P]assword:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching host key"]
+            expects = ['[u|U]sername:', 'refused', 'supported', 'cipher', 'ssh-keygen.*\"', 'timeout', 'unavailable', 'closed', '[p|P]assword:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching"]
         else:
             raise ValueError("Invalid protocol: " + self.protocol)
         attempts = 1

@@ -768,7 +768,7 @@ class connapp:
         else:
             node["options"] = defaults["options"]
         if edit["logs"]:
-            questions.append(inquirer.Text("logs", message="Pick logging path/file ", validate=self._default_validation, default=defaults["logs"]))
+            questions.append(inquirer.Text("logs", message="Pick logging path/file ",  validate=self._default_validation, default=defaults["logs"].replace("{","{{").replace("}","}}")))
         else:
             node["logs"] = defaults["logs"]
         if edit["user"]:
@@ -828,7 +828,7 @@ class connapp:
         else:
             profile["options"] = defaults["options"]
         if edit["logs"]:
-            questions.append(inquirer.Text("logs", message="Pick logging path/file ", default=defaults["logs"]))
+            questions.append(inquirer.Text("logs", message="Pick logging path/file ", default=defaults["logs"].replace("{","{{").replace("}","}}")))
         else:
             profile["logs"] = defaults["logs"]
         if edit["user"]:
