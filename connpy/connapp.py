@@ -40,8 +40,8 @@ class connapp:
         self.node = node
         self.connnodes = nodes
         self.config = config
-        self.nodes = self._getallnodes()
-        self.folders = self._getallfolders()
+        self.nodes = self.config._getallnodes()
+        self.folders = self.config._getallfolders()
         self.profiles = list(self.config.profiles.keys())
         self.case = self.config.config["case"]
         try:
@@ -106,7 +106,8 @@ class connapp:
         #APIPARSER
         apiparser = subparsers.add_parser("api", help="Start and stop connpy api") 
         apicrud = apiparser.add_mutually_exclusive_group(required=True)
-        apicrud.add_argument("--start", dest="start", nargs="?", action=self._store_type, help="Start connpy api", default="desfaultdir")
+        apicrud.add_argument("--start", dest="start", nargs=0, action=self._store_type, help="Start conppy api")
+        apicrud.add_argument("--restart", dest="restart", nargs=0, action=self._store_type, help="Restart conppy api")
         apicrud.add_argument("--stop", dest="stop", nargs=0, action=self._store_type, help="Stop conppy api")
         apiparser.set_defaults(func=self._func_api)
         #CONFIGPARSER
@@ -116,6 +117,7 @@ class connapp:
         configcrud.add_argument("--fzf", dest="fzf", nargs=1, action=self._store_type, help="Use fzf for lists", choices=["true","false"])
         configcrud.add_argument("--keepalive", dest="idletime", nargs=1, action=self._store_type, help="Set keepalive time in seconds, 0 to disable", type=int, metavar="INT")
         configcrud.add_argument("--completion", dest="completion", nargs=1, choices=["bash","zsh"], action=self._store_type, help="Get terminal completion configuration for conn")
+        configcrud.add_argument("--configfolder", dest="configfolder", nargs=1, action=self._store_type, help="Set the default location for config file", metavar="FOLDER")
         configparser.set_defaults(func=self._func_others)
         #Manage sys arguments
         commands = ["node", "profile", "mv", "move","copy", "cp", "bulk", "ls", "list", "run", "config", "api"]
@@ -307,7 +309,7 @@ class connapp:
         if matches[0] == "default":
             print("Can't delete default profile")
             exit(6)
-        usedprofile = self._profileused(matches[0])
+        usedprofile = self.config._profileused(matches[0])
         if len(usedprofile) > 0:
             print("Profile {} used in the following nodes:".format(matches[0]))
             print(", ".join(usedprofile))
@@ -369,7 +371,7 @@ class connapp:
     
     def _func_others(self, args):
         #Function called when using other commands
-        actions = {"ls": self._ls, "move": self._mvcp, "cp": self._mvcp, "bulk": self._bulk, "completion": self._completion, "case": self._case, "fzf": self._fzf, "idletime": self._idletime}
+        actions = {"ls": self._ls, "move": self._mvcp, "cp": self._mvcp, "bulk": self._bulk, "completion": self._completion, "case": self._case, "fzf": self._fzf, "idletime": self._idletime, "configfolder": self._configfolder}
         return actions.get(args.command)(args)
 
     def _ls(self, args):
@@ -443,7 +445,7 @@ class connapp:
             newnode["password"] = newnodes["password"]
             count +=1
             self.config._connections_add(**newnode)
-            self.nodes = self._getallnodes()
+            self.nodes = self.config._getallnodes()
         if count > 0:
             self.config._saveconfig(self.config.file)
             print("Succesfully added {} nodes".format(count))
@@ -475,6 +477,16 @@ class connapp:
             args.data[0] = 0
         self._change_settings(args.command, args.data[0])
 
+    def _configfolder(self, args):
+        if not os.path.isdir(args.data[0]):
+            raise argparse.ArgumentTypeError(f"readable_dir:{args.data[0]} is not a valid path")
+        else:
+            pathfile = defaultdir + "/.folder"
+            folder = os.path.abspath(args.data[0]).rstrip('/')
+            with open(pathfile, "w") as f:
+                f.write(str(folder))
+            print("Config saved")
+
     def _change_settings(self, name, value):
         self.config.config[name] = value
         self.config._saveconfig(self.config.file)
@@ -487,15 +499,10 @@ class connapp:
         return actions.get(args.action)(args)
 
     def _func_api(self, args):
-        if args.command == "start":
-            if args.data == None:
-                args.data = defaultdir
-            else:
-                if not os.path.isdir(args.data):
-                    raise argparse.ArgumentTypeError(f"readable_dir:{args.data} is not a valid path")
-            start_api(args.data)
-        if args.command == "stop":
+        if args.command == "stop" or args.command == "restart":
             stop_api()
+        if args.command == "start" or args.command == "restart":
+            start_api()
         return
 
     def _node_run(self, args):
@@ -888,7 +895,7 @@ class connapp:
         if type == "usage":
             return "conn [-h] [--add | --del | --mod | --show | --debug] [node|folder]\n       conn {profile,move,mv,copy,cp,list,ls,bulk,config} ..."
         if type == "end":
-            return "Commands:\n  profile        Manage profiles\n  move (mv)      Move node\n  copy (cp)      Copy node\n  list (ls)      List profiles, nodes or folders\n  bulk           Add nodes in bulk\n  run            Run scripts or commands on nodes\n  config         Manage app config"
+            return "Commands:\n  profile        Manage profiles\n  move (mv)      Move node\n  copy (cp)      Copy node\n  list (ls)      List profiles, nodes or folders\n  bulk           Add nodes in bulk\n  run            Run scripts or commands on nodes\n  config         Manage app config\n  api            Start and stop connpy api"
         if type == "bashcompletion":
             return '''
 #Here starts bash completion for conn
@@ -987,46 +994,6 @@ tasks:
       id: 5
   output: null
 ...'''
-
-    def _getallnodes(self):
-        #get all nodes on configfile
-        nodes = []
-        layer1 = [k for k,v in self.config.connections.items() if isinstance(v, dict) and v["type"] == "connection"]
-        folders = [k for k,v in self.config.connections.items() if isinstance(v, dict) and v["type"] == "folder"]
-        nodes.extend(layer1)
-        for f in folders:
-            layer2 = [k + "@" + f for k,v in self.config.connections[f].items() if isinstance(v, dict) and v["type"] == "connection"]
-            nodes.extend(layer2)
-            subfolders = [k for k,v in self.config.connections[f].items() if isinstance(v, dict) and v["type"] == "subfolder"]
-            for s in subfolders:
-                layer3 = [k + "@" + s + "@" + f for k,v in self.config.connections[f][s].items() if isinstance(v, dict) and v["type"] == "connection"]
-                nodes.extend(layer3)
-        return nodes
-
-    def _getallfolders(self):
-        #get all folders on configfile
-        folders = ["@" + k for k,v in self.config.connections.items() if isinstance(v, dict) and v["type"] == "folder"]
-        subfolders = []
-        for f in folders:
-            s = ["@" + k + f for k,v in self.config.connections[f[1:]].items() if isinstance(v, dict) and v["type"] == "subfolder"]
-            subfolders.extend(s)
-        folders.extend(subfolders)
-        return folders
-
-    def _profileused(self, profile):
-        #Check if profile is used before deleting it
-        nodes = []
-        layer1 = [k for k,v in self.config.connections.items() if isinstance(v, dict) and v["type"] == "connection" and ("@" + profile in v.values() or ( isinstance(v["password"],list) and "@" + profile in v["password"]))]
-        folders = [k for k,v in self.config.connections.items() if isinstance(v, dict) and v["type"] == "folder"]
-        nodes.extend(layer1)
-        for f in folders:
-            layer2 = [k + "@" + f for k,v in self.config.connections[f].items() if isinstance(v, dict) and v["type"] == "connection" and ("@" + profile in v.values() or ( isinstance(v["password"],list) and "@" + profile in v["password"]))]
-            nodes.extend(layer2)
-            subfolders = [k for k,v in self.config.connections[f].items() if isinstance(v, dict) and v["type"] == "subfolder"]
-            for s in subfolders:
-                layer3 = [k + "@" + s + "@" + f for k,v in self.config.connections[f][s].items() if isinstance(v, dict) and v["type"] == "connection" and ("@" + profile in v.values() or ( isinstance(v["password"],list) and "@" + profile in v["password"]))]
-                nodes.extend(layer3)
-        return nodes
 
     def encrypt(self, password, keyfile=None):
         '''
