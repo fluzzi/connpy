@@ -49,9 +49,17 @@ class configfile:
         '''
         home = os.path.expanduser("~")
         defaultdir = home + '/.config/conn'
-        defaultfile = defaultdir + '/config.json'
-        defaultkey = defaultdir + '/.osk'
         Path(defaultdir).mkdir(parents=True, exist_ok=True)
+        pathfile = defaultdir + '/.folder'
+        try:
+            with open(pathfile, "r") as f:
+                configdir = f.read().strip()
+        except:
+            with open(pathfile, "w") as f:
+                f.write(str(defaultdir))
+            configdir = defaultdir
+        defaultfile = configdir + '/config.json'
+        defaultkey = configdir + '/.osk'
         if conf == None:
             self.file = defaultfile
         else:
@@ -233,3 +241,44 @@ class configfile:
     def _profiles_del(self,*, id ):
         #Delete profile from config
         del self.profiles[id]
+        
+    def _getallnodes(self):
+        #get all nodes on configfile
+        nodes = []
+        layer1 = [k for k,v in self.connections.items() if isinstance(v, dict) and v["type"] == "connection"]
+        folders = [k for k,v in self.connections.items() if isinstance(v, dict) and v["type"] == "folder"]
+        nodes.extend(layer1)
+        for f in folders:
+            layer2 = [k + "@" + f for k,v in self.connections[f].items() if isinstance(v, dict) and v["type"] == "connection"]
+            nodes.extend(layer2)
+            subfolders = [k for k,v in self.connections[f].items() if isinstance(v, dict) and v["type"] == "subfolder"]
+            for s in subfolders:
+                layer3 = [k + "@" + s + "@" + f for k,v in self.connections[f][s].items() if isinstance(v, dict) and v["type"] == "connection"]
+                nodes.extend(layer3)
+        return nodes
+
+    def _getallfolders(self):
+        #get all folders on configfile
+        folders = ["@" + k for k,v in self.connections.items() if isinstance(v, dict) and v["type"] == "folder"]
+        subfolders = []
+        for f in folders:
+            s = ["@" + k + f for k,v in self.connections[f[1:]].items() if isinstance(v, dict) and v["type"] == "subfolder"]
+            subfolders.extend(s)
+        folders.extend(subfolders)
+        return folders
+
+    def _profileused(self, profile):
+        #Check if profile is used before deleting it
+        nodes = []
+        layer1 = [k for k,v in self.connections.items() if isinstance(v, dict) and v["type"] == "connection" and ("@" + profile in v.values() or ( isinstance(v["password"],list) and "@" + profile in v["password"]))]
+        folders = [k for k,v in self.connections.items() if isinstance(v, dict) and v["type"] == "folder"]
+        nodes.extend(layer1)
+        for f in folders:
+            layer2 = [k + "@" + f for k,v in self.connections[f].items() if isinstance(v, dict) and v["type"] == "connection" and ("@" + profile in v.values() or ( isinstance(v["password"],list) and "@" + profile in v["password"]))]
+            nodes.extend(layer2)
+            subfolders = [k for k,v in self.connections[f].items() if isinstance(v, dict) and v["type"] == "subfolder"]
+            for s in subfolders:
+                layer3 = [k + "@" + s + "@" + f for k,v in self.connections[f][s].items() if isinstance(v, dict) and v["type"] == "connection" and ("@" + profile in v.values() or ( isinstance(v["password"],list) and "@" + profile in v["password"]))]
+                nodes.extend(layer3)
+        return nodes
+
