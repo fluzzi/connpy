@@ -1581,7 +1581,7 @@ __pdoc__ = {
         else:
             node[&#34;options&#34;] = defaults[&#34;options&#34;]
         if edit[&#34;logs&#34;]:
-            questions.append(inquirer.Text(&#34;logs&#34;, message=&#34;Pick logging path/file &#34;, validate=self._default_validation, default=defaults[&#34;logs&#34;]))
+            questions.append(inquirer.Text(&#34;logs&#34;, message=&#34;Pick logging path/file &#34;,  validate=self._default_validation, default=defaults[&#34;logs&#34;].replace(&#34;{&#34;,&#34;{{&#34;).replace(&#34;}&#34;,&#34;}}&#34;)))
         else:
             node[&#34;logs&#34;] = defaults[&#34;logs&#34;]
         if edit[&#34;user&#34;]:
@@ -1641,7 +1641,7 @@ __pdoc__ = {
         else:
             profile[&#34;options&#34;] = defaults[&#34;options&#34;]
         if edit[&#34;logs&#34;]:
-            questions.append(inquirer.Text(&#34;logs&#34;, message=&#34;Pick logging path/file &#34;, default=defaults[&#34;logs&#34;]))
+            questions.append(inquirer.Text(&#34;logs&#34;, message=&#34;Pick logging path/file &#34;, default=defaults[&#34;logs&#34;].replace(&#34;{&#34;,&#34;{{&#34;).replace(&#34;}&#34;,&#34;}}&#34;)))
         else:
             profile[&#34;logs&#34;] = defaults[&#34;logs&#34;]
         if edit[&#34;user&#34;]:
@@ -2404,7 +2404,7 @@ tasks:
                 passwords = self._passtx(self.password)
             else:
                 passwords = []
-            expects = [&#39;yes/no&#39;, &#39;refused&#39;, &#39;supported&#39;, &#39;cipher&#39;, &#39;ssh-keygen.*\&#34;&#39;, &#39;timeout&#39;, &#39;unavailable&#39;, &#39;closed&#39;, &#39;[p|P]assword:|[u|U]sername:&#39;, r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, &#39;suspend&#39;, pexpect.EOF, pexpect.TIMEOUT, &#34;No route to host&#34;, &#34;resolve hostname&#34;, &#34;no matching host key&#34;]
+            expects = [&#39;yes/no&#39;, &#39;refused&#39;, &#39;supported&#39;, &#39;cipher&#39;, &#39;ssh-keygen.*\&#34;&#39;, &#39;timeout&#39;, &#39;unavailable&#39;, &#39;closed&#39;, &#39;[p|P]assword:|[u|U]sername:&#39;, r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, &#39;suspend&#39;, pexpect.EOF, pexpect.TIMEOUT, &#34;No route to host&#34;, &#34;resolve hostname&#34;, &#34;no matching&#34;]
         elif self.protocol == &#34;telnet&#34;:
             cmd = &#34;telnet &#34; + self.host
             if self.port != &#39;&#39;:
@@ -2417,7 +2417,7 @@ tasks:
                 passwords = self._passtx(self.password)
             else:
                 passwords = []
-            expects = [&#39;[u|U]sername:&#39;, &#39;refused&#39;, &#39;supported&#39;, &#39;cipher&#39;, &#39;ssh-keygen.*\&#34;&#39;, &#39;timeout&#39;, &#39;unavailable&#39;, &#39;closed&#39;, &#39;[p|P]assword:&#39;, r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, &#39;suspend&#39;, pexpect.EOF, pexpect.TIMEOUT, &#34;No route to host&#34;, &#34;resolve hostname&#34;, &#34;no matching host key&#34;]
+            expects = [&#39;[u|U]sername:&#39;, &#39;refused&#39;, &#39;supported&#39;, &#39;cipher&#39;, &#39;ssh-keygen.*\&#34;&#39;, &#39;timeout&#39;, &#39;unavailable&#39;, &#39;closed&#39;, &#39;[p|P]assword:&#39;, r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, &#39;suspend&#39;, pexpect.EOF, pexpect.TIMEOUT, &#34;No route to host&#34;, &#34;resolve hostname&#34;, &#34;no matching&#34;]
         else:
             raise ValueError(&#34;Invalid protocol: &#34; + self.protocol)
         attempts = 1
