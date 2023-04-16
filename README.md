@@ -125,6 +125,7 @@ positional arguments:
   bulk           Add nodes in bulk
   run            Run scripts or commands on nodes
   config         Manage app config
+  api            Start and stop connpy api
 ```
 
 ### Manage profiles:
@@ -154,3 +155,62 @@ options:
    conn pc@office
    conn server
 ``` 
+## http API
+With the Connpy API you can run commands on devices using http requests
+
+### 1. List Nodes
+
+**Endpoint**: `/list_nodes`
+
+**Method**: `POST`
+
+**Description**: This route returns a list of nodes. It can also filter the list based on a given keyword.
+
+#### Request Body:
+
+```json
+{
+  "filter": "<keyword>"
+}
+```
+
+* `filter` (optional): A keyword to filter the list of nodes. It returns only the nodes that contain the keyword. If not provided, the route will return the entire list of nodes.
+
+#### Response:
+
+- A JSON array containing the filtered list of nodes.
+
+---
+
+### 2. Run Commands
+
+**Endpoint**: `/run_commands`
+
+**Method**: `POST`
+
+**Description**: This route runs commands on selected nodes based on the provided action, nodes, and commands. It also supports executing tests by providing expected results.
+
+#### Request Body:
+
+```json
+{
+  "action": "<action>",
+  "nodes": "<nodes>",
+  "commands": "<commands>",
+  "expected": "<expected>",
+  "options": "<options>"
+}
+```
+
+* `action` (required): The action to be performed. Possible values: `run` or `test`.
+* `nodes` (required): A list of nodes or a single node on which the commands will be executed. The nodes can be specified as individual node names or a node group with the `@` prefix. Node groups can also be specified as arrays with a list of nodes inside the group.
+* `commands` (required): A list of commands to be executed on the specified nodes.
+* `expected` (optional, only used when the action is `test`): A single expected result for the test.
+* `options` (optional): Array to pass options to the run command, options are: `prompt`, `parallel`, `timeout`  
+
+#### Response:
+
+- A JSON object with the results of the executed commands on the nodes.
+## Automation module
+the automation module
+

@@ -50,7 +50,7 @@ def main():
         if words[0] == "config":
             strings=["--allow-uppercase", "--keepalive", "--completion", "--fzf", "--configfolder", "--help"]
         if words[0] == "api":
-            strings=["--start", "--stop", "--restart", "--help"]
+            strings=["--start", "--stop", "--restart", "--debug", "--help"]
         if words[0] in ["--mod", "--edit", "-e", "--show", "-s", "--add", "-a", "--rm", "--del", "-r"]:
             strings=["profile"]
         if words[0] in ["list", "ls"]:

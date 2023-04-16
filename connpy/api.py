@@ -102,12 +102,14 @@ def stop_api():
     # Read the process ID (pid) from the file
     try:
         with open(PID_FILE1, "r") as f:
-            pid = int(f.read().strip())
+            pid = int(f.readline().strip())
+            port = int(f.readline().strip())
         PID_FILE=PID_FILE1
     except:
         try:
             with open(PID_FILE2, "r") as f:
-                pid = int(f.read().strip())
+                pid = int(f.readline().strip())
+                port = int(f.readline().strip())
             PID_FILE=PID_FILE2
         except:
             print("Connpy api server is not running.")
@@ -116,30 +118,34 @@ def stop_api():
     os.kill(pid, signal.SIGTERM)
     # Delete the PID file
     os.remove(PID_FILE)
-
     print(f"Server with process ID {pid} stopped.")
+    return port
 
-def start_server():
+def debug_api(port=8048):
     app.custom_config = configfile()
-    serve(app, host='0.0.0.0', port=8048)
+    app.run(debug=True, port=port)
 
-def start_api():
+def start_server(port=8048):
+    app.custom_config = configfile()
+    serve(app, host='0.0.0.0', port=port)
+
+def start_api(port=8048):
     if os.path.exists(PID_FILE1) or os.path.exists(PID_FILE2):
         print("Connpy server is already running.")
         return
     pid = os.fork()
     if pid == 0:
-        start_server()
+        start_server(port)
     else:
         try:
             with open(PID_FILE1, "w") as f:
-                f.write(str(pid))
+                f.write(str(pid) + "\n" + str(port))
         except:
             try:
                 with open(PID_FILE2, "w") as f:
-                    f.write(str(pid))
+                    f.write(str(pid) + "\n" + str(port))
             except:
                 print("Cound't create PID file")
                 return
-        print(f'Server is running with process ID {pid}.')
+        print(f'Server is running with process ID {pid} in port {port}')
 

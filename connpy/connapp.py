@@ -106,9 +106,10 @@ class connapp:
         #APIPARSER
         apiparser = subparsers.add_parser("api", help="Start and stop connpy api") 
         apicrud = apiparser.add_mutually_exclusive_group(required=True)
-        apicrud.add_argument("--start", dest="start", nargs=0, action=self._store_type, help="Start conppy api")
-        apicrud.add_argument("--restart", dest="restart", nargs=0, action=self._store_type, help="Restart conppy api")
-        apicrud.add_argument("--stop", dest="stop", nargs=0, action=self._store_type, help="Stop conppy api")
+        apicrud.add_argument("-s","--start", dest="start", nargs="?", action=self._store_type, help="Start conppy api", type=int, default=8048, metavar="PORT")
+        apicrud.add_argument("-r","--restart", dest="restart", nargs=0, action=self._store_type, help="Restart conppy api")
+        apicrud.add_argument("-x","--stop", dest="stop", nargs=0, action=self._store_type, help="Stop conppy api")
+        apicrud.add_argument("-d", "--debug", dest="debug", nargs="?", action=self._store_type, help="Run connpy server on debug mode", type=int, default=8048, metavar="PORT")
         apiparser.set_defaults(func=self._func_api)
         #CONFIGPARSER
         configparser = subparsers.add_parser("config", help="Manage app config") 
@@ -500,9 +501,17 @@ class connapp:
 
     def _func_api(self, args):
         if args.command == "stop" or args.command == "restart":
-            stop_api()
+            args.data = stop_api()
         if args.command == "start" or args.command == "restart":
-            start_api()
+            if args.data:
+                start_api(args.data)
+            else:
+                start_api()
+        if args.command == "debug":
+            if args.data:
+                debug_api(args.data)
+            else:
+                debug_api()
         return
 
     def _node_run(self, args):
