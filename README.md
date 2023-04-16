@@ -211,6 +211,3 @@ With the Connpy API you can run commands on devices using http requests
 #### Response:
 
 - A JSON object with the results of the executed commands on the nodes.
-## Automation module
-the automation module
-
