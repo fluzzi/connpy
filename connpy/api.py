@@ -115,7 +115,10 @@ def stop_api():
             print("Connpy api server is not running.")
             return 
     # Send a SIGTERM signal to the process
-    os.kill(pid, signal.SIGTERM)
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except:
+        pass
     # Delete the PID file
     os.remove(PID_FILE)
     print(f"Server with process ID {pid} stopped.")
