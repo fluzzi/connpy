@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 from connpy import configfile, node, nodes
+from connpy.ai import ai as myai
 from waitress import serve
 import os
 import signal
@@ -22,17 +23,49 @@ def root():
 @app.route("/list_nodes", methods=["POST"])
 def list_nodes():
     conf = app.custom_config
-    output = conf._getallnodes()
     case = conf.config["case"]
     try:
         data = request.get_json()
         filter = data["filter"]
         if not case:
-            filter = filter.lower()
-        output = [item for item in output if filter in item]
+            if isinstance(filter, list):
+                filter = [item.lower() for item in filter]
+            else:
+                filter = filter.lower()
+        output = conf._getallnodes(filter)
     except:
-        pass
+        output = conf._getallnodes()
     return jsonify(output)
+
+@app.route("/get_nodes", methods=["POST"])
+def get_nodes():
+    conf = app.custom_config
+    case = conf.config["case"]
+    try:
+        data = request.get_json()
+        filter = data["filter"]
+        if not case:
+            if isinstance(filter, list):
+                filter = [item.lower() for item in filter]
+            else:
+                filter = filter.lower()
+        output = conf._getallnodesfull(filter)
+    except:
+        output = conf._getallnodesfull()
+    return jsonify(output)
+
+@app.route("/ask_ai", methods=["POST"])
+def ask_ai():
+    conf = app.custom_config
+    data = request.get_json()
+    input = data["input"]
+    if "dryrun" in data:
+        dryrun = data["dryrun"] 
+    else:
+        dryrun = False
+    ai = myai(conf)
+    return ai.ask(input, dryrun)
+
 
 @app.route("/run_commands", methods=["POST"])
 def run_commands():
@@ -51,25 +84,7 @@ def run_commands():
         error = "'{}' is mandatory".format(e.args[0])
         return({"DataError": error})
     if isinstance(nodelist, list):
-        for i in nodelist:
-            if isinstance(i, dict):
-                name = list(i.keys())[0]
-                mylist = i[name]
-                if not case:
-                    name = name.lower()
-                    mylist = [item.lower() for item in mylist]
-                this = conf.getitem(name, mylist)
-                mynodes.update(this)
-            elif i.startswith("@"):
-                if not case:
-                    i = i.lower()
-                this = conf.getitem(i)
-                mynodes.update(this)
-            else:
-                if not case:
-                    i = i.lower()
-                this = conf.getitem(i)
-                mynodes[i] = this
+        mynodes = conf.getitems(nodelist)
     else:
         if not case:
             nodelist = nodelist.lower()

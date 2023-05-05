@@ -33,7 +33,7 @@ class node:
 
         '''
     
-    def __init__(self, unique, host, options='', logs='', password='', port='', protocol='', user='', config=''):
+    def __init__(self, unique, host, options='', logs='', password='', port='', protocol='', user='', config='', tags=''):
         ''' 
             
         ### Parameters:  
@@ -63,6 +63,9 @@ class node:
             - config   (obj): Pass the object created with class configfile with 
                               key for decryption and extra configuration if you 
                               are using connection manager.  
+
+            - tags   (dict) : Tags useful for automation and personal porpuse
+                              like "os", "prompt" and "screenleght_command"
         '''
         if config == '':
             self.idletime = 0
@@ -71,11 +74,14 @@ class node:
             self.idletime = config.config["idletime"]
             self.key = config.key
         self.unique = unique
-        attr = {"host": host, "logs": logs, "options":options, "port": port, "protocol": protocol, "user": user}
+        attr = {"host": host, "logs": logs, "options":options, "port": port, "protocol": protocol, "user": user, "tags": tags}
         for key in attr:
-            profile = re.search("^@(.*)", attr[key])
+            profile = re.search("^@(.*)", str(attr[key]))
             if profile and config != '':
-                setattr(self,key,config.profiles[profile.group(1)][key])
+                try:
+                    setattr(self,key,config.profiles[profile.group(1)][key])
+                except:
+                    setattr(self,key,"")
             elif attr[key] == '' and key == "protocol":
                 try:
                     setattr(self,key,config.profiles["default"][key])
@@ -251,11 +257,15 @@ class node:
         connect = self._connect(timeout = timeout)
         now = datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S')
         if connect == True:
+            if "prompt" in self.tags:
+                prompt = self.tags["prompt"]
             expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
             output = ''
             status = ''
             if not isinstance(commands, list):
                 commands = [commands]
+            if "screen_length_command" in self.tags:
+                commands.insert(0, self.tags["screen_length_command"])
             self.mylog = io.BytesIO()
             self.child.logfile_read = self.mylog
             for c in commands:
@@ -333,10 +343,14 @@ class node:
         '''
         connect = self._connect(timeout = timeout)
         if connect == True:
+            if "prompt" in self.tags:
+                prompt = self.tags["prompt"]
             expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
             output = ''
             if not isinstance(commands, list):
                 commands = [commands]
+            if "screen_length_command" in self.tags:
+                commands.insert(0, self.tags["screen_length_command"])
             self.mylog = io.BytesIO()
             self.child.logfile_read = self.mylog
             for c in commands:
@@ -345,25 +359,26 @@ class node:
                 result = self.child.expect(expects, timeout = timeout)
                 self.child.sendline(c)
                 if result == 2:
-                    result = 3
                     break
-            if not result == 3:
-                if vars is not None:
-                    expected = expected.format(**vars)
-                expects = [expected, prompt, pexpect.EOF, pexpect.TIMEOUT]
+            if not result == 2:
                 result = self.child.expect(expects, timeout = timeout)
             self.child.close()
             output = self._logclean(self.mylog.getvalue().decode(), True)
             self.output = output
-            if result == 0:
-                self.result = True
-                self.status = 0
-                return True
-            if result in [1, 2]:
-                self.result = False
+            if result in [0, 1]:
+                lastcommand = commands[-1]
+                if vars is not None:
+                    expected = expected.format(**vars)
+                    lastcommand = lastcommand.format(**vars)
+                last_command_index = output.rfind(lastcommand)
+                cleaned_output = output[last_command_index + len(lastcommand):].strip()
+                if expected in cleaned_output:
+                    self.result = True
+                else:
+                    self.result = False
                 self.status = 0
                 return False
-            if result == 3:
+            if result == 2:
                 self.result = None
                 self.status = 2
                 return output

@@ -105,11 +105,28 @@ options:
 <li>A JSON array containing the filtered list of nodes.</li>
 </ul>
 <hr>
-<h3 id="2-run-commands">2. Run Commands</h3>
+<h3 id="2-get-nodes">2. Get Nodes</h3>
+<p><strong>Endpoint</strong>: <code>/get_nodes</code></p>
+<p><strong>Method</strong>: <code>POST</code></p>
+<p><strong>Description</strong>: This route returns a dictionary of nodes with all their attributes. It can also filter the nodes based on a given keyword.</p>
+<h4 id="request-body_1">Request Body:</h4>
+<pre><code class="language-json">{
+  &quot;filter&quot;: &quot;&lt;keyword&gt;&quot;
+}
+</code></pre>
+<ul>
+<li><code>filter</code> (optional): A keyword to filter the nodes. It returns only the nodes that contain the keyword. If not provided, the route will return the entire list of nodes.</li>
+</ul>
+<h4 id="response_1">Response:</h4>
+<ul>
+<li>A JSON array containing the filtered nodes.</li>
+</ul>
+<hr>
+<h3 id="3-run-commands">3. Run Commands</h3>
 <p><strong>Endpoint</strong>: <code>/run_commands</code></p>
 <p><strong>Method</strong>: <code>POST</code></p>
 <p><strong>Description</strong>: This route runs commands on selected nodes based on the provided action, nodes, and commands. It also supports executing tests by providing expected results.</p>
-<h4 id="request-body_1">Request Body:</h4>
+<h4 id="request-body_2">Request Body:</h4>
 <pre><code class="language-json">{
   &quot;action&quot;: &quot;&lt;action&gt;&quot;,
   &quot;nodes&quot;: &quot;&lt;nodes&gt;&quot;,
@@ -126,15 +143,33 @@ options:
 <li><code>options</code> (optional): Array to pass options to the run command, options are: <code>prompt</code>, <code>parallel</code>, <code>timeout</code>
 </li>
 </ul>
-<h4 id="response_1">Response:</h4>
+<h4 id="response_2">Response:</h4>
 <ul>
 <li>A JSON object with the results of the executed commands on the nodes.</li>
 </ul>
+<h3 id="4-ask-ai">4. Ask AI</h3>
+<p><strong>Endpoint</strong>: <code>/ask_ai</code></p>
+<p><strong>Method</strong>: <code>POST</code></p>
+<p><strong>Description</strong>: This route sends to chatgpt IA a request that will parse it into an understandable output for the application and then run the request.</p>
+<h4 id="request-body_3">Request Body:</h4>
+<pre><code class="language-json">{
+  &quot;input&quot;: &quot;&lt;user input request&gt;&quot;,
+  &quot;dryrun&quot;: true or false
+}
+</code></pre>
+<ul>
+<li><code>input</code> (required): The user input requesting the AI to perform an action on some devices or get the devices list.</li>
+<li><code>dryrun</code> (optional): If set to true, it will return the parameters to run the request but it won't run it. default is false.</li>
+</ul>
+<h4 id="response_3">Response:</h4>
+<ul>
+<li>A JSON array containing the action to run and the parameters and the result of the action.</li>
+</ul>
 <h2 id="automation-module">Automation module</h2>
-<p>the automation module</p>
+<p>The automation module</p>
 <h3 id="standalone-module">Standalone module</h3>
 <pre><code>import connpy
-router = connpy.node(&quot;unique name&quot;,&quot;ip/hostname&quot;, user=&quot;user&quot;, password=&quot;pass&quot;)
+router = connpy.node(&quot;uniqueName&quot;,&quot;ip/host&quot;, user=&quot;user&quot;, password=&quot;pass&quot;)
 router.run([&quot;term len 0&quot;,&quot;show run&quot;])
 print(router.output)
 hasip = router.test(&quot;show ip int brief&quot;,&quot;1.1.1.1&quot;)
@@ -163,9 +198,9 @@ nodes[&quot;router2&quot;] = conf.getitem(&quot;router2@office&quot;)
 nodes[&quot;router10&quot;] = conf.getitem(&quot;router10@datacenter&quot;)
 #Also, you can create the nodes manually:
 nodes = {}
-nodes[&quot;router1&quot;] = {&quot;host&quot;: &quot;1.1.1.1&quot;, &quot;user&quot;: &quot;username&quot;, &quot;password&quot;: &quot;pass1&quot;}
-nodes[&quot;router2&quot;] = {&quot;host&quot;: &quot;1.1.1.2&quot;, &quot;user&quot;: &quot;username&quot;, &quot;password&quot;: &quot;pass2&quot;}
-nodes[&quot;router3&quot;] = {&quot;host&quot;: &quot;1.1.1.2&quot;, &quot;user&quot;: &quot;username&quot;, &quot;password&quot;: &quot;pass3&quot;}
+nodes[&quot;router1&quot;] = {&quot;host&quot;: &quot;1.1.1.1&quot;, &quot;user&quot;: &quot;user&quot;, &quot;password&quot;: &quot;pass1&quot;}
+nodes[&quot;router2&quot;] = {&quot;host&quot;: &quot;1.1.1.2&quot;, &quot;user&quot;: &quot;user&quot;, &quot;password&quot;: &quot;pass2&quot;}
+nodes[&quot;router3&quot;] = {&quot;host&quot;: &quot;1.1.1.2&quot;, &quot;user&quot;: &quot;user&quot;, &quot;password&quot;: &quot;pass3&quot;}
 #Finally you run some tasks on the nodes
 mynodes = connpy.nodes(nodes, config = conf)
 result = mynodes.test([&quot;show ip int br&quot;], &quot;1.1.1.2&quot;)
@@ -197,6 +232,16 @@ routers.run(commands, variables)
 routers.test(&quot;ping {ip}&quot;, expected, variables)
 for key in routers.result:
     print(key, ' ---&gt; ', (&quot;pass&quot; if routers.result[key] else &quot;fail&quot;))
+</code></pre>
+<h3 id="using-ai">Using AI</h3>
+<pre><code>import connpy
+conf = connpy.configfile()
+organization = 'openai-org'
+api_key = &quot;openai-key&quot;
+myia = ai(conf, organization, api_key)
+input = &quot;go to router 1 and get me the full configuration&quot;
+result = myia.ask(input, dryrun = False)
+print(result)
 </code></pre>
 <details class="source">
 <summary>
@@ -302,7 +347,31 @@ With the Connpy API you can run commands on devices using http requests
 
 ---
 
-### 2. Run Commands
+### 2. Get Nodes
+
+**Endpoint**: `/get_nodes`
+
+**Method**: `POST`
+
+**Description**: This route returns a dictionary of nodes with all their attributes. It can also filter the nodes based on a given keyword.
+
+#### Request Body:
+
+```json
+{
+  &#34;filter&#34;: &#34;&lt;keyword&gt;&#34;
+}
+```
+
+* `filter` (optional): A keyword to filter the nodes. It returns only the nodes that contain the keyword. If not provided, the route will return the entire list of nodes.
+
+#### Response:
+
+- A JSON array containing the filtered nodes.
+
+---
+
+### 3. Run Commands
 
 **Endpoint**: `/run_commands`
 
@@ -331,13 +400,37 @@ With the Connpy API you can run commands on devices using http requests
 #### Response:
 
 - A JSON object with the results of the executed commands on the nodes.
-## Automation module
-the automation module
 
+### 4. Ask AI
+
+**Endpoint**: `/ask_ai`
+
+**Method**: `POST`
+
+**Description**: This route sends to chatgpt IA a request that will parse it into an understandable output for the application and then run the request.
+
+#### Request Body:
+
+```json
+{
+  &#34;input&#34;: &#34;&lt;user input request&gt;&#34;,
+  &#34;dryrun&#34;: true or false
+}
+```
+
+* `input` (required): The user input requesting the AI to perform an action on some devices or get the devices list.
+* `dryrun` (optional): If set to true, it will return the parameters to run the request but it won&#39;t run it. default is false.
+
+#### Response:
+
+- A JSON array containing the action to run and the parameters and the result of the action.
+
+## Automation module
+The automation module
 ### Standalone module
 ```
 import connpy
-router = connpy.node(&#34;unique name&#34;,&#34;ip/hostname&#34;, user=&#34;user&#34;, password=&#34;pass&#34;)
+router = connpy.node(&#34;uniqueName&#34;,&#34;ip/host&#34;, user=&#34;user&#34;, password=&#34;pass&#34;)
 router.run([&#34;term len 0&#34;,&#34;show run&#34;])
 print(router.output)
 hasip = router.test(&#34;show ip int brief&#34;,&#34;1.1.1.1&#34;)
@@ -369,9 +462,9 @@ nodes[&#34;router2&#34;] = conf.getitem(&#34;router2@office&#34;)
 nodes[&#34;router10&#34;] = conf.getitem(&#34;router10@datacenter&#34;)
 #Also, you can create the nodes manually:
 nodes = {}
-nodes[&#34;router1&#34;] = {&#34;host&#34;: &#34;1.1.1.1&#34;, &#34;user&#34;: &#34;username&#34;, &#34;password&#34;: &#34;pass1&#34;}
-nodes[&#34;router2&#34;] = {&#34;host&#34;: &#34;1.1.1.2&#34;, &#34;user&#34;: &#34;username&#34;, &#34;password&#34;: &#34;pass2&#34;}
-nodes[&#34;router3&#34;] = {&#34;host&#34;: &#34;1.1.1.2&#34;, &#34;user&#34;: &#34;username&#34;, &#34;password&#34;: &#34;pass3&#34;}
+nodes[&#34;router1&#34;] = {&#34;host&#34;: &#34;1.1.1.1&#34;, &#34;user&#34;: &#34;user&#34;, &#34;password&#34;: &#34;pass1&#34;}
+nodes[&#34;router2&#34;] = {&#34;host&#34;: &#34;1.1.1.2&#34;, &#34;user&#34;: &#34;user&#34;, &#34;password&#34;: &#34;pass2&#34;}
+nodes[&#34;router3&#34;] = {&#34;host&#34;: &#34;1.1.1.2&#34;, &#34;user&#34;: &#34;user&#34;, &#34;password&#34;: &#34;pass3&#34;}
 #Finally you run some tasks on the nodes
 mynodes = connpy.nodes(nodes, config = conf)
 result = mynodes.test([&#34;show ip int br&#34;], &#34;1.1.1.2&#34;)
@@ -405,14 +498,27 @@ routers.test(&#34;ping {ip}&#34;, expected, variables)
 for key in routers.result:
     print(key, &#39; ---&gt; &#39;, (&#34;pass&#34; if routers.result[key] else &#34;fail&#34;))
 ```
+### Using AI
+```
+import connpy
+conf = connpy.configfile()
+organization = &#39;openai-org&#39;
+api_key = &#34;openai-key&#34;
+myia = ai(conf, organization, api_key)
+input = &#34;go to router 1 and get me the full configuration&#34;
+result = myia.ask(input, dryrun = False)
+print(result)
+```
 &#39;&#39;&#39;
 from .core import node,nodes
 from .configfile import configfile
 from .connapp import connapp
+from .api import *
+from .ai import ai
 from ._version import __version__
 from pkg_resources import get_distribution
 
-__all__ = [&#34;node&#34;, &#34;nodes&#34;, &#34;configfile&#34;, &#34;connapp&#34;]
+__all__ = [&#34;node&#34;, &#34;nodes&#34;, &#34;configfile&#34;, &#34;connapp&#34;, &#34;ai&#34;]
 __author__ = &#34;Federico Luzzi&#34;
 __pdoc__ = {
     &#39;core&#39;: False,
@@ -430,6 +536,472 @@ __pdoc__ = {
 <section>
 <h2 class="section-title" id="header-classes">Classes</h2>
 <dl>
+<dt id="connpy.ai"><code class="flex name class">
+<span>class <span class="ident">ai</span></span>
+<span>(</span><span>config, org=None, api_key=None, model='gpt-3.5-turbo', temp=0.7)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>This class generates a ai object. Containts all the information and methods to make requests to openAI chatGPT to run actions on the application.</p>
+<h3 id="attributes">Attributes:</h3>
+<pre><code>- model        (str): Model of GPT api to use. Default is gpt-3.5-turbo.
+
+- temp       (float): Value between 0 and 1 that control the randomness 
+                      of generated text, with higher values increasing 
+                      creativity. Default is 0.7.
+</code></pre>
+<h3 id="parameters">Parameters:</h3>
+<pre><code>- config (obj): Pass the object created with class configfile with 
+                key for decryption and extra configuration if you 
+                are using connection manager.
+</code></pre>
+<h3 id="optional-parameters">Optional Parameters:</h3>
+<pre><code>- org     (str): A unique token identifying the user organization
+                 to interact with the API.
+
+- api_key (str): A unique authentication token required to access 
+                 and interact with the API.
+
+- model   (str): Model of GPT api to use. Default is gpt-3.5-turbo.
+
+- temp  (float): Value between 0 and 1 that control the randomness 
+                 of generated text, with higher values increasing 
+                 creativity. Default is 0.7.
+</code></pre></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class ai:
+    &#39;&#39;&#39; This class generates a ai object. Containts all the information and methods to make requests to openAI chatGPT to run actions on the application.
+
+    ### Attributes:  
+
+        - model        (str): Model of GPT api to use. Default is gpt-3.5-turbo.
+
+        - temp       (float): Value between 0 and 1 that control the randomness 
+                              of generated text, with higher values increasing 
+                              creativity. Default is 0.7.
+
+        &#39;&#39;&#39;
+
+    def __init__(self, config, org = None, api_key = None, model = &#34;gpt-3.5-turbo&#34;, temp = 0.7):
+        &#39;&#39;&#39; 
+            
+        ### Parameters:  
+
+            - config (obj): Pass the object created with class configfile with 
+                            key for decryption and extra configuration if you 
+                            are using connection manager.  
+
+        ### Optional Parameters:  
+
+            - org     (str): A unique token identifying the user organization
+                             to interact with the API.
+
+            - api_key (str): A unique authentication token required to access 
+                             and interact with the API.
+
+            - model   (str): Model of GPT api to use. Default is gpt-3.5-turbo. 
+
+            - temp  (float): Value between 0 and 1 that control the randomness 
+                             of generated text, with higher values increasing 
+                             creativity. Default is 0.7.
+   
+
+        &#39;&#39;&#39;
+        self.config = config
+        if org:
+            openai.organization = org
+        else:
+            try: 
+                openai.organization = self.config.config[&#34;openai&#34;][&#34;organization&#34;]
+            except:
+                raise ValueError(&#34;Missing openai organization&#34;)
+        if api_key:
+            openai.api_key = api_key
+        else:
+            try: 
+                openai.api_key = self.config.config[&#34;openai&#34;][&#34;api_key&#34;]
+            except:
+                raise ValueError(&#34;Missing openai api_key&#34;)
+        self.__prompt = {}
+        self.__prompt[&#34;original_system&#34;] = &#34;&#34;&#34;
+            When provided with user input for an SSH connection management application, analyze the input and extract the following information:
+
+            - app_related: True if the input is related to the application&#39;s purpose and the request is understood; False if the input is not related, not understood, or if mandatory information like filter is missing.
+            - type: Given a user input, identify the type of request they want to make. The input will represent one of two options: 
+            1. &#34;command&#34; - The user wants to get information from devices by running commands.
+            2. &#34;list_nodes&#34; - The user wants to get a list of nodes, devices, servers, or routers.
+            Response wich command or list_nodes type depending on the request.
+            - filter: One or more regex patterns indicating the device or group of devices the command should be run on, returned as a Python list (e.g., [&#39;hostname&#39;, &#39;hostname@folder&#39;, &#39;@subfolder@folder&#39;]). The filter can have different formats, such as:
+                - hostname
+                - hostname@folder
+                - hostname@subfolder@folder
+                - partofhostname
+                - @folder
+                - @subfolder@folder
+                - regex_pattern
+                The filter should be extracted from the user input exactly as it was provided.
+                Always preserve the exact filter pattern provided by the user, with no modifications. Do not process any regex, the application can do that.
+                If no filter is specified, set it to None.
+            - Expected: A value representing an expected output to search for when running the command. For the user this is a optional value. Set it to &#39;None&#39; if no value was captured.
+              expected value should ALWAYS come from the user input explicitly.
+            - response: An optional field to be filled when app_related is False or when providing an explanation related to the app. This is where you can engage in small talk, answer questions not related to the app, or provide explanations about the extracted information.
+                
+            Always respond in the following format:
+                
+                app_related: {{app_related}}
+                Type: {{command}}
+                Filter: {{filter}}
+                Expected: {{expected}}
+                Response: {{response}}
+    &#34;&#34;&#34; 
+        self.__prompt[&#34;original_user&#34;] = &#34;Get the IP addresses of loopback0 for all routers from w2az1 and e1.*(prod|dev) and check if they have the ip 192.168.1.1&#34;
+        self.__prompt[&#34;original_assistant&#34;] = &#34;app_related: True\nType: Command\nFilter: [&#39;w2az1&#39;, &#39;e1.*(prod|dev)&#39;]\nExpected: 192.168.1.1&#34;
+        self.__prompt[&#34;command_system&#34;] = &#34;&#34;&#34;
+    For each device listed below, provide the command(s) needed to perform the specified action, depending on the device OS (e.g., Cisco IOSXR router, Linux server). Always format your response as a Python list (e.g., [&#39;command1&#39;, &#39;command2&#39;]). 
+
+    Note that the application knows how to connect to devices via SSH, so you only need to provide the command(s) to run after connecting. 
+
+    If the commands needed are not for the specific OS type, just send an empty list (e.g., []).
+
+    It is crucial to always include the device name provided in your response, even when there is only one device.
+
+    your response has to be always like this:
+        node1: [&#34;command1&#34;, &#34;command2&#34;]
+        node2: [&#34;command1&#34;, &#34;command2&#34;, &#34;command3&#34;]
+        node1@folder: [&#34;command1&#34;]
+        Node4@subfolder@folder: []
+    &#34;&#34;&#34;
+        self.__prompt[&#34;command_user&#34;]= &#34;&#34;&#34;
+    input: show me the full configuration for all this devices:
+
+    Devices:
+    router1: cisco ios
+    &#34;&#34;&#34;
+        self.__prompt[&#34;command_assistant&#34;]= &#34;&#34;&#34;
+    router1: [&#39;show running-config&#39;]
+    &#34;&#34;&#34;
+        self.model = model
+        self.temp = temp
+
+    def _clean_original_response(self, raw_response):
+        #Parse response for first request to openAI GPT.
+        info_dict = {}
+        info_dict[&#34;app_related&#34;] = False
+        current_key = &#34;response&#34;
+        for line in raw_response.split(&#34;\n&#34;):
+            if line.strip() == &#34;&#34;:
+                line = &#34;\n&#34;
+            possible_keys = [&#34;app_related&#34;, &#34;type&#34;, &#34;filter&#34;, &#34;expected&#34;, &#34;response&#34;]
+            if &#39;:&#39; in line and (key := line.split(&#39;:&#39;, 1)[0].strip().lower()) in possible_keys:
+                key, value = line.split(&#34;:&#34;, 1)
+                key = key.strip().lower()
+                value = value.strip()
+                # Convert &#34;true&#34; or &#34;false&#34; (case-insensitive) to Python boolean
+                if value.lower() == &#34;true&#34;:
+                    value = True
+                elif value.lower() == &#34;false&#34;:
+                    value = False
+                elif value.lower() == &#34;none&#34;:
+                    value = None
+                if key == &#34;filter&#34;:
+                    value = ast.literal_eval(value)
+                #store in dictionary
+                info_dict[key] = value
+                current_key = key
+            else:
+                if current_key == &#34;response&#34;:
+                    if &#34;response&#34; in info_dict:
+                        info_dict[current_key] += &#34;\n&#34; + line
+                    else:
+                        info_dict[current_key] = line
+
+        return info_dict
+
+    def _clean_command_response(self, raw_response):
+        #Parse response for command request to openAI GPT.
+        info_dict = {}
+        info_dict[&#34;commands&#34;] = []
+        info_dict[&#34;variables&#34;] = {}
+        info_dict[&#34;variables&#34;][&#34;__global__&#34;] = {}
+        for line in raw_response.split(&#34;\n&#34;):
+            if &#34;:&#34; in line:
+                key, value = line.split(&#34;:&#34;, 1)
+                key = key.strip()
+                newvalue = {}
+                try:
+                    value = ast.literal_eval(value.strip())
+                    for i,e in enumerate(value, start=1):
+                        newvalue[f&#34;command{i}&#34;] = e
+                        if f&#34;{{command{i}}}&#34; not in info_dict[&#34;commands&#34;]:
+                            info_dict[&#34;commands&#34;].append(f&#34;{{command{i}}}&#34;)
+                            info_dict[&#34;variables&#34;][&#34;__global__&#34;][f&#34;command{i}&#34;] = &#34;&#34;
+                    info_dict[&#34;variables&#34;][key] = newvalue
+                except:
+                    pass
+        return info_dict
+
+
+    def _get_commands(self, user_input, nodes):
+        #Send the request for commands for each device to openAI GPT.
+        output_list = []
+        for key, value in nodes.items():
+            tags = value.get(&#39;tags&#39;, {})
+            try:
+                os_value = tags.get(&#39;os&#39;, &#39;&#39;)
+            except:
+                os_value = &#34;&#34;
+            output_list.append(f&#34;{key}: {os_value}&#34;)
+        output_str = &#34;\n&#34;.join(output_list)
+        command_input = f&#34;input: {user_input}\n\nDevices:\n{output_str}&#34;
+        message = []
+        message.append({&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: dedent(self.__prompt[&#34;command_system&#34;])})
+        message.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: dedent(self.__prompt[&#34;command_user&#34;])})
+        message.append({&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: dedent(self.__prompt[&#34;command_assistant&#34;])})
+        message.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: command_input})
+        response = openai.ChatCompletion.create(
+            model=self.model,
+            messages=message,
+            temperature=self.temp
+            )
+        output = {}
+        output[&#34;dict_response&#34;] = response
+        output[&#34;raw_response&#34;] = response[&#34;choices&#34;][0][&#34;message&#34;][&#34;content&#34;] 
+        output[&#34;response&#34;] = self._clean_command_response(output[&#34;raw_response&#34;])
+        return output
+
+    def _get_filter(self, user_input):
+        #Send the request to identify the filter and other attributes from the user input to GPT.
+        message = []
+        message.append({&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: dedent(self.__prompt[&#34;original_system&#34;])})
+        message.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: dedent(self.__prompt[&#34;original_user&#34;])})
+        message.append({&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: dedent(self.__prompt[&#34;original_assistant&#34;])})
+        message.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: user_input})
+
+        response = openai.ChatCompletion.create(
+            model=self.model,
+            messages=message,
+            temperature=self.temp,
+            top_p=1
+            )
+
+        output = {}
+        output[&#34;dict_response&#34;] = response
+        output[&#34;raw_response&#34;] = response[&#34;choices&#34;][0][&#34;message&#34;][&#34;content&#34;] 
+        clear_response = self._clean_original_response(output[&#34;raw_response&#34;])
+        output[&#34;response&#34;] = self._clean_original_response(output[&#34;raw_response&#34;])
+        return output
+        
+    def ask(self, user_input, dryrun = False):
+        &#39;&#39;&#39;
+        Send the user input to openAI GPT and parse the response to run an action in the application.
+
+        ### Parameters:  
+
+            - user_input (str): Request to send to openAI that will be parsed
+                                and returned to execute on the application.
+                                AI understands the following tasks:
+                                - Run a command on a group of devices.
+                                - List a group of devices.
+                                - Test a command on a group of devices
+                                  and verify if the output contain an
+                                  expected value.
+
+        ### Optional Parameters:  
+
+            - dryrun  (bool): Set to true to get the arguments to use to run
+                              in the app. Default is false and it will run 
+                              the actions directly.
+
+        ### Returns:  
+
+            dict: Dictionary formed with the following keys:
+                  - input: User input received
+                  - app_related: True if GPT detected the request to be related
+                    to the application.
+                  - dryrun: True/False
+                  - response: If the request is not related to the app. this
+                    key will contain chatGPT answer.
+                  - action: The action detected by the AI to run in the app.
+                  - filter: If it was detected by the AI, the filter used
+                    to get the list of nodes to work on.
+                  - nodes: If it&#39;s not a dryrun, the list of nodes matched by
+                    the filter.
+                  - args: A dictionary of arguments required to run command(s)
+                    on the nodes.
+                  - result: A dictionary with the output of the commands or 
+                    the test.
+                    
+
+        &#39;&#39;&#39;
+        output = {}
+        original = self._get_filter(user_input)
+        output[&#34;input&#34;] = user_input
+        output[&#34;app_related&#34;] = original[&#34;response&#34;][&#34;app_related&#34;]
+        output[&#34;dryrun&#34;] = dryrun
+        if not output[&#34;app_related&#34;]:
+            output[&#34;response&#34;] = original[&#34;response&#34;][&#34;response&#34;]
+        else:
+            type = original[&#34;response&#34;][&#34;type&#34;].lower()
+            if &#34;filter&#34; in original[&#34;response&#34;]:
+                output[&#34;filter&#34;] = original[&#34;response&#34;][&#34;filter&#34;]
+                if not self.config.config[&#34;case&#34;]:
+                    if isinstance(output[&#34;filter&#34;], list):
+                        output[&#34;filter&#34;] = [item.lower() for item in output[&#34;filter&#34;]]
+                    else:
+                        output[&#34;filter&#34;] = output[&#34;filter&#34;].lower()
+                if not dryrun or type == &#34;command&#34;:
+                    thisnodes = self.config._getallnodesfull(output[&#34;filter&#34;])
+                    output[&#34;nodes&#34;] = list(thisnodes.keys())
+            if not type == &#34;command&#34;:
+                output[&#34;action&#34;] = type
+            else:
+                commands = self._get_commands(user_input, thisnodes)
+                output[&#34;args&#34;] = {}
+                output[&#34;args&#34;][&#34;commands&#34;] = commands[&#34;response&#34;][&#34;commands&#34;]
+                output[&#34;args&#34;][&#34;vars&#34;] = commands[&#34;response&#34;][&#34;variables&#34;]
+                if original[&#34;response&#34;][&#34;expected&#34;]:
+                    output[&#34;args&#34;][&#34;expected&#34;] = original[&#34;response&#34;][&#34;expected&#34;]
+                    output[&#34;action&#34;] = &#34;test&#34;
+                else:
+                    output[&#34;action&#34;] = &#34;run&#34;
+                if not dryrun:
+                    mynodes = nodes(self.config.getitems(output[&#34;nodes&#34;]),config=self.config)
+                    if output[&#34;action&#34;] == &#34;test&#34;:
+                        output[&#34;result&#34;] = mynodes.test(**output[&#34;args&#34;])
+                    elif output[&#34;action&#34;] == &#34;run&#34;:
+                        output[&#34;result&#34;] = mynodes.run(**output[&#34;args&#34;])
+        return output</code></pre>
+</details>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.ai.ask"><code class="name flex">
+<span>def <span class="ident">ask</span></span>(<span>self, user_input, dryrun=False)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Send the user input to openAI GPT and parse the response to run an action in the application.</p>
+<h3 id="parameters">Parameters:</h3>
+<pre><code>- user_input (str): Request to send to openAI that will be parsed
+                    and returned to execute on the application.
+                    AI understands the following tasks:
+                    - Run a command on a group of devices.
+                    - List a group of devices.
+                    - Test a command on a group of devices
+                      and verify if the output contain an
+                      expected value.
+</code></pre>
+<h3 id="optional-parameters">Optional Parameters:</h3>
+<pre><code>- dryrun  (bool): Set to true to get the arguments to use to run
+                  in the app. Default is false and it will run 
+                  the actions directly.
+</code></pre>
+<h3 id="returns">Returns:</h3>
+<pre><code>dict: Dictionary formed with the following keys:
+      - input: User input received
+      - app_related: True if GPT detected the request to be related
+        to the application.
+      - dryrun: True/False
+      - response: If the request is not related to the app. this
+        key will contain chatGPT answer.
+      - action: The action detected by the AI to run in the app.
+      - filter: If it was detected by the AI, the filter used
+        to get the list of nodes to work on.
+      - nodes: If it's not a dryrun, the list of nodes matched by
+        the filter.
+      - args: A dictionary of arguments required to run command(s)
+        on the nodes.
+      - result: A dictionary with the output of the commands or 
+        the test.
+</code></pre></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def ask(self, user_input, dryrun = False):
+    &#39;&#39;&#39;
+    Send the user input to openAI GPT and parse the response to run an action in the application.
+
+    ### Parameters:  
+
+        - user_input (str): Request to send to openAI that will be parsed
+                            and returned to execute on the application.
+                            AI understands the following tasks:
+                            - Run a command on a group of devices.
+                            - List a group of devices.
+                            - Test a command on a group of devices
+                              and verify if the output contain an
+                              expected value.
+
+    ### Optional Parameters:  
+
+        - dryrun  (bool): Set to true to get the arguments to use to run
+                          in the app. Default is false and it will run 
+                          the actions directly.
+
+    ### Returns:  
+
+        dict: Dictionary formed with the following keys:
+              - input: User input received
+              - app_related: True if GPT detected the request to be related
+                to the application.
+              - dryrun: True/False
+              - response: If the request is not related to the app. this
+                key will contain chatGPT answer.
+              - action: The action detected by the AI to run in the app.
+              - filter: If it was detected by the AI, the filter used
+                to get the list of nodes to work on.
+              - nodes: If it&#39;s not a dryrun, the list of nodes matched by
+                the filter.
+              - args: A dictionary of arguments required to run command(s)
+                on the nodes.
+              - result: A dictionary with the output of the commands or 
+                the test.
+                
+
+    &#39;&#39;&#39;
+    output = {}
+    original = self._get_filter(user_input)
+    output[&#34;input&#34;] = user_input
+    output[&#34;app_related&#34;] = original[&#34;response&#34;][&#34;app_related&#34;]
+    output[&#34;dryrun&#34;] = dryrun
+    if not output[&#34;app_related&#34;]:
+        output[&#34;response&#34;] = original[&#34;response&#34;][&#34;response&#34;]
+    else:
+        type = original[&#34;response&#34;][&#34;type&#34;].lower()
+        if &#34;filter&#34; in original[&#34;response&#34;]:
+            output[&#34;filter&#34;] = original[&#34;response&#34;][&#34;filter&#34;]
+            if not self.config.config[&#34;case&#34;]:
+                if isinstance(output[&#34;filter&#34;], list):
+                    output[&#34;filter&#34;] = [item.lower() for item in output[&#34;filter&#34;]]
+                else:
+                    output[&#34;filter&#34;] = output[&#34;filter&#34;].lower()
+            if not dryrun or type == &#34;command&#34;:
+                thisnodes = self.config._getallnodesfull(output[&#34;filter&#34;])
+                output[&#34;nodes&#34;] = list(thisnodes.keys())
+        if not type == &#34;command&#34;:
+            output[&#34;action&#34;] = type
+        else:
+            commands = self._get_commands(user_input, thisnodes)
+            output[&#34;args&#34;] = {}
+            output[&#34;args&#34;][&#34;commands&#34;] = commands[&#34;response&#34;][&#34;commands&#34;]
+            output[&#34;args&#34;][&#34;vars&#34;] = commands[&#34;response&#34;][&#34;variables&#34;]
+            if original[&#34;response&#34;][&#34;expected&#34;]:
+                output[&#34;args&#34;][&#34;expected&#34;] = original[&#34;response&#34;][&#34;expected&#34;]
+                output[&#34;action&#34;] = &#34;test&#34;
+            else:
+                output[&#34;action&#34;] = &#34;run&#34;
+            if not dryrun:
+                mynodes = nodes(self.config.getitems(output[&#34;nodes&#34;]),config=self.config)
+                if output[&#34;action&#34;] == &#34;test&#34;:
+                    output[&#34;result&#34;] = mynodes.test(**output[&#34;args&#34;])
+                elif output[&#34;action&#34;] == &#34;run&#34;:
+                    output[&#34;result&#34;] = mynodes.run(**output[&#34;args&#34;])
+    return output</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
 <dt id="connpy.configfile"><code class="flex name class">
 <span>class <span class="ident">configfile</span></span>
 <span>(</span><span>conf=None, key=None)</span>
@@ -549,7 +1121,7 @@ __pdoc__ = {
 
     def _createconfig(self, conf):
         #Create config file
-        defaultconfig = {&#39;config&#39;: {&#39;case&#39;: False, &#39;idletime&#39;: 30, &#39;fzf&#39;: False}, &#39;connections&#39;: {}, &#39;profiles&#39;: { &#34;default&#34;: { &#34;host&#34;:&#34;&#34;, &#34;protocol&#34;:&#34;ssh&#34;, &#34;port&#34;:&#34;&#34;, &#34;user&#34;:&#34;&#34;, &#34;password&#34;:&#34;&#34;, &#34;options&#34;:&#34;&#34;, &#34;logs&#34;:&#34;&#34; }}}
+        defaultconfig = {&#39;config&#39;: {&#39;case&#39;: False, &#39;idletime&#39;: 30, &#39;fzf&#39;: False}, &#39;connections&#39;: {}, &#39;profiles&#39;: { &#34;default&#34;: { &#34;host&#34;:&#34;&#34;, &#34;protocol&#34;:&#34;ssh&#34;, &#34;port&#34;:&#34;&#34;, &#34;user&#34;:&#34;&#34;, &#34;password&#34;:&#34;&#34;, &#34;options&#34;:&#34;&#34;, &#34;logs&#34;:&#34;&#34;, &#34;tags&#34;: &#34;&#34; }}}
         if not os.path.exists(conf):
             with open(conf, &#34;w&#34;) as f:
                 json.dump(defaultconfig, f, indent = 4)
@@ -616,8 +1188,8 @@ __pdoc__ = {
 
         ### Returns:  
 
-            dict: Dictionary containing information of node or multiple dictionaries
-                  of multiple nodes.
+            dict: Dictionary containing information of node or multiple 
+                  dictionaries of multiple nodes.
 
         &#39;&#39;&#39;
         uniques = self._explode_unique(unique)
@@ -654,14 +1226,53 @@ __pdoc__ = {
             newnode.pop(&#34;type&#34;)
             return newnode
 
-    def _connections_add(self,*, id, host, folder=&#39;&#39;, subfolder=&#39;&#39;, options=&#39;&#39;, logs=&#39;&#39;, password=&#39;&#39;, port=&#39;&#39;, protocol=&#39;&#39;, user=&#39;&#39;, type = &#34;connection&#34; ):
+    def getitems(self, uniques):
+        &#39;&#39;&#39;
+        Get a group of nodes from configfile which can be passed to node/nodes class
+
+        ### Parameters:  
+
+            - uniques (str/list): Regex string name that will match hostnames 
+                                  from the connection manager. It can be a 
+                                  list of strings.
+
+        ### Returns:  
+
+            dict: Dictionary containing information of node or multiple 
+                  dictionaries of multiple nodes.
+
+        &#39;&#39;&#39;
+        nodes = {}
+        for i in uniques:
+            if isinstance(i, dict):
+                name = list(i.keys())[0]
+                mylist = i[name]
+                if not self.config[&#34;case&#34;]:
+                    name = name.lower()
+                    mylist = [item.lower() for item in mylist]
+                this = self.getitem(name, mylist)
+                nodes.update(this)
+            elif i.startswith(&#34;@&#34;):
+                if not self.config[&#34;case&#34;]:
+                    i = i.lower()
+                this = self.getitem(i)
+                nodes.update(this)
+            else:
+                if not self.config[&#34;case&#34;]:
+                    i = i.lower()
+                this = self.getitem(i)
+                nodes[i] = this
+        return nodes
+
+
+    def _connections_add(self,*, id, host, folder=&#39;&#39;, subfolder=&#39;&#39;, options=&#39;&#39;, logs=&#39;&#39;, password=&#39;&#39;, port=&#39;&#39;, protocol=&#39;&#39;, user=&#39;&#39;, tags=&#39;&#39;, type = &#34;connection&#34; ):
         #Add connection from config
         if folder == &#39;&#39;:
-            self.connections[id] = {&#34;host&#34;: host, &#34;options&#34;: options, &#34;logs&#34;: logs, &#34;password&#34;: password, &#34;port&#34;: port, &#34;protocol&#34;: protocol, &#34;user&#34;: user, &#34;type&#34;: type}
+            self.connections[id] = {&#34;host&#34;: host, &#34;options&#34;: options, &#34;logs&#34;: logs, &#34;password&#34;: password, &#34;port&#34;: port, &#34;protocol&#34;: protocol, &#34;user&#34;: user, &#34;tags&#34;: tags,&#34;type&#34;: type}
         elif folder != &#39;&#39; and subfolder == &#39;&#39;:
-            self.connections[folder][id] = {&#34;host&#34;: host, &#34;options&#34;: options, &#34;logs&#34;: logs, &#34;password&#34;: password, &#34;port&#34;: port, &#34;protocol&#34;: protocol, &#34;user&#34;: user, &#34;type&#34;: type}
+            self.connections[folder][id] = {&#34;host&#34;: host, &#34;options&#34;: options, &#34;logs&#34;: logs, &#34;password&#34;: password, &#34;port&#34;: port, &#34;protocol&#34;: protocol, &#34;user&#34;: user, &#34;tags&#34;: tags, &#34;type&#34;: type}
         elif folder != &#39;&#39; and subfolder != &#39;&#39;:
-            self.connections[folder][subfolder][id] = {&#34;host&#34;: host, &#34;options&#34;: options, &#34;logs&#34;: logs, &#34;password&#34;: password, &#34;port&#34;: port, &#34;protocol&#34;: protocol, &#34;user&#34;: user, &#34;type&#34;: type}
+            self.connections[folder][subfolder][id] = {&#34;host&#34;: host, &#34;options&#34;: options, &#34;logs&#34;: logs, &#34;password&#34;: password, &#34;port&#34;: port, &#34;protocol&#34;: protocol, &#34;user&#34;: user, &#34;tags&#34;: tags, &#34;type&#34;: type}
             
 
     def _connections_del(self,*, id, folder=&#39;&#39;, subfolder=&#39;&#39;):
@@ -690,16 +1301,16 @@ __pdoc__ = {
             del self.connections[folder][subfolder]
 
 
-    def _profiles_add(self,*, id, host = &#39;&#39;, options=&#39;&#39;, logs=&#39;&#39;, password=&#39;&#39;, port=&#39;&#39;, protocol=&#39;&#39;, user=&#39;&#39; ):
+    def _profiles_add(self,*, id, host = &#39;&#39;, options=&#39;&#39;, logs=&#39;&#39;, password=&#39;&#39;, port=&#39;&#39;, protocol=&#39;&#39;, user=&#39;&#39;, tags=&#39;&#39; ):
         #Add profile from config
-        self.profiles[id] = {&#34;host&#34;: host, &#34;options&#34;: options, &#34;logs&#34;: logs, &#34;password&#34;: password, &#34;port&#34;: port, &#34;protocol&#34;: protocol, &#34;user&#34;: user}
+        self.profiles[id] = {&#34;host&#34;: host, &#34;options&#34;: options, &#34;logs&#34;: logs, &#34;password&#34;: password, &#34;port&#34;: port, &#34;protocol&#34;: protocol, &#34;user&#34;: user, &#34;tags&#34;: tags}
             
 
     def _profiles_del(self,*, id ):
         #Delete profile from config
         del self.profiles[id]
         
-    def _getallnodes(self):
+    def _getallnodes(self, filter = None):
         #get all nodes on configfile
         nodes = []
         layer1 = [k for k,v in self.connections.items() if isinstance(v, dict) and v[&#34;type&#34;] == &#34;connection&#34;]
@@ -712,7 +1323,50 @@ __pdoc__ = {
             for s in subfolders:
                 layer3 = [k + &#34;@&#34; + s + &#34;@&#34; + f for k,v in self.connections[f][s].items() if isinstance(v, dict) and v[&#34;type&#34;] == &#34;connection&#34;]
                 nodes.extend(layer3)
+        if filter:
+            if isinstance(filter, str):
+                nodes = [item for item in nodes if re.search(filter, item)]
+            elif isinstance(filter, list):
+                nodes = [item for item in nodes if any(re.search(pattern, item) for pattern in filter)]
+            else:
+                raise ValueError(&#34;filter must be a string or a list of strings&#34;)
         return nodes
+
+    def _getallnodesfull(self, filter = None):
+        #get all nodes on configfile with all their attributes.
+        nodes = {}
+        layer1 = {k:v for k,v in self.connections.items() if isinstance(v, dict) and v[&#34;type&#34;] == &#34;connection&#34;}
+        folders = [k for k,v in self.connections.items() if isinstance(v, dict) and v[&#34;type&#34;] == &#34;folder&#34;]
+        nodes.update(layer1)
+        for f in folders:
+            layer2 = {k + &#34;@&#34; + f:v for k,v in self.connections[f].items() if isinstance(v, dict) and v[&#34;type&#34;] == &#34;connection&#34;}
+            nodes.update(layer2)
+            subfolders = [k for k,v in self.connections[f].items() if isinstance(v, dict) and v[&#34;type&#34;] == &#34;subfolder&#34;]
+            for s in subfolders:
+                layer3 = {k + &#34;@&#34; + s + &#34;@&#34; + f:v for k,v in self.connections[f][s].items() if isinstance(v, dict) and v[&#34;type&#34;] == &#34;connection&#34;}
+                nodes.update(layer3)
+        if filter:
+            if isinstance(filter, str):
+                nodes = {k: v for k, v in nodes.items() if re.search(filter, k)}
+            elif isinstance(filter, list):
+                nodes = {k: v for k, v in nodes.items() if any(re.search(pattern, k) for pattern in filter)}
+            else:
+                raise ValueError(&#34;filter must be a string or a list of strings&#34;)
+        for node, keys in nodes.items():
+            for key, value in keys.items():
+                profile = re.search(&#34;^@(.*)&#34;, str(value))
+                if profile:
+                    try:
+                        nodes[node][key] = self.profiles[profile.group(1)][key]
+                    except:
+                        nodes[node][key] = &#34;&#34;
+                elif value == &#39;&#39; and key == &#34;protocol&#34;:
+                    try:
+                        nodes[node][key] = config.profiles[&#34;default&#34;][key]
+                    except:
+                        nodes[node][key] = &#34;ssh&#34;
+        return nodes
+
 
     def _getallfolders(self):
         #get all folders on configfile
@@ -756,8 +1410,8 @@ __pdoc__ = {
                nodes inside the folder passing a list.
 </code></pre>
 <h3 id="returns">Returns:</h3>
-<pre><code>dict: Dictionary containing information of node or multiple dictionaries
-      of multiple nodes.
+<pre><code>dict: Dictionary containing information of node or multiple 
+      dictionaries of multiple nodes.
 </code></pre></div>
 <details class="source">
 <summary>
@@ -780,8 +1434,8 @@ __pdoc__ = {
 
     ### Returns:  
 
-        dict: Dictionary containing information of node or multiple dictionaries
-              of multiple nodes.
+        dict: Dictionary containing information of node or multiple 
+              dictionaries of multiple nodes.
 
     &#39;&#39;&#39;
     uniques = self._explode_unique(unique)
@@ -817,6 +1471,63 @@ __pdoc__ = {
         newnode = deepcopy(node)
         newnode.pop(&#34;type&#34;)
         return newnode</code></pre>
+</details>
+</dd>
+<dt id="connpy.configfile.getitems"><code class="name flex">
+<span>def <span class="ident">getitems</span></span>(<span>self, uniques)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Get a group of nodes from configfile which can be passed to node/nodes class</p>
+<h3 id="parameters">Parameters:</h3>
+<pre><code>- uniques (str/list): Regex string name that will match hostnames 
+                      from the connection manager. It can be a 
+                      list of strings.
+</code></pre>
+<h3 id="returns">Returns:</h3>
+<pre><code>dict: Dictionary containing information of node or multiple 
+      dictionaries of multiple nodes.
+</code></pre></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def getitems(self, uniques):
+    &#39;&#39;&#39;
+    Get a group of nodes from configfile which can be passed to node/nodes class
+
+    ### Parameters:  
+
+        - uniques (str/list): Regex string name that will match hostnames 
+                              from the connection manager. It can be a 
+                              list of strings.
+
+    ### Returns:  
+
+        dict: Dictionary containing information of node or multiple 
+              dictionaries of multiple nodes.
+
+    &#39;&#39;&#39;
+    nodes = {}
+    for i in uniques:
+        if isinstance(i, dict):
+            name = list(i.keys())[0]
+            mylist = i[name]
+            if not self.config[&#34;case&#34;]:
+                name = name.lower()
+                mylist = [item.lower() for item in mylist]
+            this = self.getitem(name, mylist)
+            nodes.update(this)
+        elif i.startswith(&#34;@&#34;):
+            if not self.config[&#34;case&#34;]:
+                i = i.lower()
+            this = self.getitem(i)
+            nodes.update(this)
+        else:
+            if not self.config[&#34;case&#34;]:
+                i = i.lower()
+            this = self.getitem(i)
+            nodes[i] = this
+    return nodes</code></pre>
 </details>
 </dd>
 </dl>
@@ -932,6 +1643,7 @@ __pdoc__ = {
         configcrud.add_argument(&#34;--keepalive&#34;, dest=&#34;idletime&#34;, nargs=1, action=self._store_type, help=&#34;Set keepalive time in seconds, 0 to disable&#34;, type=int, metavar=&#34;INT&#34;)
         configcrud.add_argument(&#34;--completion&#34;, dest=&#34;completion&#34;, nargs=1, choices=[&#34;bash&#34;,&#34;zsh&#34;], action=self._store_type, help=&#34;Get terminal completion configuration for conn&#34;)
         configcrud.add_argument(&#34;--configfolder&#34;, dest=&#34;configfolder&#34;, nargs=1, action=self._store_type, help=&#34;Set the default location for config file&#34;, metavar=&#34;FOLDER&#34;)
+        configcrud.add_argument(&#34;--openai&#34;, dest=&#34;openai&#34;, nargs=2, action=self._store_type, help=&#34;Set openai organization and api_key&#34;, metavar=(&#34;ORGANIZATION&#34;, &#34;API_KEY&#34;))
         configparser.set_defaults(func=self._func_others)
         #Manage sys arguments
         commands = [&#34;node&#34;, &#34;profile&#34;, &#34;mv&#34;, &#34;move&#34;,&#34;copy&#34;, &#34;cp&#34;, &#34;bulk&#34;, &#34;ls&#34;, &#34;list&#34;, &#34;run&#34;, &#34;config&#34;, &#34;api&#34;]
@@ -1057,6 +1769,7 @@ __pdoc__ = {
                 print(&#34;You can also leave empty any value except hostname/IP.&#34;)
                 print(&#34;You can pass 1 or more passwords using comma separated @profiles&#34;)
                 print(&#34;You can use this variables on logging file name: ${id} ${unique} ${host} ${port} ${user} ${protocol}&#34;)
+                print(&#34;Some useful tags to set for automation are &#39;os&#39;, &#39;screen_length_command&#39;, and &#39;prompt&#39;.&#34;)
                 newnode = self._questions_nodes(args.data, uniques)
                 if newnode == False:
                     exit(7)
@@ -1185,7 +1898,7 @@ __pdoc__ = {
     
     def _func_others(self, args):
         #Function called when using other commands
-        actions = {&#34;ls&#34;: self._ls, &#34;move&#34;: self._mvcp, &#34;cp&#34;: self._mvcp, &#34;bulk&#34;: self._bulk, &#34;completion&#34;: self._completion, &#34;case&#34;: self._case, &#34;fzf&#34;: self._fzf, &#34;idletime&#34;: self._idletime, &#34;configfolder&#34;: self._configfolder}
+        actions = {&#34;ls&#34;: self._ls, &#34;move&#34;: self._mvcp, &#34;cp&#34;: self._mvcp, &#34;bulk&#34;: self._bulk, &#34;completion&#34;: self._completion, &#34;case&#34;: self._case, &#34;fzf&#34;: self._fzf, &#34;idletime&#34;: self._idletime, &#34;configfolder&#34;: self._configfolder, &#34;openai&#34;: self._openai}
         return actions.get(args.command)(args)
 
     def _ls(self, args):
@@ -1255,6 +1968,7 @@ __pdoc__ = {
             newnode[&#34;port&#34;] = newnodes[&#34;port&#34;]
             newnode[&#34;options&#34;] = newnodes[&#34;options&#34;]
             newnode[&#34;logs&#34;] = newnodes[&#34;logs&#34;]
+            newnode[&#34;tags&#34;] = newnodes[&#34;tags&#34;]
             newnode[&#34;user&#34;] = newnodes[&#34;user&#34;]
             newnode[&#34;password&#34;] = newnodes[&#34;password&#34;]
             count +=1
@@ -1300,6 +2014,13 @@ __pdoc__ = {
             with open(pathfile, &#34;w&#34;) as f:
                 f.write(str(folder))
             print(&#34;Config saved&#34;)
+        
+    def _openai(self, args):
+        openaikeys = {}
+        openaikeys[&#34;organization&#34;] = args.data[0]
+        openaikeys[&#34;api_key&#34;] = args.data[1]
+        self._change_settings(args.command, openaikeys)
+
 
     def _change_settings(self, name, value):
         self.config.config[name] = value
@@ -1329,7 +2050,6 @@ __pdoc__ = {
 
     def _node_run(self, args):
         command = &#34; &#34;.join(args.data[1:])
-        command = command.split(&#34;-&#34;)
         matches = list(filter(lambda k: k == args.data[0], self.nodes))
         if len(matches) == 0:
             print(&#34;{} not found&#34;.format(args.data[0]))
@@ -1358,7 +2078,6 @@ __pdoc__ = {
             print(&#34;failed reading file {}&#34;.format(args.data[0]))
             exit(10)
         for script in scripts[&#34;tasks&#34;]:
-            nodes = {}
             args = {}
             try:
                 action = script[&#34;action&#34;]
@@ -1370,18 +2089,7 @@ __pdoc__ = {
             except KeyError as e:
                 print(&#34;&#39;{}&#39; is mandatory&#34;.format(e.args[0]))
                 exit(11)
-            for i in nodelist:
-                if isinstance(i, dict):
-                    name = list(i.keys())[0]
-                    this = self.config.getitem(name, i[name])
-                    nodes.update(this)
-                elif i.startswith(&#34;@&#34;):
-                    this = self.config.getitem(i)
-                    nodes.update(this)
-                else:
-                    this = self.config.getitem(i)
-                    nodes[i] = this
-            nodes = self.connnodes(nodes, config = self.config)
+            nodes = self.connnodes(self.config.getitems(nodelist), config = self.config)
             stdout = False
             if output is None:
                 pass
@@ -1511,6 +2219,33 @@ __pdoc__ = {
                 raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Profile {} don&#39;t exist&#34;.format(i))
         return True
 
+    def _tags_validation(self, answers, current):
+        #Validation for Tags in inquirer when managing nodes
+        if current.startswith(&#34;@&#34;):
+            if current[1:] not in self.profiles:
+                raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Profile {} don&#39;t exist&#34;.format(current))
+        elif current != &#34;&#34;:
+            isdict = False
+            try:
+                isdict = ast.literal_eval(current)
+            except:
+                pass
+            if not isinstance (isdict, dict):
+                raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Tags should be a python dictionary.&#34;.format(current))
+        return True
+
+    def _profile_tags_validation(self, answers, current):
+        #Validation for Tags in inquirer when managing profiles
+        if current != &#34;&#34;:
+            isdict = False
+            try:
+                isdict = ast.literal_eval(current)
+            except:
+                pass
+            if not isinstance (isdict, dict):
+                raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Tags should be a python dictionary.&#34;.format(current))
+        return True
+
     def _default_validation(self, answers, current):
         #Default validation type used in multiples questions in inquirer
         if current.startswith(&#34;@&#34;):
@@ -1557,6 +2292,7 @@ __pdoc__ = {
         questions.append(inquirer.Confirm(&#34;port&#34;, message=&#34;Edit Port?&#34;))
         questions.append(inquirer.Confirm(&#34;options&#34;, message=&#34;Edit Options?&#34;))
         questions.append(inquirer.Confirm(&#34;logs&#34;, message=&#34;Edit logging path/file?&#34;))
+        questions.append(inquirer.Confirm(&#34;tags&#34;, message=&#34;Edit tags?&#34;))
         questions.append(inquirer.Confirm(&#34;user&#34;, message=&#34;Edit User?&#34;))
         questions.append(inquirer.Confirm(&#34;password&#34;, message=&#34;Edit password?&#34;))
         answers = inquirer.prompt(questions)
@@ -1566,12 +2302,13 @@ __pdoc__ = {
         #Questions when adding or editing nodes
         try:
             defaults = self.config.getitem(unique)
+            if &#34;tags&#34; not in defaults:
+                defaults[&#34;tags&#34;] = &#34;&#34;
         except:
-            defaults = { &#34;host&#34;:&#34;&#34;, &#34;protocol&#34;:&#34;&#34;, &#34;port&#34;:&#34;&#34;, &#34;user&#34;:&#34;&#34;, &#34;options&#34;:&#34;&#34;, &#34;logs&#34;:&#34;&#34; }
+            defaults = { &#34;host&#34;:&#34;&#34;, &#34;protocol&#34;:&#34;&#34;, &#34;port&#34;:&#34;&#34;, &#34;user&#34;:&#34;&#34;, &#34;options&#34;:&#34;&#34;, &#34;logs&#34;:&#34;&#34; , &#34;tags&#34;:&#34;&#34;}
         node = {}
-
         if edit == None:
-            edit = { &#34;host&#34;:True, &#34;protocol&#34;:True, &#34;port&#34;:True, &#34;user&#34;:True, &#34;password&#34;: True,&#34;options&#34;:True, &#34;logs&#34;:True }
+            edit = { &#34;host&#34;:True, &#34;protocol&#34;:True, &#34;port&#34;:True, &#34;user&#34;:True, &#34;password&#34;: True,&#34;options&#34;:True, &#34;logs&#34;:True, &#34;tags&#34;:True }
         questions = []
         if edit[&#34;host&#34;]:
             questions.append(inquirer.Text(&#34;host&#34;, message=&#34;Add Hostname or IP&#34;, validate=self._host_validation, default=defaults[&#34;host&#34;]))
@@ -1593,6 +2330,10 @@ __pdoc__ = {
             questions.append(inquirer.Text(&#34;logs&#34;, message=&#34;Pick logging path/file &#34;,  validate=self._default_validation, default=defaults[&#34;logs&#34;].replace(&#34;{&#34;,&#34;{{&#34;).replace(&#34;}&#34;,&#34;}}&#34;)))
         else:
             node[&#34;logs&#34;] = defaults[&#34;logs&#34;]
+        if edit[&#34;tags&#34;]:
+            questions.append(inquirer.Text(&#34;tags&#34;, message=&#34;Add tags dictionary&#34;,  validate=self._tags_validation, default=str(defaults[&#34;tags&#34;]).replace(&#34;{&#34;,&#34;{{&#34;).replace(&#34;}&#34;,&#34;}}&#34;)))
+        else:
+            node[&#34;tags&#34;] = defaults[&#34;tags&#34;]
         if edit[&#34;user&#34;]:
             questions.append(inquirer.Text(&#34;user&#34;, message=&#34;Pick username&#34;, validate=self._default_validation, default=defaults[&#34;user&#34;]))
         else:
@@ -1619,6 +2360,8 @@ __pdoc__ = {
                 answer[&#34;password&#34;] = passa[&#34;password&#34;].split(&#34;,&#34;)
             elif answer[&#34;password&#34;] == &#34;No Password&#34;:
                 answer[&#34;password&#34;] = &#34;&#34;
+        if &#34;tags&#34; in answer.keys() and not answer[&#34;tags&#34;].startswith(&#34;@&#34;) and answer[&#34;tags&#34;]:
+            answer[&#34;tags&#34;] = ast.literal_eval(answer[&#34;tags&#34;])
         result = {**uniques, **answer, **node}
         result[&#34;type&#34;] = &#34;connection&#34;
         return result
@@ -1627,11 +2370,13 @@ __pdoc__ = {
         #Questions when adding or editing profiles
         try:
             defaults = self.config.profiles[unique]
+            if &#34;tags&#34; not in defaults:
+                defaults[&#34;tags&#34;] = &#34;&#34;
         except:
-            defaults = { &#34;host&#34;:&#34;&#34;, &#34;protocol&#34;:&#34;&#34;, &#34;port&#34;:&#34;&#34;, &#34;user&#34;:&#34;&#34;, &#34;options&#34;:&#34;&#34;, &#34;logs&#34;:&#34;&#34; }
+            defaults = { &#34;host&#34;:&#34;&#34;, &#34;protocol&#34;:&#34;&#34;, &#34;port&#34;:&#34;&#34;, &#34;user&#34;:&#34;&#34;, &#34;options&#34;:&#34;&#34;, &#34;logs&#34;:&#34;&#34;, &#34;tags&#34;: &#34;&#34; }
         profile = {}
         if edit == None:
-            edit = { &#34;host&#34;:True, &#34;protocol&#34;:True, &#34;port&#34;:True, &#34;user&#34;:True, &#34;password&#34;: True,&#34;options&#34;:True, &#34;logs&#34;:True }
+            edit = { &#34;host&#34;:True, &#34;protocol&#34;:True, &#34;port&#34;:True, &#34;user&#34;:True, &#34;password&#34;: True,&#34;options&#34;:True, &#34;logs&#34;:True, &#34;tags&#34;:True }
         questions = []
         if edit[&#34;host&#34;]:
             questions.append(inquirer.Text(&#34;host&#34;, message=&#34;Add Hostname or IP&#34;, default=defaults[&#34;host&#34;]))
@@ -1653,6 +2398,10 @@ __pdoc__ = {
             questions.append(inquirer.Text(&#34;logs&#34;, message=&#34;Pick logging path/file &#34;, default=defaults[&#34;logs&#34;].replace(&#34;{&#34;,&#34;{{&#34;).replace(&#34;}&#34;,&#34;}}&#34;)))
         else:
             profile[&#34;logs&#34;] = defaults[&#34;logs&#34;]
+        if edit[&#34;tags&#34;]:
+            questions.append(inquirer.Text(&#34;tags&#34;, message=&#34;Add tags dictionary&#34;,  validate=self._profile_tags_validation, default=str(defaults[&#34;tags&#34;]).replace(&#34;{&#34;,&#34;{{&#34;).replace(&#34;}&#34;,&#34;}}&#34;)))
+        else:
+            profile[&#34;tags&#34;] = defaults[&#34;tags&#34;]
         if edit[&#34;user&#34;]:
             questions.append(inquirer.Text(&#34;user&#34;, message=&#34;Pick username&#34;, default=defaults[&#34;user&#34;]))
         else:
@@ -1667,6 +2416,8 @@ __pdoc__ = {
         if &#34;password&#34; in answer.keys():
             if answer[&#34;password&#34;] != &#34;&#34;:
                 answer[&#34;password&#34;] = self.encrypt(answer[&#34;password&#34;])
+        if &#34;tags&#34; in answer.keys() and answer[&#34;tags&#34;]:
+            answer[&#34;tags&#34;] = ast.literal_eval(answer[&#34;tags&#34;])
         result = {**answer, **profile}
         result[&#34;id&#34;] = unique
         return result
@@ -1681,6 +2432,7 @@ __pdoc__ = {
         questions.append(inquirer.Text(&#34;port&#34;, message=&#34;Select Port Number&#34;, validate=self._port_validation))
         questions.append(inquirer.Text(&#34;options&#34;, message=&#34;Pass extra options to protocol&#34;, validate=self._default_validation))
         questions.append(inquirer.Text(&#34;logs&#34;, message=&#34;Pick logging path/file &#34;, validate=self._default_validation))
+        questions.append(inquirer.Text(&#34;tags&#34;, message=&#34;Add tags dictionary&#34;,  validate=self._tags_validation))
         questions.append(inquirer.Text(&#34;user&#34;, message=&#34;Pick username&#34;, validate=self._default_validation))
         questions.append(inquirer.List(&#34;password&#34;, message=&#34;Password: Use a local password, no password or a list of profiles to reference?&#34;, choices=[&#34;Local Password&#34;, &#34;Profiles&#34;, &#34;No Password&#34;]))
         answer = inquirer.prompt(questions)
@@ -1698,6 +2450,8 @@ __pdoc__ = {
             elif answer[&#34;password&#34;] == &#34;No Password&#34;:
                 answer[&#34;password&#34;] = &#34;&#34;
         answer[&#34;type&#34;] = &#34;connection&#34;
+        if &#34;tags&#34; in answer.keys() and not answer[&#34;tags&#34;].startswith(&#34;@&#34;) and answer[&#34;tags&#34;]:
+            answer[&#34;tags&#34;] = ast.literal_eval(answer[&#34;tags&#34;])
         return answer
 
     def _type_node(self, arg_value, pat=re.compile(r&#34;^[0-9a-zA-Z_.$@#-]+$&#34;)):
@@ -1895,7 +2649,7 @@ tasks:
 </details>
 </dd>
 <dt id="connpy.connapp.start"><code class="name flex">
-<span>def <span class="ident">start</span></span>(<span>self, argv=['--html', 'connpy', '-o', 'docs', '-f'])</span>
+<span>def <span class="ident">start</span></span>(<span>self, argv=['connpy', '--html', '-o', 'docs/', '--force'])</span>
 </code></dt>
 <dd>
 <div class="desc"><h3 id="parameters">Parameters:</h3>
@@ -1975,6 +2729,7 @@ tasks:
     configcrud.add_argument(&#34;--keepalive&#34;, dest=&#34;idletime&#34;, nargs=1, action=self._store_type, help=&#34;Set keepalive time in seconds, 0 to disable&#34;, type=int, metavar=&#34;INT&#34;)
     configcrud.add_argument(&#34;--completion&#34;, dest=&#34;completion&#34;, nargs=1, choices=[&#34;bash&#34;,&#34;zsh&#34;], action=self._store_type, help=&#34;Get terminal completion configuration for conn&#34;)
     configcrud.add_argument(&#34;--configfolder&#34;, dest=&#34;configfolder&#34;, nargs=1, action=self._store_type, help=&#34;Set the default location for config file&#34;, metavar=&#34;FOLDER&#34;)
+    configcrud.add_argument(&#34;--openai&#34;, dest=&#34;openai&#34;, nargs=2, action=self._store_type, help=&#34;Set openai organization and api_key&#34;, metavar=(&#34;ORGANIZATION&#34;, &#34;API_KEY&#34;))
     configparser.set_defaults(func=self._func_others)
     #Manage sys arguments
     commands = [&#34;node&#34;, &#34;profile&#34;, &#34;mv&#34;, &#34;move&#34;,&#34;copy&#34;, &#34;cp&#34;, &#34;bulk&#34;, &#34;ls&#34;, &#34;list&#34;, &#34;run&#34;, &#34;config&#34;, &#34;api&#34;]
@@ -1992,7 +2747,7 @@ tasks:
 </dd>
 <dt id="connpy.node"><code class="flex name class">
 <span>class <span class="ident">node</span></span>
-<span>(</span><span>unique, host, options='', logs='', password='', port='', protocol='', user='', config='')</span>
+<span>(</span><span>unique, host, options='', logs='', password='', port='', protocol='', user='', config='', tags='')</span>
 </code></dt>
 <dd>
 <div class="desc"><p>This class generates a node object. Containts all the information and methods to connect and interact with a device using ssh or telnet.</p>
@@ -2032,6 +2787,9 @@ tasks:
 - config   (obj): Pass the object created with class configfile with 
                   key for decryption and extra configuration if you 
                   are using connection manager.
+
+- tags   (dict) : Tags useful for automation and personal porpuse
+                  like "os", "prompt" and "screenleght_command"
 </code></pre></div>
 <details class="source">
 <summary>
@@ -2054,7 +2812,7 @@ tasks:
 
         &#39;&#39;&#39;
     
-    def __init__(self, unique, host, options=&#39;&#39;, logs=&#39;&#39;, password=&#39;&#39;, port=&#39;&#39;, protocol=&#39;&#39;, user=&#39;&#39;, config=&#39;&#39;):
+    def __init__(self, unique, host, options=&#39;&#39;, logs=&#39;&#39;, password=&#39;&#39;, port=&#39;&#39;, protocol=&#39;&#39;, user=&#39;&#39;, config=&#39;&#39;, tags=&#39;&#39;):
         &#39;&#39;&#39; 
             
         ### Parameters:  
@@ -2084,6 +2842,9 @@ tasks:
             - config   (obj): Pass the object created with class configfile with 
                               key for decryption and extra configuration if you 
                               are using connection manager.  
+
+            - tags   (dict) : Tags useful for automation and personal porpuse
+                              like &#34;os&#34;, &#34;prompt&#34; and &#34;screenleght_command&#34;
         &#39;&#39;&#39;
         if config == &#39;&#39;:
             self.idletime = 0
@@ -2092,11 +2853,14 @@ tasks:
             self.idletime = config.config[&#34;idletime&#34;]
             self.key = config.key
         self.unique = unique
-        attr = {&#34;host&#34;: host, &#34;logs&#34;: logs, &#34;options&#34;:options, &#34;port&#34;: port, &#34;protocol&#34;: protocol, &#34;user&#34;: user}
+        attr = {&#34;host&#34;: host, &#34;logs&#34;: logs, &#34;options&#34;:options, &#34;port&#34;: port, &#34;protocol&#34;: protocol, &#34;user&#34;: user, &#34;tags&#34;: tags}
         for key in attr:
-            profile = re.search(&#34;^@(.*)&#34;, attr[key])
+            profile = re.search(&#34;^@(.*)&#34;, str(attr[key]))
             if profile and config != &#39;&#39;:
-                setattr(self,key,config.profiles[profile.group(1)][key])
+                try:
+                    setattr(self,key,config.profiles[profile.group(1)][key])
+                except:
+                    setattr(self,key,&#34;&#34;)
             elif attr[key] == &#39;&#39; and key == &#34;protocol&#34;:
                 try:
                     setattr(self,key,config.profiles[&#34;default&#34;][key])
@@ -2272,11 +3036,15 @@ tasks:
         connect = self._connect(timeout = timeout)
         now = datetime.datetime.now().strftime(&#39;%Y-%m-%d_%H%M%S&#39;)
         if connect == True:
+            if &#34;prompt&#34; in self.tags:
+                prompt = self.tags[&#34;prompt&#34;]
             expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
             output = &#39;&#39;
             status = &#39;&#39;
             if not isinstance(commands, list):
                 commands = [commands]
+            if &#34;screen_length_command&#34; in self.tags:
+                commands.insert(0, self.tags[&#34;screen_length_command&#34;])
             self.mylog = io.BytesIO()
             self.child.logfile_read = self.mylog
             for c in commands:
@@ -2354,10 +3122,14 @@ tasks:
         &#39;&#39;&#39;
         connect = self._connect(timeout = timeout)
         if connect == True:
+            if &#34;prompt&#34; in self.tags:
+                prompt = self.tags[&#34;prompt&#34;]
             expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
             output = &#39;&#39;
             if not isinstance(commands, list):
                 commands = [commands]
+            if &#34;screen_length_command&#34; in self.tags:
+                commands.insert(0, self.tags[&#34;screen_length_command&#34;])
             self.mylog = io.BytesIO()
             self.child.logfile_read = self.mylog
             for c in commands:
@@ -2366,25 +3138,26 @@ tasks:
                 result = self.child.expect(expects, timeout = timeout)
                 self.child.sendline(c)
                 if result == 2:
-                    result = 3
                     break
-            if not result == 3:
-                if vars is not None:
-                    expected = expected.format(**vars)
-                expects = [expected, prompt, pexpect.EOF, pexpect.TIMEOUT]
+            if not result == 2:
                 result = self.child.expect(expects, timeout = timeout)
             self.child.close()
             output = self._logclean(self.mylog.getvalue().decode(), True)
             self.output = output
-            if result == 0:
-                self.result = True
-                self.status = 0
-                return True
-            if result in [1, 2]:
-                self.result = False
+            if result in [0, 1]:
+                lastcommand = commands[-1]
+                if vars is not None:
+                    expected = expected.format(**vars)
+                    lastcommand = lastcommand.format(**vars)
+                last_command_index = output.rfind(lastcommand)
+                cleaned_output = output[last_command_index + len(lastcommand):].strip()
+                if expected in cleaned_output:
+                    self.result = True
+                else:
+                    self.result = False
                 self.status = 0
                 return False
-            if result == 3:
+            if result == 2:
                 self.result = None
                 self.status = 2
                 return output
@@ -2624,11 +3397,15 @@ tasks:
     connect = self._connect(timeout = timeout)
     now = datetime.datetime.now().strftime(&#39;%Y-%m-%d_%H%M%S&#39;)
     if connect == True:
+        if &#34;prompt&#34; in self.tags:
+            prompt = self.tags[&#34;prompt&#34;]
         expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
         output = &#39;&#39;
         status = &#39;&#39;
         if not isinstance(commands, list):
             commands = [commands]
+        if &#34;screen_length_command&#34; in self.tags:
+            commands.insert(0, self.tags[&#34;screen_length_command&#34;])
         self.mylog = io.BytesIO()
         self.child.logfile_read = self.mylog
         for c in commands:
@@ -2747,10 +3524,14 @@ tasks:
     &#39;&#39;&#39;
     connect = self._connect(timeout = timeout)
     if connect == True:
+        if &#34;prompt&#34; in self.tags:
+            prompt = self.tags[&#34;prompt&#34;]
         expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
         output = &#39;&#39;
         if not isinstance(commands, list):
             commands = [commands]
+        if &#34;screen_length_command&#34; in self.tags:
+            commands.insert(0, self.tags[&#34;screen_length_command&#34;])
         self.mylog = io.BytesIO()
         self.child.logfile_read = self.mylog
         for c in commands:
@@ -2759,25 +3540,26 @@ tasks:
             result = self.child.expect(expects, timeout = timeout)
             self.child.sendline(c)
             if result == 2:
-                result = 3
                 break
-        if not result == 3:
-            if vars is not None:
-                expected = expected.format(**vars)
-            expects = [expected, prompt, pexpect.EOF, pexpect.TIMEOUT]
+        if not result == 2:
             result = self.child.expect(expects, timeout = timeout)
         self.child.close()
         output = self._logclean(self.mylog.getvalue().decode(), True)
         self.output = output
-        if result == 0:
-            self.result = True
-            self.status = 0
-            return True
-        if result in [1, 2]:
-            self.result = False
+        if result in [0, 1]:
+            lastcommand = commands[-1]
+            if vars is not None:
+                expected = expected.format(**vars)
+                lastcommand = lastcommand.format(**vars)
+            last_command_index = output.rfind(lastcommand)
+            cleaned_output = output[last_command_index + len(lastcommand):].strip()
+            if expected in cleaned_output:
+                self.result = True
+            else:
+                self.result = False
             self.status = 0
             return False
-        if result == 3:
+        if result == 2:
             self.result = None
             self.status = 2
             return output
@@ -3339,9 +4121,19 @@ tasks:
 <li><a href="#response">Response:</a></li>
 </ul>
 </li>
-<li><a href="#2-run-commands">2. Run Commands</a><ul>
+<li><a href="#2-get-nodes">2. Get Nodes</a><ul>
 <li><a href="#request-body_1">Request Body:</a></li>
 <li><a href="#response_1">Response:</a></li>
+</ul>
+</li>
+<li><a href="#3-run-commands">3. Run Commands</a><ul>
+<li><a href="#request-body_2">Request Body:</a></li>
+<li><a href="#response_2">Response:</a></li>
+</ul>
+</li>
+<li><a href="#4-ask-ai">4. Ask AI</a><ul>
+<li><a href="#request-body_3">Request Body:</a></li>
+<li><a href="#response_3">Response:</a></li>
 </ul>
 </li>
 </ul>
@@ -3351,6 +4143,7 @@ tasks:
 <li><a href="#using-manager-configuration">Using manager configuration</a></li>
 <li><a href="#running-parallel-tasks">Running parallel tasks</a></li>
 <li><a href="#using-variables">Using variables</a></li>
+<li><a href="#using-ai">Using AI</a></li>
 </ul>
 </li>
 </ul>
@@ -3359,9 +4152,16 @@ tasks:
 <li><h3><a href="#header-classes">Classes</a></h3>
 <ul>
 <li>
+<h4><code><a title="connpy.ai" href="#connpy.ai">ai</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.ai.ask" href="#connpy.ai.ask">ask</a></code></li>
+</ul>
+</li>
+<li>
 <h4><code><a title="connpy.configfile" href="#connpy.configfile">configfile</a></code></h4>
 <ul class="">
 <li><code><a title="connpy.configfile.getitem" href="#connpy.configfile.getitem">getitem</a></code></li>
+<li><code><a title="connpy.configfile.getitems" href="#connpy.configfile.getitems">getitems</a></code></li>
 </ul>
 </li>
 <li>
