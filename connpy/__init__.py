@@ -98,7 +98,31 @@ With the Connpy API you can run commands on devices using http requests
 
 ---
 
-### 2. Run Commands
+### 2. Get Nodes
+
+**Endpoint**: `/get_nodes`
+
+**Method**: `POST`
+
+**Description**: This route returns a dictionary of nodes with all their attributes. It can also filter the nodes based on a given keyword.
+
+#### Request Body:
+
+```json
+{
+  "filter": "<keyword>"
+}
+```
+
+* `filter` (optional): A keyword to filter the nodes. It returns only the nodes that contain the keyword. If not provided, the route will return the entire list of nodes.
+
+#### Response:
+
+- A JSON array containing the filtered nodes.
+
+---
+
+### 3. Run Commands
 
 **Endpoint**: `/run_commands`
 
@@ -127,13 +151,37 @@ With the Connpy API you can run commands on devices using http requests
 #### Response:
 
 - A JSON object with the results of the executed commands on the nodes.
-## Automation module
-the automation module
 
+### 4. Ask AI
+
+**Endpoint**: `/ask_ai`
+
+**Method**: `POST`
+
+**Description**: This route sends to chatgpt IA a request that will parse it into an understandable output for the application and then run the request.
+
+#### Request Body:
+
+```json
+{
+  "input": "<user input request>",
+  "dryrun": true or false
+}
+```
+
+* `input` (required): The user input requesting the AI to perform an action on some devices or get the devices list.
+* `dryrun` (optional): If set to true, it will return the parameters to run the request but it won't run it. default is false.
+
+#### Response:
+
+- A JSON array containing the action to run and the parameters and the result of the action.
+
+## Automation module
+The automation module
 ### Standalone module
 ```
 import connpy
-router = connpy.node("unique name","ip/hostname", user="user", password="pass")
+router = connpy.node("uniqueName","ip/host", user="user", password="pass")
 router.run(["term len 0","show run"])
 print(router.output)
 hasip = router.test("show ip int brief","1.1.1.1")
@@ -165,9 +213,9 @@ nodes["router2"] = conf.getitem("router2@office")
 nodes["router10"] = conf.getitem("router10@datacenter")
 #Also, you can create the nodes manually:
 nodes = {}
-nodes["router1"] = {"host": "1.1.1.1", "user": "username", "password": "pass1"}
-nodes["router2"] = {"host": "1.1.1.2", "user": "username", "password": "pass2"}
-nodes["router3"] = {"host": "1.1.1.2", "user": "username", "password": "pass3"}
+nodes["router1"] = {"host": "1.1.1.1", "user": "user", "password": "pass1"}
+nodes["router2"] = {"host": "1.1.1.2", "user": "user", "password": "pass2"}
+nodes["router3"] = {"host": "1.1.1.2", "user": "user", "password": "pass3"}
 #Finally you run some tasks on the nodes
 mynodes = connpy.nodes(nodes, config = conf)
 result = mynodes.test(["show ip int br"], "1.1.1.2")
@@ -201,14 +249,27 @@ routers.test("ping {ip}", expected, variables)
 for key in routers.result:
     print(key, ' ---> ', ("pass" if routers.result[key] else "fail"))
 ```
+### Using AI
+```
+import connpy
+conf = connpy.configfile()
+organization = 'openai-org'
+api_key = "openai-key"
+myia = ai(conf, organization, api_key)
+input = "go to router 1 and get me the full configuration"
+result = myia.ask(input, dryrun = False)
+print(result)
+```
 '''
 from .core import node,nodes
 from .configfile import configfile
 from .connapp import connapp
+from .api import *
+from .ai import ai
 from ._version import __version__
 from pkg_resources import get_distribution
 
-__all__ = ["node", "nodes", "configfile", "connapp"]
+__all__ = ["node", "nodes", "configfile", "connapp", "ai"]
 __author__ = "Federico Luzzi"
 __pdoc__ = {
     'core': False,

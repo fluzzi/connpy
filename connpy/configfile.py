@@ -92,7 +92,7 @@ class configfile:
 
     def _createconfig(self, conf):
         #Create config file
-        defaultconfig = {'config': {'case': False, 'idletime': 30, 'fzf': False}, 'connections': {}, 'profiles': { "default": { "host":"", "protocol":"ssh", "port":"", "user":"", "password":"", "options":"", "logs":"" }}}
+        defaultconfig = {'config': {'case': False, 'idletime': 30, 'fzf': False}, 'connections': {}, 'profiles': { "default": { "host":"", "protocol":"ssh", "port":"", "user":"", "password":"", "options":"", "logs":"", "tags": "" }}}
         if not os.path.exists(conf):
             with open(conf, "w") as f:
                 json.dump(defaultconfig, f, indent = 4)
@@ -159,8 +159,8 @@ class configfile:
 
         ### Returns:  
 
-            dict: Dictionary containing information of node or multiple dictionaries
-                  of multiple nodes.
+            dict: Dictionary containing information of node or multiple 
+                  dictionaries of multiple nodes.
 
         '''
         uniques = self._explode_unique(unique)
@@ -197,14 +197,53 @@ class configfile:
             newnode.pop("type")
             return newnode
 
-    def _connections_add(self,*, id, host, folder='', subfolder='', options='', logs='', password='', port='', protocol='', user='', type = "connection" ):
+    def getitems(self, uniques):
+        '''
+        Get a group of nodes from configfile which can be passed to node/nodes class
+
+        ### Parameters:  
+
+            - uniques (str/list): Regex string name that will match hostnames 
+                                  from the connection manager. It can be a 
+                                  list of strings.
+
+        ### Returns:  
+
+            dict: Dictionary containing information of node or multiple 
+                  dictionaries of multiple nodes.
+
+        '''
+        nodes = {}
+        for i in uniques:
+            if isinstance(i, dict):
+                name = list(i.keys())[0]
+                mylist = i[name]
+                if not self.config["case"]:
+                    name = name.lower()
+                    mylist = [item.lower() for item in mylist]
+                this = self.getitem(name, mylist)
+                nodes.update(this)
+            elif i.startswith("@"):
+                if not self.config["case"]:
+                    i = i.lower()
+                this = self.getitem(i)
+                nodes.update(this)
+            else:
+                if not self.config["case"]:
+                    i = i.lower()
+                this = self.getitem(i)
+                nodes[i] = this
+        return nodes
+
+
+    def _connections_add(self,*, id, host, folder='', subfolder='', options='', logs='', password='', port='', protocol='', user='', tags='', type = "connection" ):
         #Add connection from config
         if folder == '':
-            self.connections[id] = {"host": host, "options": options, "logs": logs, "password": password, "port": port, "protocol": protocol, "user": user, "type": type}
+            self.connections[id] = {"host": host, "options": options, "logs": logs, "password": password, "port": port, "protocol": protocol, "user": user, "tags": tags,"type": type}
         elif folder != '' and subfolder == '':
-            self.connections[folder][id] = {"host": host, "options": options, "logs": logs, "password": password, "port": port, "protocol": protocol, "user": user, "type": type}
+            self.connections[folder][id] = {"host": host, "options": options, "logs": logs, "password": password, "port": port, "protocol": protocol, "user": user, "tags": tags, "type": type}
         elif folder != '' and subfolder != '':
-            self.connections[folder][subfolder][id] = {"host": host, "options": options, "logs": logs, "password": password, "port": port, "protocol": protocol, "user": user, "type": type}
+            self.connections[folder][subfolder][id] = {"host": host, "options": options, "logs": logs, "password": password, "port": port, "protocol": protocol, "user": user, "tags": tags, "type": type}
             
 
     def _connections_del(self,*, id, folder='', subfolder=''):
@@ -233,16 +272,16 @@ class configfile:
             del self.connections[folder][subfolder]
 
 
-    def _profiles_add(self,*, id, host = '', options='', logs='', password='', port='', protocol='', user='' ):
+    def _profiles_add(self,*, id, host = '', options='', logs='', password='', port='', protocol='', user='', tags='' ):
         #Add profile from config
-        self.profiles[id] = {"host": host, "options": options, "logs": logs, "password": password, "port": port, "protocol": protocol, "user": user}
+        self.profiles[id] = {"host": host, "options": options, "logs": logs, "password": password, "port": port, "protocol": protocol, "user": user, "tags": tags}
             
 
     def _profiles_del(self,*, id ):
         #Delete profile from config
         del self.profiles[id]
         
-    def _getallnodes(self):
+    def _getallnodes(self, filter = None):
         #get all nodes on configfile
         nodes = []
         layer1 = [k for k,v in self.connections.items() if isinstance(v, dict) and v["type"] == "connection"]
@@ -255,7 +294,50 @@ class configfile:
             for s in subfolders:
                 layer3 = [k + "@" + s + "@" + f for k,v in self.connections[f][s].items() if isinstance(v, dict) and v["type"] == "connection"]
                 nodes.extend(layer3)
+        if filter:
+            if isinstance(filter, str):
+                nodes = [item for item in nodes if re.search(filter, item)]
+            elif isinstance(filter, list):
+                nodes = [item for item in nodes if any(re.search(pattern, item) for pattern in filter)]
+            else:
+                raise ValueError("filter must be a string or a list of strings")
         return nodes
+
+    def _getallnodesfull(self, filter = None):
+        #get all nodes on configfile with all their attributes.
+        nodes = {}
+        layer1 = {k:v for k,v in self.connections.items() if isinstance(v, dict) and v["type"] == "connection"}
+        folders = [k for k,v in self.connections.items() if isinstance(v, dict) and v["type"] == "folder"]
+        nodes.update(layer1)
+        for f in folders:
+            layer2 = {k + "@" + f:v for k,v in self.connections[f].items() if isinstance(v, dict) and v["type"] == "connection"}
+            nodes.update(layer2)
+            subfolders = [k for k,v in self.connections[f].items() if isinstance(v, dict) and v["type"] == "subfolder"]
+            for s in subfolders:
+                layer3 = {k + "@" + s + "@" + f:v for k,v in self.connections[f][s].items() if isinstance(v, dict) and v["type"] == "connection"}
+                nodes.update(layer3)
+        if filter:
+            if isinstance(filter, str):
+                nodes = {k: v for k, v in nodes.items() if re.search(filter, k)}
+            elif isinstance(filter, list):
+                nodes = {k: v for k, v in nodes.items() if any(re.search(pattern, k) for pattern in filter)}
+            else:
+                raise ValueError("filter must be a string or a list of strings")
+        for node, keys in nodes.items():
+            for key, value in keys.items():
+                profile = re.search("^@(.*)", str(value))
+                if profile:
+                    try:
+                        nodes[node][key] = self.profiles[profile.group(1)][key]
+                    except:
+                        nodes[node][key] = ""
+                elif value == '' and key == "protocol":
+                    try:
+                        nodes[node][key] = config.profiles["default"][key]
+                    except:
+                        nodes[node][key] = "ssh"
+        return nodes
+
 
     def _getallfolders(self):
         #get all folders on configfile

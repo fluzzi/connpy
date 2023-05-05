@@ -10,8 +10,9 @@ import sys
 import inquirer
 from .core import node,nodes
 from ._version import __version__
-from .api import *
+from .api import start_api,stop_api,debug_api
 import yaml
+import ast
 try:
     from pyfzf.pyfzf import FzfPrompt
 except:
@@ -119,6 +120,7 @@ class connapp:
         configcrud.add_argument("--keepalive", dest="idletime", nargs=1, action=self._store_type, help="Set keepalive time in seconds, 0 to disable", type=int, metavar="INT")
         configcrud.add_argument("--completion", dest="completion", nargs=1, choices=["bash","zsh"], action=self._store_type, help="Get terminal completion configuration for conn")
         configcrud.add_argument("--configfolder", dest="configfolder", nargs=1, action=self._store_type, help="Set the default location for config file", metavar="FOLDER")
+        configcrud.add_argument("--openai", dest="openai", nargs=2, action=self._store_type, help="Set openai organization and api_key", metavar=("ORGANIZATION", "API_KEY"))
         configparser.set_defaults(func=self._func_others)
         #Manage sys arguments
         commands = ["node", "profile", "mv", "move","copy", "cp", "bulk", "ls", "list", "run", "config", "api"]
@@ -244,6 +246,7 @@ class connapp:
                 print("You can also leave empty any value except hostname/IP.")
                 print("You can pass 1 or more passwords using comma separated @profiles")
                 print("You can use this variables on logging file name: ${id} ${unique} ${host} ${port} ${user} ${protocol}")
+                print("Some useful tags to set for automation are 'os', 'screen_length_command', and 'prompt'.")
                 newnode = self._questions_nodes(args.data, uniques)
                 if newnode == False:
                     exit(7)
@@ -372,7 +375,7 @@ class connapp:
     
     def _func_others(self, args):
         #Function called when using other commands
-        actions = {"ls": self._ls, "move": self._mvcp, "cp": self._mvcp, "bulk": self._bulk, "completion": self._completion, "case": self._case, "fzf": self._fzf, "idletime": self._idletime, "configfolder": self._configfolder}
+        actions = {"ls": self._ls, "move": self._mvcp, "cp": self._mvcp, "bulk": self._bulk, "completion": self._completion, "case": self._case, "fzf": self._fzf, "idletime": self._idletime, "configfolder": self._configfolder, "openai": self._openai}
         return actions.get(args.command)(args)
 
     def _ls(self, args):
@@ -442,6 +445,7 @@ class connapp:
             newnode["port"] = newnodes["port"]
             newnode["options"] = newnodes["options"]
             newnode["logs"] = newnodes["logs"]
+            newnode["tags"] = newnodes["tags"]
             newnode["user"] = newnodes["user"]
             newnode["password"] = newnodes["password"]
             count +=1
@@ -487,6 +491,13 @@ class connapp:
             with open(pathfile, "w") as f:
                 f.write(str(folder))
             print("Config saved")
+        
+    def _openai(self, args):
+        openaikeys = {}
+        openaikeys["organization"] = args.data[0]
+        openaikeys["api_key"] = args.data[1]
+        self._change_settings(args.command, openaikeys)
+
 
     def _change_settings(self, name, value):
         self.config.config[name] = value
@@ -516,7 +527,6 @@ class connapp:
 
     def _node_run(self, args):
         command = " ".join(args.data[1:])
-        command = command.split("-")
         matches = list(filter(lambda k: k == args.data[0], self.nodes))
         if len(matches) == 0:
             print("{} not found".format(args.data[0]))
@@ -545,7 +555,6 @@ class connapp:
             print("failed reading file {}".format(args.data[0]))
             exit(10)
         for script in scripts["tasks"]:
-            nodes = {}
             args = {}
             try:
                 action = script["action"]
@@ -557,18 +566,7 @@ class connapp:
             except KeyError as e:
                 print("'{}' is mandatory".format(e.args[0]))
                 exit(11)
-            for i in nodelist:
-                if isinstance(i, dict):
-                    name = list(i.keys())[0]
-                    this = self.config.getitem(name, i[name])
-                    nodes.update(this)
-                elif i.startswith("@"):
-                    this = self.config.getitem(i)
-                    nodes.update(this)
-                else:
-                    this = self.config.getitem(i)
-                    nodes[i] = this
-            nodes = self.connnodes(nodes, config = self.config)
+            nodes = self.connnodes(self.config.getitems(nodelist), config = self.config)
             stdout = False
             if output is None:
                 pass
@@ -698,6 +696,33 @@ class connapp:
                 raise inquirer.errors.ValidationError("", reason="Profile {} don't exist".format(i))
         return True
 
+    def _tags_validation(self, answers, current):
+        #Validation for Tags in inquirer when managing nodes
+        if current.startswith("@"):
+            if current[1:] not in self.profiles:
+                raise inquirer.errors.ValidationError("", reason="Profile {} don't exist".format(current))
+        elif current != "":
+            isdict = False
+            try:
+                isdict = ast.literal_eval(current)
+            except:
+                pass
+            if not isinstance (isdict, dict):
+                raise inquirer.errors.ValidationError("", reason="Tags should be a python dictionary.".format(current))
+        return True
+
+    def _profile_tags_validation(self, answers, current):
+        #Validation for Tags in inquirer when managing profiles
+        if current != "":
+            isdict = False
+            try:
+                isdict = ast.literal_eval(current)
+            except:
+                pass
+            if not isinstance (isdict, dict):
+                raise inquirer.errors.ValidationError("", reason="Tags should be a python dictionary.".format(current))
+        return True
+
     def _default_validation(self, answers, current):
         #Default validation type used in multiples questions in inquirer
         if current.startswith("@"):
@@ -744,6 +769,7 @@ class connapp:
         questions.append(inquirer.Confirm("port", message="Edit Port?"))
         questions.append(inquirer.Confirm("options", message="Edit Options?"))
         questions.append(inquirer.Confirm("logs", message="Edit logging path/file?"))
+        questions.append(inquirer.Confirm("tags", message="Edit tags?"))
         questions.append(inquirer.Confirm("user", message="Edit User?"))
         questions.append(inquirer.Confirm("password", message="Edit password?"))
         answers = inquirer.prompt(questions)
@@ -753,12 +779,13 @@ class connapp:
         #Questions when adding or editing nodes
         try:
             defaults = self.config.getitem(unique)
+            if "tags" not in defaults:
+                defaults["tags"] = ""
         except:
-            defaults = { "host":"", "protocol":"", "port":"", "user":"", "options":"", "logs":"" }
+            defaults = { "host":"", "protocol":"", "port":"", "user":"", "options":"", "logs":"" , "tags":""}
         node = {}
-
         if edit == None:
-            edit = { "host":True, "protocol":True, "port":True, "user":True, "password": True,"options":True, "logs":True }
+            edit = { "host":True, "protocol":True, "port":True, "user":True, "password": True,"options":True, "logs":True, "tags":True }
         questions = []
         if edit["host"]:
             questions.append(inquirer.Text("host", message="Add Hostname or IP", validate=self._host_validation, default=defaults["host"]))
@@ -780,6 +807,10 @@ class connapp:
             questions.append(inquirer.Text("logs", message="Pick logging path/file ",  validate=self._default_validation, default=defaults["logs"].replace("{","{{").replace("}","}}")))
         else:
             node["logs"] = defaults["logs"]
+        if edit["tags"]:
+            questions.append(inquirer.Text("tags", message="Add tags dictionary",  validate=self._tags_validation, default=str(defaults["tags"]).replace("{","{{").replace("}","}}")))
+        else:
+            node["tags"] = defaults["tags"]
         if edit["user"]:
             questions.append(inquirer.Text("user", message="Pick username", validate=self._default_validation, default=defaults["user"]))
         else:
@@ -806,6 +837,8 @@ class connapp:
                 answer["password"] = passa["password"].split(",")
             elif answer["password"] == "No Password":
                 answer["password"] = ""
+        if "tags" in answer.keys() and not answer["tags"].startswith("@") and answer["tags"]:
+            answer["tags"] = ast.literal_eval(answer["tags"])
         result = {**uniques, **answer, **node}
         result["type"] = "connection"
         return result
@@ -814,11 +847,13 @@ class connapp:
         #Questions when adding or editing profiles
         try:
             defaults = self.config.profiles[unique]
+            if "tags" not in defaults:
+                defaults["tags"] = ""
         except:
-            defaults = { "host":"", "protocol":"", "port":"", "user":"", "options":"", "logs":"" }
+            defaults = { "host":"", "protocol":"", "port":"", "user":"", "options":"", "logs":"", "tags": "" }
         profile = {}
         if edit == None:
-            edit = { "host":True, "protocol":True, "port":True, "user":True, "password": True,"options":True, "logs":True }
+            edit = { "host":True, "protocol":True, "port":True, "user":True, "password": True,"options":True, "logs":True, "tags":True }
         questions = []
         if edit["host"]:
             questions.append(inquirer.Text("host", message="Add Hostname or IP", default=defaults["host"]))
@@ -840,6 +875,10 @@ class connapp:
             questions.append(inquirer.Text("logs", message="Pick logging path/file ", default=defaults["logs"].replace("{","{{").replace("}","}}")))
         else:
             profile["logs"] = defaults["logs"]
+        if edit["tags"]:
+            questions.append(inquirer.Text("tags", message="Add tags dictionary",  validate=self._profile_tags_validation, default=str(defaults["tags"]).replace("{","{{").replace("}","}}")))
+        else:
+            profile["tags"] = defaults["tags"]
         if edit["user"]:
             questions.append(inquirer.Text("user", message="Pick username", default=defaults["user"]))
         else:
@@ -854,6 +893,8 @@ class connapp:
         if "password" in answer.keys():
             if answer["password"] != "":
                 answer["password"] = self.encrypt(answer["password"])
+        if "tags" in answer.keys() and answer["tags"]:
+            answer["tags"] = ast.literal_eval(answer["tags"])
         result = {**answer, **profile}
         result["id"] = unique
         return result
@@ -868,6 +909,7 @@ class connapp:
         questions.append(inquirer.Text("port", message="Select Port Number", validate=self._port_validation))
         questions.append(inquirer.Text("options", message="Pass extra options to protocol", validate=self._default_validation))
         questions.append(inquirer.Text("logs", message="Pick logging path/file ", validate=self._default_validation))
+        questions.append(inquirer.Text("tags", message="Add tags dictionary",  validate=self._tags_validation))
         questions.append(inquirer.Text("user", message="Pick username", validate=self._default_validation))
         questions.append(inquirer.List("password", message="Password: Use a local password, no password or a list of profiles to reference?", choices=["Local Password", "Profiles", "No Password"]))
         answer = inquirer.prompt(questions)
@@ -885,6 +927,8 @@ class connapp:
             elif answer["password"] == "No Password":
                 answer["password"] = ""
         answer["type"] = "connection"
+        if "tags" in answer.keys() and not answer["tags"].startswith("@") and answer["tags"]:
+            answer["tags"] = ast.literal_eval(answer["tags"])
         return answer
 
     def _type_node(self, arg_value, pat=re.compile(r"^[0-9a-zA-Z_.$@#-]+$")):
