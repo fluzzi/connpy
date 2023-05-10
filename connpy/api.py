@@ -63,8 +63,12 @@ def ask_ai():
         dryrun = data["dryrun"] 
     else:
         dryrun = False
+    if "chat_history" in data:
+        chat_history = data["chat_history"]
+    else:
+        chat_history = None
     ai = myai(conf)
-    return ai.ask(input, dryrun)
+    return ai.ask(input, dryrun, chat_history)
 
 
 @app.route("/run_commands", methods=["POST"])
