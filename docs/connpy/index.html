@@ -730,8 +730,10 @@ __pdoc__ = {
                 key, value = line.split(&#34;:&#34;, 1)
                 key = key.strip()
                 newvalue = {}
+                pattern = r&#39;\[.*?\]&#39;
+                match = re.search(pattern, value.strip())
                 try:
-                    value = ast.literal_eval(value.strip())
+                    value = ast.literal_eval(match.group(0))
                     for i,e in enumerate(value, start=1):
                         newvalue[f&#34;command{i}&#34;] = e
                         if f&#34;{{command{i}}}&#34; not in info_dict[&#34;commands&#34;]:
@@ -771,14 +773,16 @@ __pdoc__ = {
         output[&#34;response&#34;] = self._clean_command_response(output[&#34;raw_response&#34;])
         return output
 
-    def _get_filter(self, user_input):
+    def _get_filter(self, user_input, chat_history = None):
         #Send the request to identify the filter and other attributes from the user input to GPT.
         message = []
         message.append({&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: dedent(self.__prompt[&#34;original_system&#34;])})
         message.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: dedent(self.__prompt[&#34;original_user&#34;])})
         message.append({&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: dedent(self.__prompt[&#34;original_assistant&#34;])})
-        message.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: user_input})
-
+        if not chat_history:
+            chat_history = []
+        chat_history.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: user_input})
+        message.extend(chat_history)
         response = openai.ChatCompletion.create(
             model=self.model,
             messages=message,
@@ -789,11 +793,13 @@ __pdoc__ = {
         output = {}
         output[&#34;dict_response&#34;] = response
         output[&#34;raw_response&#34;] = response[&#34;choices&#34;][0][&#34;message&#34;][&#34;content&#34;] 
+        chat_history.append({&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: output[&#34;raw_response&#34;]})
+        output[&#34;chat_history&#34;] = chat_history
         clear_response = self._clean_original_response(output[&#34;raw_response&#34;])
         output[&#34;response&#34;] = self._clean_original_response(output[&#34;raw_response&#34;])
         return output
         
-    def ask(self, user_input, dryrun = False):
+    def ask(self, user_input, dryrun = False, chat_history = None):
         &#39;&#39;&#39;
         Send the user input to openAI GPT and parse the response to run an action in the application.
 
@@ -832,14 +838,18 @@ __pdoc__ = {
                     on the nodes.
                   - result: A dictionary with the output of the commands or 
                     the test.
+                  - chat_history: The chat history between user and chatbot.
+                    It can be used as an attribute for next request.
+                
                     
 
         &#39;&#39;&#39;
         output = {}
-        original = self._get_filter(user_input)
+        original = self._get_filter(user_input, chat_history)
         output[&#34;input&#34;] = user_input
         output[&#34;app_related&#34;] = original[&#34;response&#34;][&#34;app_related&#34;]
         output[&#34;dryrun&#34;] = dryrun
+        output[&#34;chat_history&#34;] = original[&#34;chat_history&#34;]
         if not output[&#34;app_related&#34;]:
             output[&#34;response&#34;] = original[&#34;response&#34;][&#34;response&#34;]
         else:
@@ -855,7 +865,7 @@ __pdoc__ = {
                     thisnodes = self.config._getallnodesfull(output[&#34;filter&#34;])
                     output[&#34;nodes&#34;] = list(thisnodes.keys())
             if not type == &#34;command&#34;:
-                output[&#34;action&#34;] = type
+                output[&#34;action&#34;] = &#34;list_nodes&#34;
             else:
                 commands = self._get_commands(user_input, thisnodes)
                 output[&#34;args&#34;] = {}
@@ -877,7 +887,7 @@ __pdoc__ = {
 <h3>Methods</h3>
 <dl>
 <dt id="connpy.ai.ask"><code class="name flex">
-<span>def <span class="ident">ask</span></span>(<span>self, user_input, dryrun=False)</span>
+<span>def <span class="ident">ask</span></span>(<span>self, user_input, dryrun=False, chat_history=None)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Send the user input to openAI GPT and parse the response to run an action in the application.</p>
@@ -913,12 +923,14 @@ __pdoc__ = {
         on the nodes.
       - result: A dictionary with the output of the commands or 
         the test.
+      - chat_history: The chat history between user and chatbot.
+        It can be used as an attribute for next request.
 </code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def ask(self, user_input, dryrun = False):
+<pre><code class="python">def ask(self, user_input, dryrun = False, chat_history = None):
     &#39;&#39;&#39;
     Send the user input to openAI GPT and parse the response to run an action in the application.
 
@@ -957,14 +969,18 @@ __pdoc__ = {
                 on the nodes.
               - result: A dictionary with the output of the commands or 
                 the test.
+              - chat_history: The chat history between user and chatbot.
+                It can be used as an attribute for next request.
+            
                 
 
     &#39;&#39;&#39;
     output = {}
-    original = self._get_filter(user_input)
+    original = self._get_filter(user_input, chat_history)
     output[&#34;input&#34;] = user_input
     output[&#34;app_related&#34;] = original[&#34;response&#34;][&#34;app_related&#34;]
     output[&#34;dryrun&#34;] = dryrun
+    output[&#34;chat_history&#34;] = original[&#34;chat_history&#34;]
     if not output[&#34;app_related&#34;]:
         output[&#34;response&#34;] = original[&#34;response&#34;][&#34;response&#34;]
     else:
@@ -980,7 +996,7 @@ __pdoc__ = {
                 thisnodes = self.config._getallnodesfull(output[&#34;filter&#34;])
                 output[&#34;nodes&#34;] = list(thisnodes.keys())
         if not type == &#34;command&#34;:
-            output[&#34;action&#34;] = type
+            output[&#34;action&#34;] = &#34;list_nodes&#34;
         else:
             commands = self._get_commands(user_input, thisnodes)
             output[&#34;args&#34;] = {}

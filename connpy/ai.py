@@ -164,8 +164,10 @@ class ai:
                 key, value = line.split(":", 1)
                 key = key.strip()
                 newvalue = {}
+                pattern = r'\[.*?\]'
+                match = re.search(pattern, value.strip())
                 try:
-                    value = ast.literal_eval(value.strip())
+                    value = ast.literal_eval(match.group(0))
                     for i,e in enumerate(value, start=1):
                         newvalue[f"command{i}"] = e
                         if f"{{command{i}}}" not in info_dict["commands"]:
@@ -205,14 +207,16 @@ class ai:
         output["response"] = self._clean_command_response(output["raw_response"])
         return output
 
-    def _get_filter(self, user_input):
+    def _get_filter(self, user_input, chat_history = None):
         #Send the request to identify the filter and other attributes from the user input to GPT.
         message = []
         message.append({"role": "system", "content": dedent(self.__prompt["original_system"])})
         message.append({"role": "user", "content": dedent(self.__prompt["original_user"])})
         message.append({"role": "assistant", "content": dedent(self.__prompt["original_assistant"])})
-        message.append({"role": "user", "content": user_input})
-
+        if not chat_history:
+            chat_history = []
+        chat_history.append({"role": "user", "content": user_input})
+        message.extend(chat_history)
         response = openai.ChatCompletion.create(
             model=self.model,
             messages=message,
@@ -223,11 +227,13 @@ class ai:
         output = {}
         output["dict_response"] = response
         output["raw_response"] = response["choices"][0]["message"]["content"] 
+        chat_history.append({"role": "assistant", "content": output["raw_response"]})
+        output["chat_history"] = chat_history
         clear_response = self._clean_original_response(output["raw_response"])
         output["response"] = self._clean_original_response(output["raw_response"])
         return output
         
-    def ask(self, user_input, dryrun = False):
+    def ask(self, user_input, dryrun = False, chat_history = None):
         '''
         Send the user input to openAI GPT and parse the response to run an action in the application.
 
@@ -266,14 +272,18 @@ class ai:
                     on the nodes.
                   - result: A dictionary with the output of the commands or 
                     the test.
+                  - chat_history: The chat history between user and chatbot.
+                    It can be used as an attribute for next request.
+                
                     
 
         '''
         output = {}
-        original = self._get_filter(user_input)
+        original = self._get_filter(user_input, chat_history)
         output["input"] = user_input
         output["app_related"] = original["response"]["app_related"]
         output["dryrun"] = dryrun
+        output["chat_history"] = original["chat_history"]
         if not output["app_related"]:
             output["response"] = original["response"]["response"]
         else:
@@ -289,7 +299,7 @@ class ai:
                     thisnodes = self.config._getallnodesfull(output["filter"])
                     output["nodes"] = list(thisnodes.keys())
             if not type == "command":
-                output["action"] = type
+                output["action"] = "list_nodes"
             else:
                 commands = self._get_commands(user_input, thisnodes)
                 output["args"] = {}
