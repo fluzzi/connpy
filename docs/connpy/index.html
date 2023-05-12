@@ -147,6 +147,7 @@ options:
 <ul>
 <li>A JSON object with the results of the executed commands on the nodes.</li>
 </ul>
+<hr>
 <h3 id="4-ask-ai">4. Ask AI</h3>
 <p><strong>Endpoint</strong>: <code>/ask_ai</code></p>
 <p><strong>Method</strong>: <code>POST</code></p>
@@ -400,6 +401,8 @@ With the Connpy API you can run commands on devices using http requests
 #### Response:
 
 - A JSON object with the results of the executed commands on the nodes.
+
+---
 
 ### 4. Ask AI
 
@@ -682,8 +685,33 @@ __pdoc__ = {
         self.__prompt[&#34;command_assistant&#34;]= &#34;&#34;&#34;
     router1: [&#39;show running-config&#39;]
     &#34;&#34;&#34;
+        self.__prompt[&#34;confirmation_system&#34;] = &#34;&#34;&#34;
+        Please analyze the user&#39;s input and categorize it as either an affirmation or negation. Based on this analysis, respond with:
+
+            &#39;True&#39; if the input is an affirmation like &#39;do it&#39;, &#39;go ahead&#39;, &#39;sure&#39;, etc.
+            &#39;False&#39; if the input is a negation.
+            If the input does not fit into either of these categories, kindly express that you didn&#39;t understand and request the user to rephrase their response.
+            &#34;&#34;&#34;
+        self.__prompt[&#34;confirmation_user&#34;] = &#34;Yes go ahead!&#34;
+        self.__prompt[&#34;confirmation_assistant&#34;] = &#34;True&#34;
         self.model = model
         self.temp = temp
+
+    def _retry_function(self, function, max_retries, backoff_num, *args):
+        #Retry openai requests
+        retries = 0
+        while retries &lt; max_retries:
+            try:
+                myfunction = function(*args)
+                break
+            except (openai.error.APIConnectionError, openai.error.RateLimitError):
+                wait_time = backoff_num * (2 ** retries)
+                time.sleep(wait_time)
+                retries += 1
+                continue
+        if retries == max_retries:
+            myfunction = False
+        return myfunction
 
     def _clean_original_response(self, raw_response):
         #Parse response for first request to openAI GPT.
@@ -744,6 +772,14 @@ __pdoc__ = {
                     pass
         return info_dict
 
+    def _clean_confirmation_response(self, raw_response):
+        #Parse response for confirmation request to openAI GPT.
+        value = raw_response.strip()
+        if value.strip(&#34;.&#34;).lower() == &#34;true&#34;:
+            value = True
+        elif value.strip(&#34;.&#34;).lower() == &#34;false&#34;:
+            value = False
+        return value
 
     def _get_commands(self, user_input, nodes):
         #Send the request for commands for each device to openAI GPT.
@@ -799,7 +835,51 @@ __pdoc__ = {
         output[&#34;response&#34;] = self._clean_original_response(output[&#34;raw_response&#34;])
         return output
         
-    def ask(self, user_input, dryrun = False, chat_history = None):
+    def _get_confirmation(self, user_input):
+        #Send the request to identify if user is confirming or denying the task
+        message = []
+        message.append({&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: dedent(self.__prompt[&#34;confirmation_system&#34;])})
+        message.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: dedent(self.__prompt[&#34;confirmation_user&#34;])})
+        message.append({&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: dedent(self.__prompt[&#34;confirmation_assistant&#34;])})
+        message.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: user_input})
+        response = openai.ChatCompletion.create(
+            model=self.model,
+            messages=message,
+            temperature=self.temp,
+            top_p=1
+            )
+        output = {}
+        output[&#34;dict_response&#34;] = response
+        output[&#34;raw_response&#34;] = response[&#34;choices&#34;][0][&#34;message&#34;][&#34;content&#34;] 
+        output[&#34;response&#34;] = self._clean_confirmation_response(output[&#34;raw_response&#34;])
+        return output
+
+    def confirm(self, user_input, max_retries=3, backoff_num=1):
+        &#39;&#39;&#39;
+        Send the user input to openAI GPT and verify if response is afirmative or negative.
+
+        ### Parameters:  
+
+            - user_input (str): User response confirming or denying.
+
+        ### Optional Parameters:  
+
+            - max_retries (int): Maximum number of retries for gpt api.
+            - backoff_num (int): Backoff factor for exponential wait time
+                                 between retries.
+
+        ### Returns:  
+
+            bool or str: True, False or str if AI coudn&#39;t understand the response
+        &#39;&#39;&#39;
+        result = self._retry_function(self._get_confirmation, max_retries, backoff_num, user_input)
+        if result:
+            output = result[&#34;response&#34;]
+        else:
+            output = f&#34;{self.model} api is not responding right now, please try again later.&#34;
+        return output
+
+    def ask(self, user_input, dryrun = False, chat_history = None,  max_retries=3, backoff_num=1):
         &#39;&#39;&#39;
         Send the user input to openAI GPT and parse the response to run an action in the application.
 
@@ -816,9 +896,13 @@ __pdoc__ = {
 
         ### Optional Parameters:  
 
-            - dryrun  (bool): Set to true to get the arguments to use to run
-                              in the app. Default is false and it will run 
-                              the actions directly.
+            - dryrun       (bool): Set to true to get the arguments to use to
+                                   run in the app. Default is false and it
+                                   will run the actions directly.
+            - chat_history (list): List in gpt api format for the chat history.
+            - max_retries   (int): Maximum number of retries for gpt api.
+            - backoff_num   (int): Backoff factor for exponential wait time
+                                   between retries.
 
         ### Returns:  
 
@@ -845,7 +929,11 @@ __pdoc__ = {
 
         &#39;&#39;&#39;
         output = {}
-        original = self._get_filter(user_input, chat_history)
+        original = self._retry_function(self._get_filter, max_retries, backoff_num, user_input, chat_history)
+        if not original:
+            output[&#34;app_related&#34;] = False
+            output[&#34;response&#34;] = f&#34;{self.model} api is not responding right now, please try again later.&#34;
+            return output
         output[&#34;input&#34;] = user_input
         output[&#34;app_related&#34;] = original[&#34;response&#34;][&#34;app_related&#34;]
         output[&#34;dryrun&#34;] = dryrun
@@ -867,7 +955,12 @@ __pdoc__ = {
             if not type == &#34;command&#34;:
                 output[&#34;action&#34;] = &#34;list_nodes&#34;
             else:
-                commands = self._get_commands(user_input, thisnodes)
+                commands = self._retry_function(self._get_commands, max_retries, backoff_num, user_input, thisnodes)
+                if not commands:
+                    output = []
+                    output[&#34;app_related&#34;] = False
+                    output[&#34;response&#34;] = f&#34;{self.model} api is not responding right now, please try again later.&#34;
+                    return output
                 output[&#34;args&#34;] = {}
                 output[&#34;args&#34;][&#34;commands&#34;] = commands[&#34;response&#34;][&#34;commands&#34;]
                 output[&#34;args&#34;][&#34;vars&#34;] = commands[&#34;response&#34;][&#34;variables&#34;]
@@ -876,10 +969,21 @@ __pdoc__ = {
                     output[&#34;action&#34;] = &#34;test&#34;
                 else:
                     output[&#34;action&#34;] = &#34;run&#34;
+                if dryrun:
+                    output[&#34;task&#34;] = []
+                    if output[&#34;action&#34;] == &#34;test&#34;:
+                        output[&#34;task&#34;].append({&#34;Task&#34;: &#34;Verify if expected value is in command(s) output&#34;})
+                        output[&#34;task&#34;].append({&#34;Expected value to verify&#34;: output[&#34;args&#34;][&#34;expected&#34;]})
+                    elif output[&#34;action&#34;] == &#34;run&#34;:
+                        output[&#34;task&#34;].append({&#34;Task&#34;: &#34;Run command(s) on devices and return output&#34;})
+                    varstocommands = deepcopy(output[&#34;args&#34;][&#34;vars&#34;])
+                    del varstocommands[&#34;__global__&#34;]
+                    output[&#34;task&#34;].append({&#34;Devices&#34;: varstocommands})
                 if not dryrun:
                     mynodes = nodes(self.config.getitems(output[&#34;nodes&#34;]),config=self.config)
                     if output[&#34;action&#34;] == &#34;test&#34;:
                         output[&#34;result&#34;] = mynodes.test(**output[&#34;args&#34;])
+                        output[&#34;logs&#34;] = mynodes.output
                     elif output[&#34;action&#34;] == &#34;run&#34;:
                         output[&#34;result&#34;] = mynodes.run(**output[&#34;args&#34;])
         return output</code></pre>
@@ -887,7 +991,7 @@ __pdoc__ = {
 <h3>Methods</h3>
 <dl>
 <dt id="connpy.ai.ask"><code class="name flex">
-<span>def <span class="ident">ask</span></span>(<span>self, user_input, dryrun=False, chat_history=None)</span>
+<span>def <span class="ident">ask</span></span>(<span>self, user_input, dryrun=False, chat_history=None, max_retries=3, backoff_num=1)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Send the user input to openAI GPT and parse the response to run an action in the application.</p>
@@ -902,9 +1006,13 @@ __pdoc__ = {
                       expected value.
 </code></pre>
 <h3 id="optional-parameters">Optional Parameters:</h3>
-<pre><code>- dryrun  (bool): Set to true to get the arguments to use to run
-                  in the app. Default is false and it will run 
-                  the actions directly.
+<pre><code>- dryrun       (bool): Set to true to get the arguments to use to
+                       run in the app. Default is false and it
+                       will run the actions directly.
+- chat_history (list): List in gpt api format for the chat history.
+- max_retries   (int): Maximum number of retries for gpt api.
+- backoff_num   (int): Backoff factor for exponential wait time
+                       between retries.
 </code></pre>
 <h3 id="returns">Returns:</h3>
 <pre><code>dict: Dictionary formed with the following keys:
@@ -930,7 +1038,7 @@ __pdoc__ = {
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def ask(self, user_input, dryrun = False, chat_history = None):
+<pre><code class="python">def ask(self, user_input, dryrun = False, chat_history = None,  max_retries=3, backoff_num=1):
     &#39;&#39;&#39;
     Send the user input to openAI GPT and parse the response to run an action in the application.
 
@@ -947,9 +1055,13 @@ __pdoc__ = {
 
     ### Optional Parameters:  
 
-        - dryrun  (bool): Set to true to get the arguments to use to run
-                          in the app. Default is false and it will run 
-                          the actions directly.
+        - dryrun       (bool): Set to true to get the arguments to use to
+                               run in the app. Default is false and it
+                               will run the actions directly.
+        - chat_history (list): List in gpt api format for the chat history.
+        - max_retries   (int): Maximum number of retries for gpt api.
+        - backoff_num   (int): Backoff factor for exponential wait time
+                               between retries.
 
     ### Returns:  
 
@@ -976,7 +1088,11 @@ __pdoc__ = {
 
     &#39;&#39;&#39;
     output = {}
-    original = self._get_filter(user_input, chat_history)
+    original = self._retry_function(self._get_filter, max_retries, backoff_num, user_input, chat_history)
+    if not original:
+        output[&#34;app_related&#34;] = False
+        output[&#34;response&#34;] = f&#34;{self.model} api is not responding right now, please try again later.&#34;
+        return output
     output[&#34;input&#34;] = user_input
     output[&#34;app_related&#34;] = original[&#34;response&#34;][&#34;app_related&#34;]
     output[&#34;dryrun&#34;] = dryrun
@@ -998,7 +1114,12 @@ __pdoc__ = {
         if not type == &#34;command&#34;:
             output[&#34;action&#34;] = &#34;list_nodes&#34;
         else:
-            commands = self._get_commands(user_input, thisnodes)
+            commands = self._retry_function(self._get_commands, max_retries, backoff_num, user_input, thisnodes)
+            if not commands:
+                output = []
+                output[&#34;app_related&#34;] = False
+                output[&#34;response&#34;] = f&#34;{self.model} api is not responding right now, please try again later.&#34;
+                return output
             output[&#34;args&#34;] = {}
             output[&#34;args&#34;][&#34;commands&#34;] = commands[&#34;response&#34;][&#34;commands&#34;]
             output[&#34;args&#34;][&#34;vars&#34;] = commands[&#34;response&#34;][&#34;variables&#34;]
@@ -1007,12 +1128,69 @@ __pdoc__ = {
                 output[&#34;action&#34;] = &#34;test&#34;
             else:
                 output[&#34;action&#34;] = &#34;run&#34;
+            if dryrun:
+                output[&#34;task&#34;] = []
+                if output[&#34;action&#34;] == &#34;test&#34;:
+                    output[&#34;task&#34;].append({&#34;Task&#34;: &#34;Verify if expected value is in command(s) output&#34;})
+                    output[&#34;task&#34;].append({&#34;Expected value to verify&#34;: output[&#34;args&#34;][&#34;expected&#34;]})
+                elif output[&#34;action&#34;] == &#34;run&#34;:
+                    output[&#34;task&#34;].append({&#34;Task&#34;: &#34;Run command(s) on devices and return output&#34;})
+                varstocommands = deepcopy(output[&#34;args&#34;][&#34;vars&#34;])
+                del varstocommands[&#34;__global__&#34;]
+                output[&#34;task&#34;].append({&#34;Devices&#34;: varstocommands})
             if not dryrun:
                 mynodes = nodes(self.config.getitems(output[&#34;nodes&#34;]),config=self.config)
                 if output[&#34;action&#34;] == &#34;test&#34;:
                     output[&#34;result&#34;] = mynodes.test(**output[&#34;args&#34;])
+                    output[&#34;logs&#34;] = mynodes.output
                 elif output[&#34;action&#34;] == &#34;run&#34;:
                     output[&#34;result&#34;] = mynodes.run(**output[&#34;args&#34;])
+    return output</code></pre>
+</details>
+</dd>
+<dt id="connpy.ai.confirm"><code class="name flex">
+<span>def <span class="ident">confirm</span></span>(<span>self, user_input, max_retries=3, backoff_num=1)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Send the user input to openAI GPT and verify if response is afirmative or negative.</p>
+<h3 id="parameters">Parameters:</h3>
+<pre><code>- user_input (str): User response confirming or denying.
+</code></pre>
+<h3 id="optional-parameters">Optional Parameters:</h3>
+<pre><code>- max_retries (int): Maximum number of retries for gpt api.
+- backoff_num (int): Backoff factor for exponential wait time
+                     between retries.
+</code></pre>
+<h3 id="returns">Returns:</h3>
+<pre><code>bool or str: True, False or str if AI coudn't understand the response
+</code></pre></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def confirm(self, user_input, max_retries=3, backoff_num=1):
+    &#39;&#39;&#39;
+    Send the user input to openAI GPT and verify if response is afirmative or negative.
+
+    ### Parameters:  
+
+        - user_input (str): User response confirming or denying.
+
+    ### Optional Parameters:  
+
+        - max_retries (int): Maximum number of retries for gpt api.
+        - backoff_num (int): Backoff factor for exponential wait time
+                             between retries.
+
+    ### Returns:  
+
+        bool or str: True, False or str if AI coudn&#39;t understand the response
+    &#39;&#39;&#39;
+    result = self._retry_function(self._get_confirmation, max_retries, backoff_num, user_input)
+    if result:
+        output = result[&#34;response&#34;]
+    else:
+        output = f&#34;{self.model} api is not responding right now, please try again later.&#34;
     return output</code></pre>
 </details>
 </dd>
@@ -4171,6 +4349,7 @@ tasks:
 <h4><code><a title="connpy.ai" href="#connpy.ai">ai</a></code></h4>
 <ul class="">
 <li><code><a title="connpy.ai.ask" href="#connpy.ai.ask">ask</a></code></li>
+<li><code><a title="connpy.ai.confirm" href="#connpy.ai.confirm">confirm</a></code></li>
 </ul>
 </li>
 <li>

@@ -152,6 +152,8 @@ With the Connpy API you can run commands on devices using http requests
 
 - A JSON object with the results of the executed commands on the nodes.
 
+---
+
 ### 4. Ask AI
 
 **Endpoint**: `/ask_ai`

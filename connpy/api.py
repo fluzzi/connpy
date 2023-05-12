@@ -70,6 +70,13 @@ def ask_ai():
     ai = myai(conf)
     return ai.ask(input, dryrun, chat_history)
 
+@app.route("/confirm", methods=["POST"])
+def confirm():
+    conf = app.custom_config
+    data = request.get_json()
+    input = data["input"]
+    ai = myai(conf)
+    return str(ai.confirm(input))
 
 @app.route("/run_commands", methods=["POST"])
 def run_commands():
@@ -99,7 +106,7 @@ def run_commands():
 
     mynodes = nodes(mynodes, config=conf)
     try:
-        args["vars"] = data["variables"]
+        args["vars"] = data["vars"]
     except:
         pass
     try:
@@ -111,7 +118,9 @@ def run_commands():
     if action == "run":
         output = mynodes.run(**args)
     elif action == "test":
-        output = mynodes.test(**args)
+        output = {}
+        output["result"] = mynodes.test(**args)
+        output["output"] = mynodes.output
     else:
         error = "Wrong action '{}'".format(action)
         return({"DataError": error})

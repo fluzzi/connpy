@@ -1,9 +1,11 @@
 import openai
+import time
 import json
 import re
 import ast
 from textwrap import dedent
 from .core import nodes
+from copy import deepcopy
 
 class ai:
     ''' This class generates a ai object. Containts all the information and methods to make requests to openAI chatGPT to run actions on the application.
@@ -116,8 +118,33 @@ class ai:
         self.__prompt["command_assistant"]= """
     router1: ['show running-config']
     """
+        self.__prompt["confirmation_system"] = """
+        Please analyze the user's input and categorize it as either an affirmation or negation. Based on this analysis, respond with:
+
+            'True' if the input is an affirmation like 'do it', 'go ahead', 'sure', etc.
+            'False' if the input is a negation.
+            If the input does not fit into either of these categories, kindly express that you didn't understand and request the user to rephrase their response.
+            """
+        self.__prompt["confirmation_user"] = "Yes go ahead!"
+        self.__prompt["confirmation_assistant"] = "True"
         self.model = model
         self.temp = temp
+
+    def _retry_function(self, function, max_retries, backoff_num, *args):
+        #Retry openai requests
+        retries = 0
+        while retries < max_retries:
+            try:
+                myfunction = function(*args)
+                break
+            except (openai.error.APIConnectionError, openai.error.RateLimitError):
+                wait_time = backoff_num * (2 ** retries)
+                time.sleep(wait_time)
+                retries += 1
+                continue
+        if retries == max_retries:
+            myfunction = False
+        return myfunction
 
     def _clean_original_response(self, raw_response):
         #Parse response for first request to openAI GPT.
@@ -178,6 +205,14 @@ class ai:
                     pass
         return info_dict
 
+    def _clean_confirmation_response(self, raw_response):
+        #Parse response for confirmation request to openAI GPT.
+        value = raw_response.strip()
+        if value.strip(".").lower() == "true":
+            value = True
+        elif value.strip(".").lower() == "false":
+            value = False
+        return value
 
     def _get_commands(self, user_input, nodes):
         #Send the request for commands for each device to openAI GPT.
@@ -233,7 +268,51 @@ class ai:
         output["response"] = self._clean_original_response(output["raw_response"])
         return output
         
-    def ask(self, user_input, dryrun = False, chat_history = None):
+    def _get_confirmation(self, user_input):
+        #Send the request to identify if user is confirming or denying the task
+        message = []
+        message.append({"role": "system", "content": dedent(self.__prompt["confirmation_system"])})
+        message.append({"role": "user", "content": dedent(self.__prompt["confirmation_user"])})
+        message.append({"role": "assistant", "content": dedent(self.__prompt["confirmation_assistant"])})
+        message.append({"role": "user", "content": user_input})
+        response = openai.ChatCompletion.create(
+            model=self.model,
+            messages=message,
+            temperature=self.temp,
+            top_p=1
+            )
+        output = {}
+        output["dict_response"] = response
+        output["raw_response"] = response["choices"][0]["message"]["content"] 
+        output["response"] = self._clean_confirmation_response(output["raw_response"])
+        return output
+
+    def confirm(self, user_input, max_retries=3, backoff_num=1):
+        '''
+        Send the user input to openAI GPT and verify if response is afirmative or negative.
+
+        ### Parameters:  
+
+            - user_input (str): User response confirming or denying.
+
+        ### Optional Parameters:  
+
+            - max_retries (int): Maximum number of retries for gpt api.
+            - backoff_num (int): Backoff factor for exponential wait time
+                                 between retries.
+
+        ### Returns:  
+
+            bool or str: True, False or str if AI coudn't understand the response
+        '''
+        result = self._retry_function(self._get_confirmation, max_retries, backoff_num, user_input)
+        if result:
+            output = result["response"]
+        else:
+            output = f"{self.model} api is not responding right now, please try again later."
+        return output
+
+    def ask(self, user_input, dryrun = False, chat_history = None,  max_retries=3, backoff_num=1):
         '''
         Send the user input to openAI GPT and parse the response to run an action in the application.
 
@@ -250,9 +329,13 @@ class ai:
 
         ### Optional Parameters:  
 
-            - dryrun  (bool): Set to true to get the arguments to use to run
-                              in the app. Default is false and it will run 
-                              the actions directly.
+            - dryrun       (bool): Set to true to get the arguments to use to
+                                   run in the app. Default is false and it
+                                   will run the actions directly.
+            - chat_history (list): List in gpt api format for the chat history.
+            - max_retries   (int): Maximum number of retries for gpt api.
+            - backoff_num   (int): Backoff factor for exponential wait time
+                                   between retries.
 
         ### Returns:  
 
@@ -279,7 +362,11 @@ class ai:
 
         '''
         output = {}
-        original = self._get_filter(user_input, chat_history)
+        original = self._retry_function(self._get_filter, max_retries, backoff_num, user_input, chat_history)
+        if not original:
+            output["app_related"] = False
+            output["response"] = f"{self.model} api is not responding right now, please try again later."
+            return output
         output["input"] = user_input
         output["app_related"] = original["response"]["app_related"]
         output["dryrun"] = dryrun
@@ -301,7 +388,12 @@ class ai:
             if not type == "command":
                 output["action"] = "list_nodes"
             else:
-                commands = self._get_commands(user_input, thisnodes)
+                commands = self._retry_function(self._get_commands, max_retries, backoff_num, user_input, thisnodes)
+                if not commands:
+                    output = []
+                    output["app_related"] = False
+                    output["response"] = f"{self.model} api is not responding right now, please try again later."
+                    return output
                 output["args"] = {}
                 output["args"]["commands"] = commands["response"]["commands"]
                 output["args"]["vars"] = commands["response"]["variables"]
@@ -310,10 +402,21 @@ class ai:
                     output["action"] = "test"
                 else:
                     output["action"] = "run"
+                if dryrun:
+                    output["task"] = []
+                    if output["action"] == "test":
+                        output["task"].append({"Task": "Verify if expected value is in command(s) output"})
+                        output["task"].append({"Expected value to verify": output["args"]["expected"]})
+                    elif output["action"] == "run":
+                        output["task"].append({"Task": "Run command(s) on devices and return output"})
+                    varstocommands = deepcopy(output["args"]["vars"])
+                    del varstocommands["__global__"]
+                    output["task"].append({"Devices": varstocommands})
                 if not dryrun:
                     mynodes = nodes(self.config.getitems(output["nodes"]),config=self.config)
                     if output["action"] == "test":
                         output["result"] = mynodes.test(**output["args"])
+                        output["logs"] = mynodes.output
                     elif output["action"] == "run":
                         output["result"] = mynodes.run(**output["args"])
         return output
