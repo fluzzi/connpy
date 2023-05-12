@@ -95,19 +95,21 @@ class ai:
         self.__prompt["original_user"] = "Get the IP addresses of loopback0 for all routers from w2az1 and e1.*(prod|dev) and check if they have the ip 192.168.1.1"
         self.__prompt["original_assistant"] = "app_related: True\nType: Command\nFilter: ['w2az1', 'e1.*(prod|dev)']\nExpected: 192.168.1.1"
         self.__prompt["command_system"] = """
-    For each device listed below, provide the command(s) needed to perform the specified action, depending on the device OS (e.g., Cisco IOSXR router, Linux server). Always format your response as a Python list (e.g., ['command1', 'command2']). 
+        For each device listed below, provide the command(s) needed to perform the specified action, depending on the device OS (e.g., Cisco IOSXR router, Linux server). Always format your response as a Python list (e.g., ['command1', 'command2']). 
 
-    Note that the application knows how to connect to devices via SSH, so you only need to provide the command(s) to run after connecting. 
+        It's very important to note: If a user has provided a specific command to be run, you should include that command exactly as provided, even if it's not recognized or understood. No alterations should be made to the user-provided commands under any circumstances. 
 
-    If the commands needed are not for the specific OS type, just send an empty list (e.g., []).
+        The application knows how to connect to devices via SSH, so you only need to provide the command(s) to run after connecting. 
 
-    It is crucial to always include the device name provided in your response, even when there is only one device.
+        If the commands needed are not for the specific OS type, just send an empty list (e.g., []). 
 
-    your response has to be always like this:
-        node1: ["command1", "command2"]
-        node2: ["command1", "command2", "command3"]
-        node1@folder: ["command1"]
-        Node4@subfolder@folder: []
+        It is crucial to always include the device name provided in your response, even when there is only one device.
+
+        Your response has to be always like this:
+            node1: ["command1", "command2"]
+            node2: ["command1", "command2", "command3"]
+            node1@folder: ["command1"]
+            Node4@subfolder@folder: []
     """
         self.__prompt["command_user"]= """
     input: show me the full configuration for all this devices:
