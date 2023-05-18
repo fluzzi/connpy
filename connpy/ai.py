@@ -364,14 +364,14 @@ class ai:
 
         '''
         output = {}
+        output["dryrun"] = dryrun
+        output["input"] = user_input
         original = self._retry_function(self._get_filter, max_retries, backoff_num, user_input, chat_history)
         if not original:
             output["app_related"] = False
             output["response"] = f"{self.model} api is not responding right now, please try again later."
             return output
-        output["input"] = user_input
         output["app_related"] = original["response"]["app_related"]
-        output["dryrun"] = dryrun
         output["chat_history"] = original["chat_history"]
         if not output["app_related"]:
             output["response"] = original["response"]["response"]
@@ -390,9 +390,14 @@ class ai:
             if not type == "command":
                 output["action"] = "list_nodes"
             else:
-                commands = self._retry_function(self._get_commands, max_retries, backoff_num, user_input, thisnodes)
+                if thisnodes:
+                    commands = self._retry_function(self._get_commands, max_retries, backoff_num, user_input, thisnodes)
+                else:
+                    output["app_related"] = False
+                    filterlist = ", ".join(output["filter"])
+                    output["response"] = f"I'm sorry, I coudn't find any device with filter{'s' if len(output['filter']) != 1 else ''}: {filterlist}."
+                    return output
                 if not commands:
-                    output = []
                     output["app_related"] = False
                     output["response"] = f"{self.model} api is not responding right now, please try again later."
                     return output

@@ -931,14 +931,14 @@ __pdoc__ = {
 
         &#39;&#39;&#39;
         output = {}
+        output[&#34;dryrun&#34;] = dryrun
+        output[&#34;input&#34;] = user_input
         original = self._retry_function(self._get_filter, max_retries, backoff_num, user_input, chat_history)
         if not original:
             output[&#34;app_related&#34;] = False
             output[&#34;response&#34;] = f&#34;{self.model} api is not responding right now, please try again later.&#34;
             return output
-        output[&#34;input&#34;] = user_input
         output[&#34;app_related&#34;] = original[&#34;response&#34;][&#34;app_related&#34;]
-        output[&#34;dryrun&#34;] = dryrun
         output[&#34;chat_history&#34;] = original[&#34;chat_history&#34;]
         if not output[&#34;app_related&#34;]:
             output[&#34;response&#34;] = original[&#34;response&#34;][&#34;response&#34;]
@@ -957,9 +957,14 @@ __pdoc__ = {
             if not type == &#34;command&#34;:
                 output[&#34;action&#34;] = &#34;list_nodes&#34;
             else:
-                commands = self._retry_function(self._get_commands, max_retries, backoff_num, user_input, thisnodes)
+                if thisnodes:
+                    commands = self._retry_function(self._get_commands, max_retries, backoff_num, user_input, thisnodes)
+                else:
+                    output[&#34;app_related&#34;] = False
+                    filterlist = &#34;, &#34;.join(output[&#34;filter&#34;])
+                    output[&#34;response&#34;] = f&#34;I&#39;m sorry, I coudn&#39;t find any device with filter{&#39;s&#39; if len(output[&#39;filter&#39;]) != 1 else &#39;&#39;}: {filterlist}.&#34;
+                    return output
                 if not commands:
-                    output = []
                     output[&#34;app_related&#34;] = False
                     output[&#34;response&#34;] = f&#34;{self.model} api is not responding right now, please try again later.&#34;
                     return output
@@ -1090,14 +1095,14 @@ __pdoc__ = {
 
     &#39;&#39;&#39;
     output = {}
+    output[&#34;dryrun&#34;] = dryrun
+    output[&#34;input&#34;] = user_input
     original = self._retry_function(self._get_filter, max_retries, backoff_num, user_input, chat_history)
     if not original:
         output[&#34;app_related&#34;] = False
         output[&#34;response&#34;] = f&#34;{self.model} api is not responding right now, please try again later.&#34;
         return output
-    output[&#34;input&#34;] = user_input
     output[&#34;app_related&#34;] = original[&#34;response&#34;][&#34;app_related&#34;]
-    output[&#34;dryrun&#34;] = dryrun
     output[&#34;chat_history&#34;] = original[&#34;chat_history&#34;]
     if not output[&#34;app_related&#34;]:
         output[&#34;response&#34;] = original[&#34;response&#34;][&#34;response&#34;]
@@ -1116,9 +1121,14 @@ __pdoc__ = {
         if not type == &#34;command&#34;:
             output[&#34;action&#34;] = &#34;list_nodes&#34;
         else:
-            commands = self._retry_function(self._get_commands, max_retries, backoff_num, user_input, thisnodes)
+            if thisnodes:
+                commands = self._retry_function(self._get_commands, max_retries, backoff_num, user_input, thisnodes)
+            else:
+                output[&#34;app_related&#34;] = False
+                filterlist = &#34;, &#34;.join(output[&#34;filter&#34;])
+                output[&#34;response&#34;] = f&#34;I&#39;m sorry, I coudn&#39;t find any device with filter{&#39;s&#39; if len(output[&#39;filter&#39;]) != 1 else &#39;&#39;}: {filterlist}.&#34;
+                return output
             if not commands:
-                output = []
                 output[&#34;app_related&#34;] = False
                 output[&#34;response&#34;] = f&#34;{self.model} api is not responding right now, please try again later.&#34;
                 return output
