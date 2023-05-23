@@ -706,6 +706,16 @@ Users will typically use words like verify, check, make sure, or similar to refe
         self.model = model
         self.temp = temp
 
+    def process_string(self, s):
+        if s.startswith(&#39;[&#39;) and s.endswith(&#39;]&#39;) and not (s.startswith(&#34;[&#39;&#34;) and s.endswith(&#34;&#39;]&#34;)) and not (s.startswith(&#39;[&#34;&#39;) and s.endswith(&#39;&#34;]&#39;)):
+            # Extract the content inside square brackets and split by comma
+            content = s[1:-1].split(&#39;,&#39;)
+            # Add single quotes around each item and join them back together with commas
+            new_content = &#39;, &#39;.join(f&#34;&#39;{item.strip()}&#39;&#34; for item in content)
+            # Replace the old content with the new content
+            s = &#39;[&#39; + new_content + &#39;]&#39;
+        return s
+
     def _retry_function(self, function, max_retries, backoff_num, *args):
         #Retry openai requests
         retries = 0
@@ -743,6 +753,7 @@ Users will typically use words like verify, check, make sure, or similar to refe
                 elif value.lower() == &#34;none&#34;:
                     value = None
                 if key == &#34;filter&#34;:
+                    value = self.process_string(value)
                     value = ast.literal_eval(value)
                 #store in dictionary
                 info_dict[key] = value
@@ -796,10 +807,10 @@ Users will typically use words like verify, check, make sure, or similar to refe
         for key, value in nodes.items():
             tags = value.get(&#39;tags&#39;, {})
             try:
-                os_value = tags.get(&#39;os&#39;, &#39;&#39;)
+                if os_value := tags.get(&#39;os&#39;):
+                    output_list.append(f&#34;{key}: {os_value}&#34;)
             except:
-                os_value = &#34;&#34;
-            output_list.append(f&#34;{key}: {os_value}&#34;)
+                pass
         output_str = &#34;\n&#34;.join(output_list)
         command_input = f&#34;input: {user_input}\n\nDevices:\n{output_str}&#34;
         message = []
@@ -978,6 +989,7 @@ Users will typically use words like verify, check, make sure, or similar to refe
                 output[&#34;args&#34;] = {}
                 output[&#34;args&#34;][&#34;commands&#34;] = commands[&#34;response&#34;][&#34;commands&#34;]
                 output[&#34;args&#34;][&#34;vars&#34;] = commands[&#34;response&#34;][&#34;variables&#34;]
+                output[&#34;nodes&#34;] = [item for item in output[&#34;nodes&#34;] if output[&#34;args&#34;][&#34;vars&#34;].get(item)]
                 if original[&#34;response&#34;].get(&#34;expected&#34;):
                     output[&#34;args&#34;][&#34;expected&#34;] = original[&#34;response&#34;][&#34;expected&#34;]
                     output[&#34;action&#34;] = &#34;test&#34;
@@ -1142,6 +1154,7 @@ Users will typically use words like verify, check, make sure, or similar to refe
             output[&#34;args&#34;] = {}
             output[&#34;args&#34;][&#34;commands&#34;] = commands[&#34;response&#34;][&#34;commands&#34;]
             output[&#34;args&#34;][&#34;vars&#34;] = commands[&#34;response&#34;][&#34;variables&#34;]
+            output[&#34;nodes&#34;] = [item for item in output[&#34;nodes&#34;] if output[&#34;args&#34;][&#34;vars&#34;].get(item)]
             if original[&#34;response&#34;].get(&#34;expected&#34;):
                 output[&#34;args&#34;][&#34;expected&#34;] = original[&#34;response&#34;][&#34;expected&#34;]
                 output[&#34;action&#34;] = &#34;test&#34;
@@ -1211,6 +1224,26 @@ Users will typically use words like verify, check, make sure, or similar to refe
     else:
         output = f&#34;{self.model} api is not responding right now, please try again later.&#34;
     return output</code></pre>
+</details>
+</dd>
+<dt id="connpy.ai.process_string"><code class="name flex">
+<span>def <span class="ident">process_string</span></span>(<span>self, s)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def process_string(self, s):
+    if s.startswith(&#39;[&#39;) and s.endswith(&#39;]&#39;) and not (s.startswith(&#34;[&#39;&#34;) and s.endswith(&#34;&#39;]&#34;)) and not (s.startswith(&#39;[&#34;&#39;) and s.endswith(&#39;&#34;]&#39;)):
+        # Extract the content inside square brackets and split by comma
+        content = s[1:-1].split(&#39;,&#39;)
+        # Add single quotes around each item and join them back together with commas
+        new_content = &#39;, &#39;.join(f&#34;&#39;{item.strip()}&#39;&#34; for item in content)
+        # Replace the old content with the new content
+        s = &#39;[&#39; + new_content + &#39;]&#39;
+    return s</code></pre>
 </details>
 </dd>
 </dl>
@@ -4369,6 +4402,7 @@ tasks:
 <ul class="">
 <li><code><a title="connpy.ai.ask" href="#connpy.ai.ask">ask</a></code></li>
 <li><code><a title="connpy.ai.confirm" href="#connpy.ai.confirm">confirm</a></code></li>
+<li><code><a title="connpy.ai.process_string" href="#connpy.ai.process_string">process_string</a></code></li>
 </ul>
 </li>
 <li>
