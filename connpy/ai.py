@@ -139,6 +139,16 @@ Users will typically use words like verify, check, make sure, or similar to refe
         self.model = model
         self.temp = temp
 
+    def process_string(self, s):
+        if s.startswith('[') and s.endswith(']') and not (s.startswith("['") and s.endswith("']")) and not (s.startswith('["') and s.endswith('"]')):
+            # Extract the content inside square brackets and split by comma
+            content = s[1:-1].split(',')
+            # Add single quotes around each item and join them back together with commas
+            new_content = ', '.join(f"'{item.strip()}'" for item in content)
+            # Replace the old content with the new content
+            s = '[' + new_content + ']'
+        return s
+
     def _retry_function(self, function, max_retries, backoff_num, *args):
         #Retry openai requests
         retries = 0
@@ -176,6 +186,7 @@ Users will typically use words like verify, check, make sure, or similar to refe
                 elif value.lower() == "none":
                     value = None
                 if key == "filter":
+                    value = self.process_string(value)
                     value = ast.literal_eval(value)
                 #store in dictionary
                 info_dict[key] = value
@@ -229,10 +240,10 @@ Users will typically use words like verify, check, make sure, or similar to refe
         for key, value in nodes.items():
             tags = value.get('tags', {})
             try:
-                os_value = tags.get('os', '')
+                if os_value := tags.get('os'):
+                    output_list.append(f"{key}: {os_value}")
             except:
-                os_value = ""
-            output_list.append(f"{key}: {os_value}")
+                pass
         output_str = "\n".join(output_list)
         command_input = f"input: {user_input}\n\nDevices:\n{output_str}"
         message = []
@@ -411,6 +422,7 @@ Users will typically use words like verify, check, make sure, or similar to refe
                 output["args"] = {}
                 output["args"]["commands"] = commands["response"]["commands"]
                 output["args"]["vars"] = commands["response"]["variables"]
+                output["nodes"] = [item for item in output["nodes"] if output["args"]["vars"].get(item)]
                 if original["response"].get("expected"):
                     output["args"]["expected"] = original["response"]["expected"]
                     output["action"] = "test"
