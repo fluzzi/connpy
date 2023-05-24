@@ -156,7 +156,7 @@ Users will typically use words like verify, check, make sure, or similar to refe
             try:
                 myfunction = function(*args)
                 break
-            except (openai.error.APIConnectionError, openai.error.RateLimitError):
+            except:
                 wait_time = backoff_num * (2 ** retries)
                 time.sleep(wait_time)
                 retries += 1
