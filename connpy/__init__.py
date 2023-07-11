@@ -42,6 +42,7 @@ Commands:
   run            Run scripts or commands on nodes
   config         Manage app config
   api            Start and stop connpy api
+  ai             Make request to an AI
 ```
 
 ###   Manage profiles

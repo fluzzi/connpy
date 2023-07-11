@@ -20,7 +20,7 @@ class ai:
 
         '''
 
-    def __init__(self, config, org = None, api_key = None, model = "gpt-3.5-turbo", temp = 0.7):
+    def __init__(self, config, org = None, api_key = None, model = None, temp = 0.7):
         ''' 
             
         ### Parameters:  
@@ -60,18 +60,25 @@ class ai:
                 openai.api_key = self.config.config["openai"]["api_key"]
             except:
                 raise ValueError("Missing openai api_key")
+        if model:
+            self.model = model
+        else:
+            try:
+                self.model = self.config.config["openai"]["model"]
+            except:
+                self.model = "gpt-3.5-turbo-0613"
+        self.temp = temp
         self.__prompt = {}
         self.__prompt["original_system"] = """
-            You are the AI assistant of a network connection manager and automation app called connpy. When provided with user input analyze the input and extract the following information:
+            You are the AI chatbot and assistant of a network connection manager and automation app called connpy. When provided with user input analyze the input and extract the following information. If user wants to chat just reply and don't call a function:
 
-            - app_related: True if the input is related to the application's purpose and the request is understood; False if the input is not related, not understood, or if mandatory information like filter is missing. If user ask information about the app it should be false 
             - type: Given a user input, identify the type of request they want to make. The input will represent one of two options: 
 
                 1. "command" - The user wants to get information from devices by running commands.
                 2. "list_nodes" - The user wants to get a list of nodes, devices, servers, or routers.
                 The 'type' field should reflect whether the user input is a command or a request for a list of nodes.
 
-            - filter: One or more regex patterns indicating the device or group of devices the command should be run on, returned as a Python list (e.g., ['hostname', 'hostname@folder', '@subfolder@folder']). The filter can have different formats, such as:
+            - filter: One or more regex patterns indicating the device or group of devices the command should be run on. The filter can have different formats, such as:
                 - hostname
                 - hostname@folder
                 - hostname@subfolder@folder
@@ -82,41 +89,46 @@ class ai:
 
                 The filter should be extracted from the user input exactly as it was provided.
                 Always preserve the exact filter pattern provided by the user, with no modifications. Do not process any regex, the application can do that.
-                If no filter is specified, set it to None.
 
-            - Expected: This field represents an expected output to search for when running the command. It's an optional value for the user.
-Set it to 'None' if no value was captured.
-The expected value should ALWAYS come from the user input explicitly.
-Users will typically use words like verify, check, make sure, or similar to refer to the expected value.
-
-            - response: An optional field to be filled when app_related is False or when providing an explanation related to the app. This is where you can engage in small talk, answer questions not related to the app, or provide explanations about the extracted information.
-            
-            Always respond in the following format:
-                
-                app_related: {{app_related}}
-                Type: {{command}}
-                Filter: {{filter}}
-                Expected: {{expected}}
-                Response: {{response}}
     """ 
         self.__prompt["original_user"] = "Get the IP addresses of loopback0 for all routers from w2az1 and e1.*(prod|dev) and check if they have the ip 192.168.1.1"
-        self.__prompt["original_assistant"] = "app_related: True\nType: Command\nFilter: ['w2az1', 'e1.*(prod|dev)']\nExpected: 192.168.1.1"
+        self.__prompt["original_assistant"] = {"name": "get_network_device_info", "arguments": "{\n  \"type\": \"command\",\n  \"filter\": [\"w2az1\",\"e1.*(prod|dev)\"]\n}"}
+        self.__prompt["original_function"] = {}
+        self.__prompt["original_function"]["name"] = "get_network_device_info"
+        self.__prompt["original_function"]["descriptions"] = "You are the AI chatbot and assistant of a network connection manager and automation app called connpy. When provided with user input analyze the input and extract the information acording to the function, If user wants to chat just reply and don't call a function",
+        self.__prompt["original_function"]["parameters"] = {}
+        self.__prompt["original_function"]["parameters"]["type"] = "object"
+        self.__prompt["original_function"]["parameters"]["properties"] = {}
+        self.__prompt["original_function"]["parameters"]["properties"]["type"] = {}
+        self.__prompt["original_function"]["parameters"]["properties"]["type"]["type"] = "string"
+        self.__prompt["original_function"]["parameters"]["properties"]["type"]["description"] ="""
+Categorize the user's request based on the operation they want to perform on the nodes. The requests can be classified into the following categories:
+
+    1. "command" - This represents a request to retrieve specific information or configurations from nodes. An example would be: "go to routers in @office and get the config".
+
+    2. "list_nodes" - This is when the user wants a list of nodes. An example could be: "get me the nodes in @office".
+"""
+        self.__prompt["original_function"]["parameters"]["properties"]["type"]["enum"] = ["command", "list_nodes"]
+        self.__prompt["original_function"]["parameters"]["properties"]["filter"] = {}
+        self.__prompt["original_function"]["parameters"]["properties"]["filter"]["type"] = "array"
+        self.__prompt["original_function"]["parameters"]["properties"]["filter"]["items"] = {}
+        self.__prompt["original_function"]["parameters"]["properties"]["filter"]["items"]["type"] = "string"
+        self.__prompt["original_function"]["parameters"]["properties"]["filter"]["items"]["description"] = """One or more regex patterns indicating the device or group of devices the command should be run on.  The filter should be extracted from the user input exactly as it was provided. 
+                The filter can have different formats, such as:
+                - hostname
+                - hostname@folder
+                - hostname@subfolder@folder
+                - partofhostname
+                - @folder
+                - @subfolder@folder
+                - regex_pattern
+                """
+        self.__prompt["original_function"]["parameters"]["required"] = ["type", "filter"]
         self.__prompt["command_system"] = """
-        For each device listed below, provide the command(s) needed to perform the specified action, depending on the device OS (e.g., Cisco IOSXR router, Linux server). Always format your response as a Python list (e.g., ['command1', 'command2']). 
-
+        For each device listed below, provide the command(s) needed to perform the specified action, depending on the device OS (e.g., Cisco IOSXR router, Linux server).
         The application knows how to connect to devices via SSH, so you only need to provide the command(s) to run after connecting. 
-
         If the commands needed are not for the specific OS type, just send an empty list (e.g., []). 
-
-        It is crucial to always include the device name provided in your response, even when there is only one device.
-
         Note: Preserving the integrity of user-provided commands is of utmost importance. If a user has provided a specific command to run, include that command exactly as it was given, even if it's not recognized or understood. Under no circumstances should you modify or alter user-provided commands.
-
-        Your response has to be always like this:
-            node1: ["command1", "command2"]
-            node2: ["command1", "command2", "command3"]
-            node1@folder: ["command1"]
-            Node4@subfolder@folder: []
     """
         self.__prompt["command_user"]= """
     input: show me the full configuration for all this devices:
@@ -124,20 +136,44 @@ Users will typically use words like verify, check, make sure, or similar to refe
     Devices:
     router1: cisco ios
     """
-        self.__prompt["command_assistant"]= """
-    router1: ['show running-config']
+        self.__prompt["command_assistant"] = {"name": "get_commands", "arguments": "{\n  \"router1\": \"show running-configuration\"\n}"}
+        self.__prompt["command_function"] = {}
+        self.__prompt["command_function"]["name"] = "get_commands"
+        self.__prompt["command_function"]["descriptions"] = """ 
+        For each device listed below, provide the command(s) needed to perform the specified action, depending on the device OS (e.g., Cisco IOSXR router, Linux server).
+        The application knows how to connect to devices via SSH, so you only need to provide the command(s) to run after connecting. 
+        If the commands needed are not for the specific OS type, just send an empty list (e.g., []). 
     """
+        self.__prompt["command_function"]["parameters"] = {}
+        self.__prompt["command_function"]["parameters"]["type"] = "object"
+        self.__prompt["command_function"]["parameters"]["properties"] = {}
         self.__prompt["confirmation_system"] = """
         Please analyze the user's input and categorize it as either an affirmation or negation. Based on this analysis, respond with:
 
-            'True' if the input is an affirmation like 'do it', 'go ahead', 'sure', etc.
-            'False' if the input is a negation.
-            If the input does not fit into either of these categories, kindly express that you didn't understand and request the user to rephrase their response.
+            'true' if the input is an affirmation like 'do it', 'go ahead', 'sure', etc.
+            'false' if the input is a negation.
+            'none' If the input does not fit into either of these categories.
             """
         self.__prompt["confirmation_user"] = "Yes go ahead!"
         self.__prompt["confirmation_assistant"] = "True"
-        self.model = model
-        self.temp = temp
+        self.__prompt["confirmation_function"] = {}
+        self.__prompt["confirmation_function"]["name"] = "get_confirmation"
+        self.__prompt["confirmation_function"]["descriptions"] = """ 
+        Analize user request and respond:
+    """
+        self.__prompt["confirmation_function"]["parameters"] = {}
+        self.__prompt["confirmation_function"]["parameters"]["type"] = "object"
+        self.__prompt["confirmation_function"]["parameters"]["properties"] = {}
+        self.__prompt["confirmation_function"]["parameters"]["properties"]["result"] = {}
+        self.__prompt["confirmation_function"]["parameters"]["properties"]["result"]["description"] = """'true' if the input is an affirmation like 'do it', 'go ahead', 'sure', etc.
+'false' if the input is a negation.
+'none' If the input does not fit into either of these categories"""
+        self.__prompt["confirmation_function"]["parameters"]["properties"]["result"]["type"] = "string"
+        self.__prompt["confirmation_function"]["parameters"]["properties"]["result"]["enum"] = ["true", "false", "none"]
+        self.__prompt["confirmation_function"]["parameters"]["properties"]["response"] = {}
+        self.__prompt["confirmation_function"]["parameters"]["properties"]["response"]["description"] = "If the user don't message is not an affiramtion or negation, kindly ask the user to rephrase."
+        self.__prompt["confirmation_function"]["parameters"]["properties"]["response"]["type"] = "string"
+        self.__prompt["confirmation_function"]["parameters"]["required"] = ["result"]
 
     def process_string(self, s):
         if s.startswith('[') and s.endswith(']') and not (s.startswith("['") and s.endswith("']")) and not (s.startswith('["') and s.endswith('"]')):
@@ -165,83 +201,37 @@ Users will typically use words like verify, check, make sure, or similar to refe
             myfunction = False
         return myfunction
 
-    def _clean_original_response(self, raw_response):
-        #Parse response for first request to openAI GPT.
-        info_dict = {}
-        info_dict["app_related"] = False
-        current_key = "response"
-        for line in raw_response.split("\n"):
-            if line.strip() == "":
-                line = "\n"
-            possible_keys = ["app_related", "type", "filter", "expected", "response"]
-            if ':' in line and (key := line.split(':', 1)[0].strip().lower()) in possible_keys:
-                key, value = line.split(":", 1)
-                key = key.strip().lower()
-                value = value.strip()
-                # Convert "true" or "false" (case-insensitive) to Python boolean
-                if value.lower() == "true":
-                    value = True
-                elif value.lower() == "false":
-                    value = False
-                elif value.lower() == "none":
-                    value = None
-                if key == "filter":
-                    value = self.process_string(value)
-                    value = ast.literal_eval(value)
-                #store in dictionary
-                info_dict[key] = value
-                current_key = key
-            else:
-                if current_key == "response":
-                    if "response" in info_dict:
-                        info_dict[current_key] += "\n" + line
-                    else:
-                        info_dict[current_key] = line
-
-        return info_dict
-
     def _clean_command_response(self, raw_response):
         #Parse response for command request to openAI GPT.
         info_dict = {}
         info_dict["commands"] = []
         info_dict["variables"] = {}
         info_dict["variables"]["__global__"] = {}
-        for line in raw_response.split("\n"):
-            if ":" in line:
-                key, value = line.split(":", 1)
-                key = key.strip()
-                newvalue = {}
-                pattern = r'\[.*?\]'
-                match = re.search(pattern, value.strip())
-                try:
-                    value = ast.literal_eval(match.group(0))
-                    for i,e in enumerate(value, start=1):
-                        newvalue[f"command{i}"] = e
-                        if f"{{command{i}}}" not in info_dict["commands"]:
-                            info_dict["commands"].append(f"{{command{i}}}")
-                            info_dict["variables"]["__global__"][f"command{i}"] = ""
-                    info_dict["variables"][key] = newvalue
-                except:
-                    pass
+        for key, value in raw_response.items():
+            key = key.strip()
+            newvalue = {}
+            for i,e in enumerate(value, start=1):
+                newvalue[f"command{i}"] = e
+                if f"{{command{i}}}" not in info_dict["commands"]:
+                    info_dict["commands"].append(f"{{command{i}}}")
+                    info_dict["variables"]["__global__"][f"command{i}"] = ""
+                info_dict["variables"][key] = newvalue
         return info_dict
-
-    def _clean_confirmation_response(self, raw_response):
-        #Parse response for confirmation request to openAI GPT.
-        value = raw_response.strip()
-        if value.strip(".").lower() == "true":
-            value = True
-        elif value.strip(".").lower() == "false":
-            value = False
-        return value
 
     def _get_commands(self, user_input, nodes):
         #Send the request for commands for each device to openAI GPT.
         output_list = []
+        command_function = deepcopy(self.__prompt["command_function"])
         for key, value in nodes.items():
             tags = value.get('tags', {})
             try:
                 if os_value := tags.get('os'):
                     output_list.append(f"{key}: {os_value}")
+                    command_function["parameters"]["properties"][key] = {}
+                    command_function["parameters"]["properties"][key]["type"] = "array"
+                    command_function["parameters"]["properties"][key]["description"] = f"OS: {os_value}"
+                    command_function["parameters"]["properties"][key]["items"] = {}
+                    command_function["parameters"]["properties"][key]["items"]["type"] = "string" 
             except:
                 pass
         output_str = "\n".join(output_list)
@@ -249,17 +239,20 @@ Users will typically use words like verify, check, make sure, or similar to refe
         message = []
         message.append({"role": "system", "content": dedent(self.__prompt["command_system"]).strip()})
         message.append({"role": "user", "content": dedent(self.__prompt["command_user"]).strip()})
-        message.append({"role": "assistant", "content": dedent(self.__prompt["command_assistant"]).strip()})
+        message.append({"role": "assistant", "content": None, "function_call": self.__prompt["command_assistant"]})
         message.append({"role": "user", "content": command_input})
+        functions = [command_function]
         response = openai.ChatCompletion.create(
             model=self.model,
             messages=message,
+            functions=functions,
+            function_call={"name": "get_commands"},
             temperature=self.temp
             )
         output = {}
-        output["dict_response"] = response
-        output["raw_response"] = response["choices"][0]["message"]["content"] 
-        output["response"] = self._clean_command_response(output["raw_response"])
+        result = response["choices"][0]["message"].to_dict()
+        json_result = json.loads(result["function_call"]["arguments"])
+        output["response"] = self._clean_command_response(json_result)
         return output
 
     def _get_filter(self, user_input, chat_history = None):
@@ -267,7 +260,8 @@ Users will typically use words like verify, check, make sure, or similar to refe
         message = []
         message.append({"role": "system", "content": dedent(self.__prompt["original_system"]).strip()})
         message.append({"role": "user", "content": dedent(self.__prompt["original_user"]).strip()})
-        message.append({"role": "assistant", "content": dedent(self.__prompt["original_assistant"]).strip()})
+        message.append({"role": "assistant", "content": None, "function_call": self.__prompt["original_assistant"]})
+        functions = [self.__prompt["original_function"]]
         if not chat_history:
             chat_history = []
         chat_history.append({"role": "user", "content": user_input})
@@ -275,36 +269,55 @@ Users will typically use words like verify, check, make sure, or similar to refe
         response = openai.ChatCompletion.create(
             model=self.model,
             messages=message,
+            functions=functions,
+            function_call="auto",
             temperature=self.temp,
             top_p=1
             )
 
+        def extract_quoted_strings(text):
+            pattern = r'["\'](.*?)["\']'
+            matches = re.findall(pattern, text)
+            return matches
+        expected = extract_quoted_strings(user_input)
         output = {}
-        output["dict_response"] = response
-        output["raw_response"] = response["choices"][0]["message"]["content"] 
-        chat_history.append({"role": "assistant", "content": output["raw_response"]})
+        result = response["choices"][0]["message"].to_dict()
+        if result["content"]:
+            output["app_related"] = False
+            chat_history.append({"role": "assistant", "content": result["content"]})
+            output["response"] = result["content"]
+        else:
+            json_result = json.loads(result["function_call"]["arguments"])
+            output["app_related"] = True
+            output["filter"] = json_result["filter"]
+            output["type"] = json_result["type"]
+            chat_history.append({"role": "assistant", "content": result["content"], "function_call": {"name": result["function_call"]["name"], "arguments": json.dumps(json_result)}})
+        output["expected"] = expected
         output["chat_history"] = chat_history
-        clear_response = self._clean_original_response(output["raw_response"])
-        output["response"] = self._clean_original_response(output["raw_response"])
         return output
         
     def _get_confirmation(self, user_input):
         #Send the request to identify if user is confirming or denying the task
         message = []
-        message.append({"role": "system", "content": dedent(self.__prompt["confirmation_system"]).strip()})
-        message.append({"role": "user", "content": dedent(self.__prompt["confirmation_user"]).strip()})
-        message.append({"role": "assistant", "content": dedent(self.__prompt["confirmation_assistant"]).strip()})
         message.append({"role": "user", "content": user_input})
+        functions = [self.__prompt["confirmation_function"]]
         response = openai.ChatCompletion.create(
             model=self.model,
             messages=message,
+            functions=functions,
+            function_call={"name": "get_confirmation"},
             temperature=self.temp,
             top_p=1
             )
+        result = response["choices"][0]["message"].to_dict()
+        json_result = json.loads(result["function_call"]["arguments"])
         output = {}
-        output["dict_response"] = response
-        output["raw_response"] = response["choices"][0]["message"]["content"] 
-        output["response"] = self._clean_confirmation_response(output["raw_response"])
+        if json_result["result"] == "true":
+            output["result"] = True
+        elif json_result["result"] == "false":
+            output["result"] = False
+        elif json_result["result"] == "none":
+            output["result"] = json_result["response"]
         return output
 
     def confirm(self, user_input, max_retries=3, backoff_num=1):
@@ -327,7 +340,7 @@ Users will typically use words like verify, check, make sure, or similar to refe
         '''
         result = self._retry_function(self._get_confirmation, max_retries, backoff_num, user_input)
         if result:
-            output = result["response"]
+            output = result["result"]
         else:
             output = f"{self.model} api is not responding right now, please try again later."
         return output
@@ -389,14 +402,14 @@ Users will typically use words like verify, check, make sure, or similar to refe
             output["app_related"] = False
             output["response"] = f"{self.model} api is not responding right now, please try again later."
             return output
-        output["app_related"] = original["response"]["app_related"]
+        output["app_related"] = original["app_related"]
         output["chat_history"] = original["chat_history"]
         if not output["app_related"]:
-            output["response"] = original["response"]["response"]
+            output["response"] = original["response"]
         else:
-            type = original["response"]["type"].lower()
-            if "filter" in original["response"]:
-                output["filter"] = original["response"]["filter"]
+            type = original["type"]
+            if "filter" in original:
+                output["filter"] = original["filter"]
                 if not self.config.config["case"]:
                     if isinstance(output["filter"], list):
                         output["filter"] = [item.lower() for item in output["filter"]]
@@ -423,8 +436,8 @@ Users will typically use words like verify, check, make sure, or similar to refe
                 output["args"]["commands"] = commands["response"]["commands"]
                 output["args"]["vars"] = commands["response"]["variables"]
                 output["nodes"] = [item for item in output["nodes"] if output["args"]["vars"].get(item)]
-                if original["response"].get("expected"):
-                    output["args"]["expected"] = original["response"]["expected"]
+                if original.get("expected"):
+                    output["args"]["expected"] = original["expected"]
                     output["action"] = "test"
                 else:
                     output["action"] = "run"
