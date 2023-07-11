@@ -61,6 +61,7 @@ Commands:
   run            Run scripts or commands on nodes
   config         Manage app config
   api            Start and stop connpy api
+  ai             Make request to an AI
 </code></pre>
 <h3 id="manage-profiles">Manage profiles</h3>
 <pre><code>usage: conn profile [-h] (--add | --del | --mod | --show) profile
@@ -292,6 +293,7 @@ Commands:
   run            Run scripts or commands on nodes
   config         Manage app config
   api            Start and stop connpy api
+  ai             Make request to an AI
 ```
 
 ###   Manage profiles
@@ -541,7 +543,7 @@ __pdoc__ = {
 <dl>
 <dt id="connpy.ai"><code class="flex name class">
 <span>class <span class="ident">ai</span></span>
-<span>(</span><span>config, org=None, api_key=None, model='gpt-3.5-turbo', temp=0.7)</span>
+<span>(</span><span>config, org=None, api_key=None, model=None, temp=0.7)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>This class generates a ai object. Containts all the information and methods to make requests to openAI chatGPT to run actions on the application.</p>
@@ -587,7 +589,7 @@ __pdoc__ = {
 
         &#39;&#39;&#39;
 
-    def __init__(self, config, org = None, api_key = None, model = &#34;gpt-3.5-turbo&#34;, temp = 0.7):
+    def __init__(self, config, org = None, api_key = None, model = None, temp = 0.7):
         &#39;&#39;&#39; 
             
         ### Parameters:  
@@ -627,18 +629,25 @@ __pdoc__ = {
                 openai.api_key = self.config.config[&#34;openai&#34;][&#34;api_key&#34;]
             except:
                 raise ValueError(&#34;Missing openai api_key&#34;)
+        if model:
+            self.model = model
+        else:
+            try:
+                self.model = self.config.config[&#34;openai&#34;][&#34;model&#34;]
+            except:
+                self.model = &#34;gpt-3.5-turbo-0613&#34;
+        self.temp = temp
         self.__prompt = {}
         self.__prompt[&#34;original_system&#34;] = &#34;&#34;&#34;
-            You are the AI assistant of a network connection manager and automation app called connpy. When provided with user input analyze the input and extract the following information:
+            You are the AI chatbot and assistant of a network connection manager and automation app called connpy. When provided with user input analyze the input and extract the following information. If user wants to chat just reply and don&#39;t call a function:
 
-            - app_related: True if the input is related to the application&#39;s purpose and the request is understood; False if the input is not related, not understood, or if mandatory information like filter is missing. If user ask information about the app it should be false 
             - type: Given a user input, identify the type of request they want to make. The input will represent one of two options: 
 
                 1. &#34;command&#34; - The user wants to get information from devices by running commands.
                 2. &#34;list_nodes&#34; - The user wants to get a list of nodes, devices, servers, or routers.
                 The &#39;type&#39; field should reflect whether the user input is a command or a request for a list of nodes.
 
-            - filter: One or more regex patterns indicating the device or group of devices the command should be run on, returned as a Python list (e.g., [&#39;hostname&#39;, &#39;hostname@folder&#39;, &#39;@subfolder@folder&#39;]). The filter can have different formats, such as:
+            - filter: One or more regex patterns indicating the device or group of devices the command should be run on. The filter can have different formats, such as:
                 - hostname
                 - hostname@folder
                 - hostname@subfolder@folder
@@ -649,41 +658,46 @@ __pdoc__ = {
 
                 The filter should be extracted from the user input exactly as it was provided.
                 Always preserve the exact filter pattern provided by the user, with no modifications. Do not process any regex, the application can do that.
-                If no filter is specified, set it to None.
 
-            - Expected: This field represents an expected output to search for when running the command. It&#39;s an optional value for the user.
-Set it to &#39;None&#39; if no value was captured.
-The expected value should ALWAYS come from the user input explicitly.
-Users will typically use words like verify, check, make sure, or similar to refer to the expected value.
-
-            - response: An optional field to be filled when app_related is False or when providing an explanation related to the app. This is where you can engage in small talk, answer questions not related to the app, or provide explanations about the extracted information.
-            
-            Always respond in the following format:
-                
-                app_related: {{app_related}}
-                Type: {{command}}
-                Filter: {{filter}}
-                Expected: {{expected}}
-                Response: {{response}}
     &#34;&#34;&#34; 
         self.__prompt[&#34;original_user&#34;] = &#34;Get the IP addresses of loopback0 for all routers from w2az1 and e1.*(prod|dev) and check if they have the ip 192.168.1.1&#34;
-        self.__prompt[&#34;original_assistant&#34;] = &#34;app_related: True\nType: Command\nFilter: [&#39;w2az1&#39;, &#39;e1.*(prod|dev)&#39;]\nExpected: 192.168.1.1&#34;
+        self.__prompt[&#34;original_assistant&#34;] = {&#34;name&#34;: &#34;get_network_device_info&#34;, &#34;arguments&#34;: &#34;{\n  \&#34;type\&#34;: \&#34;command\&#34;,\n  \&#34;filter\&#34;: [\&#34;w2az1\&#34;,\&#34;e1.*(prod|dev)\&#34;]\n}&#34;}
+        self.__prompt[&#34;original_function&#34;] = {}
+        self.__prompt[&#34;original_function&#34;][&#34;name&#34;] = &#34;get_network_device_info&#34;
+        self.__prompt[&#34;original_function&#34;][&#34;descriptions&#34;] = &#34;You are the AI chatbot and assistant of a network connection manager and automation app called connpy. When provided with user input analyze the input and extract the information acording to the function, If user wants to chat just reply and don&#39;t call a function&#34;,
+        self.__prompt[&#34;original_function&#34;][&#34;parameters&#34;] = {}
+        self.__prompt[&#34;original_function&#34;][&#34;parameters&#34;][&#34;type&#34;] = &#34;object&#34;
+        self.__prompt[&#34;original_function&#34;][&#34;parameters&#34;][&#34;properties&#34;] = {}
+        self.__prompt[&#34;original_function&#34;][&#34;parameters&#34;][&#34;properties&#34;][&#34;type&#34;] = {}
+        self.__prompt[&#34;original_function&#34;][&#34;parameters&#34;][&#34;properties&#34;][&#34;type&#34;][&#34;type&#34;] = &#34;string&#34;
+        self.__prompt[&#34;original_function&#34;][&#34;parameters&#34;][&#34;properties&#34;][&#34;type&#34;][&#34;description&#34;] =&#34;&#34;&#34;
+Categorize the user&#39;s request based on the operation they want to perform on the nodes. The requests can be classified into the following categories:
+
+    1. &#34;command&#34; - This represents a request to retrieve specific information or configurations from nodes. An example would be: &#34;go to routers in @office and get the config&#34;.
+
+    2. &#34;list_nodes&#34; - This is when the user wants a list of nodes. An example could be: &#34;get me the nodes in @office&#34;.
+&#34;&#34;&#34;
+        self.__prompt[&#34;original_function&#34;][&#34;parameters&#34;][&#34;properties&#34;][&#34;type&#34;][&#34;enum&#34;] = [&#34;command&#34;, &#34;list_nodes&#34;]
+        self.__prompt[&#34;original_function&#34;][&#34;parameters&#34;][&#34;properties&#34;][&#34;filter&#34;] = {}
+        self.__prompt[&#34;original_function&#34;][&#34;parameters&#34;][&#34;properties&#34;][&#34;filter&#34;][&#34;type&#34;] = &#34;array&#34;
+        self.__prompt[&#34;original_function&#34;][&#34;parameters&#34;][&#34;properties&#34;][&#34;filter&#34;][&#34;items&#34;] = {}
+        self.__prompt[&#34;original_function&#34;][&#34;parameters&#34;][&#34;properties&#34;][&#34;filter&#34;][&#34;items&#34;][&#34;type&#34;] = &#34;string&#34;
+        self.__prompt[&#34;original_function&#34;][&#34;parameters&#34;][&#34;properties&#34;][&#34;filter&#34;][&#34;items&#34;][&#34;description&#34;] = &#34;&#34;&#34;One or more regex patterns indicating the device or group of devices the command should be run on.  The filter should be extracted from the user input exactly as it was provided. 
+                The filter can have different formats, such as:
+                - hostname
+                - hostname@folder
+                - hostname@subfolder@folder
+                - partofhostname
+                - @folder
+                - @subfolder@folder
+                - regex_pattern
+                &#34;&#34;&#34;
+        self.__prompt[&#34;original_function&#34;][&#34;parameters&#34;][&#34;required&#34;] = [&#34;type&#34;, &#34;filter&#34;]
         self.__prompt[&#34;command_system&#34;] = &#34;&#34;&#34;
-        For each device listed below, provide the command(s) needed to perform the specified action, depending on the device OS (e.g., Cisco IOSXR router, Linux server). Always format your response as a Python list (e.g., [&#39;command1&#39;, &#39;command2&#39;]). 
-
+        For each device listed below, provide the command(s) needed to perform the specified action, depending on the device OS (e.g., Cisco IOSXR router, Linux server).
         The application knows how to connect to devices via SSH, so you only need to provide the command(s) to run after connecting. 
-
         If the commands needed are not for the specific OS type, just send an empty list (e.g., []). 
-
-        It is crucial to always include the device name provided in your response, even when there is only one device.
-
         Note: Preserving the integrity of user-provided commands is of utmost importance. If a user has provided a specific command to run, include that command exactly as it was given, even if it&#39;s not recognized or understood. Under no circumstances should you modify or alter user-provided commands.
-
-        Your response has to be always like this:
-            node1: [&#34;command1&#34;, &#34;command2&#34;]
-            node2: [&#34;command1&#34;, &#34;command2&#34;, &#34;command3&#34;]
-            node1@folder: [&#34;command1&#34;]
-            Node4@subfolder@folder: []
     &#34;&#34;&#34;
         self.__prompt[&#34;command_user&#34;]= &#34;&#34;&#34;
     input: show me the full configuration for all this devices:
@@ -691,20 +705,44 @@ Users will typically use words like verify, check, make sure, or similar to refe
     Devices:
     router1: cisco ios
     &#34;&#34;&#34;
-        self.__prompt[&#34;command_assistant&#34;]= &#34;&#34;&#34;
-    router1: [&#39;show running-config&#39;]
+        self.__prompt[&#34;command_assistant&#34;] = {&#34;name&#34;: &#34;get_commands&#34;, &#34;arguments&#34;: &#34;{\n  \&#34;router1\&#34;: \&#34;show running-configuration\&#34;\n}&#34;}
+        self.__prompt[&#34;command_function&#34;] = {}
+        self.__prompt[&#34;command_function&#34;][&#34;name&#34;] = &#34;get_commands&#34;
+        self.__prompt[&#34;command_function&#34;][&#34;descriptions&#34;] = &#34;&#34;&#34; 
+        For each device listed below, provide the command(s) needed to perform the specified action, depending on the device OS (e.g., Cisco IOSXR router, Linux server).
+        The application knows how to connect to devices via SSH, so you only need to provide the command(s) to run after connecting. 
+        If the commands needed are not for the specific OS type, just send an empty list (e.g., []). 
     &#34;&#34;&#34;
+        self.__prompt[&#34;command_function&#34;][&#34;parameters&#34;] = {}
+        self.__prompt[&#34;command_function&#34;][&#34;parameters&#34;][&#34;type&#34;] = &#34;object&#34;
+        self.__prompt[&#34;command_function&#34;][&#34;parameters&#34;][&#34;properties&#34;] = {}
         self.__prompt[&#34;confirmation_system&#34;] = &#34;&#34;&#34;
         Please analyze the user&#39;s input and categorize it as either an affirmation or negation. Based on this analysis, respond with:
 
-            &#39;True&#39; if the input is an affirmation like &#39;do it&#39;, &#39;go ahead&#39;, &#39;sure&#39;, etc.
-            &#39;False&#39; if the input is a negation.
-            If the input does not fit into either of these categories, kindly express that you didn&#39;t understand and request the user to rephrase their response.
+            &#39;true&#39; if the input is an affirmation like &#39;do it&#39;, &#39;go ahead&#39;, &#39;sure&#39;, etc.
+            &#39;false&#39; if the input is a negation.
+            &#39;none&#39; If the input does not fit into either of these categories.
             &#34;&#34;&#34;
         self.__prompt[&#34;confirmation_user&#34;] = &#34;Yes go ahead!&#34;
         self.__prompt[&#34;confirmation_assistant&#34;] = &#34;True&#34;
-        self.model = model
-        self.temp = temp
+        self.__prompt[&#34;confirmation_function&#34;] = {}
+        self.__prompt[&#34;confirmation_function&#34;][&#34;name&#34;] = &#34;get_confirmation&#34;
+        self.__prompt[&#34;confirmation_function&#34;][&#34;descriptions&#34;] = &#34;&#34;&#34; 
+        Analize user request and respond:
+    &#34;&#34;&#34;
+        self.__prompt[&#34;confirmation_function&#34;][&#34;parameters&#34;] = {}
+        self.__prompt[&#34;confirmation_function&#34;][&#34;parameters&#34;][&#34;type&#34;] = &#34;object&#34;
+        self.__prompt[&#34;confirmation_function&#34;][&#34;parameters&#34;][&#34;properties&#34;] = {}
+        self.__prompt[&#34;confirmation_function&#34;][&#34;parameters&#34;][&#34;properties&#34;][&#34;result&#34;] = {}
+        self.__prompt[&#34;confirmation_function&#34;][&#34;parameters&#34;][&#34;properties&#34;][&#34;result&#34;][&#34;description&#34;] = &#34;&#34;&#34;&#39;true&#39; if the input is an affirmation like &#39;do it&#39;, &#39;go ahead&#39;, &#39;sure&#39;, etc.
+&#39;false&#39; if the input is a negation.
+&#39;none&#39; If the input does not fit into either of these categories&#34;&#34;&#34;
+        self.__prompt[&#34;confirmation_function&#34;][&#34;parameters&#34;][&#34;properties&#34;][&#34;result&#34;][&#34;type&#34;] = &#34;string&#34;
+        self.__prompt[&#34;confirmation_function&#34;][&#34;parameters&#34;][&#34;properties&#34;][&#34;result&#34;][&#34;enum&#34;] = [&#34;true&#34;, &#34;false&#34;, &#34;none&#34;]
+        self.__prompt[&#34;confirmation_function&#34;][&#34;parameters&#34;][&#34;properties&#34;][&#34;response&#34;] = {}
+        self.__prompt[&#34;confirmation_function&#34;][&#34;parameters&#34;][&#34;properties&#34;][&#34;response&#34;][&#34;description&#34;] = &#34;If the user don&#39;t message is not an affiramtion or negation, kindly ask the user to rephrase.&#34;
+        self.__prompt[&#34;confirmation_function&#34;][&#34;parameters&#34;][&#34;properties&#34;][&#34;response&#34;][&#34;type&#34;] = &#34;string&#34;
+        self.__prompt[&#34;confirmation_function&#34;][&#34;parameters&#34;][&#34;required&#34;] = [&#34;result&#34;]
 
     def process_string(self, s):
         if s.startswith(&#39;[&#39;) and s.endswith(&#39;]&#39;) and not (s.startswith(&#34;[&#39;&#34;) and s.endswith(&#34;&#39;]&#34;)) and not (s.startswith(&#39;[&#34;&#39;) and s.endswith(&#39;&#34;]&#39;)):
@@ -732,83 +770,37 @@ Users will typically use words like verify, check, make sure, or similar to refe
             myfunction = False
         return myfunction
 
-    def _clean_original_response(self, raw_response):
-        #Parse response for first request to openAI GPT.
-        info_dict = {}
-        info_dict[&#34;app_related&#34;] = False
-        current_key = &#34;response&#34;
-        for line in raw_response.split(&#34;\n&#34;):
-            if line.strip() == &#34;&#34;:
-                line = &#34;\n&#34;
-            possible_keys = [&#34;app_related&#34;, &#34;type&#34;, &#34;filter&#34;, &#34;expected&#34;, &#34;response&#34;]
-            if &#39;:&#39; in line and (key := line.split(&#39;:&#39;, 1)[0].strip().lower()) in possible_keys:
-                key, value = line.split(&#34;:&#34;, 1)
-                key = key.strip().lower()
-                value = value.strip()
-                # Convert &#34;true&#34; or &#34;false&#34; (case-insensitive) to Python boolean
-                if value.lower() == &#34;true&#34;:
-                    value = True
-                elif value.lower() == &#34;false&#34;:
-                    value = False
-                elif value.lower() == &#34;none&#34;:
-                    value = None
-                if key == &#34;filter&#34;:
-                    value = self.process_string(value)
-                    value = ast.literal_eval(value)
-                #store in dictionary
-                info_dict[key] = value
-                current_key = key
-            else:
-                if current_key == &#34;response&#34;:
-                    if &#34;response&#34; in info_dict:
-                        info_dict[current_key] += &#34;\n&#34; + line
-                    else:
-                        info_dict[current_key] = line
-
-        return info_dict
-
     def _clean_command_response(self, raw_response):
         #Parse response for command request to openAI GPT.
         info_dict = {}
         info_dict[&#34;commands&#34;] = []
         info_dict[&#34;variables&#34;] = {}
         info_dict[&#34;variables&#34;][&#34;__global__&#34;] = {}
-        for line in raw_response.split(&#34;\n&#34;):
-            if &#34;:&#34; in line:
-                key, value = line.split(&#34;:&#34;, 1)
-                key = key.strip()
-                newvalue = {}
-                pattern = r&#39;\[.*?\]&#39;
-                match = re.search(pattern, value.strip())
-                try:
-                    value = ast.literal_eval(match.group(0))
-                    for i,e in enumerate(value, start=1):
-                        newvalue[f&#34;command{i}&#34;] = e
-                        if f&#34;{{command{i}}}&#34; not in info_dict[&#34;commands&#34;]:
-                            info_dict[&#34;commands&#34;].append(f&#34;{{command{i}}}&#34;)
-                            info_dict[&#34;variables&#34;][&#34;__global__&#34;][f&#34;command{i}&#34;] = &#34;&#34;
-                    info_dict[&#34;variables&#34;][key] = newvalue
-                except:
-                    pass
+        for key, value in raw_response.items():
+            key = key.strip()
+            newvalue = {}
+            for i,e in enumerate(value, start=1):
+                newvalue[f&#34;command{i}&#34;] = e
+                if f&#34;{{command{i}}}&#34; not in info_dict[&#34;commands&#34;]:
+                    info_dict[&#34;commands&#34;].append(f&#34;{{command{i}}}&#34;)
+                    info_dict[&#34;variables&#34;][&#34;__global__&#34;][f&#34;command{i}&#34;] = &#34;&#34;
+                info_dict[&#34;variables&#34;][key] = newvalue
         return info_dict
-
-    def _clean_confirmation_response(self, raw_response):
-        #Parse response for confirmation request to openAI GPT.
-        value = raw_response.strip()
-        if value.strip(&#34;.&#34;).lower() == &#34;true&#34;:
-            value = True
-        elif value.strip(&#34;.&#34;).lower() == &#34;false&#34;:
-            value = False
-        return value
 
     def _get_commands(self, user_input, nodes):
         #Send the request for commands for each device to openAI GPT.
         output_list = []
+        command_function = deepcopy(self.__prompt[&#34;command_function&#34;])
         for key, value in nodes.items():
             tags = value.get(&#39;tags&#39;, {})
             try:
                 if os_value := tags.get(&#39;os&#39;):
                     output_list.append(f&#34;{key}: {os_value}&#34;)
+                    command_function[&#34;parameters&#34;][&#34;properties&#34;][key] = {}
+                    command_function[&#34;parameters&#34;][&#34;properties&#34;][key][&#34;type&#34;] = &#34;array&#34;
+                    command_function[&#34;parameters&#34;][&#34;properties&#34;][key][&#34;description&#34;] = f&#34;OS: {os_value}&#34;
+                    command_function[&#34;parameters&#34;][&#34;properties&#34;][key][&#34;items&#34;] = {}
+                    command_function[&#34;parameters&#34;][&#34;properties&#34;][key][&#34;items&#34;][&#34;type&#34;] = &#34;string&#34; 
             except:
                 pass
         output_str = &#34;\n&#34;.join(output_list)
@@ -816,17 +808,20 @@ Users will typically use words like verify, check, make sure, or similar to refe
         message = []
         message.append({&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: dedent(self.__prompt[&#34;command_system&#34;]).strip()})
         message.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: dedent(self.__prompt[&#34;command_user&#34;]).strip()})
-        message.append({&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: dedent(self.__prompt[&#34;command_assistant&#34;]).strip()})
+        message.append({&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: None, &#34;function_call&#34;: self.__prompt[&#34;command_assistant&#34;]})
         message.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: command_input})
+        functions = [command_function]
         response = openai.ChatCompletion.create(
             model=self.model,
             messages=message,
+            functions=functions,
+            function_call={&#34;name&#34;: &#34;get_commands&#34;},
             temperature=self.temp
             )
         output = {}
-        output[&#34;dict_response&#34;] = response
-        output[&#34;raw_response&#34;] = response[&#34;choices&#34;][0][&#34;message&#34;][&#34;content&#34;] 
-        output[&#34;response&#34;] = self._clean_command_response(output[&#34;raw_response&#34;])
+        result = response[&#34;choices&#34;][0][&#34;message&#34;].to_dict()
+        json_result = json.loads(result[&#34;function_call&#34;][&#34;arguments&#34;])
+        output[&#34;response&#34;] = self._clean_command_response(json_result)
         return output
 
     def _get_filter(self, user_input, chat_history = None):
@@ -834,7 +829,8 @@ Users will typically use words like verify, check, make sure, or similar to refe
         message = []
         message.append({&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: dedent(self.__prompt[&#34;original_system&#34;]).strip()})
         message.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: dedent(self.__prompt[&#34;original_user&#34;]).strip()})
-        message.append({&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: dedent(self.__prompt[&#34;original_assistant&#34;]).strip()})
+        message.append({&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: None, &#34;function_call&#34;: self.__prompt[&#34;original_assistant&#34;]})
+        functions = [self.__prompt[&#34;original_function&#34;]]
         if not chat_history:
             chat_history = []
         chat_history.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: user_input})
@@ -842,36 +838,55 @@ Users will typically use words like verify, check, make sure, or similar to refe
         response = openai.ChatCompletion.create(
             model=self.model,
             messages=message,
+            functions=functions,
+            function_call=&#34;auto&#34;,
             temperature=self.temp,
             top_p=1
             )
 
+        def extract_quoted_strings(text):
+            pattern = r&#39;[&#34;\&#39;](.*?)[&#34;\&#39;]&#39;
+            matches = re.findall(pattern, text)
+            return matches
+        expected = extract_quoted_strings(user_input)
         output = {}
-        output[&#34;dict_response&#34;] = response
-        output[&#34;raw_response&#34;] = response[&#34;choices&#34;][0][&#34;message&#34;][&#34;content&#34;] 
-        chat_history.append({&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: output[&#34;raw_response&#34;]})
+        result = response[&#34;choices&#34;][0][&#34;message&#34;].to_dict()
+        if result[&#34;content&#34;]:
+            output[&#34;app_related&#34;] = False
+            chat_history.append({&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: result[&#34;content&#34;]})
+            output[&#34;response&#34;] = result[&#34;content&#34;]
+        else:
+            json_result = json.loads(result[&#34;function_call&#34;][&#34;arguments&#34;])
+            output[&#34;app_related&#34;] = True
+            output[&#34;filter&#34;] = json_result[&#34;filter&#34;]
+            output[&#34;type&#34;] = json_result[&#34;type&#34;]
+            chat_history.append({&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: result[&#34;content&#34;], &#34;function_call&#34;: {&#34;name&#34;: result[&#34;function_call&#34;][&#34;name&#34;], &#34;arguments&#34;: json.dumps(json_result)}})
+        output[&#34;expected&#34;] = expected
         output[&#34;chat_history&#34;] = chat_history
-        clear_response = self._clean_original_response(output[&#34;raw_response&#34;])
-        output[&#34;response&#34;] = self._clean_original_response(output[&#34;raw_response&#34;])
         return output
         
     def _get_confirmation(self, user_input):
         #Send the request to identify if user is confirming or denying the task
         message = []
-        message.append({&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: dedent(self.__prompt[&#34;confirmation_system&#34;]).strip()})
-        message.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: dedent(self.__prompt[&#34;confirmation_user&#34;]).strip()})
-        message.append({&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: dedent(self.__prompt[&#34;confirmation_assistant&#34;]).strip()})
         message.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: user_input})
+        functions = [self.__prompt[&#34;confirmation_function&#34;]]
         response = openai.ChatCompletion.create(
             model=self.model,
             messages=message,
+            functions=functions,
+            function_call={&#34;name&#34;: &#34;get_confirmation&#34;},
             temperature=self.temp,
             top_p=1
             )
+        result = response[&#34;choices&#34;][0][&#34;message&#34;].to_dict()
+        json_result = json.loads(result[&#34;function_call&#34;][&#34;arguments&#34;])
         output = {}
-        output[&#34;dict_response&#34;] = response
-        output[&#34;raw_response&#34;] = response[&#34;choices&#34;][0][&#34;message&#34;][&#34;content&#34;] 
-        output[&#34;response&#34;] = self._clean_confirmation_response(output[&#34;raw_response&#34;])
+        if json_result[&#34;result&#34;] == &#34;true&#34;:
+            output[&#34;result&#34;] = True
+        elif json_result[&#34;result&#34;] == &#34;false&#34;:
+            output[&#34;result&#34;] = False
+        elif json_result[&#34;result&#34;] == &#34;none&#34;:
+            output[&#34;result&#34;] = json_result[&#34;response&#34;]
         return output
 
     def confirm(self, user_input, max_retries=3, backoff_num=1):
@@ -894,7 +909,7 @@ Users will typically use words like verify, check, make sure, or similar to refe
         &#39;&#39;&#39;
         result = self._retry_function(self._get_confirmation, max_retries, backoff_num, user_input)
         if result:
-            output = result[&#34;response&#34;]
+            output = result[&#34;result&#34;]
         else:
             output = f&#34;{self.model} api is not responding right now, please try again later.&#34;
         return output
@@ -956,14 +971,14 @@ Users will typically use words like verify, check, make sure, or similar to refe
             output[&#34;app_related&#34;] = False
             output[&#34;response&#34;] = f&#34;{self.model} api is not responding right now, please try again later.&#34;
             return output
-        output[&#34;app_related&#34;] = original[&#34;response&#34;][&#34;app_related&#34;]
+        output[&#34;app_related&#34;] = original[&#34;app_related&#34;]
         output[&#34;chat_history&#34;] = original[&#34;chat_history&#34;]
         if not output[&#34;app_related&#34;]:
-            output[&#34;response&#34;] = original[&#34;response&#34;][&#34;response&#34;]
+            output[&#34;response&#34;] = original[&#34;response&#34;]
         else:
-            type = original[&#34;response&#34;][&#34;type&#34;].lower()
-            if &#34;filter&#34; in original[&#34;response&#34;]:
-                output[&#34;filter&#34;] = original[&#34;response&#34;][&#34;filter&#34;]
+            type = original[&#34;type&#34;]
+            if &#34;filter&#34; in original:
+                output[&#34;filter&#34;] = original[&#34;filter&#34;]
                 if not self.config.config[&#34;case&#34;]:
                     if isinstance(output[&#34;filter&#34;], list):
                         output[&#34;filter&#34;] = [item.lower() for item in output[&#34;filter&#34;]]
@@ -990,8 +1005,8 @@ Users will typically use words like verify, check, make sure, or similar to refe
                 output[&#34;args&#34;][&#34;commands&#34;] = commands[&#34;response&#34;][&#34;commands&#34;]
                 output[&#34;args&#34;][&#34;vars&#34;] = commands[&#34;response&#34;][&#34;variables&#34;]
                 output[&#34;nodes&#34;] = [item for item in output[&#34;nodes&#34;] if output[&#34;args&#34;][&#34;vars&#34;].get(item)]
-                if original[&#34;response&#34;].get(&#34;expected&#34;):
-                    output[&#34;args&#34;][&#34;expected&#34;] = original[&#34;response&#34;][&#34;expected&#34;]
+                if original.get(&#34;expected&#34;):
+                    output[&#34;args&#34;][&#34;expected&#34;] = original[&#34;expected&#34;]
                     output[&#34;action&#34;] = &#34;test&#34;
                 else:
                     output[&#34;action&#34;] = &#34;run&#34;
@@ -1121,14 +1136,14 @@ Users will typically use words like verify, check, make sure, or similar to refe
         output[&#34;app_related&#34;] = False
         output[&#34;response&#34;] = f&#34;{self.model} api is not responding right now, please try again later.&#34;
         return output
-    output[&#34;app_related&#34;] = original[&#34;response&#34;][&#34;app_related&#34;]
+    output[&#34;app_related&#34;] = original[&#34;app_related&#34;]
     output[&#34;chat_history&#34;] = original[&#34;chat_history&#34;]
     if not output[&#34;app_related&#34;]:
-        output[&#34;response&#34;] = original[&#34;response&#34;][&#34;response&#34;]
+        output[&#34;response&#34;] = original[&#34;response&#34;]
     else:
-        type = original[&#34;response&#34;][&#34;type&#34;].lower()
-        if &#34;filter&#34; in original[&#34;response&#34;]:
-            output[&#34;filter&#34;] = original[&#34;response&#34;][&#34;filter&#34;]
+        type = original[&#34;type&#34;]
+        if &#34;filter&#34; in original:
+            output[&#34;filter&#34;] = original[&#34;filter&#34;]
             if not self.config.config[&#34;case&#34;]:
                 if isinstance(output[&#34;filter&#34;], list):
                     output[&#34;filter&#34;] = [item.lower() for item in output[&#34;filter&#34;]]
@@ -1155,8 +1170,8 @@ Users will typically use words like verify, check, make sure, or similar to refe
             output[&#34;args&#34;][&#34;commands&#34;] = commands[&#34;response&#34;][&#34;commands&#34;]
             output[&#34;args&#34;][&#34;vars&#34;] = commands[&#34;response&#34;][&#34;variables&#34;]
             output[&#34;nodes&#34;] = [item for item in output[&#34;nodes&#34;] if output[&#34;args&#34;][&#34;vars&#34;].get(item)]
-            if original[&#34;response&#34;].get(&#34;expected&#34;):
-                output[&#34;args&#34;][&#34;expected&#34;] = original[&#34;response&#34;][&#34;expected&#34;]
+            if original.get(&#34;expected&#34;):
+                output[&#34;args&#34;][&#34;expected&#34;] = original[&#34;expected&#34;]
                 output[&#34;action&#34;] = &#34;test&#34;
             else:
                 output[&#34;action&#34;] = &#34;run&#34;
@@ -1220,7 +1235,7 @@ Users will typically use words like verify, check, make sure, or similar to refe
     &#39;&#39;&#39;
     result = self._retry_function(self._get_confirmation, max_retries, backoff_num, user_input)
     if result:
-        output = result[&#34;response&#34;]
+        output = result[&#34;result&#34;]
     else:
         output = f&#34;{self.model} api is not responding right now, please try again later.&#34;
     return output</code></pre>
@@ -1868,6 +1883,13 @@ Users will typically use words like verify, check, make sure, or similar to refe
         bulkparser = subparsers.add_parser(&#34;bulk&#34;, help=&#34;Add nodes in bulk&#34;) 
         bulkparser.add_argument(&#34;bulk&#34;, const=&#34;bulk&#34;, nargs=0, action=self._store_type, help=&#34;Add nodes in bulk&#34;)
         bulkparser.set_defaults(func=self._func_others)
+        # AIPARSER
+        aiparser = subparsers.add_parser(&#34;ai&#34;, help=&#34;Make request to an AI&#34;) 
+        aiparser.add_argument(&#34;ask&#34;, nargs=&#39;*&#39;, help=&#34;Ask connpy AI something&#34;)
+        aiparser.add_argument(&#34;--model&#34;, nargs=1, help=&#34;Set the OPENAI model id&#34;)
+        aiparser.add_argument(&#34;--org&#34;, nargs=1, help=&#34;Set the OPENAI organization id&#34;)
+        aiparser.add_argument(&#34;--api_key&#34;, nargs=1, help=&#34;Set the OPENAI API key&#34;)
+        aiparser.set_defaults(func=self._func_ai)
         #RUNPARSER
         runparser = subparsers.add_parser(&#34;run&#34;, help=&#34;Run scripts or commands on nodes&#34;, formatter_class=argparse.RawTextHelpFormatter) 
         runparser.add_argument(&#34;run&#34;, nargs=&#39;+&#39;, action=self._store_type, help=self._help(&#34;run&#34;), default=&#34;run&#34;)
@@ -1889,10 +1911,12 @@ Users will typically use words like verify, check, make sure, or similar to refe
         configcrud.add_argument(&#34;--keepalive&#34;, dest=&#34;idletime&#34;, nargs=1, action=self._store_type, help=&#34;Set keepalive time in seconds, 0 to disable&#34;, type=int, metavar=&#34;INT&#34;)
         configcrud.add_argument(&#34;--completion&#34;, dest=&#34;completion&#34;, nargs=1, choices=[&#34;bash&#34;,&#34;zsh&#34;], action=self._store_type, help=&#34;Get terminal completion configuration for conn&#34;)
         configcrud.add_argument(&#34;--configfolder&#34;, dest=&#34;configfolder&#34;, nargs=1, action=self._store_type, help=&#34;Set the default location for config file&#34;, metavar=&#34;FOLDER&#34;)
-        configcrud.add_argument(&#34;--openai&#34;, dest=&#34;openai&#34;, nargs=2, action=self._store_type, help=&#34;Set openai organization and api_key&#34;, metavar=(&#34;ORGANIZATION&#34;, &#34;API_KEY&#34;))
+        configcrud.add_argument(&#34;--openai-org&#34;, dest=&#34;organization&#34;, nargs=1, action=self._store_type, help=&#34;Set openai organization&#34;, metavar=&#34;ORGANIZATION&#34;)
+        configcrud.add_argument(&#34;--openai-api-key&#34;, dest=&#34;api_key&#34;, nargs=1, action=self._store_type, help=&#34;Set openai api_key&#34;, metavar=&#34;API_KEY&#34;)
+        configcrud.add_argument(&#34;--openai-model&#34;, dest=&#34;model&#34;, nargs=1, action=self._store_type, help=&#34;Set openai model&#34;, metavar=&#34;MODEL&#34;)
         configparser.set_defaults(func=self._func_others)
         #Manage sys arguments
-        commands = [&#34;node&#34;, &#34;profile&#34;, &#34;mv&#34;, &#34;move&#34;,&#34;copy&#34;, &#34;cp&#34;, &#34;bulk&#34;, &#34;ls&#34;, &#34;list&#34;, &#34;run&#34;, &#34;config&#34;, &#34;api&#34;]
+        commands = [&#34;node&#34;, &#34;profile&#34;, &#34;mv&#34;, &#34;move&#34;,&#34;copy&#34;, &#34;cp&#34;, &#34;bulk&#34;, &#34;ls&#34;, &#34;list&#34;, &#34;run&#34;, &#34;config&#34;, &#34;api&#34;, &#34;ai&#34;]
         profilecmds = [&#34;--add&#34;, &#34;-a&#34;, &#34;--del&#34;, &#34;--rm&#34;,  &#34;-r&#34;, &#34;--mod&#34;, &#34;--edit&#34;, &#34;-e&#34;, &#34;--show&#34;, &#34;-s&#34;]
         if len(argv) &gt;= 2 and argv[1] == &#34;profile&#34; and argv[0] in profilecmds:
             argv[1] = argv[0]
@@ -2035,10 +2059,14 @@ Users will typically use words like verify, check, make sure, or similar to refe
         for k, v in node.items():
             if isinstance(v, str):
                 print(k + &#34;: &#34; + v)
-            else:
+            elif isinstance(v, list):
                 print(k + &#34;:&#34;)
                 for i in v:
                     print(&#34;  - &#34; + i)
+            elif isinstance(v, dict):
+                print(k + &#34;:&#34;)
+                for i,d in v.items():
+                    print(&#34;  - &#34; + i + &#34;: &#34; + d)
 
     def _mod(self, args):
         if args.data == None:
@@ -2103,10 +2131,14 @@ Users will typically use words like verify, check, make sure, or similar to refe
         for k, v in profile.items():
             if isinstance(v, str):
                 print(k + &#34;: &#34; + v)
-            else:
+            elif isinstance(v, list):
                 print(k + &#34;:&#34;)
                 for i in v:
                     print(&#34;  - &#34; + i)
+            elif isinstance(v, dict):
+                print(k + &#34;:&#34;)
+                for i,d in v.items():
+                    print(&#34;  - &#34; + i + &#34;: &#34; + d)
 
     def _profile_add(self, args):
         matches = list(filter(lambda k: k == args.data[0], self.profiles))
@@ -2144,7 +2176,7 @@ Users will typically use words like verify, check, make sure, or similar to refe
     
     def _func_others(self, args):
         #Function called when using other commands
-        actions = {&#34;ls&#34;: self._ls, &#34;move&#34;: self._mvcp, &#34;cp&#34;: self._mvcp, &#34;bulk&#34;: self._bulk, &#34;completion&#34;: self._completion, &#34;case&#34;: self._case, &#34;fzf&#34;: self._fzf, &#34;idletime&#34;: self._idletime, &#34;configfolder&#34;: self._configfolder, &#34;openai&#34;: self._openai}
+        actions = {&#34;ls&#34;: self._ls, &#34;move&#34;: self._mvcp, &#34;cp&#34;: self._mvcp, &#34;bulk&#34;: self._bulk, &#34;completion&#34;: self._completion, &#34;case&#34;: self._case, &#34;fzf&#34;: self._fzf, &#34;idletime&#34;: self._idletime, &#34;configfolder&#34;: self._configfolder, &#34;organization&#34;: self._openai, &#34;api_key&#34;: self._openai, &#34;model&#34;: self._openai}
         return actions.get(args.command)(args)
 
     def _ls(self, args):
@@ -2262,10 +2294,12 @@ Users will typically use words like verify, check, make sure, or similar to refe
             print(&#34;Config saved&#34;)
         
     def _openai(self, args):
-        openaikeys = {}
-        openaikeys[&#34;organization&#34;] = args.data[0]
-        openaikeys[&#34;api_key&#34;] = args.data[1]
-        self._change_settings(args.command, openaikeys)
+        if &#34;openai&#34; in self.config.config:
+            openaikeys = self.config.config[&#34;openai&#34;]
+        else:
+            openaikeys = {}
+        openaikeys[args.command] = args.data[0]
+        self._change_settings(&#34;openai&#34;, openaikeys)
 
 
     def _change_settings(self, name, value):
@@ -2278,6 +2312,115 @@ Users will typically use words like verify, check, make sure, or similar to refe
             args.action = &#34;noderun&#34;
         actions = {&#34;noderun&#34;: self._node_run, &#34;generate&#34;: self._yaml_generate, &#34;run&#34;: self._yaml_run}
         return actions.get(args.action)(args)
+
+    def _func_ai(self, args):
+        arguments = {}
+        if args.model:
+            arguments[&#34;model&#34;] = args.model[0]
+        if args.org:
+            arguments[&#34;org&#34;] = args.org[0]
+        if args.api_key:
+            arguments[&#34;api_key&#34;] = args.api_key[0]
+        self.myai = ai(self.config, **arguments)
+        if args.ask:
+            input = &#34; &#34;.join(args.ask)
+            request = self.myai.ask(input, dryrun = True)
+            if not request[&#34;app_related&#34;]:
+                mdprint(Markdown(request[&#34;response&#34;]))
+                print(&#34;\r&#34;)
+            else:
+                if request[&#34;action&#34;] == &#34;list_nodes&#34;:
+                    if request[&#34;filter&#34;]:
+                        nodes = self.config._getallnodes(request[&#34;filter&#34;])
+                    else:
+                        nodes = self.config._getallnodes()
+                    list = &#34;\n&#34;.join(nodes)
+                    print(list)
+                else:
+                    yaml_data = yaml.dump(request[&#34;task&#34;])
+                    confirmation = f&#34;I&#39;m going to run the following task:\n```{yaml_data}```&#34;
+                    mdprint(Markdown(confirmation))
+                    question = [inquirer.Confirm(&#34;task&#34;, message=&#34;Are you sure you want to continue?&#34;)]
+                    print(&#34;\r&#34;)
+                    confirm = inquirer.prompt(question)
+                    if confirm == None:
+                        exit(7)
+                    if confirm[&#34;task&#34;]:
+                        script = {}
+                        script[&#34;name&#34;] = &#34;RESULT&#34;
+                        script[&#34;output&#34;] = &#34;stdout&#34;
+                        script[&#34;nodes&#34;] = request[&#34;nodes&#34;]
+                        script[&#34;action&#34;] = request[&#34;action&#34;]
+                        if &#34;expected&#34; in request:
+                            script[&#34;expected&#34;] = request[&#34;expected&#34;]
+                        script.update(request[&#34;args&#34;])
+                        self._cli_run(script)
+        else:
+            history = None
+            mdprint(Markdown(&#34;**Chatbot**: Hi! How can I help you today?\n\n---&#34;))
+            while True:
+                questions = [
+                        inquirer.Text(&#39;message&#39;, message=&#34;User&#34;, validate=self._ai_validation),
+                    ]
+                answers = inquirer.prompt(questions)
+                if answers == None:
+                    exit(7)
+                response, history = self._process_input(answers[&#34;message&#34;], history)
+                mdprint(Markdown(f&#34;&#34;&#34;**Chatbot**:\n{response}\n\n---&#34;&#34;&#34;))
+        return
+
+
+    def _ai_validation(self, answers, current, regex = &#34;^.+$&#34;):
+        #Validate ai user chat.
+        if not re.match(regex, current):
+            raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Can&#39;t send empty messages&#34;)
+        return True
+
+    def _process_input(self, input, history):
+        response = self.myai.ask(input , chat_history = history, dryrun = True)
+        if not response[&#34;app_related&#34;]:
+            if not history:
+                history = []
+            history.extend(response[&#34;chat_history&#34;])
+            return response[&#34;response&#34;], history
+        else:
+            history = None
+            if response[&#34;action&#34;] == &#34;list_nodes&#34;:
+                if response[&#34;filter&#34;]:
+                    nodes = self.config._getallnodes(response[&#34;filter&#34;])
+                else:
+                    nodes = self.config._getallnodes()
+                list = &#34;\n&#34;.join(nodes)
+                response = f&#34;```{list}\n```&#34;
+            else:
+                yaml_data = yaml.dump(response[&#34;task&#34;])
+                confirmresponse = f&#34;I&#39;m going to run the following task:\n```{yaml_data}```\nPlease confirm&#34;
+                while True:
+                    mdprint(Markdown(f&#34;&#34;&#34;**Chatbot**:\n{confirmresponse}&#34;&#34;&#34;))
+                    questions = [
+                            inquirer.Text(&#39;message&#39;, message=&#34;User&#34;, validate=self._ai_validation),
+                        ]
+                    answers = inquirer.prompt(questions)
+                    if answers == None:
+                        exit(7)
+                    confirmation = self.myai.confirm(answers[&#34;message&#34;])
+                    if isinstance(confirmation, bool):
+                        if not confirmation:
+                            response = &#34;Request cancelled&#34;
+                        else:
+                            nodes = self.connnodes(self.config.getitems(response[&#34;nodes&#34;]), config = self.config)
+                            if response[&#34;action&#34;] == &#34;run&#34;:
+                                output = nodes.run(**response[&#34;args&#34;])
+                                response = &#34;&#34;
+                            elif response[&#34;action&#34;] == &#34;test&#34;:
+                                result = nodes.test(**response[&#34;args&#34;])
+                                yaml_result = yaml.dump(result,default_flow_style=False, indent=4)
+                                output = nodes.output
+                                response = f&#34;This is the result for your test:\n```\n{yaml_result}\n```&#34;
+                            for k,v in output.items():
+                                response += f&#34;\n***{k}***:\n```\n{v}\n```\n&#34;
+                        break
+            return response, history
 
     def _func_api(self, args):
         if args.command == &#34;stop&#34; or args.command == &#34;restart&#34;:
@@ -2324,68 +2467,67 @@ Users will typically use words like verify, check, make sure, or similar to refe
             print(&#34;failed reading file {}&#34;.format(args.data[0]))
             exit(10)
         for script in scripts[&#34;tasks&#34;]:
-            args = {}
-            try:
-                action = script[&#34;action&#34;]
-                nodelist = script[&#34;nodes&#34;]
-                args[&#34;commands&#34;] = script[&#34;commands&#34;]
-                output = script[&#34;output&#34;]
-                if action == &#34;test&#34;:
-                    args[&#34;expected&#34;] = script[&#34;expected&#34;]
-            except KeyError as e:
-                print(&#34;&#39;{}&#39; is mandatory&#34;.format(e.args[0]))
-                exit(11)
-            nodes = self.connnodes(self.config.getitems(nodelist), config = self.config)
-            stdout = False
-            if output is None:
-                pass
-            elif output == &#34;stdout&#34;:
-                stdout = True
-            elif isinstance(output, str) and action == &#34;run&#34;:
-                args[&#34;folder&#34;] = output
-            try:
-                args[&#34;vars&#34;] = script[&#34;variables&#34;]
-            except:
-                pass
-            try:
-                options = script[&#34;options&#34;]
-                thisoptions = {k: v for k, v in options.items() if k in [&#34;prompt&#34;, &#34;parallel&#34;, &#34;timeout&#34;]}
-                args.update(thisoptions)
-            except:
-                options = None
-            size = str(os.get_terminal_size())
-            p = re.search(r&#39;.*columns=([0-9]+)&#39;, size)
-            columns = int(p.group(1))
-            if action == &#34;run&#34;:
-                nodes.run(**args)
-                print(script[&#34;name&#34;].upper() + &#34;-&#34; * (columns - len(script[&#34;name&#34;])))
-                for i in nodes.status.keys():
-                    print(&#34;   &#34; + i + &#34; &#34; + &#34;-&#34; * (columns - len(i) - 13) + (&#34; PASS(0)&#34; if nodes.status[i] == 0 else &#34; FAIL({})&#34;.format(nodes.status[i])))
-                    if stdout:
-                        for line in nodes.output[i].splitlines():
-                            print(&#34;      &#34; + line)
-            elif action == &#34;test&#34;:
-                nodes.test(**args)
-                print(script[&#34;name&#34;].upper() + &#34;-&#34; * (columns - len(script[&#34;name&#34;])))
-                for i in nodes.status.keys():
-                    print(&#34;   &#34; + i + &#34; &#34; + &#34;-&#34; * (columns - len(i) - 13) + (&#34; PASS(0)&#34; if nodes.status[i] == 0 else &#34; FAIL({})&#34;.format(nodes.status[i])))
+            self._cli_run(script)
+
+
+    def _cli_run(self, script):
+        args = {}
+        try:
+            action = script[&#34;action&#34;]
+            nodelist = script[&#34;nodes&#34;]
+            args[&#34;commands&#34;] = script[&#34;commands&#34;]
+            output = script[&#34;output&#34;]
+            if action == &#34;test&#34;:
+                args[&#34;expected&#34;] = script[&#34;expected&#34;]
+        except KeyError as e:
+            print(&#34;&#39;{}&#39; is mandatory&#34;.format(e.args[0]))
+            exit(11)
+        nodes = self.connnodes(self.config.getitems(nodelist), config = self.config)
+        stdout = False
+        if output is None:
+            pass
+        elif output == &#34;stdout&#34;:
+            stdout = True
+        elif isinstance(output, str) and action == &#34;run&#34;:
+            args[&#34;folder&#34;] = output
+        if &#34;variables&#34; in script:
+            args[&#34;vars&#34;] = script[&#34;variables&#34;]
+        if &#34;vars&#34; in script:
+            args[&#34;vars&#34;] = script[&#34;vars&#34;]
+        try:
+            options = script[&#34;options&#34;]
+            thisoptions = {k: v for k, v in options.items() if k in [&#34;prompt&#34;, &#34;parallel&#34;, &#34;timeout&#34;]}
+            args.update(thisoptions)
+        except:
+            options = None
+        size = str(os.get_terminal_size())
+        p = re.search(r&#39;.*columns=([0-9]+)&#39;, size)
+        columns = int(p.group(1))
+        if action == &#34;run&#34;:
+            nodes.run(**args)
+            print(script[&#34;name&#34;].upper() + &#34;-&#34; * (columns - len(script[&#34;name&#34;])))
+            for i in nodes.status.keys():
+                print(&#34;   &#34; + i + &#34; &#34; + &#34;-&#34; * (columns - len(i) - 13) + (&#34; PASS(0)&#34; if nodes.status[i] == 0 else &#34; FAIL({})&#34;.format(nodes.status[i])))
+                if stdout:
+                    for line in nodes.output[i].splitlines():
+                        print(&#34;      &#34; + line)
+        elif action == &#34;test&#34;:
+            nodes.test(**args)
+            print(script[&#34;name&#34;].upper() + &#34;-&#34; * (columns - len(script[&#34;name&#34;])))
+            for i in nodes.status.keys():
+                print(&#34;   &#34; + i + &#34; &#34; + &#34;-&#34; * (columns - len(i) - 13) + (&#34; PASS(0)&#34; if nodes.status[i] == 0 else &#34; FAIL({})&#34;.format(nodes.status[i])))
+                if nodes.status[i] == 0:
+                    max_length = max(len(s) for s in nodes.result[i].keys())
+                    for k,v in nodes.result[i].items():
+                        print(&#34;     TEST for &#39;{}&#39;&#34;.format(k) +  &#34; &#34;*(max_length - len(k) + 1) + &#34;--&gt; &#34; + str(v).upper())
+                if stdout:
                     if nodes.status[i] == 0:
-                        try:
-                            myexpected = args[&#34;expected&#34;].format(**args[&#34;vars&#34;][i])
-                        except:
-                            try:
-                                myexpected = args[&#34;expected&#34;].format(**args[&#34;vars&#34;][&#34;__global__&#34;])
-                            except:
-                                myexpected = args[&#34;expected&#34;]
-                        print(&#34;     TEST for &#39;{}&#39; --&gt; &#34;.format(myexpected) + str(nodes.result[i]).upper())
-                    if stdout:
-                        if nodes.status[i] == 0:
-                            print(&#34;     &#34; + &#34;-&#34; * (len(myexpected) + 16 + len(str(nodes.result[i]))))
-                        for line in nodes.output[i].splitlines():
-                            print(&#34;      &#34; + line)
-            else:
-                print(&#34;Wrong action &#39;{}&#39;&#34;.format(action))
-                exit(13)
+                        print(&#34;     &#34; + &#34;-&#34; * (max_length + 21))
+                    for line in nodes.output[i].splitlines():
+                        print(&#34;      &#34; + line)
+        else:
+            print(&#34;Wrong action &#39;{}&#39;&#34;.format(action))
+            exit(13)
 
     def _choose(self, list, name, action):
         #Generates an inquirer list to pick
@@ -2717,28 +2859,37 @@ Users will typically use words like verify, check, make sure, or similar to refe
         if type == &#34;usage&#34;:
             return &#34;conn [-h] [--add | --del | --mod | --show | --debug] [node|folder]\n       conn {profile,move,mv,copy,cp,list,ls,bulk,config} ...&#34;
         if type == &#34;end&#34;:
-            return &#34;Commands:\n  profile        Manage profiles\n  move (mv)      Move node\n  copy (cp)      Copy node\n  list (ls)      List profiles, nodes or folders\n  bulk           Add nodes in bulk\n  run            Run scripts or commands on nodes\n  config         Manage app config\n  api            Start and stop connpy api&#34;
+            return &#34;Commands:\n  profile        Manage profiles\n  move (mv)      Move node\n  copy (cp)      Copy node\n  list (ls)      List profiles, nodes or folders\n  bulk           Add nodes in bulk\n  run            Run scripts or commands on nodes\n  config         Manage app config\n  api            Start and stop connpy api\n  ai             Make request to an AI&#34;
         if type == &#34;bashcompletion&#34;:
             return &#39;&#39;&#39;
 #Here starts bash completion for conn
 _conn()
 {
-        strings=&#34;$(connpy-completion-helper ${#COMP_WORDS[@]} ${COMP_WORDS[@]})&#34;
-        COMPREPLY=($(compgen -W &#34;$strings&#34; -- &#34;${COMP_WORDS[-1]}&#34;))
+        mapfile -t strings &lt; &lt;(connpy-completion-helper &#34;bash&#34; &#34;${#COMP_WORDS[@]}&#34; &#34;${COMP_WORDS[@]}&#34;)
+        local IFS=$&#39;\\t\\n&#39;
+        COMPREPLY=($(compgen -W &#34;$(printf &#39;%s&#39; &#34;${strings[@]}&#34;)&#34; -- &#34;${COMP_WORDS[-1]}&#34;))
 }
-complete -o nosort -F _conn conn
-complete -o nosort -F _conn connpy
+
+complete -o nospace -o nosort -F _conn conn
+complete -o nospace -o nosort -F _conn connpy
 #Here ends bash completion for conn
         &#39;&#39;&#39;
         if type == &#34;zshcompletion&#34;:
             return &#39;&#39;&#39;
-
 #Here starts zsh completion for conn
 autoload -U compinit &amp;&amp; compinit
 _conn()
 {
-    strings=($(connpy-completion-helper ${#words} $words))
-    compadd &#34;$@&#34; -- `echo $strings`
+    strings=($(connpy-completion-helper &#34;zsh&#34; ${#words} $words))
+    for string in &#34;${strings[@]}&#34;; do
+        if [[ &#34;${string}&#34; =~ .*/$ ]]; then
+            # If the string ends with a &#39;/&#39;, do not append a space
+            compadd -S &#39;&#39; -- &#34;$string&#34;
+        else
+            # If the string does not end with a &#39;/&#39;, append a space
+            compadd -S &#39; &#39; -- &#34;$string&#34;
+        fi
+    done
 }
 compdef _conn conn
 compdef _conn connpy
@@ -2895,7 +3046,7 @@ tasks:
 </details>
 </dd>
 <dt id="connpy.connapp.start"><code class="name flex">
-<span>def <span class="ident">start</span></span>(<span>self, argv=['connpy', '--html', '-o', 'docs/', '--force'])</span>
+<span>def <span class="ident">start</span></span>(<span>self, argv=['connpy', '-o', 'docs/', '--html', '--force'])</span>
 </code></dt>
 <dd>
 <div class="desc"><h3 id="parameters">Parameters:</h3>
@@ -2954,6 +3105,13 @@ tasks:
     bulkparser = subparsers.add_parser(&#34;bulk&#34;, help=&#34;Add nodes in bulk&#34;) 
     bulkparser.add_argument(&#34;bulk&#34;, const=&#34;bulk&#34;, nargs=0, action=self._store_type, help=&#34;Add nodes in bulk&#34;)
     bulkparser.set_defaults(func=self._func_others)
+    # AIPARSER
+    aiparser = subparsers.add_parser(&#34;ai&#34;, help=&#34;Make request to an AI&#34;) 
+    aiparser.add_argument(&#34;ask&#34;, nargs=&#39;*&#39;, help=&#34;Ask connpy AI something&#34;)
+    aiparser.add_argument(&#34;--model&#34;, nargs=1, help=&#34;Set the OPENAI model id&#34;)
+    aiparser.add_argument(&#34;--org&#34;, nargs=1, help=&#34;Set the OPENAI organization id&#34;)
+    aiparser.add_argument(&#34;--api_key&#34;, nargs=1, help=&#34;Set the OPENAI API key&#34;)
+    aiparser.set_defaults(func=self._func_ai)
     #RUNPARSER
     runparser = subparsers.add_parser(&#34;run&#34;, help=&#34;Run scripts or commands on nodes&#34;, formatter_class=argparse.RawTextHelpFormatter) 
     runparser.add_argument(&#34;run&#34;, nargs=&#39;+&#39;, action=self._store_type, help=self._help(&#34;run&#34;), default=&#34;run&#34;)
@@ -2975,10 +3133,12 @@ tasks:
     configcrud.add_argument(&#34;--keepalive&#34;, dest=&#34;idletime&#34;, nargs=1, action=self._store_type, help=&#34;Set keepalive time in seconds, 0 to disable&#34;, type=int, metavar=&#34;INT&#34;)
     configcrud.add_argument(&#34;--completion&#34;, dest=&#34;completion&#34;, nargs=1, choices=[&#34;bash&#34;,&#34;zsh&#34;], action=self._store_type, help=&#34;Get terminal completion configuration for conn&#34;)
     configcrud.add_argument(&#34;--configfolder&#34;, dest=&#34;configfolder&#34;, nargs=1, action=self._store_type, help=&#34;Set the default location for config file&#34;, metavar=&#34;FOLDER&#34;)
-    configcrud.add_argument(&#34;--openai&#34;, dest=&#34;openai&#34;, nargs=2, action=self._store_type, help=&#34;Set openai organization and api_key&#34;, metavar=(&#34;ORGANIZATION&#34;, &#34;API_KEY&#34;))
+    configcrud.add_argument(&#34;--openai-org&#34;, dest=&#34;organization&#34;, nargs=1, action=self._store_type, help=&#34;Set openai organization&#34;, metavar=&#34;ORGANIZATION&#34;)
+    configcrud.add_argument(&#34;--openai-api-key&#34;, dest=&#34;api_key&#34;, nargs=1, action=self._store_type, help=&#34;Set openai api_key&#34;, metavar=&#34;API_KEY&#34;)
+    configcrud.add_argument(&#34;--openai-model&#34;, dest=&#34;model&#34;, nargs=1, action=self._store_type, help=&#34;Set openai model&#34;, metavar=&#34;MODEL&#34;)
     configparser.set_defaults(func=self._func_others)
     #Manage sys arguments
-    commands = [&#34;node&#34;, &#34;profile&#34;, &#34;mv&#34;, &#34;move&#34;,&#34;copy&#34;, &#34;cp&#34;, &#34;bulk&#34;, &#34;ls&#34;, &#34;list&#34;, &#34;run&#34;, &#34;config&#34;, &#34;api&#34;]
+    commands = [&#34;node&#34;, &#34;profile&#34;, &#34;mv&#34;, &#34;move&#34;,&#34;copy&#34;, &#34;cp&#34;, &#34;bulk&#34;, &#34;ls&#34;, &#34;list&#34;, &#34;run&#34;, &#34;config&#34;, &#34;api&#34;, &#34;ai&#34;]
     profilecmds = [&#34;--add&#34;, &#34;-a&#34;, &#34;--del&#34;, &#34;--rm&#34;,  &#34;-r&#34;, &#34;--mod&#34;, &#34;--edit&#34;, &#34;-e&#34;, &#34;--show&#34;, &#34;-s&#34;]
     if len(argv) &gt;= 2 and argv[1] == &#34;profile&#34; and argv[0] in profilecmds:
         argv[1] = argv[0]
@@ -3166,12 +3326,12 @@ tasks:
             t = open(logfile, &#34;r&#34;).read()
         else:
             t = logfile
+        while t.find(&#34;\b&#34;) != -1:
+            t = re.sub(&#39;[^\b]\b&#39;, &#39;&#39;, t)
         t = t.replace(&#34;\n&#34;,&#34;&#34;,1)
         t = t.replace(&#34;\a&#34;,&#34;&#34;)
         t = t.replace(&#39;\n\n&#39;, &#39;\n&#39;)
         t = re.sub(r&#39;.\[K&#39;, &#39;&#39;, t)
-        while t.find(&#34;\b&#34;) != -1:
-            t = re.sub(&#39;[^\b]\b&#39;, &#39;&#39;, t)
         ansi_escape = re.compile(r&#39;\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/ ]*[@-~])&#39;)
         t = ansi_escape.sub(&#39;&#39;, t)
         t = t.lstrip(&#34; \n\r&#34;)
@@ -3374,6 +3534,8 @@ tasks:
             output = &#39;&#39;
             if not isinstance(commands, list):
                 commands = [commands]
+            if not isinstance(expected, list):
+                expected = [expected]
             if &#34;screen_length_command&#34; in self.tags:
                 commands.insert(0, self.tags[&#34;screen_length_command&#34;])
             self.mylog = io.BytesIO()
@@ -3391,18 +3553,25 @@ tasks:
             output = self._logclean(self.mylog.getvalue().decode(), True)
             self.output = output
             if result in [0, 1]:
-                lastcommand = commands[-1]
-                if vars is not None:
-                    expected = expected.format(**vars)
-                    lastcommand = lastcommand.format(**vars)
-                last_command_index = output.rfind(lastcommand)
-                cleaned_output = output[last_command_index + len(lastcommand):].strip()
-                if expected in cleaned_output:
-                    self.result = True
-                else:
-                    self.result = False
+                # lastcommand = commands[-1]
+                # if vars is not None:
+                    # lastcommand = lastcommand.format(**vars)
+                # last_command_index = output.rfind(lastcommand)
+                # cleaned_output = output[last_command_index + len(lastcommand):].strip()
+                self.result = {}
+                for e in expected:
+                    if vars is not None:
+                        e = e.format(**vars)
+                    updatedprompt = re.sub(r&#39;(?&lt;!\\)\$&#39;, &#39;&#39;, prompt)
+                    newpattern = f&#34;.*({updatedprompt}).*{e}.*&#34;
+                    cleaned_output = output
+                    cleaned_output = re.sub(newpattern, &#39;&#39;, cleaned_output)
+                    if e in cleaned_output:
+                        self.result[e] = True
+                    else:
+                        self.result[e]= False
                 self.status = 0
-                return False
+                return self.result
             if result == 2:
                 self.result = None
                 self.status = 2
@@ -3776,6 +3945,8 @@ tasks:
         output = &#39;&#39;
         if not isinstance(commands, list):
             commands = [commands]
+        if not isinstance(expected, list):
+            expected = [expected]
         if &#34;screen_length_command&#34; in self.tags:
             commands.insert(0, self.tags[&#34;screen_length_command&#34;])
         self.mylog = io.BytesIO()
@@ -3793,18 +3964,25 @@ tasks:
         output = self._logclean(self.mylog.getvalue().decode(), True)
         self.output = output
         if result in [0, 1]:
-            lastcommand = commands[-1]
-            if vars is not None:
-                expected = expected.format(**vars)
-                lastcommand = lastcommand.format(**vars)
-            last_command_index = output.rfind(lastcommand)
-            cleaned_output = output[last_command_index + len(lastcommand):].strip()
-            if expected in cleaned_output:
-                self.result = True
-            else:
-                self.result = False
+            # lastcommand = commands[-1]
+            # if vars is not None:
+                # lastcommand = lastcommand.format(**vars)
+            # last_command_index = output.rfind(lastcommand)
+            # cleaned_output = output[last_command_index + len(lastcommand):].strip()
+            self.result = {}
+            for e in expected:
+                if vars is not None:
+                    e = e.format(**vars)
+                updatedprompt = re.sub(r&#39;(?&lt;!\\)\$&#39;, &#39;&#39;, prompt)
+                newpattern = f&#34;.*({updatedprompt}).*{e}.*&#34;
+                cleaned_output = output
+                cleaned_output = re.sub(newpattern, &#39;&#39;, cleaned_output)
+                if e in cleaned_output:
+                    self.result[e] = True
+                else:
+                    self.result[e]= False
             self.status = 0
-            return False
+            return self.result
         if result == 2:
             self.result = None
             self.status = 2

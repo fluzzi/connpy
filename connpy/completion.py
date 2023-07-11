@@ -1,6 +1,7 @@
 import sys
 import os
 import json
+import glob
 
 def _getallnodes(config):
     #get all nodes on configfile
@@ -36,19 +37,29 @@ def main():
     nodes = _getallnodes(config)
     folders = _getallfolders(config)
     profiles = list(config["profiles"].keys())
-    wordsnumber = int(sys.argv[1])
-    words = sys.argv[3:]
+    app = sys.argv[1]
+    if app in ["bash", "zsh"]:
+        positions = [2,4]
+    else:
+        positions = [1,3]
+    wordsnumber = int(sys.argv[positions[0]])
+    words = sys.argv[positions[1]:]
     if wordsnumber == 2:
-        strings=["--add", "--del", "--rm", "--edit", "--mod", "--show", "mv", "move", "ls", "list", "cp", "copy", "profile", "run", "bulk", "config", "api", "--help"]
+        strings=["--add", "--del", "--rm", "--edit", "--mod", "--show", "mv", "move", "ls", "list", "cp", "copy", "profile", "run", "bulk", "config", "api", "ai", "--help"]
         strings.extend(nodes)
         strings.extend(folders)
 
+    elif wordsnumber >= 3 and words[0] == "ai":
+        if wordsnumber == 3:
+            strings = ["--help", "--org", "--model", "--api_key"]
+        else:
+            strings = ["--org", "--model", "--api_key"]
     elif wordsnumber == 3:
         strings=[]
         if words[0] == "profile":
             strings=["--add", "--rm", "--del", "--edit", "--mod", "--show", "--help"]
         if words[0] == "config":
-            strings=["--allow-uppercase", "--keepalive", "--completion", "--fzf", "--configfolder", "--help"]
+            strings=["--allow-uppercase", "--keepalive", "--completion", "--fzf", "--configfolder", "--openai-org", "--openai-org-api-key", "--openai-org-model","--help"]
         if words[0] == "api":
             strings=["--start", "--stop", "--restart", "--debug", "--help"]
         if words[0] in ["--mod", "--edit", "-e", "--show", "-s", "--add", "-a", "--rm", "--del", "-r"]:
@@ -59,7 +70,18 @@ def main():
             strings=["--help"]
         if words[0] in ["--rm", "--del", "-r"]:
             strings.extend(folders)
-        if words[0] in ["--rm", "--del", "-r", "--mod", "--edit", "-e", "--show", "-s", "mv", "move", "cp", "copy", "run"]:
+        if words[0] in ["--rm", "--del", "-r", "--mod", "--edit", "-e", "--show", "-s", "mv", "move", "cp", "copy"]:
+            strings.extend(nodes)
+        if words[0] == "run":
+            if words[-1] == "run":
+                path = './*'
+            else:
+                path = words[-1] + "*"
+            strings = glob.glob(path)
+            for i in range(len(strings)):
+                if os.path.isdir(strings[i]):
+                    strings[i] += '/'
+            strings = [s[2:] if s.startswith('./') else s for s in strings]
             strings.extend(nodes)
 
     elif wordsnumber == 4:
@@ -73,7 +95,9 @@ def main():
           if words[0] == "config" and words[1] in ["--fzf", "--allow-uppercase"]:
               strings=["true", "false"]
 
-    print(*strings)
+    if app == "bash":
+        strings = [s if s.endswith('/') else f"'{s} '" for s in strings]
+    print('\t'.join(strings))
 
 if __name__ == '__main__':
     sys.exit(main())

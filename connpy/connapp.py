@@ -11,8 +11,11 @@ import inquirer
 from .core import node,nodes
 from ._version import __version__
 from .api import start_api,stop_api,debug_api
+from .ai import ai
 import yaml
 import ast
+from rich import print as mdprint
+from rich.markdown import Markdown
 try:
     from pyfzf.pyfzf import FzfPrompt
 except:
@@ -99,6 +102,13 @@ class connapp:
         bulkparser = subparsers.add_parser("bulk", help="Add nodes in bulk") 
         bulkparser.add_argument("bulk", const="bulk", nargs=0, action=self._store_type, help="Add nodes in bulk")
         bulkparser.set_defaults(func=self._func_others)
+        # AIPARSER
+        aiparser = subparsers.add_parser("ai", help="Make request to an AI") 
+        aiparser.add_argument("ask", nargs='*', help="Ask connpy AI something")
+        aiparser.add_argument("--model", nargs=1, help="Set the OPENAI model id")
+        aiparser.add_argument("--org", nargs=1, help="Set the OPENAI organization id")
+        aiparser.add_argument("--api_key", nargs=1, help="Set the OPENAI API key")
+        aiparser.set_defaults(func=self._func_ai)
         #RUNPARSER
         runparser = subparsers.add_parser("run", help="Run scripts or commands on nodes", formatter_class=argparse.RawTextHelpFormatter) 
         runparser.add_argument("run", nargs='+', action=self._store_type, help=self._help("run"), default="run")
@@ -120,10 +130,12 @@ class connapp:
         configcrud.add_argument("--keepalive", dest="idletime", nargs=1, action=self._store_type, help="Set keepalive time in seconds, 0 to disable", type=int, metavar="INT")
         configcrud.add_argument("--completion", dest="completion", nargs=1, choices=["bash","zsh"], action=self._store_type, help="Get terminal completion configuration for conn")
         configcrud.add_argument("--configfolder", dest="configfolder", nargs=1, action=self._store_type, help="Set the default location for config file", metavar="FOLDER")
-        configcrud.add_argument("--openai", dest="openai", nargs=2, action=self._store_type, help="Set openai organization and api_key", metavar=("ORGANIZATION", "API_KEY"))
+        configcrud.add_argument("--openai-org", dest="organization", nargs=1, action=self._store_type, help="Set openai organization", metavar="ORGANIZATION")
+        configcrud.add_argument("--openai-api-key", dest="api_key", nargs=1, action=self._store_type, help="Set openai api_key", metavar="API_KEY")
+        configcrud.add_argument("--openai-model", dest="model", nargs=1, action=self._store_type, help="Set openai model", metavar="MODEL")
         configparser.set_defaults(func=self._func_others)
         #Manage sys arguments
-        commands = ["node", "profile", "mv", "move","copy", "cp", "bulk", "ls", "list", "run", "config", "api"]
+        commands = ["node", "profile", "mv", "move","copy", "cp", "bulk", "ls", "list", "run", "config", "api", "ai"]
         profilecmds = ["--add", "-a", "--del", "--rm",  "-r", "--mod", "--edit", "-e", "--show", "-s"]
         if len(argv) >= 2 and argv[1] == "profile" and argv[0] in profilecmds:
             argv[1] = argv[0]
@@ -266,10 +278,14 @@ class connapp:
         for k, v in node.items():
             if isinstance(v, str):
                 print(k + ": " + v)
-            else:
+            elif isinstance(v, list):
                 print(k + ":")
                 for i in v:
                     print("  - " + i)
+            elif isinstance(v, dict):
+                print(k + ":")
+                for i,d in v.items():
+                    print("  - " + i + ": " + d)
 
     def _mod(self, args):
         if args.data == None:
@@ -334,10 +350,14 @@ class connapp:
         for k, v in profile.items():
             if isinstance(v, str):
                 print(k + ": " + v)
-            else:
+            elif isinstance(v, list):
                 print(k + ":")
                 for i in v:
                     print("  - " + i)
+            elif isinstance(v, dict):
+                print(k + ":")
+                for i,d in v.items():
+                    print("  - " + i + ": " + d)
 
     def _profile_add(self, args):
         matches = list(filter(lambda k: k == args.data[0], self.profiles))
@@ -375,7 +395,7 @@ class connapp:
     
     def _func_others(self, args):
         #Function called when using other commands
-        actions = {"ls": self._ls, "move": self._mvcp, "cp": self._mvcp, "bulk": self._bulk, "completion": self._completion, "case": self._case, "fzf": self._fzf, "idletime": self._idletime, "configfolder": self._configfolder, "openai": self._openai}
+        actions = {"ls": self._ls, "move": self._mvcp, "cp": self._mvcp, "bulk": self._bulk, "completion": self._completion, "case": self._case, "fzf": self._fzf, "idletime": self._idletime, "configfolder": self._configfolder, "organization": self._openai, "api_key": self._openai, "model": self._openai}
         return actions.get(args.command)(args)
 
     def _ls(self, args):
@@ -493,10 +513,12 @@ class connapp:
             print("Config saved")
         
     def _openai(self, args):
-        openaikeys = {}
-        openaikeys["organization"] = args.data[0]
-        openaikeys["api_key"] = args.data[1]
-        self._change_settings(args.command, openaikeys)
+        if "openai" in self.config.config:
+            openaikeys = self.config.config["openai"]
+        else:
+            openaikeys = {}
+        openaikeys[args.command] = args.data[0]
+        self._change_settings("openai", openaikeys)
 
 
     def _change_settings(self, name, value):
@@ -509,6 +531,115 @@ class connapp:
             args.action = "noderun"
         actions = {"noderun": self._node_run, "generate": self._yaml_generate, "run": self._yaml_run}
         return actions.get(args.action)(args)
+
+    def _func_ai(self, args):
+        arguments = {}
+        if args.model:
+            arguments["model"] = args.model[0]
+        if args.org:
+            arguments["org"] = args.org[0]
+        if args.api_key:
+            arguments["api_key"] = args.api_key[0]
+        self.myai = ai(self.config, **arguments)
+        if args.ask:
+            input = " ".join(args.ask)
+            request = self.myai.ask(input, dryrun = True)
+            if not request["app_related"]:
+                mdprint(Markdown(request["response"]))
+                print("\r")
+            else:
+                if request["action"] == "list_nodes":
+                    if request["filter"]:
+                        nodes = self.config._getallnodes(request["filter"])
+                    else:
+                        nodes = self.config._getallnodes()
+                    list = "\n".join(nodes)
+                    print(list)
+                else:
+                    yaml_data = yaml.dump(request["task"])
+                    confirmation = f"I'm going to run the following task:\n```{yaml_data}```"
+                    mdprint(Markdown(confirmation))
+                    question = [inquirer.Confirm("task", message="Are you sure you want to continue?")]
+                    print("\r")
+                    confirm = inquirer.prompt(question)
+                    if confirm == None:
+                        exit(7)
+                    if confirm["task"]:
+                        script = {}
+                        script["name"] = "RESULT"
+                        script["output"] = "stdout"
+                        script["nodes"] = request["nodes"]
+                        script["action"] = request["action"]
+                        if "expected" in request:
+                            script["expected"] = request["expected"]
+                        script.update(request["args"])
+                        self._cli_run(script)
+        else:
+            history = None
+            mdprint(Markdown("**Chatbot**: Hi! How can I help you today?\n\n---"))
+            while True:
+                questions = [
+                        inquirer.Text('message', message="User", validate=self._ai_validation),
+                    ]
+                answers = inquirer.prompt(questions)
+                if answers == None:
+                    exit(7)
+                response, history = self._process_input(answers["message"], history)
+                mdprint(Markdown(f"""**Chatbot**:\n{response}\n\n---"""))
+        return
+
+
+    def _ai_validation(self, answers, current, regex = "^.+$"):
+        #Validate ai user chat.
+        if not re.match(regex, current):
+            raise inquirer.errors.ValidationError("", reason="Can't send empty messages")
+        return True
+
+    def _process_input(self, input, history):
+        response = self.myai.ask(input , chat_history = history, dryrun = True)
+        if not response["app_related"]:
+            if not history:
+                history = []
+            history.extend(response["chat_history"])
+            return response["response"], history
+        else:
+            history = None
+            if response["action"] == "list_nodes":
+                if response["filter"]:
+                    nodes = self.config._getallnodes(response["filter"])
+                else:
+                    nodes = self.config._getallnodes()
+                list = "\n".join(nodes)
+                response = f"```{list}\n```"
+            else:
+                yaml_data = yaml.dump(response["task"])
+                confirmresponse = f"I'm going to run the following task:\n```{yaml_data}```\nPlease confirm"
+                while True:
+                    mdprint(Markdown(f"""**Chatbot**:\n{confirmresponse}"""))
+                    questions = [
+                            inquirer.Text('message', message="User", validate=self._ai_validation),
+                        ]
+                    answers = inquirer.prompt(questions)
+                    if answers == None:
+                        exit(7)
+                    confirmation = self.myai.confirm(answers["message"])
+                    if isinstance(confirmation, bool):
+                        if not confirmation:
+                            response = "Request cancelled"
+                        else:
+                            nodes = self.connnodes(self.config.getitems(response["nodes"]), config = self.config)
+                            if response["action"] == "run":
+                                output = nodes.run(**response["args"])
+                                response = ""
+                            elif response["action"] == "test":
+                                result = nodes.test(**response["args"])
+                                yaml_result = yaml.dump(result,default_flow_style=False, indent=4)
+                                output = nodes.output
+                                response = f"This is the result for your test:\n```\n{yaml_result}\n```"
+                            for k,v in output.items():
+                                response += f"\n***{k}***:\n```\n{v}\n```\n"
+                        break
+            return response, history
 
     def _func_api(self, args):
         if args.command == "stop" or args.command == "restart":
@@ -555,68 +686,67 @@ class connapp:
             print("failed reading file {}".format(args.data[0]))
             exit(10)
         for script in scripts["tasks"]:
-            args = {}
-            try:
-                action = script["action"]
-                nodelist = script["nodes"]
-                args["commands"] = script["commands"]
-                output = script["output"]
-                if action == "test":
-                    args["expected"] = script["expected"]
-            except KeyError as e:
-                print("'{}' is mandatory".format(e.args[0]))
-                exit(11)
-            nodes = self.connnodes(self.config.getitems(nodelist), config = self.config)
-            stdout = False
-            if output is None:
-                pass
-            elif output == "stdout":
-                stdout = True
-            elif isinstance(output, str) and action == "run":
-                args["folder"] = output
-            try:
-                args["vars"] = script["variables"]
-            except:
-                pass
-            try:
-                options = script["options"]
-                thisoptions = {k: v for k, v in options.items() if k in ["prompt", "parallel", "timeout"]}
-                args.update(thisoptions)
-            except:
-                options = None
-            size = str(os.get_terminal_size())
-            p = re.search(r'.*columns=([0-9]+)', size)
-            columns = int(p.group(1))
-            if action == "run":
-                nodes.run(**args)
-                print(script["name"].upper() + "-" * (columns - len(script["name"])))
-                for i in nodes.status.keys():
-                    print("   " + i + " " + "-" * (columns - len(i) - 13) + (" PASS(0)" if nodes.status[i] == 0 else " FAIL({})".format(nodes.status[i])))
-                    if stdout:
-                        for line in nodes.output[i].splitlines():
-                            print("      " + line)
-            elif action == "test":
-                nodes.test(**args)
-                print(script["name"].upper() + "-" * (columns - len(script["name"])))
-                for i in nodes.status.keys():
-                    print("   " + i + " " + "-" * (columns - len(i) - 13) + (" PASS(0)" if nodes.status[i] == 0 else " FAIL({})".format(nodes.status[i])))
+            self._cli_run(script)
+
+
+    def _cli_run(self, script):
+        args = {}
+        try:
+            action = script["action"]
+            nodelist = script["nodes"]
+            args["commands"] = script["commands"]
+            output = script["output"]
+            if action == "test":
+                args["expected"] = script["expected"]
+        except KeyError as e:
+            print("'{}' is mandatory".format(e.args[0]))
+            exit(11)
+        nodes = self.connnodes(self.config.getitems(nodelist), config = self.config)
+        stdout = False
+        if output is None:
+            pass
+        elif output == "stdout":
+            stdout = True
+        elif isinstance(output, str) and action == "run":
+            args["folder"] = output
+        if "variables" in script:
+            args["vars"] = script["variables"]
+        if "vars" in script:
+            args["vars"] = script["vars"]
+        try:
+            options = script["options"]
+            thisoptions = {k: v for k, v in options.items() if k in ["prompt", "parallel", "timeout"]}
+            args.update(thisoptions)
+        except:
+            options = None
+        size = str(os.get_terminal_size())
+        p = re.search(r'.*columns=([0-9]+)', size)
+        columns = int(p.group(1))
+        if action == "run":
+            nodes.run(**args)
+            print(script["name"].upper() + "-" * (columns - len(script["name"])))
+            for i in nodes.status.keys():
+                print("   " + i + " " + "-" * (columns - len(i) - 13) + (" PASS(0)" if nodes.status[i] == 0 else " FAIL({})".format(nodes.status[i])))
+                if stdout:
+                    for line in nodes.output[i].splitlines():
+                        print("      " + line)
+        elif action == "test":
+            nodes.test(**args)
+            print(script["name"].upper() + "-" * (columns - len(script["name"])))
+            for i in nodes.status.keys():
+                print("   " + i + " " + "-" * (columns - len(i) - 13) + (" PASS(0)" if nodes.status[i] == 0 else " FAIL({})".format(nodes.status[i])))
+                if nodes.status[i] == 0:
+                    max_length = max(len(s) for s in nodes.result[i].keys())
+                    for k,v in nodes.result[i].items():
+                        print("     TEST for '{}'".format(k) +  " "*(max_length - len(k) + 1) + "--> " + str(v).upper())
+                if stdout:
                     if nodes.status[i] == 0:
-                        try:
-                            myexpected = args["expected"].format(**args["vars"][i])
-                        except:
-                            try:
-                                myexpected = args["expected"].format(**args["vars"]["__global__"])
-                            except:
-                                myexpected = args["expected"]
-                        print("     TEST for '{}' --> ".format(myexpected) + str(nodes.result[i]).upper())
-                    if stdout:
-                        if nodes.status[i] == 0:
-                            print("     " + "-" * (len(myexpected) + 16 + len(str(nodes.result[i]))))
-                        for line in nodes.output[i].splitlines():
-                            print("      " + line)
-            else:
-                print("Wrong action '{}'".format(action))
-                exit(13)
+                        print("     " + "-" * (max_length + 21))
+                    for line in nodes.output[i].splitlines():
+                        print("      " + line)
+        else:
+            print("Wrong action '{}'".format(action))
+            exit(13)
 
     def _choose(self, list, name, action):
         #Generates an inquirer list to pick
@@ -948,28 +1078,37 @@ class connapp:
         if type == "usage":
             return "conn [-h] [--add | --del | --mod | --show | --debug] [node|folder]\n       conn {profile,move,mv,copy,cp,list,ls,bulk,config} ..."
         if type == "end":
-            return "Commands:\n  profile        Manage profiles\n  move (mv)      Move node\n  copy (cp)      Copy node\n  list (ls)      List profiles, nodes or folders\n  bulk           Add nodes in bulk\n  run            Run scripts or commands on nodes\n  config         Manage app config\n  api            Start and stop connpy api"
+            return "Commands:\n  profile        Manage profiles\n  move (mv)      Move node\n  copy (cp)      Copy node\n  list (ls)      List profiles, nodes or folders\n  bulk           Add nodes in bulk\n  run            Run scripts or commands on nodes\n  config         Manage app config\n  api            Start and stop connpy api\n  ai             Make request to an AI"
         if type == "bashcompletion":
             return '''
 #Here starts bash completion for conn
 _conn()
 {
-        strings="$(connpy-completion-helper ${#COMP_WORDS[@]} ${COMP_WORDS[@]})"
-        COMPREPLY=($(compgen -W "$strings" -- "${COMP_WORDS[-1]}"))
+        mapfile -t strings < <(connpy-completion-helper "bash" "${#COMP_WORDS[@]}" "${COMP_WORDS[@]}")
+        local IFS=$'\\t\\n'
+        COMPREPLY=($(compgen -W "$(printf '%s' "${strings[@]}")" -- "${COMP_WORDS[-1]}"))
 }
-complete -o nosort -F _conn conn
-complete -o nosort -F _conn connpy
+
+complete -o nospace -o nosort -F _conn conn
+complete -o nospace -o nosort -F _conn connpy
 #Here ends bash completion for conn
         '''
         if type == "zshcompletion":
             return '''
-
 #Here starts zsh completion for conn
 autoload -U compinit && compinit
 _conn()
 {
-    strings=($(connpy-completion-helper ${#words} $words))
-    compadd "$@" -- `echo $strings`
+    strings=($(connpy-completion-helper "zsh" ${#words} $words))
+    for string in "${strings[@]}"; do
+        if [[ "${string}" =~ .*/$ ]]; then
+            # If the string ends with a '/', do not append a space
+            compadd -S '' -- "$string"
+        else
+            # If the string does not end with a '/', append a space
+            compadd -S ' ' -- "$string"
+        fi
+    done
 }
 compdef _conn conn
 compdef _conn connpy

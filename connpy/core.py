@@ -141,12 +141,12 @@ class node:
             t = open(logfile, "r").read()
         else:
             t = logfile
+        while t.find("\b") != -1:
+            t = re.sub('[^\b]\b', '', t)
         t = t.replace("\n","",1)
         t = t.replace("\a","")
         t = t.replace('\n\n', '\n')
         t = re.sub(r'.\[K', '', t)
-        while t.find("\b") != -1:
-            t = re.sub('[^\b]\b', '', t)
         ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/ ]*[@-~])')
         t = ansi_escape.sub('', t)
         t = t.lstrip(" \n\r")
@@ -349,6 +349,8 @@ class node:
             output = ''
             if not isinstance(commands, list):
                 commands = [commands]
+            if not isinstance(expected, list):
+                expected = [expected]
             if "screen_length_command" in self.tags:
                 commands.insert(0, self.tags["screen_length_command"])
             self.mylog = io.BytesIO()
@@ -366,18 +368,25 @@ class node:
             output = self._logclean(self.mylog.getvalue().decode(), True)
             self.output = output
             if result in [0, 1]:
-                lastcommand = commands[-1]
-                if vars is not None:
-                    expected = expected.format(**vars)
-                    lastcommand = lastcommand.format(**vars)
-                last_command_index = output.rfind(lastcommand)
-                cleaned_output = output[last_command_index + len(lastcommand):].strip()
-                if expected in cleaned_output:
-                    self.result = True
-                else:
-                    self.result = False
+                # lastcommand = commands[-1]
+                # if vars is not None:
+                    # lastcommand = lastcommand.format(**vars)
+                # last_command_index = output.rfind(lastcommand)
+                # cleaned_output = output[last_command_index + len(lastcommand):].strip()
+                self.result = {}
+                for e in expected:
+                    if vars is not None:
+                        e = e.format(**vars)
+                    updatedprompt = re.sub(r'(?<!\\)\$', '', prompt)
+                    newpattern = f".*({updatedprompt}).*{e}.*"
+                    cleaned_output = output
+                    cleaned_output = re.sub(newpattern, '', cleaned_output)
+                    if e in cleaned_output:
+                        self.result[e] = True
+                    else:
+                        self.result[e]= False
                 self.status = 0
-                return False
+                return self.result
             if result == 2:
                 self.result = None
                 self.status = 2
