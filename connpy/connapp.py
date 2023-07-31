@@ -598,9 +598,13 @@ class connapp:
     def _process_input(self, input, history):
         response = self.myai.ask(input , chat_history = history, dryrun = True)
         if not response["app_related"]:
-            if not history:
-                history = []
-            history.extend(response["chat_history"])
+            try:
+                if not history:
+                    history = []
+                history.extend(response["chat_history"])
+            except:
+                if not history:
+                    history = None
             return response["response"], history
         else:
             history = None
