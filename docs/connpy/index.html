@@ -2379,9 +2379,13 @@ Categorize the user&#39;s request based on the operation they want to perform on
     def _process_input(self, input, history):
         response = self.myai.ask(input , chat_history = history, dryrun = True)
         if not response[&#34;app_related&#34;]:
-            if not history:
-                history = []
-            history.extend(response[&#34;chat_history&#34;])
+            try:
+                if not history:
+                    history = []
+                history.extend(response[&#34;chat_history&#34;])
+            except:
+                if not history:
+                    history = None
             return response[&#34;response&#34;], history
         else:
             history = None
