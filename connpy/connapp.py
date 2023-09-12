@@ -13,6 +13,9 @@ from ._version import __version__
 from .api import start_api,stop_api,debug_api
 from .ai import ai
 import yaml
+class NoAliasDumper(yaml.SafeDumper):
+    def ignore_aliases(self, data):
+        return True
 import ast
 from rich import print as mdprint
 from rich.markdown import Markdown
@@ -102,6 +105,14 @@ class connapp:
         bulkparser = subparsers.add_parser("bulk", help="Add nodes in bulk") 
         bulkparser.add_argument("bulk", const="bulk", nargs=0, action=self._store_type, help="Add nodes in bulk")
         bulkparser.set_defaults(func=self._func_others)
+        # EXPORTPARSER
+        exportparser = subparsers.add_parser("export", help="Export connection folder to Yaml file") 
+        exportparser.add_argument("export", nargs=2, action=self._store_type, help="export [@subfolder]@folder file.yaml", type=self._type_node)
+        exportparser.set_defaults(func=self._func_export)
+        # IMPORTPARSER
+        importparser = subparsers.add_parser("import", help="Import connection folder to config from Yaml file") 
+        importparser.add_argument("import", nargs=1, action=self._store_type, help="import file.yaml", type=self._type_node)
+        importparser.set_defaults(func=self._func_import)
         # AIPARSER
         aiparser = subparsers.add_parser("ai", help="Make request to an AI") 
         aiparser.add_argument("ask", nargs='*', help="Ask connpy AI something")
@@ -135,7 +146,7 @@ class connapp:
         configcrud.add_argument("--openai-model", dest="model", nargs=1, action=self._store_type, help="Set openai model", metavar="MODEL")
         configparser.set_defaults(func=self._func_others)
         #Manage sys arguments
-        commands = ["node", "profile", "mv", "move","copy", "cp", "bulk", "ls", "list", "run", "config", "api", "ai"]
+        commands = ["node", "profile", "mv", "move","copy", "cp", "bulk", "ls", "list", "run", "config", "api", "ai", "export", "import"]
         profilecmds = ["--add", "-a", "--del", "--rm",  "-r", "--mod", "--edit", "-e", "--show", "-s"]
         if len(argv) >= 2 and argv[1] == "profile" and argv[0] in profilecmds:
             argv[1] = argv[0]
@@ -291,27 +302,55 @@ class connapp:
         if args.data == None:
             print("Missing argument node")
             exit(3)
-        matches = list(filter(lambda k: k == args.data, self.nodes))
+        # matches = list(filter(lambda k: k == args.data, self.nodes))
+        matches = self.config._getallnodes(args.data)
         if len(matches) == 0:
-            print("{} not found".format(args.data))
+            print("No connection found with filter: {}".format(args.data))
             exit(2)
-        node = self.config.getitem(matches[0])
+        elif len(matches) == 1:
+            uniques = self.config._explode_unique(args.data)
+            unique = matches[0]
+        else:
+            uniques = {"id": None, "folder": None}
+            unique = None
+        print("Editing: {}".format(matches))
+        node = {}
+        for i in matches:
+            node[i] = self.config.getitem(i)
         edits = self._questions_edit()
         if edits == None:
             exit(7)
-        uniques = self.config._explode_unique(args.data)
-        updatenode = self._questions_nodes(args.data, uniques, edit=edits)
+        updatenode = self._questions_nodes(unique, uniques, edit=edits)
         if not updatenode:
             exit(7)
-        uniques.update(node)
-        uniques["type"] = "connection"
-        if sorted(updatenode.items()) == sorted(uniques.items()):
-            print("Nothing to do here")
-            return
+        if len(matches) == 1:
+            uniques.update(node[matches[0]])
+            uniques["type"] = "connection"
+            if sorted(updatenode.items()) == sorted(uniques.items()):
+                print("Nothing to do here")
+                return
+            else:
+                self.config._connections_add(**updatenode)
+                self.config._saveconfig(self.config.file)
+                print("{} edited succesfully".format(args.data))
         else:
-            self.config._connections_add(**updatenode)
+            for k in node:
+                updatednode = self.config._explode_unique(k)
+                updatednode["type"] = "connection"
+                updatednode.update(node[k])
+                editcount = 0
+                for key, should_edit in edits.items():
+                    if should_edit:
+                        editcount += 1
+                        updatednode[key] = updatenode[key]
+                if not editcount:
+                    print("Nothing to do here")
+                    return
+                else:
+                    self.config._connections_add(**updatednode)
             self.config._saveconfig(self.config.file)
-            print("{} edited succesfully".format(args.data))
+            print("{} edited succesfully".format(matches))
+            return
 
 
     def _func_profile(self, args):
@@ -525,6 +564,57 @@ class connapp:
         self.config.config[name] = value
         self.config._saveconfig(self.config.file)
         print("Config saved")
+
+    def _func_import(self, args):
+        if not os.path.exists(args.data[0]):
+            print("File {} dosn't exists".format(args.data[0]))
+            exit(14)
+        question = [inquirer.Confirm("import", message="Are you sure you want to import {} file? This could overwrite your current configuration".format(args.data[0]))]
+        confirm = inquirer.prompt(question)
+        if confirm == None:
+            exit(7)
+        if confirm["import"]:
+            try:
+                with open(args.data[0]) as file:
+                    imported = yaml.load(file, Loader=yaml.FullLoader)
+            except:
+                print("failed reading file {}".format(args.data[0]))
+                exit(10)
+            for k,v in imported.items():
+                uniques = self.config._explode_unique(k)
+                folder = f"@{uniques['folder']}"
+                matches = list(filter(lambda k: k == folder, self.folders))
+                if len(matches) == 0:
+                    uniquefolder = self.config._explode_unique(folder)
+                    self.config._folder_add(**uniquefolder)
+                if "subfolder" in uniques:
+                    subfolder = f"@{uniques['subfolder']}@{uniques['folder']}"
+                    matches = list(filter(lambda k: k == subfolder, self.folders))
+                    if len(matches) == 0:
+                        uniquesubfolder = self.config._explode_unique(subfolder)
+                        self.config._folder_add(**uniquesubfolder)
+                uniques.update(v)
+                self.config._connections_add(**uniques)
+            self.config._saveconfig(self.config.file)
+            print("File {} imported succesfully".format(args.data[0]))
+        return
+
+    def _func_export(self, args):
+        matches = list(filter(lambda k: k == args.data[0], self.folders))
+        if len(matches) == 0:
+            print("{} folder not found".format(args.data[0]))
+            exit(2)
+        if os.path.exists(args.data[1]):
+            print("File {} already exists".format(args.data[1]))
+            exit(14)
+        else:
+            foldercons = self.config._getallnodesfull(args.data[0], extract = False)
+            with open(args.data[1], "w") as file:
+                yaml.dump(foldercons, file, Dumper=NoAliasDumper, default_flow_style=False)
+                file.close()
+            print("File {} generated succesfully".format(args.data[1]))
+            exit()
+        return
 
     def _func_run(self, args):
         if len(args.data) > 1:
@@ -916,7 +1006,7 @@ class connapp:
             if "tags" not in defaults:
                 defaults["tags"] = ""
         except:
-            defaults = { "host":"", "protocol":"", "port":"", "user":"", "options":"", "logs":"" , "tags":""}
+            defaults = { "host":"", "protocol":"", "port":"", "user":"", "options":"", "logs":"" , "tags":"", "password":""}
         node = {}
         if edit == None:
             edit = { "host":True, "protocol":True, "port":True, "user":True, "password": True,"options":True, "logs":True, "tags":True }
@@ -1082,7 +1172,7 @@ class connapp:
         if type == "usage":
             return "conn [-h] [--add | --del | --mod | --show | --debug] [node|folder]\n       conn {profile,move,mv,copy,cp,list,ls,bulk,config} ..."
         if type == "end":
-            return "Commands:\n  profile        Manage profiles\n  move (mv)      Move node\n  copy (cp)      Copy node\n  list (ls)      List profiles, nodes or folders\n  bulk           Add nodes in bulk\n  run            Run scripts or commands on nodes\n  config         Manage app config\n  api            Start and stop connpy api\n  ai             Make request to an AI"
+            return "Commands:\n  profile        Manage profiles\n  move (mv)      Move node\n  copy (cp)      Copy node\n  list (ls)      List profiles, nodes or folders\n  bulk           Add nodes in bulk\n  export         Export connection folder to Yaml file\n  import         Import connection folder to config from Yaml file\n  run            Run scripts or commands on nodes\n  config         Manage app config\n  api            Start and stop connpy api\n  ai             Make request to an AI"
         if type == "bashcompletion":
             return '''
 #Here starts bash completion for conn
