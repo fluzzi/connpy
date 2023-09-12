@@ -133,6 +133,8 @@ positional arguments:
   copy (cp)      Copy node
   list (ls)      List profiles, nodes or folders
   bulk           Add nodes in bulk
+  export         Export connection folder to Yaml file
+  import         Import connection folder to config from Yaml file
   run            Run scripts or commands on nodes
   config         Manage app config
   api            Start and stop connpy api

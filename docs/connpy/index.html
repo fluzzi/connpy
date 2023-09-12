@@ -58,6 +58,8 @@ Commands:
   copy (cp)      Copy node
   list (ls)      List profiles, nodes or folders
   bulk           Add nodes in bulk
+  export         Export connection folder to Yaml file
+  import         Import connection folder to config from Yaml file
   run            Run scripts or commands on nodes
   config         Manage app config
   api            Start and stop connpy api
@@ -290,6 +292,8 @@ Commands:
   copy (cp)      Copy node
   list (ls)      List profiles, nodes or folders
   bulk           Add nodes in bulk
+  export         Export connection folder to Yaml file
+  import         Import connection folder to config from Yaml file
   run            Run scripts or commands on nodes
   config         Manage app config
   api            Start and stop connpy api
@@ -1493,7 +1497,7 @@ Categorize the user&#39;s request based on the operation they want to perform on
 
         ### Parameters:  
 
-            - uniques (str/list): Regex string name that will match hostnames 
+            - uniques (str/list): String name that will match hostnames 
                                   from the connection manager. It can be a 
                                   list of strings.
 
@@ -1504,6 +1508,8 @@ Categorize the user&#39;s request based on the operation they want to perform on
 
         &#39;&#39;&#39;
         nodes = {}
+        if isinstance(uniques, str):
+            uniques = [uniques]
         for i in uniques:
             if isinstance(i, dict):
                 name = list(i.keys())[0]
@@ -1593,7 +1599,7 @@ Categorize the user&#39;s request based on the operation they want to perform on
                 raise ValueError(&#34;filter must be a string or a list of strings&#34;)
         return nodes
 
-    def _getallnodesfull(self, filter = None):
+    def _getallnodesfull(self, filter = None, extract = True):
         #get all nodes on configfile with all their attributes.
         nodes = {}
         layer1 = {k:v for k,v in self.connections.items() if isinstance(v, dict) and v[&#34;type&#34;] == &#34;connection&#34;}
@@ -1613,19 +1619,20 @@ Categorize the user&#39;s request based on the operation they want to perform on
                 nodes = {k: v for k, v in nodes.items() if any(re.search(pattern, k) for pattern in filter)}
             else:
                 raise ValueError(&#34;filter must be a string or a list of strings&#34;)
-        for node, keys in nodes.items():
-            for key, value in keys.items():
-                profile = re.search(&#34;^@(.*)&#34;, str(value))
-                if profile:
-                    try:
-                        nodes[node][key] = self.profiles[profile.group(1)][key]
-                    except:
-                        nodes[node][key] = &#34;&#34;
-                elif value == &#39;&#39; and key == &#34;protocol&#34;:
-                    try:
-                        nodes[node][key] = config.profiles[&#34;default&#34;][key]
-                    except:
-                        nodes[node][key] = &#34;ssh&#34;
+        if extract:
+            for node, keys in nodes.items():
+                for key, value in keys.items():
+                    profile = re.search(&#34;^@(.*)&#34;, str(value))
+                    if profile:
+                        try:
+                            nodes[node][key] = self.profiles[profile.group(1)][key]
+                        except:
+                            nodes[node][key] = &#34;&#34;
+                    elif value == &#39;&#39; and key == &#34;protocol&#34;:
+                        try:
+                            nodes[node][key] = config.profiles[&#34;default&#34;][key]
+                        except:
+                            nodes[node][key] = &#34;ssh&#34;
         return nodes
 
 
@@ -1740,7 +1747,7 @@ Categorize the user&#39;s request based on the operation they want to perform on
 <dd>
 <div class="desc"><p>Get a group of nodes from configfile which can be passed to node/nodes class</p>
 <h3 id="parameters">Parameters:</h3>
-<pre><code>- uniques (str/list): Regex string name that will match hostnames 
+<pre><code>- uniques (str/list): String name that will match hostnames 
                       from the connection manager. It can be a 
                       list of strings.
 </code></pre>
@@ -1758,7 +1765,7 @@ Categorize the user&#39;s request based on the operation they want to perform on
 
     ### Parameters:  
 
-        - uniques (str/list): Regex string name that will match hostnames 
+        - uniques (str/list): String name that will match hostnames 
                               from the connection manager. It can be a 
                               list of strings.
 
@@ -1769,6 +1776,8 @@ Categorize the user&#39;s request based on the operation they want to perform on
 
     &#39;&#39;&#39;
     nodes = {}
+    if isinstance(uniques, str):
+        uniques = [uniques]
     for i in uniques:
         if isinstance(i, dict):
             name = list(i.keys())[0]
@@ -1883,6 +1892,14 @@ Categorize the user&#39;s request based on the operation they want to perform on
         bulkparser = subparsers.add_parser(&#34;bulk&#34;, help=&#34;Add nodes in bulk&#34;) 
         bulkparser.add_argument(&#34;bulk&#34;, const=&#34;bulk&#34;, nargs=0, action=self._store_type, help=&#34;Add nodes in bulk&#34;)
         bulkparser.set_defaults(func=self._func_others)
+        # EXPORTPARSER
+        exportparser = subparsers.add_parser(&#34;export&#34;, help=&#34;Export connection folder to Yaml file&#34;) 
+        exportparser.add_argument(&#34;export&#34;, nargs=2, action=self._store_type, help=&#34;export [@subfolder]@folder file.yaml&#34;, type=self._type_node)
+        exportparser.set_defaults(func=self._func_export)
+        # IMPORTPARSER
+        importparser = subparsers.add_parser(&#34;import&#34;, help=&#34;Import connection folder to config from Yaml file&#34;) 
+        importparser.add_argument(&#34;import&#34;, nargs=1, action=self._store_type, help=&#34;import file.yaml&#34;, type=self._type_node)
+        importparser.set_defaults(func=self._func_import)
         # AIPARSER
         aiparser = subparsers.add_parser(&#34;ai&#34;, help=&#34;Make request to an AI&#34;) 
         aiparser.add_argument(&#34;ask&#34;, nargs=&#39;*&#39;, help=&#34;Ask connpy AI something&#34;)
@@ -1916,7 +1933,7 @@ Categorize the user&#39;s request based on the operation they want to perform on
         configcrud.add_argument(&#34;--openai-model&#34;, dest=&#34;model&#34;, nargs=1, action=self._store_type, help=&#34;Set openai model&#34;, metavar=&#34;MODEL&#34;)
         configparser.set_defaults(func=self._func_others)
         #Manage sys arguments
-        commands = [&#34;node&#34;, &#34;profile&#34;, &#34;mv&#34;, &#34;move&#34;,&#34;copy&#34;, &#34;cp&#34;, &#34;bulk&#34;, &#34;ls&#34;, &#34;list&#34;, &#34;run&#34;, &#34;config&#34;, &#34;api&#34;, &#34;ai&#34;]
+        commands = [&#34;node&#34;, &#34;profile&#34;, &#34;mv&#34;, &#34;move&#34;,&#34;copy&#34;, &#34;cp&#34;, &#34;bulk&#34;, &#34;ls&#34;, &#34;list&#34;, &#34;run&#34;, &#34;config&#34;, &#34;api&#34;, &#34;ai&#34;, &#34;export&#34;, &#34;import&#34;]
         profilecmds = [&#34;--add&#34;, &#34;-a&#34;, &#34;--del&#34;, &#34;--rm&#34;,  &#34;-r&#34;, &#34;--mod&#34;, &#34;--edit&#34;, &#34;-e&#34;, &#34;--show&#34;, &#34;-s&#34;]
         if len(argv) &gt;= 2 and argv[1] == &#34;profile&#34; and argv[0] in profilecmds:
             argv[1] = argv[0]
@@ -2072,27 +2089,55 @@ Categorize the user&#39;s request based on the operation they want to perform on
         if args.data == None:
             print(&#34;Missing argument node&#34;)
             exit(3)
-        matches = list(filter(lambda k: k == args.data, self.nodes))
+        # matches = list(filter(lambda k: k == args.data, self.nodes))
+        matches = self.config._getallnodes(args.data)
         if len(matches) == 0:
-            print(&#34;{} not found&#34;.format(args.data))
+            print(&#34;No connection found with filter: {}&#34;.format(args.data))
             exit(2)
-        node = self.config.getitem(matches[0])
+        elif len(matches) == 1:
+            uniques = self.config._explode_unique(args.data)
+            unique = matches[0]
+        else:
+            uniques = {&#34;id&#34;: None, &#34;folder&#34;: None}
+            unique = None
+        print(&#34;Editing: {}&#34;.format(matches))
+        node = {}
+        for i in matches:
+            node[i] = self.config.getitem(i)
         edits = self._questions_edit()
         if edits == None:
             exit(7)
-        uniques = self.config._explode_unique(args.data)
-        updatenode = self._questions_nodes(args.data, uniques, edit=edits)
+        updatenode = self._questions_nodes(unique, uniques, edit=edits)
         if not updatenode:
             exit(7)
-        uniques.update(node)
-        uniques[&#34;type&#34;] = &#34;connection&#34;
-        if sorted(updatenode.items()) == sorted(uniques.items()):
-            print(&#34;Nothing to do here&#34;)
-            return
+        if len(matches) == 1:
+            uniques.update(node[matches[0]])
+            uniques[&#34;type&#34;] = &#34;connection&#34;
+            if sorted(updatenode.items()) == sorted(uniques.items()):
+                print(&#34;Nothing to do here&#34;)
+                return
+            else:
+                self.config._connections_add(**updatenode)
+                self.config._saveconfig(self.config.file)
+                print(&#34;{} edited succesfully&#34;.format(args.data))
         else:
-            self.config._connections_add(**updatenode)
+            for k in node:
+                updatednode = self.config._explode_unique(k)
+                updatednode[&#34;type&#34;] = &#34;connection&#34;
+                updatednode.update(node[k])
+                editcount = 0
+                for key, should_edit in edits.items():
+                    if should_edit:
+                        editcount += 1
+                        updatednode[key] = updatenode[key]
+                if not editcount:
+                    print(&#34;Nothing to do here&#34;)
+                    return
+                else:
+                    self.config._connections_add(**updatednode)
             self.config._saveconfig(self.config.file)
-            print(&#34;{} edited succesfully&#34;.format(args.data))
+            print(&#34;{} edited succesfully&#34;.format(matches))
+            return
 
 
     def _func_profile(self, args):
@@ -2306,6 +2351,57 @@ Categorize the user&#39;s request based on the operation they want to perform on
         self.config.config[name] = value
         self.config._saveconfig(self.config.file)
         print(&#34;Config saved&#34;)
+
+    def _func_import(self, args):
+        if not os.path.exists(args.data[0]):
+            print(&#34;File {} dosn&#39;t exists&#34;.format(args.data[0]))
+            exit(14)
+        question = [inquirer.Confirm(&#34;import&#34;, message=&#34;Are you sure you want to import {} file? This could overwrite your current configuration&#34;.format(args.data[0]))]
+        confirm = inquirer.prompt(question)
+        if confirm == None:
+            exit(7)
+        if confirm[&#34;import&#34;]:
+            try:
+                with open(args.data[0]) as file:
+                    imported = yaml.load(file, Loader=yaml.FullLoader)
+            except:
+                print(&#34;failed reading file {}&#34;.format(args.data[0]))
+                exit(10)
+            for k,v in imported.items():
+                uniques = self.config._explode_unique(k)
+                folder = f&#34;@{uniques[&#39;folder&#39;]}&#34;
+                matches = list(filter(lambda k: k == folder, self.folders))
+                if len(matches) == 0:
+                    uniquefolder = self.config._explode_unique(folder)
+                    self.config._folder_add(**uniquefolder)
+                if &#34;subfolder&#34; in uniques:
+                    subfolder = f&#34;@{uniques[&#39;subfolder&#39;]}@{uniques[&#39;folder&#39;]}&#34;
+                    matches = list(filter(lambda k: k == subfolder, self.folders))
+                    if len(matches) == 0:
+                        uniquesubfolder = self.config._explode_unique(subfolder)
+                        self.config._folder_add(**uniquesubfolder)
+                uniques.update(v)
+                self.config._connections_add(**uniques)
+            self.config._saveconfig(self.config.file)
+            print(&#34;File {} imported succesfully&#34;.format(args.data[0]))
+        return
+
+    def _func_export(self, args):
+        matches = list(filter(lambda k: k == args.data[0], self.folders))
+        if len(matches) == 0:
+            print(&#34;{} folder not found&#34;.format(args.data[0]))
+            exit(2)
+        if os.path.exists(args.data[1]):
+            print(&#34;File {} already exists&#34;.format(args.data[1]))
+            exit(14)
+        else:
+            foldercons = self.config._getallnodesfull(args.data[0], extract = False)
+            with open(args.data[1], &#34;w&#34;) as file:
+                yaml.dump(foldercons, file, Dumper=NoAliasDumper, default_flow_style=False)
+                file.close()
+            print(&#34;File {} generated succesfully&#34;.format(args.data[1]))
+            exit()
+        return
 
     def _func_run(self, args):
         if len(args.data) &gt; 1:
@@ -2697,7 +2793,7 @@ Categorize the user&#39;s request based on the operation they want to perform on
             if &#34;tags&#34; not in defaults:
                 defaults[&#34;tags&#34;] = &#34;&#34;
         except:
-            defaults = { &#34;host&#34;:&#34;&#34;, &#34;protocol&#34;:&#34;&#34;, &#34;port&#34;:&#34;&#34;, &#34;user&#34;:&#34;&#34;, &#34;options&#34;:&#34;&#34;, &#34;logs&#34;:&#34;&#34; , &#34;tags&#34;:&#34;&#34;}
+            defaults = { &#34;host&#34;:&#34;&#34;, &#34;protocol&#34;:&#34;&#34;, &#34;port&#34;:&#34;&#34;, &#34;user&#34;:&#34;&#34;, &#34;options&#34;:&#34;&#34;, &#34;logs&#34;:&#34;&#34; , &#34;tags&#34;:&#34;&#34;, &#34;password&#34;:&#34;&#34;}
         node = {}
         if edit == None:
             edit = { &#34;host&#34;:True, &#34;protocol&#34;:True, &#34;port&#34;:True, &#34;user&#34;:True, &#34;password&#34;: True,&#34;options&#34;:True, &#34;logs&#34;:True, &#34;tags&#34;:True }
@@ -2863,7 +2959,7 @@ Categorize the user&#39;s request based on the operation they want to perform on
         if type == &#34;usage&#34;:
             return &#34;conn [-h] [--add | --del | --mod | --show | --debug] [node|folder]\n       conn {profile,move,mv,copy,cp,list,ls,bulk,config} ...&#34;
         if type == &#34;end&#34;:
-            return &#34;Commands:\n  profile        Manage profiles\n  move (mv)      Move node\n  copy (cp)      Copy node\n  list (ls)      List profiles, nodes or folders\n  bulk           Add nodes in bulk\n  run            Run scripts or commands on nodes\n  config         Manage app config\n  api            Start and stop connpy api\n  ai             Make request to an AI&#34;
+            return &#34;Commands:\n  profile        Manage profiles\n  move (mv)      Move node\n  copy (cp)      Copy node\n  list (ls)      List profiles, nodes or folders\n  bulk           Add nodes in bulk\n  export         Export connection folder to Yaml file\n  import         Import connection folder to config from Yaml file\n  run            Run scripts or commands on nodes\n  config         Manage app config\n  api            Start and stop connpy api\n  ai             Make request to an AI&#34;
         if type == &#34;bashcompletion&#34;:
             return &#39;&#39;&#39;
 #Here starts bash completion for conn
@@ -3050,7 +3146,7 @@ tasks:
 </details>
 </dd>
 <dt id="connpy.connapp.start"><code class="name flex">
-<span>def <span class="ident">start</span></span>(<span>self, argv=['connpy', '-o', 'docs/', '--html', '--force'])</span>
+<span>def <span class="ident">start</span></span>(<span>self, argv=['connpy', '-o', 'docs/', '--force', '--html'])</span>
 </code></dt>
 <dd>
 <div class="desc"><h3 id="parameters">Parameters:</h3>
@@ -3109,6 +3205,14 @@ tasks:
     bulkparser = subparsers.add_parser(&#34;bulk&#34;, help=&#34;Add nodes in bulk&#34;) 
     bulkparser.add_argument(&#34;bulk&#34;, const=&#34;bulk&#34;, nargs=0, action=self._store_type, help=&#34;Add nodes in bulk&#34;)
     bulkparser.set_defaults(func=self._func_others)
+    # EXPORTPARSER
+    exportparser = subparsers.add_parser(&#34;export&#34;, help=&#34;Export connection folder to Yaml file&#34;) 
+    exportparser.add_argument(&#34;export&#34;, nargs=2, action=self._store_type, help=&#34;export [@subfolder]@folder file.yaml&#34;, type=self._type_node)
+    exportparser.set_defaults(func=self._func_export)
+    # IMPORTPARSER
+    importparser = subparsers.add_parser(&#34;import&#34;, help=&#34;Import connection folder to config from Yaml file&#34;) 
+    importparser.add_argument(&#34;import&#34;, nargs=1, action=self._store_type, help=&#34;import file.yaml&#34;, type=self._type_node)
+    importparser.set_defaults(func=self._func_import)
     # AIPARSER
     aiparser = subparsers.add_parser(&#34;ai&#34;, help=&#34;Make request to an AI&#34;) 
     aiparser.add_argument(&#34;ask&#34;, nargs=&#39;*&#39;, help=&#34;Ask connpy AI something&#34;)
@@ -3142,7 +3246,7 @@ tasks:
     configcrud.add_argument(&#34;--openai-model&#34;, dest=&#34;model&#34;, nargs=1, action=self._store_type, help=&#34;Set openai model&#34;, metavar=&#34;MODEL&#34;)
     configparser.set_defaults(func=self._func_others)
     #Manage sys arguments
-    commands = [&#34;node&#34;, &#34;profile&#34;, &#34;mv&#34;, &#34;move&#34;,&#34;copy&#34;, &#34;cp&#34;, &#34;bulk&#34;, &#34;ls&#34;, &#34;list&#34;, &#34;run&#34;, &#34;config&#34;, &#34;api&#34;, &#34;ai&#34;]
+    commands = [&#34;node&#34;, &#34;profile&#34;, &#34;mv&#34;, &#34;move&#34;,&#34;copy&#34;, &#34;cp&#34;, &#34;bulk&#34;, &#34;ls&#34;, &#34;list&#34;, &#34;run&#34;, &#34;config&#34;, &#34;api&#34;, &#34;ai&#34;, &#34;export&#34;, &#34;import&#34;]
     profilecmds = [&#34;--add&#34;, &#34;-a&#34;, &#34;--del&#34;, &#34;--rm&#34;,  &#34;-r&#34;, &#34;--mod&#34;, &#34;--edit&#34;, &#34;-e&#34;, &#34;--show&#34;, &#34;-s&#34;]
     if len(argv) &gt;= 2 and argv[1] == &#34;profile&#34; and argv[0] in profilecmds:
         argv[1] = argv[0]

@@ -203,7 +203,7 @@ class configfile:
 
         ### Parameters:  
 
-            - uniques (str/list): Regex string name that will match hostnames 
+            - uniques (str/list): String name that will match hostnames 
                                   from the connection manager. It can be a 
                                   list of strings.
 
@@ -214,6 +214,8 @@ class configfile:
 
         '''
         nodes = {}
+        if isinstance(uniques, str):
+            uniques = [uniques]
         for i in uniques:
             if isinstance(i, dict):
                 name = list(i.keys())[0]
@@ -303,7 +305,7 @@ class configfile:
                 raise ValueError("filter must be a string or a list of strings")
         return nodes
 
-    def _getallnodesfull(self, filter = None):
+    def _getallnodesfull(self, filter = None, extract = True):
         #get all nodes on configfile with all their attributes.
         nodes = {}
         layer1 = {k:v for k,v in self.connections.items() if isinstance(v, dict) and v["type"] == "connection"}
@@ -323,19 +325,20 @@ class configfile:
                 nodes = {k: v for k, v in nodes.items() if any(re.search(pattern, k) for pattern in filter)}
             else:
                 raise ValueError("filter must be a string or a list of strings")
-        for node, keys in nodes.items():
-            for key, value in keys.items():
-                profile = re.search("^@(.*)", str(value))
-                if profile:
-                    try:
-                        nodes[node][key] = self.profiles[profile.group(1)][key]
-                    except:
-                        nodes[node][key] = ""
-                elif value == '' and key == "protocol":
-                    try:
-                        nodes[node][key] = config.profiles["default"][key]
-                    except:
-                        nodes[node][key] = "ssh"
+        if extract:
+            for node, keys in nodes.items():
+                for key, value in keys.items():
+                    profile = re.search("^@(.*)", str(value))
+                    if profile:
+                        try:
+                            nodes[node][key] = self.profiles[profile.group(1)][key]
+                        except:
+                            nodes[node][key] = ""
+                    elif value == '' and key == "protocol":
+                        try:
+                            nodes[node][key] = config.profiles["default"][key]
+                        except:
+                            nodes[node][key] = "ssh"
         return nodes
 
 
