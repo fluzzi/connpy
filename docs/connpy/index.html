@@ -1894,11 +1894,11 @@ Categorize the user&#39;s request based on the operation they want to perform on
         bulkparser.set_defaults(func=self._func_others)
         # EXPORTPARSER
         exportparser = subparsers.add_parser(&#34;export&#34;, help=&#34;Export connection folder to Yaml file&#34;) 
-        exportparser.add_argument(&#34;export&#34;, nargs=2, action=self._store_type, help=&#34;export [@subfolder]@folder file.yaml&#34;, type=self._type_node)
+        exportparser.add_argument(&#34;export&#34;, nargs=2, action=self._store_type, help=&#34;Export [@subfolder]@folder /path/to/file.yml&#34;)
         exportparser.set_defaults(func=self._func_export)
         # IMPORTPARSER
         importparser = subparsers.add_parser(&#34;import&#34;, help=&#34;Import connection folder to config from Yaml file&#34;) 
-        importparser.add_argument(&#34;import&#34;, nargs=1, action=self._store_type, help=&#34;import file.yaml&#34;, type=self._type_node)
+        importparser.add_argument(&#34;file&#34;, nargs=1, action=self._store_type, help=&#34;Import /path/to/file.yml&#34;)
         importparser.set_defaults(func=self._func_import)
         # AIPARSER
         aiparser = subparsers.add_parser(&#34;ai&#34;, help=&#34;Make request to an AI&#34;) 
@@ -2356,7 +2356,8 @@ Categorize the user&#39;s request based on the operation they want to perform on
         if not os.path.exists(args.data[0]):
             print(&#34;File {} dosn&#39;t exists&#34;.format(args.data[0]))
             exit(14)
-        question = [inquirer.Confirm(&#34;import&#34;, message=&#34;Are you sure you want to import {} file? This could overwrite your current configuration&#34;.format(args.data[0]))]
+        print(&#34;This could overwrite your current configuration!&#34;)
+        question = [inquirer.Confirm(&#34;import&#34;, message=&#34;Are you sure you want to import {} file?&#34;.format(args.data[0]))]
         confirm = inquirer.prompt(question)
         if confirm == None:
             exit(7)
@@ -3207,11 +3208,11 @@ tasks:
     bulkparser.set_defaults(func=self._func_others)
     # EXPORTPARSER
     exportparser = subparsers.add_parser(&#34;export&#34;, help=&#34;Export connection folder to Yaml file&#34;) 
-    exportparser.add_argument(&#34;export&#34;, nargs=2, action=self._store_type, help=&#34;export [@subfolder]@folder file.yaml&#34;, type=self._type_node)
+    exportparser.add_argument(&#34;export&#34;, nargs=2, action=self._store_type, help=&#34;Export [@subfolder]@folder /path/to/file.yml&#34;)
     exportparser.set_defaults(func=self._func_export)
     # IMPORTPARSER
     importparser = subparsers.add_parser(&#34;import&#34;, help=&#34;Import connection folder to config from Yaml file&#34;) 
-    importparser.add_argument(&#34;import&#34;, nargs=1, action=self._store_type, help=&#34;import file.yaml&#34;, type=self._type_node)
+    importparser.add_argument(&#34;file&#34;, nargs=1, action=self._store_type, help=&#34;Import /path/to/file.yml&#34;)
     importparser.set_defaults(func=self._func_import)
     # AIPARSER
     aiparser = subparsers.add_parser(&#34;ai&#34;, help=&#34;Make request to an AI&#34;) 

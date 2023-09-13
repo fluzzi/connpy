@@ -107,11 +107,11 @@ class connapp:
         bulkparser.set_defaults(func=self._func_others)
         # EXPORTPARSER
         exportparser = subparsers.add_parser("export", help="Export connection folder to Yaml file") 
-        exportparser.add_argument("export", nargs=2, action=self._store_type, help="export [@subfolder]@folder file.yaml", type=self._type_node)
+        exportparser.add_argument("export", nargs=2, action=self._store_type, help="Export [@subfolder]@folder /path/to/file.yml")
         exportparser.set_defaults(func=self._func_export)
         # IMPORTPARSER
         importparser = subparsers.add_parser("import", help="Import connection folder to config from Yaml file") 
-        importparser.add_argument("import", nargs=1, action=self._store_type, help="import file.yaml", type=self._type_node)
+        importparser.add_argument("file", nargs=1, action=self._store_type, help="Import /path/to/file.yml")
         importparser.set_defaults(func=self._func_import)
         # AIPARSER
         aiparser = subparsers.add_parser("ai", help="Make request to an AI") 
@@ -569,7 +569,8 @@ class connapp:
         if not os.path.exists(args.data[0]):
             print("File {} dosn't exists".format(args.data[0]))
             exit(14)
-        question = [inquirer.Confirm("import", message="Are you sure you want to import {} file? This could overwrite your current configuration".format(args.data[0]))]
+        print("This could overwrite your current configuration!")
+        question = [inquirer.Confirm("import", message="Are you sure you want to import {} file?".format(args.data[0]))]
         confirm = inquirer.prompt(question)
         if confirm == None:
             exit(7)
