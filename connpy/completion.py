@@ -45,7 +45,7 @@ def main():
     wordsnumber = int(sys.argv[positions[0]])
     words = sys.argv[positions[1]:]
     if wordsnumber == 2:
-        strings=["--add", "--del", "--rm", "--edit", "--mod", "--show", "mv", "move", "ls", "list", "cp", "copy", "profile", "run", "bulk", "config", "api", "ai", "--help"]
+        strings=["--add", "--del", "--rm", "--edit", "--mod", "--show", "mv", "move", "ls", "list", "cp", "copy", "profile", "run", "bulk", "config", "api", "ai", "export", "import", "--help"]
         strings.extend(nodes)
         strings.extend(folders)
 
@@ -66,23 +66,26 @@ def main():
             strings=["profile"]
         if words[0] in ["list", "ls"]:
             strings=["profiles", "nodes", "folders"]
-        if words[0] in ["bulk", "mv", "cp", "copy", "run"]:
+        if words[0] in ["bulk", "mv", "cp", "copy", "export"]:
             strings=["--help"]
-        if words[0] in ["--rm", "--del", "-r"]:
+        if words[0] in ["--rm", "--del", "-r", "export"]:
             strings.extend(folders)
         if words[0] in ["--rm", "--del", "-r", "--mod", "--edit", "-e", "--show", "-s", "mv", "move", "cp", "copy"]:
             strings.extend(nodes)
-        if words[0] == "run":
-            if words[-1] == "run":
+        if words[0] in ["run", "import"]:
+            if words[-1] in ["run", "import"]:
                 path = './*'
             else:
                 path = words[-1] + "*"
-            strings = glob.glob(path)
-            for i in range(len(strings)):
-                if os.path.isdir(strings[i]):
-                    strings[i] += '/'
-            strings = [s[2:] if s.startswith('./') else s for s in strings]
-            strings.extend(nodes)
+            pathstrings = glob.glob(path)
+            for i in range(len(pathstrings)):
+                if os.path.isdir(pathstrings[i]):
+                    pathstrings[i] += '/'
+            strings = ["--help"]
+            pathstrings = [s[2:] if s.startswith('./') else s for s in pathstrings]
+            strings.extend(pathstrings)
+            if words[0] == "run":
+                strings.extend(nodes)
 
     elif wordsnumber == 4:
           strings=[]
