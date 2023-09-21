@@ -320,8 +320,10 @@ class configfile:
                 nodes.update(layer3)
         if filter:
             if isinstance(filter, str):
+                filter = "^(?!.*@).+$" if filter == "@" else filter
                 nodes = {k: v for k, v in nodes.items() if re.search(filter, k)}
             elif isinstance(filter, list):
+                filter = ["^(?!.*@).+$" if item == "@" else item for item in filter]
                 nodes = {k: v for k, v in nodes.items() if any(re.search(pattern, k) for pattern in filter)}
             else:
                 raise ValueError("filter must be a string or a list of strings")

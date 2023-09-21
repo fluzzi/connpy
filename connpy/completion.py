@@ -66,14 +66,14 @@ def main():
             strings=["profile"]
         if words[0] in ["list", "ls"]:
             strings=["profiles", "nodes", "folders"]
-        if words[0] in ["bulk", "mv", "cp", "copy", "export"]:
+        if words[0] in ["bulk", "mv", "cp", "copy"]:
             strings=["--help"]
-        if words[0] in ["--rm", "--del", "-r", "export"]:
+        if words[0] in ["--rm", "--del", "-r"]:
             strings.extend(folders)
         if words[0] in ["--rm", "--del", "-r", "--mod", "--edit", "-e", "--show", "-s", "mv", "move", "cp", "copy"]:
             strings.extend(nodes)
-        if words[0] in ["run", "import"]:
-            if words[-1] in ["run", "import"]:
+        if words[0] in ["run", "import", "export"]:
+            if words[-1] in ["run", "import", "export"]:
                 path = './*'
             else:
                 path = words[-1] + "*"
@@ -83,9 +83,14 @@ def main():
                     pathstrings[i] += '/'
             strings = ["--help"]
             pathstrings = [s[2:] if s.startswith('./') else s for s in pathstrings]
+            if words[0] == "export":
+                pathstrings = [s for s in pathstrings if os.path.isdir(s)]
             strings.extend(pathstrings)
             if words[0] == "run":
                 strings.extend(nodes)
+
+    elif wordsnumber >= 4 and words[0] == "export" and words[1] != "--help":
+        strings = [item for item in folders if not any(word in item for word in words[:-1])]
 
     elif wordsnumber == 4:
           strings=[]
@@ -97,6 +102,7 @@ def main():
               strings=["bash", "zsh"]
           if words[0] == "config" and words[1] in ["--fzf", "--allow-uppercase"]:
               strings=["true", "false"]
+
 
     if app == "bash":
         strings = [s if s.endswith('/') else f"'{s} '" for s in strings]

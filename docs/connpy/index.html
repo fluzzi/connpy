@@ -1614,8 +1614,10 @@ Categorize the user&#39;s request based on the operation they want to perform on
                 nodes.update(layer3)
         if filter:
             if isinstance(filter, str):
+                filter = &#34;^(?!.*@).+$&#34; if filter == &#34;@&#34; else filter
                 nodes = {k: v for k, v in nodes.items() if re.search(filter, k)}
             elif isinstance(filter, list):
+                filter = [&#34;^(?!.*@).+$&#34; if item == &#34;@&#34; else item for item in filter]
                 nodes = {k: v for k, v in nodes.items() if any(re.search(pattern, k) for pattern in filter)}
             else:
                 raise ValueError(&#34;filter must be a string or a list of strings&#34;)
@@ -1894,7 +1896,7 @@ Categorize the user&#39;s request based on the operation they want to perform on
         bulkparser.set_defaults(func=self._func_others)
         # EXPORTPARSER
         exportparser = subparsers.add_parser(&#34;export&#34;, help=&#34;Export connection folder to Yaml file&#34;) 
-        exportparser.add_argument(&#34;export&#34;, nargs=2, action=self._store_type, help=&#34;Export [@subfolder]@folder /path/to/file.yml&#34;)
+        exportparser.add_argument(&#34;export&#34;, nargs=&#34;+&#34;, action=self._store_type, help=&#34;Export /path/to/file.yml [@subfolder1][@folder1] [@subfolderN][@folderN]&#34;)
         exportparser.set_defaults(func=self._func_export)
         # IMPORTPARSER
         importparser = subparsers.add_parser(&#34;import&#34;, help=&#34;Import connection folder to config from Yaml file&#34;) 
@@ -2370,11 +2372,12 @@ Categorize the user&#39;s request based on the operation they want to perform on
                 exit(10)
             for k,v in imported.items():
                 uniques = self.config._explode_unique(k)
-                folder = f&#34;@{uniques[&#39;folder&#39;]}&#34;
-                matches = list(filter(lambda k: k == folder, self.folders))
-                if len(matches) == 0:
-                    uniquefolder = self.config._explode_unique(folder)
-                    self.config._folder_add(**uniquefolder)
+                if &#34;folder&#34; in uniques:
+                    folder = f&#34;@{uniques[&#39;folder&#39;]}&#34;
+                    matches = list(filter(lambda k: k == folder, self.folders))
+                    if len(matches) == 0:
+                        uniquefolder = self.config._explode_unique(folder)
+                        self.config._folder_add(**uniquefolder)
                 if &#34;subfolder&#34; in uniques:
                     subfolder = f&#34;@{uniques[&#39;subfolder&#39;]}@{uniques[&#39;folder&#39;]}&#34;
                     matches = list(filter(lambda k: k == subfolder, self.folders))
@@ -2388,20 +2391,23 @@ Categorize the user&#39;s request based on the operation they want to perform on
         return
 
     def _func_export(self, args):
-        matches = list(filter(lambda k: k == args.data[0], self.folders))
-        if len(matches) == 0:
-            print(&#34;{} folder not found&#34;.format(args.data[0]))
-            exit(2)
-        if os.path.exists(args.data[1]):
-            print(&#34;File {} already exists&#34;.format(args.data[1]))
+        if os.path.exists(args.data[0]):
+            print(&#34;File {} already exists&#34;.format(args.data[0]))
             exit(14)
+        if len(args.data[1:]) == 0:
+            foldercons = self.config._getallnodesfull(extract = False)
         else:
-            foldercons = self.config._getallnodesfull(args.data[0], extract = False)
-            with open(args.data[1], &#34;w&#34;) as file:
-                yaml.dump(foldercons, file, Dumper=NoAliasDumper, default_flow_style=False)
-                file.close()
-            print(&#34;File {} generated succesfully&#34;.format(args.data[1]))
-            exit()
+            for folder in args.data[1:]:
+                matches = list(filter(lambda k: k == folder, self.folders))
+                if len(matches) == 0 and folder != &#34;@&#34;:
+                    print(&#34;{} folder not found&#34;.format(folder))
+                    exit(2)
+            foldercons = self.config._getallnodesfull(args.data[1:], extract = False)
+        with open(args.data[0], &#34;w&#34;) as file:
+            yaml.dump(foldercons, file, Dumper=NoAliasDumper, default_flow_style=False)
+            file.close()
+        print(&#34;File {} generated succesfully&#34;.format(args.data[0]))
+        exit()
         return
 
     def _func_run(self, args):
@@ -3147,7 +3153,7 @@ tasks:
 </details>
 </dd>
 <dt id="connpy.connapp.start"><code class="name flex">
-<span>def <span class="ident">start</span></span>(<span>self, argv=['connpy', '-o', 'docs/', '--force', '--html'])</span>
+<span>def <span class="ident">start</span></span>(<span>self, argv=['connpy', '--html', '-o', 'docs/', '-f'])</span>
 </code></dt>
 <dd>
 <div class="desc"><h3 id="parameters">Parameters:</h3>
@@ -3208,7 +3214,7 @@ tasks:
     bulkparser.set_defaults(func=self._func_others)
     # EXPORTPARSER
     exportparser = subparsers.add_parser(&#34;export&#34;, help=&#34;Export connection folder to Yaml file&#34;) 
-    exportparser.add_argument(&#34;export&#34;, nargs=2, action=self._store_type, help=&#34;Export [@subfolder]@folder /path/to/file.yml&#34;)
+    exportparser.add_argument(&#34;export&#34;, nargs=&#34;+&#34;, action=self._store_type, help=&#34;Export /path/to/file.yml [@subfolder1][@folder1] [@subfolderN][@folderN]&#34;)
     exportparser.set_defaults(func=self._func_export)
     # IMPORTPARSER
     importparser = subparsers.add_parser(&#34;import&#34;, help=&#34;Import connection folder to config from Yaml file&#34;) 
