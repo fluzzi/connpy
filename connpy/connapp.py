@@ -107,7 +107,7 @@ class connapp:
         bulkparser.set_defaults(func=self._func_others)
         # EXPORTPARSER
         exportparser = subparsers.add_parser("export", help="Export connection folder to Yaml file") 
-        exportparser.add_argument("export", nargs=2, action=self._store_type, help="Export [@subfolder]@folder /path/to/file.yml")
+        exportparser.add_argument("export", nargs="+", action=self._store_type, help="Export /path/to/file.yml [@subfolder1][@folder1] [@subfolderN][@folderN]")
         exportparser.set_defaults(func=self._func_export)
         # IMPORTPARSER
         importparser = subparsers.add_parser("import", help="Import connection folder to config from Yaml file") 
@@ -583,11 +583,12 @@ class connapp:
                 exit(10)
             for k,v in imported.items():
                 uniques = self.config._explode_unique(k)
-                folder = f"@{uniques['folder']}"
-                matches = list(filter(lambda k: k == folder, self.folders))
-                if len(matches) == 0:
-                    uniquefolder = self.config._explode_unique(folder)
-                    self.config._folder_add(**uniquefolder)
+                if "folder" in uniques:
+                    folder = f"@{uniques['folder']}"
+                    matches = list(filter(lambda k: k == folder, self.folders))
+                    if len(matches) == 0:
+                        uniquefolder = self.config._explode_unique(folder)
+                        self.config._folder_add(**uniquefolder)
                 if "subfolder" in uniques:
                     subfolder = f"@{uniques['subfolder']}@{uniques['folder']}"
                     matches = list(filter(lambda k: k == subfolder, self.folders))
@@ -601,20 +602,23 @@ class connapp:
         return
 
     def _func_export(self, args):
-        matches = list(filter(lambda k: k == args.data[0], self.folders))
-        if len(matches) == 0:
-            print("{} folder not found".format(args.data[0]))
-            exit(2)
-        if os.path.exists(args.data[1]):
-            print("File {} already exists".format(args.data[1]))
+        if os.path.exists(args.data[0]):
+            print("File {} already exists".format(args.data[0]))
             exit(14)
+        if len(args.data[1:]) == 0:
+            foldercons = self.config._getallnodesfull(extract = False)
         else:
-            foldercons = self.config._getallnodesfull(args.data[0], extract = False)
-            with open(args.data[1], "w") as file:
-                yaml.dump(foldercons, file, Dumper=NoAliasDumper, default_flow_style=False)
-                file.close()
-            print("File {} generated succesfully".format(args.data[1]))
-            exit()
+            for folder in args.data[1:]:
+                matches = list(filter(lambda k: k == folder, self.folders))
+                if len(matches) == 0 and folder != "@":
+                    print("{} folder not found".format(folder))
+                    exit(2)
+            foldercons = self.config._getallnodesfull(args.data[1:], extract = False)
+        with open(args.data[0], "w") as file:
+            yaml.dump(foldercons, file, Dumper=NoAliasDumper, default_flow_style=False)
+            file.close()
+        print("File {} generated succesfully".format(args.data[0]))
+        exit()
         return
 
     def _func_run(self, args):
