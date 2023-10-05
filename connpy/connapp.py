@@ -1184,8 +1184,13 @@ class connapp:
 _conn()
 {
         mapfile -t strings < <(connpy-completion-helper "bash" "${#COMP_WORDS[@]}" "${COMP_WORDS[@]}")
-        local IFS=$'\\t\\n'
-        COMPREPLY=($(compgen -W "$(printf '%s' "${strings[@]}")" -- "${COMP_WORDS[-1]}"))
+        local IFS=$'\t\n'
+        local home_dir=$(eval echo ~)
+        local last_word=${COMP_WORDS[-1]/\~/$home_dir}
+        COMPREPLY=($(compgen -W "$(printf '%s' "${strings[@]}")" -- "$last_word"))
+        if [ "$last_word" != "${COMP_WORDS[-1]}" ]; then
+            COMPREPLY=(${COMPREPLY[@]/$home_dir/\~})
+        fi
 }
 
 complete -o nospace -o nosort -F _conn conn
@@ -1198,14 +1203,20 @@ complete -o nospace -o nosort -F _conn connpy
 autoload -U compinit && compinit
 _conn()
 {
-    strings=($(connpy-completion-helper "zsh" ${#words} $words))
+    local home_dir=$(eval echo ~)
+    last_word=${words[-1]/\~/$home_dir}
+    strings=($(connpy-completion-helper "zsh" ${#words} $words[1,-2] $last_word))
     for string in "${strings[@]}"; do
+        #Replace the expanded home directory with ~
+        if [ "$last_word" != "$words[-1]" ]; then
+            string=${string/$home_dir/\~}
+        fi
         if [[ "${string}" =~ .*/$ ]]; then
             # If the string ends with a '/', do not append a space
-            compadd -S '' -- "$string"
+            compadd -Q -S '' -- "$string"
         else
             # If the string does not end with a '/', append a space
-            compadd -S ' ' -- "$string"
+            compadd -Q -S ' ' -- "$string"
         fi
     done
 }
