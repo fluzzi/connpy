@@ -161,6 +161,21 @@ class node:
         else:
             return t
 
+    def _savelog(self):
+        '''Save the log buffer to the file at regular intervals if there are changes.'''
+        t = threading.current_thread()
+        prev_size = 0  # Store the previous size of the buffer
+
+        while getattr(t, "do_run", True):  # Check if thread is signaled to stop
+            current_size = self.mylog.tell()  # Current size of the buffer
+
+            # Only save if the buffer size has changed
+            if current_size != prev_size:
+                with open(self.logfile, "w") as f:  # Use "w" to overwrite the file
+                    f.write(self._logclean(self.mylog.getvalue().decode(), True))
+                prev_size = current_size  # Update the previous size
+            sleep(5)
+
     def _filter(self, a):
         #Set time for last input when using interact
         self.lastinput = time()
@@ -192,9 +207,15 @@ class node:
             self.child.setwinsize(int(size.group(2)),int(size.group(1)))
             print("Connected to " + self.unique + " at " + self.host + (":" if self.port != '' else '') + self.port + " via: " + self.protocol)
             if 'logfile' in dir(self):
+                # Initialize self.mylog
                 if not 'mylog' in dir(self):
                     self.mylog = io.BytesIO()
                 self.child.logfile_read = self.mylog
+                
+                # Start the _savelog thread
+                log_thread = threading.Thread(target=self._savelog)
+                log_thread.daemon = True
+                log_thread.start()
             if 'missingtext' in dir(self):
                 print(self.child.after.decode(), end='')
             if self.idletime > 0:
@@ -204,11 +225,9 @@ class node:
             if debug:
                 print(self.mylog.getvalue().decode())
             self.child.interact(input_filter=self._filter)
-            if "logfile" in dir(self):
-                output = self._logclean(self.mylog.getvalue().decode(), True)
+            if 'logfile' in dir(self):
                 with open(self.logfile, "w") as f:
-                    f.write(output)
-                    f.close()
+                    f.write(self._logclean(self.mylog.getvalue().decode(), True))
 
         else:
             print(connect)

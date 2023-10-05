@@ -28,6 +28,25 @@ def _getallfolders(config):
     folders.extend(subfolders)
     return folders
 
+def _getcwd(words, option, folderonly=False):
+    # Expand tilde to home directory if present
+    if words[-1].startswith("~"):
+        words[-1] = os.path.expanduser(words[-1])
+    
+    if words[-1] == option:
+        path = './*'
+    else:
+        path = words[-1] + "*"
+
+    pathstrings = glob.glob(path)
+    for i in range(len(pathstrings)):
+        if os.path.isdir(pathstrings[i]):
+            pathstrings[i] += '/'
+    pathstrings = [s[2:] if s.startswith('./') else s for s in pathstrings]
+    if folderonly:
+        pathstrings = [s for s in pathstrings if os.path.isdir(s)]
+    return pathstrings
+
 def main():
     home = os.path.expanduser("~")
     defaultdir = home + '/.config/conn'
@@ -73,18 +92,11 @@ def main():
         if words[0] in ["--rm", "--del", "-r", "--mod", "--edit", "-e", "--show", "-s", "mv", "move", "cp", "copy"]:
             strings.extend(nodes)
         if words[0] in ["run", "import", "export"]:
-            if words[-1] in ["run", "import", "export"]:
-                path = './*'
-            else:
-                path = words[-1] + "*"
-            pathstrings = glob.glob(path)
-            for i in range(len(pathstrings)):
-                if os.path.isdir(pathstrings[i]):
-                    pathstrings[i] += '/'
             strings = ["--help"]
-            pathstrings = [s[2:] if s.startswith('./') else s for s in pathstrings]
             if words[0] == "export":
-                pathstrings = [s for s in pathstrings if os.path.isdir(s)]
+                pathstrings = _getcwd(words, words[0], True)
+            else:
+                pathstrings = _getcwd(words, words[0])
             strings.extend(pathstrings)
             if words[0] == "run":
                 strings.extend(nodes)
@@ -102,6 +114,8 @@ def main():
               strings=["bash", "zsh"]
           if words[0] == "config" and words[1] in ["--fzf", "--allow-uppercase"]:
               strings=["true", "false"]
+          if words[0] == "config" and words[1] in ["--configfolder"]:
+              strings=_getcwd(words,words[0],True)
 
 
     if app == "bash":
