@@ -66,7 +66,7 @@ class ai:
             try:
                 self.model = self.config.config["openai"]["model"]
             except:
-                self.model = "gpt-3.5-turbo-0613"
+                self.model = "gpt-3.5-turbo"
         self.temp = temp
         self.__prompt = {}
         self.__prompt["original_system"] = """
@@ -125,7 +125,7 @@ Categorize the user's request based on the operation they want to perform on the
                 """
         self.__prompt["original_function"]["parameters"]["required"] = ["type", "filter"]
         self.__prompt["command_system"] = """
-        For each device listed below, provide the command(s) needed to perform the specified action, depending on the device OS (e.g., Cisco IOSXR router, Linux server).
+        For each OS listed below, provide the command(s) needed to perform the specified action, depending on the device OS (e.g., Cisco IOSXR router, Linux server).
         The application knows how to connect to devices via SSH, so you only need to provide the command(s) to run after connecting. 
         If the commands needed are not for the specific OS type, just send an empty list (e.g., []). 
         Note: Preserving the integrity of user-provided commands is of utmost importance. If a user has provided a specific command to run, include that command exactly as it was given, even if it's not recognized or understood. Under no circumstances should you modify or alter user-provided commands.
@@ -133,14 +133,14 @@ Categorize the user's request based on the operation they want to perform on the
         self.__prompt["command_user"]= """
     input: show me the full configuration for all this devices:
 
-    Devices:
-    router1: cisco ios
+    OS:
+    cisco ios:
     """
-        self.__prompt["command_assistant"] = {"name": "get_commands", "arguments": "{\n  \"router1\": \"show running-configuration\"\n}"}
+        self.__prompt["command_assistant"] = {"name": "get_commands", "arguments": "{\n  \"cisco ios\": \"show running-configuration\"\n}"}
         self.__prompt["command_function"] = {}
         self.__prompt["command_function"]["name"] = "get_commands"
         self.__prompt["command_function"]["descriptions"] = """ 
-        For each device listed below, provide the command(s) needed to perform the specified action, depending on the device OS (e.g., Cisco IOSXR router, Linux server).
+        For each OS listed below, provide the command(s) needed to perform the specified action, depending on the device OS (e.g., Cisco IOSXR router, Linux server).
         The application knows how to connect to devices via SSH, so you only need to provide the command(s) to run after connecting. 
         If the commands needed are not for the specific OS type, just send an empty list (e.g., []). 
     """
@@ -201,16 +201,16 @@ Categorize the user's request based on the operation they want to perform on the
             myfunction = False
         return myfunction
 
-    def _clean_command_response(self, raw_response):
+    def _clean_command_response(self, raw_response, node_list):
         #Parse response for command request to openAI GPT.
         info_dict = {}
         info_dict["commands"] = []
         info_dict["variables"] = {}
         info_dict["variables"]["__global__"] = {}
-        for key, value in raw_response.items():
-            key = key.strip()
+        for key, value in node_list.items():
             newvalue = {}
-            for i,e in enumerate(value, start=1):
+            commands = raw_response[value]
+            for i,e in enumerate(commands, start=1):
                 newvalue[f"command{i}"] = e
                 if f"{{command{i}}}" not in info_dict["commands"]:
                     info_dict["commands"].append(f"{{command{i}}}")
@@ -222,20 +222,22 @@ Categorize the user's request based on the operation they want to perform on the
         #Send the request for commands for each device to openAI GPT.
         output_list = []
         command_function = deepcopy(self.__prompt["command_function"])
+        node_list = {}
         for key, value in nodes.items():
             tags = value.get('tags', {})
             try:
                 if os_value := tags.get('os'):
-                    output_list.append(f"{key}: {os_value}")
-                    command_function["parameters"]["properties"][key] = {}
-                    command_function["parameters"]["properties"][key]["type"] = "array"
-                    command_function["parameters"]["properties"][key]["description"] = f"OS: {os_value}"
-                    command_function["parameters"]["properties"][key]["items"] = {}
-                    command_function["parameters"]["properties"][key]["items"]["type"] = "string" 
+                    node_list[key] = os_value
+                    output_list.append(f"{os_value}")
+                    command_function["parameters"]["properties"][os_value] = {}
+                    command_function["parameters"]["properties"][os_value]["type"] = "array"
+                    command_function["parameters"]["properties"][os_value]["description"] = f"OS: {os_value}"
+                    command_function["parameters"]["properties"][os_value]["items"] = {}
+                    command_function["parameters"]["properties"][os_value]["items"]["type"] = "string" 
             except:
                 pass
-        output_str = "\n".join(output_list)
-        command_input = f"input: {user_input}\n\nDevices:\n{output_str}"
+        output_str = "\n".join(list(set(output_list)))
+        command_input = f"input: {user_input}\n\nOS:\n{output_str}"
         message = []
         message.append({"role": "system", "content": dedent(self.__prompt["command_system"]).strip()})
         message.append({"role": "user", "content": dedent(self.__prompt["command_user"]).strip()})
@@ -252,7 +254,7 @@ Categorize the user's request based on the operation they want to perform on the
         output = {}
         result = response["choices"][0]["message"].to_dict()
         json_result = json.loads(result["function_call"]["arguments"])
-        output["response"] = self._clean_command_response(json_result)
+        output["response"] = self._clean_command_response(json_result, node_list)
         return output
 
     def _get_filter(self, user_input, chat_history = None):
