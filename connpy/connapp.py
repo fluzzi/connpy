@@ -72,7 +72,7 @@ class connapp:
         #NODEPARSER
         nodeparser = subparsers.add_parser("node",usage=self._help("usage"), help=self._help("node"),epilog=self._help("end"), formatter_class=argparse.RawTextHelpFormatter) 
         nodecrud = nodeparser.add_mutually_exclusive_group()
-        nodeparser.add_argument("node", metavar="node|folder", nargs='?', default=None, action=self._store_type, type=self._type_node, help=self._help("node"))
+        nodeparser.add_argument("node", metavar="node|folder", nargs='?', default=None, action=self._store_type, help=self._help("node"))
         nodecrud.add_argument("-v","--version", dest="action", action="store_const", help="Show version", const="version", default="connect")
         nodecrud.add_argument("-a","--add", dest="action", action="store_const", help="Add new node[@subfolder][@folder] or [@subfolder]@folder", const="add", default="connect")
         nodecrud.add_argument("-r","--del", "--rm", dest="action", action="store_const", help="Delete node[@subfolder][@folder] or [@subfolder]@folder", const="del", default="connect")
@@ -100,6 +100,8 @@ class connapp:
         #LISTPARSER
         lsparser = subparsers.add_parser("list", aliases=["ls"], help="List profiles, nodes or folders") 
         lsparser.add_argument("ls", action=self._store_type, choices=["profiles","nodes","folders"], help="List profiles, nodes or folders", default=False)
+        lsparser.add_argument("--filter", nargs=1, help="Filter results")
+        lsparser.add_argument("--format", nargs=1, help="Format of the output of nodes using {name}, {NAME}, {location}, {LOCATION}, {host} and {HOST}")
         lsparser.set_defaults(func=self._func_others)
         #BULKPARSER
         bulkparser = subparsers.add_parser("bulk", help="Add nodes in bulk") 
@@ -206,24 +208,31 @@ class connapp:
         elif args.data.startswith("@"):
             matches = list(filter(lambda k: k == args.data, self.folders))
         else:
-            matches = list(filter(lambda k: k == args.data, self.nodes))
+            matches = self.config._getallnodes(args.data)
         if len(matches) == 0:
             print("{} not found".format(args.data))
             exit(2)
-        question = [inquirer.Confirm("delete", message="Are you sure you want to delete {}?".format(matches[0]))]
+        print("Removing: {}".format(matches))
+        question = [inquirer.Confirm("delete", message="Are you sure you want to continue?")]
         confirm = inquirer.prompt(question)
         if confirm == None:
             exit(7)
         if confirm["delete"]:
-            uniques = self.config._explode_unique(matches[0])
             if args.data.startswith("@"):
+                uniques = self.config._explode_unique(matches[0])
                 self.config._folder_del(**uniques)
             else:
-                self.config._connections_del(**uniques)
+                for node in matches:
+                    nodeuniques = self.config._explode_unique(node)
+                    self.config._connections_del(**nodeuniques)
             self.config._saveconfig(self.config.file)
-            print("{} deleted succesfully".format(matches[0]))
+            if len(matches) == 1:
+                print("{} deleted succesfully".format(matches[0]))
+            else:
+                print(f"{len(matches)} nodes deleted succesfully")
 
     def _add(self, args):
+        args.data = self._type_node(args.data)
         if args.data == None:
             print("Missing argument node")
             exit(3)
@@ -302,7 +311,6 @@ class connapp:
         if args.data == None:
             print("Missing argument node")
             exit(3)
-        # matches = list(filter(lambda k: k == args.data, self.nodes))
         matches = self.config._getallnodes(args.data)
         if len(matches) == 0:
             print("No connection found with filter: {}".format(args.data))
@@ -438,7 +446,30 @@ class connapp:
         return actions.get(args.command)(args)
 
     def _ls(self, args):
-        print(*getattr(self, args.data), sep="\n")
+        items = getattr(self, args.data)
+        if args.filter:
+            items = [ item for item in items if re.search(args.filter[0], item)]
+        if args.format and args.data == "nodes":
+            newitems = []
+            for i in items:
+                formated = {}
+                info = self.config.getitem(i)
+                if "@" in i:
+                    name_part, location_part = i.split("@", 1)
+                    formated["location"] = "@" + location_part
+                else:
+                    name_part = i
+                    formated["location"] = ""
+                formated["name"] = name_part
+                formated["host"] = info["host"]
+                items_copy = list(formated.items())
+                for key, value in items_copy:
+                    upper_key = key.upper()
+                    upper_value = value.upper()
+                    formated[upper_key] = upper_value
+                newitems.append(args.format[0].format(**formated))
+            items = newitems
+        print(*items, sep="\n")
 
     def _mvcp(self, args):
         if not self.case:
@@ -757,14 +788,13 @@ class connapp:
 
     def _node_run(self, args):
         command = " ".join(args.data[1:])
-        matches = list(filter(lambda k: k == args.data[0], self.nodes))
-        if len(matches) == 0:
-            print("{} not found".format(args.data[0]))
-            exit(2)
-        node = self.config.getitem(matches[0])
-        node = self.node(matches[0],**node, config = self.config)
-        node.run(command)
-        print(node.output)
+        script = {}
+        script["name"] = "Output"
+        script["action"] = "run"
+        script["nodes"] = args.data[0]
+        script["commands"] = [command]
+        script["output"] = "stdout"
+        self._cli_run(script)
 
     def _yaml_generate(self, args):
         if os.path.exists(args.data[0]):
@@ -800,7 +830,11 @@ class connapp:
         except KeyError as e:
             print("'{}' is mandatory".format(e.args[0]))
             exit(11)
-        nodes = self.connnodes(self.config.getitems(nodelist), config = self.config)
+        nodes = self.config._getallnodes(nodelist)
+        if len(nodes) == 0:
+            print("{} don't match any node".format(nodelist))
+            exit(2)
+        nodes = self.connnodes(self.config.getitems(nodes), config = self.config)
         stdout = False
         if output is None:
             pass
@@ -818,9 +852,12 @@ class connapp:
             args.update(thisoptions)
         except:
             options = None
-        size = str(os.get_terminal_size())
-        p = re.search(r'.*columns=([0-9]+)', size)
-        columns = int(p.group(1))
+        try:
+            size = str(os.get_terminal_size())
+            p = re.search(r'.*columns=([0-9]+)', size)
+            columns = int(p.group(1))
+        except:
+            columns = 80
         if action == "run":
             nodes.run(**args)
             print(script["name"].upper() + "-" * (columns - len(script["name"])))
@@ -1162,12 +1199,12 @@ class connapp:
 
     def _type_node(self, arg_value, pat=re.compile(r"^[0-9a-zA-Z_.$@#-]+$")):
         if not pat.match(arg_value):
-            raise argparse.ArgumentTypeError
+            raise ValueError(f"Argument error: {arg_value}")
         return arg_value
     
     def _type_profile(self, arg_value, pat=re.compile(r"^[0-9a-zA-Z_.$#-]+$")):
         if not pat.match(arg_value):
-            raise argparse.ArgumentTypeError
+            raise ValueError
         return arg_value
 
     def _help(self, type):

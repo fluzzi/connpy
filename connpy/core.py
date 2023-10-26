@@ -436,7 +436,7 @@ class node:
                 passwords = self._passtx(self.password)
             else:
                 passwords = []
-            expects = ['yes/no', 'refused', 'supported', 'cipher', 'ssh-keygen.*\"', 'timeout', 'unavailable', 'closed', '[p|P]assword:|[u|U]sername:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching"]
+            expects = ['yes/no', 'refused', 'supported', 'cipher', 'ssh-keygen.*\"', 'timeout|timed.out', 'unavailable', 'closed', '[p|P]assword:|[u|U]sername:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching"]
         elif self.protocol == "telnet":
             cmd = "telnet " + self.host
             if self.port != '':
@@ -449,7 +449,7 @@ class node:
                 passwords = self._passtx(self.password)
             else:
                 passwords = []
-            expects = ['[u|U]sername:', 'refused', 'supported', 'cipher', 'ssh-keygen.*\"', 'timeout', 'unavailable', 'closed', '[p|P]assword:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching"]
+            expects = ['[u|U]sername:', 'refused', 'supported', 'cipher', 'ssh-keygen.*\"', 'timeout|timed.out', 'unavailable', 'closed', '[p|P]assword:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching"]
         else:
             raise ValueError("Invalid protocol: " + self.protocol)
         attempts = 1
@@ -476,9 +476,6 @@ class node:
                             else:
                                 self.missingtext = True
                                 break
-                    if results == 4:
-                        child.terminate()
-                        return "Connection failed code:" + str(results) + "\n" + child.after.decode()
                     if results in  [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15]:
                         child.terminate()
                         if results == 12 and attempts != max_attempts:
@@ -486,7 +483,11 @@ class node:
                             endloop = True
                             break
                         else:
-                            return "Connection failed code:" + str(results)
+                            if results == 12:
+                                after = "Connection timeout"
+                            else:
+                                after = child.after.decode()
+                        return ("Connection failed code:" + str(results) + "\n" + child.before.decode() + after + child.readline().decode()).rstrip()
                     if results == 8:
                         if len(passwords) > 0:
                             child.sendline(passwords[i])

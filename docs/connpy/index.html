@@ -639,7 +639,7 @@ __pdoc__ = {
             try:
                 self.model = self.config.config[&#34;openai&#34;][&#34;model&#34;]
             except:
-                self.model = &#34;gpt-3.5-turbo-0613&#34;
+                self.model = &#34;gpt-3.5-turbo&#34;
         self.temp = temp
         self.__prompt = {}
         self.__prompt[&#34;original_system&#34;] = &#34;&#34;&#34;
@@ -698,7 +698,7 @@ Categorize the user&#39;s request based on the operation they want to perform on
                 &#34;&#34;&#34;
         self.__prompt[&#34;original_function&#34;][&#34;parameters&#34;][&#34;required&#34;] = [&#34;type&#34;, &#34;filter&#34;]
         self.__prompt[&#34;command_system&#34;] = &#34;&#34;&#34;
-        For each device listed below, provide the command(s) needed to perform the specified action, depending on the device OS (e.g., Cisco IOSXR router, Linux server).
+        For each OS listed below, provide the command(s) needed to perform the specified action, depending on the device OS (e.g., Cisco IOSXR router, Linux server).
         The application knows how to connect to devices via SSH, so you only need to provide the command(s) to run after connecting. 
         If the commands needed are not for the specific OS type, just send an empty list (e.g., []). 
         Note: Preserving the integrity of user-provided commands is of utmost importance. If a user has provided a specific command to run, include that command exactly as it was given, even if it&#39;s not recognized or understood. Under no circumstances should you modify or alter user-provided commands.
@@ -706,14 +706,14 @@ Categorize the user&#39;s request based on the operation they want to perform on
         self.__prompt[&#34;command_user&#34;]= &#34;&#34;&#34;
     input: show me the full configuration for all this devices:
 
-    Devices:
-    router1: cisco ios
+    OS:
+    cisco ios:
     &#34;&#34;&#34;
-        self.__prompt[&#34;command_assistant&#34;] = {&#34;name&#34;: &#34;get_commands&#34;, &#34;arguments&#34;: &#34;{\n  \&#34;router1\&#34;: \&#34;show running-configuration\&#34;\n}&#34;}
+        self.__prompt[&#34;command_assistant&#34;] = {&#34;name&#34;: &#34;get_commands&#34;, &#34;arguments&#34;: &#34;{\n  \&#34;cisco ios\&#34;: \&#34;show running-configuration\&#34;\n}&#34;}
         self.__prompt[&#34;command_function&#34;] = {}
         self.__prompt[&#34;command_function&#34;][&#34;name&#34;] = &#34;get_commands&#34;
         self.__prompt[&#34;command_function&#34;][&#34;descriptions&#34;] = &#34;&#34;&#34; 
-        For each device listed below, provide the command(s) needed to perform the specified action, depending on the device OS (e.g., Cisco IOSXR router, Linux server).
+        For each OS listed below, provide the command(s) needed to perform the specified action, depending on the device OS (e.g., Cisco IOSXR router, Linux server).
         The application knows how to connect to devices via SSH, so you only need to provide the command(s) to run after connecting. 
         If the commands needed are not for the specific OS type, just send an empty list (e.g., []). 
     &#34;&#34;&#34;
@@ -774,16 +774,16 @@ Categorize the user&#39;s request based on the operation they want to perform on
             myfunction = False
         return myfunction
 
-    def _clean_command_response(self, raw_response):
+    def _clean_command_response(self, raw_response, node_list):
         #Parse response for command request to openAI GPT.
         info_dict = {}
         info_dict[&#34;commands&#34;] = []
         info_dict[&#34;variables&#34;] = {}
         info_dict[&#34;variables&#34;][&#34;__global__&#34;] = {}
-        for key, value in raw_response.items():
-            key = key.strip()
+        for key, value in node_list.items():
             newvalue = {}
-            for i,e in enumerate(value, start=1):
+            commands = raw_response[value]
+            for i,e in enumerate(commands, start=1):
                 newvalue[f&#34;command{i}&#34;] = e
                 if f&#34;{{command{i}}}&#34; not in info_dict[&#34;commands&#34;]:
                     info_dict[&#34;commands&#34;].append(f&#34;{{command{i}}}&#34;)
@@ -795,20 +795,22 @@ Categorize the user&#39;s request based on the operation they want to perform on
         #Send the request for commands for each device to openAI GPT.
         output_list = []
         command_function = deepcopy(self.__prompt[&#34;command_function&#34;])
+        node_list = {}
         for key, value in nodes.items():
             tags = value.get(&#39;tags&#39;, {})
             try:
                 if os_value := tags.get(&#39;os&#39;):
-                    output_list.append(f&#34;{key}: {os_value}&#34;)
-                    command_function[&#34;parameters&#34;][&#34;properties&#34;][key] = {}
-                    command_function[&#34;parameters&#34;][&#34;properties&#34;][key][&#34;type&#34;] = &#34;array&#34;
-                    command_function[&#34;parameters&#34;][&#34;properties&#34;][key][&#34;description&#34;] = f&#34;OS: {os_value}&#34;
-                    command_function[&#34;parameters&#34;][&#34;properties&#34;][key][&#34;items&#34;] = {}
-                    command_function[&#34;parameters&#34;][&#34;properties&#34;][key][&#34;items&#34;][&#34;type&#34;] = &#34;string&#34; 
+                    node_list[key] = os_value
+                    output_list.append(f&#34;{os_value}&#34;)
+                    command_function[&#34;parameters&#34;][&#34;properties&#34;][os_value] = {}
+                    command_function[&#34;parameters&#34;][&#34;properties&#34;][os_value][&#34;type&#34;] = &#34;array&#34;
+                    command_function[&#34;parameters&#34;][&#34;properties&#34;][os_value][&#34;description&#34;] = f&#34;OS: {os_value}&#34;
+                    command_function[&#34;parameters&#34;][&#34;properties&#34;][os_value][&#34;items&#34;] = {}
+                    command_function[&#34;parameters&#34;][&#34;properties&#34;][os_value][&#34;items&#34;][&#34;type&#34;] = &#34;string&#34; 
             except:
                 pass
-        output_str = &#34;\n&#34;.join(output_list)
-        command_input = f&#34;input: {user_input}\n\nDevices:\n{output_str}&#34;
+        output_str = &#34;\n&#34;.join(list(set(output_list)))
+        command_input = f&#34;input: {user_input}\n\nOS:\n{output_str}&#34;
         message = []
         message.append({&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: dedent(self.__prompt[&#34;command_system&#34;]).strip()})
         message.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: dedent(self.__prompt[&#34;command_user&#34;]).strip()})
@@ -825,7 +827,7 @@ Categorize the user&#39;s request based on the operation they want to perform on
         output = {}
         result = response[&#34;choices&#34;][0][&#34;message&#34;].to_dict()
         json_result = json.loads(result[&#34;function_call&#34;][&#34;arguments&#34;])
-        output[&#34;response&#34;] = self._clean_command_response(json_result)
+        output[&#34;response&#34;] = self._clean_command_response(json_result, node_list)
         return output
 
     def _get_filter(self, user_input, chat_history = None):
@@ -1861,7 +1863,7 @@ Categorize the user&#39;s request based on the operation they want to perform on
         #NODEPARSER
         nodeparser = subparsers.add_parser(&#34;node&#34;,usage=self._help(&#34;usage&#34;), help=self._help(&#34;node&#34;),epilog=self._help(&#34;end&#34;), formatter_class=argparse.RawTextHelpFormatter) 
         nodecrud = nodeparser.add_mutually_exclusive_group()
-        nodeparser.add_argument(&#34;node&#34;, metavar=&#34;node|folder&#34;, nargs=&#39;?&#39;, default=None, action=self._store_type, type=self._type_node, help=self._help(&#34;node&#34;))
+        nodeparser.add_argument(&#34;node&#34;, metavar=&#34;node|folder&#34;, nargs=&#39;?&#39;, default=None, action=self._store_type, help=self._help(&#34;node&#34;))
         nodecrud.add_argument(&#34;-v&#34;,&#34;--version&#34;, dest=&#34;action&#34;, action=&#34;store_const&#34;, help=&#34;Show version&#34;, const=&#34;version&#34;, default=&#34;connect&#34;)
         nodecrud.add_argument(&#34;-a&#34;,&#34;--add&#34;, dest=&#34;action&#34;, action=&#34;store_const&#34;, help=&#34;Add new node[@subfolder][@folder] or [@subfolder]@folder&#34;, const=&#34;add&#34;, default=&#34;connect&#34;)
         nodecrud.add_argument(&#34;-r&#34;,&#34;--del&#34;, &#34;--rm&#34;, dest=&#34;action&#34;, action=&#34;store_const&#34;, help=&#34;Delete node[@subfolder][@folder] or [@subfolder]@folder&#34;, const=&#34;del&#34;, default=&#34;connect&#34;)
@@ -1889,6 +1891,8 @@ Categorize the user&#39;s request based on the operation they want to perform on
         #LISTPARSER
         lsparser = subparsers.add_parser(&#34;list&#34;, aliases=[&#34;ls&#34;], help=&#34;List profiles, nodes or folders&#34;) 
         lsparser.add_argument(&#34;ls&#34;, action=self._store_type, choices=[&#34;profiles&#34;,&#34;nodes&#34;,&#34;folders&#34;], help=&#34;List profiles, nodes or folders&#34;, default=False)
+        lsparser.add_argument(&#34;--filter&#34;, nargs=1, help=&#34;Filter results&#34;)
+        lsparser.add_argument(&#34;--format&#34;, nargs=1, help=&#34;Format of the output of nodes using {name}, {NAME}, {location}, {LOCATION}, {host} and {HOST}&#34;)
         lsparser.set_defaults(func=self._func_others)
         #BULKPARSER
         bulkparser = subparsers.add_parser(&#34;bulk&#34;, help=&#34;Add nodes in bulk&#34;) 
@@ -1995,24 +1999,31 @@ Categorize the user&#39;s request based on the operation they want to perform on
         elif args.data.startswith(&#34;@&#34;):
             matches = list(filter(lambda k: k == args.data, self.folders))
         else:
-            matches = list(filter(lambda k: k == args.data, self.nodes))
+            matches = self.config._getallnodes(args.data)
         if len(matches) == 0:
             print(&#34;{} not found&#34;.format(args.data))
             exit(2)
-        question = [inquirer.Confirm(&#34;delete&#34;, message=&#34;Are you sure you want to delete {}?&#34;.format(matches[0]))]
+        print(&#34;Removing: {}&#34;.format(matches))
+        question = [inquirer.Confirm(&#34;delete&#34;, message=&#34;Are you sure you want to continue?&#34;)]
         confirm = inquirer.prompt(question)
         if confirm == None:
             exit(7)
         if confirm[&#34;delete&#34;]:
-            uniques = self.config._explode_unique(matches[0])
             if args.data.startswith(&#34;@&#34;):
+                uniques = self.config._explode_unique(matches[0])
                 self.config._folder_del(**uniques)
             else:
-                self.config._connections_del(**uniques)
+                for node in matches:
+                    nodeuniques = self.config._explode_unique(node)
+                    self.config._connections_del(**nodeuniques)
             self.config._saveconfig(self.config.file)
-            print(&#34;{} deleted succesfully&#34;.format(matches[0]))
+            if len(matches) == 1:
+                print(&#34;{} deleted succesfully&#34;.format(matches[0]))
+            else:
+                print(f&#34;{len(matches)} nodes deleted succesfully&#34;)
 
     def _add(self, args):
+        args.data = self._type_node(args.data)
         if args.data == None:
             print(&#34;Missing argument node&#34;)
             exit(3)
@@ -2091,7 +2102,6 @@ Categorize the user&#39;s request based on the operation they want to perform on
         if args.data == None:
             print(&#34;Missing argument node&#34;)
             exit(3)
-        # matches = list(filter(lambda k: k == args.data, self.nodes))
         matches = self.config._getallnodes(args.data)
         if len(matches) == 0:
             print(&#34;No connection found with filter: {}&#34;.format(args.data))
@@ -2227,7 +2237,30 @@ Categorize the user&#39;s request based on the operation they want to perform on
         return actions.get(args.command)(args)
 
     def _ls(self, args):
-        print(*getattr(self, args.data), sep=&#34;\n&#34;)
+        items = getattr(self, args.data)
+        if args.filter:
+            items = [ item for item in items if re.search(args.filter[0], item)]
+        if args.format and args.data == &#34;nodes&#34;:
+            newitems = []
+            for i in items:
+                formated = {}
+                info = self.config.getitem(i)
+                if &#34;@&#34; in i:
+                    name_part, location_part = i.split(&#34;@&#34;, 1)
+                    formated[&#34;location&#34;] = &#34;@&#34; + location_part
+                else:
+                    name_part = i
+                    formated[&#34;location&#34;] = &#34;&#34;
+                formated[&#34;name&#34;] = name_part
+                formated[&#34;host&#34;] = info[&#34;host&#34;]
+                items_copy = list(formated.items())
+                for key, value in items_copy:
+                    upper_key = key.upper()
+                    upper_value = value.upper()
+                    formated[upper_key] = upper_value
+                newitems.append(args.format[0].format(**formated))
+            items = newitems
+        print(*items, sep=&#34;\n&#34;)
 
     def _mvcp(self, args):
         if not self.case:
@@ -2546,14 +2579,13 @@ Categorize the user&#39;s request based on the operation they want to perform on
 
     def _node_run(self, args):
         command = &#34; &#34;.join(args.data[1:])
-        matches = list(filter(lambda k: k == args.data[0], self.nodes))
-        if len(matches) == 0:
-            print(&#34;{} not found&#34;.format(args.data[0]))
-            exit(2)
-        node = self.config.getitem(matches[0])
-        node = self.node(matches[0],**node, config = self.config)
-        node.run(command)
-        print(node.output)
+        script = {}
+        script[&#34;name&#34;] = &#34;Output&#34;
+        script[&#34;action&#34;] = &#34;run&#34;
+        script[&#34;nodes&#34;] = args.data[0]
+        script[&#34;commands&#34;] = [command]
+        script[&#34;output&#34;] = &#34;stdout&#34;
+        self._cli_run(script)
 
     def _yaml_generate(self, args):
         if os.path.exists(args.data[0]):
@@ -2589,7 +2621,11 @@ Categorize the user&#39;s request based on the operation they want to perform on
         except KeyError as e:
             print(&#34;&#39;{}&#39; is mandatory&#34;.format(e.args[0]))
             exit(11)
-        nodes = self.connnodes(self.config.getitems(nodelist), config = self.config)
+        nodes = self.config._getallnodes(nodelist)
+        if len(nodes) == 0:
+            print(&#34;{} don&#39;t match any node&#34;.format(nodelist))
+            exit(2)
+        nodes = self.connnodes(self.config.getitems(nodes), config = self.config)
         stdout = False
         if output is None:
             pass
@@ -2607,9 +2643,12 @@ Categorize the user&#39;s request based on the operation they want to perform on
             args.update(thisoptions)
         except:
             options = None
-        size = str(os.get_terminal_size())
-        p = re.search(r&#39;.*columns=([0-9]+)&#39;, size)
-        columns = int(p.group(1))
+        try:
+            size = str(os.get_terminal_size())
+            p = re.search(r&#39;.*columns=([0-9]+)&#39;, size)
+            columns = int(p.group(1))
+        except:
+            columns = 80
         if action == &#34;run&#34;:
             nodes.run(**args)
             print(script[&#34;name&#34;].upper() + &#34;-&#34; * (columns - len(script[&#34;name&#34;])))
@@ -2951,12 +2990,12 @@ Categorize the user&#39;s request based on the operation they want to perform on
 
     def _type_node(self, arg_value, pat=re.compile(r&#34;^[0-9a-zA-Z_.$@#-]+$&#34;)):
         if not pat.match(arg_value):
-            raise argparse.ArgumentTypeError
+            raise ValueError(f&#34;Argument error: {arg_value}&#34;)
         return arg_value
     
     def _type_profile(self, arg_value, pat=re.compile(r&#34;^[0-9a-zA-Z_.$#-]+$&#34;)):
         if not pat.match(arg_value):
-            raise argparse.ArgumentTypeError
+            raise ValueError
         return arg_value
 
     def _help(self, type):
@@ -3190,7 +3229,7 @@ tasks:
     #NODEPARSER
     nodeparser = subparsers.add_parser(&#34;node&#34;,usage=self._help(&#34;usage&#34;), help=self._help(&#34;node&#34;),epilog=self._help(&#34;end&#34;), formatter_class=argparse.RawTextHelpFormatter) 
     nodecrud = nodeparser.add_mutually_exclusive_group()
-    nodeparser.add_argument(&#34;node&#34;, metavar=&#34;node|folder&#34;, nargs=&#39;?&#39;, default=None, action=self._store_type, type=self._type_node, help=self._help(&#34;node&#34;))
+    nodeparser.add_argument(&#34;node&#34;, metavar=&#34;node|folder&#34;, nargs=&#39;?&#39;, default=None, action=self._store_type, help=self._help(&#34;node&#34;))
     nodecrud.add_argument(&#34;-v&#34;,&#34;--version&#34;, dest=&#34;action&#34;, action=&#34;store_const&#34;, help=&#34;Show version&#34;, const=&#34;version&#34;, default=&#34;connect&#34;)
     nodecrud.add_argument(&#34;-a&#34;,&#34;--add&#34;, dest=&#34;action&#34;, action=&#34;store_const&#34;, help=&#34;Add new node[@subfolder][@folder] or [@subfolder]@folder&#34;, const=&#34;add&#34;, default=&#34;connect&#34;)
     nodecrud.add_argument(&#34;-r&#34;,&#34;--del&#34;, &#34;--rm&#34;, dest=&#34;action&#34;, action=&#34;store_const&#34;, help=&#34;Delete node[@subfolder][@folder] or [@subfolder]@folder&#34;, const=&#34;del&#34;, default=&#34;connect&#34;)
@@ -3218,6 +3257,8 @@ tasks:
     #LISTPARSER
     lsparser = subparsers.add_parser(&#34;list&#34;, aliases=[&#34;ls&#34;], help=&#34;List profiles, nodes or folders&#34;) 
     lsparser.add_argument(&#34;ls&#34;, action=self._store_type, choices=[&#34;profiles&#34;,&#34;nodes&#34;,&#34;folders&#34;], help=&#34;List profiles, nodes or folders&#34;, default=False)
+    lsparser.add_argument(&#34;--filter&#34;, nargs=1, help=&#34;Filter results&#34;)
+    lsparser.add_argument(&#34;--format&#34;, nargs=1, help=&#34;Format of the output of nodes using {name}, {NAME}, {location}, {LOCATION}, {host} and {HOST}&#34;)
     lsparser.set_defaults(func=self._func_others)
     #BULKPARSER
     bulkparser = subparsers.add_parser(&#34;bulk&#34;, help=&#34;Add nodes in bulk&#34;) 
@@ -3747,7 +3788,7 @@ tasks:
                 passwords = self._passtx(self.password)
             else:
                 passwords = []
-            expects = [&#39;yes/no&#39;, &#39;refused&#39;, &#39;supported&#39;, &#39;cipher&#39;, &#39;ssh-keygen.*\&#34;&#39;, &#39;timeout&#39;, &#39;unavailable&#39;, &#39;closed&#39;, &#39;[p|P]assword:|[u|U]sername:&#39;, r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, &#39;suspend&#39;, pexpect.EOF, pexpect.TIMEOUT, &#34;No route to host&#34;, &#34;resolve hostname&#34;, &#34;no matching&#34;]
+            expects = [&#39;yes/no&#39;, &#39;refused&#39;, &#39;supported&#39;, &#39;cipher&#39;, &#39;ssh-keygen.*\&#34;&#39;, &#39;timeout|timed.out&#39;, &#39;unavailable&#39;, &#39;closed&#39;, &#39;[p|P]assword:|[u|U]sername:&#39;, r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, &#39;suspend&#39;, pexpect.EOF, pexpect.TIMEOUT, &#34;No route to host&#34;, &#34;resolve hostname&#34;, &#34;no matching&#34;]
         elif self.protocol == &#34;telnet&#34;:
             cmd = &#34;telnet &#34; + self.host
             if self.port != &#39;&#39;:
@@ -3760,7 +3801,7 @@ tasks:
                 passwords = self._passtx(self.password)
             else:
                 passwords = []
-            expects = [&#39;[u|U]sername:&#39;, &#39;refused&#39;, &#39;supported&#39;, &#39;cipher&#39;, &#39;ssh-keygen.*\&#34;&#39;, &#39;timeout&#39;, &#39;unavailable&#39;, &#39;closed&#39;, &#39;[p|P]assword:&#39;, r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, &#39;suspend&#39;, pexpect.EOF, pexpect.TIMEOUT, &#34;No route to host&#34;, &#34;resolve hostname&#34;, &#34;no matching&#34;]
+            expects = [&#39;[u|U]sername:&#39;, &#39;refused&#39;, &#39;supported&#39;, &#39;cipher&#39;, &#39;ssh-keygen.*\&#34;&#39;, &#39;timeout|timed.out&#39;, &#39;unavailable&#39;, &#39;closed&#39;, &#39;[p|P]assword:&#39;, r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, &#39;suspend&#39;, pexpect.EOF, pexpect.TIMEOUT, &#34;No route to host&#34;, &#34;resolve hostname&#34;, &#34;no matching&#34;]
         else:
             raise ValueError(&#34;Invalid protocol: &#34; + self.protocol)
         attempts = 1
@@ -3787,9 +3828,6 @@ tasks:
                             else:
                                 self.missingtext = True
                                 break
-                    if results == 4:
-                        child.terminate()
-                        return &#34;Connection failed code:&#34; + str(results) + &#34;\n&#34; + child.after.decode()
                     if results in  [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15]:
                         child.terminate()
                         if results == 12 and attempts != max_attempts:
@@ -3797,7 +3835,11 @@ tasks:
                             endloop = True
                             break
                         else:
-                            return &#34;Connection failed code:&#34; + str(results)
+                            if results == 12:
+                                after = &#34;Connection timeout&#34;
+                            else:
+                                after = child.after.decode()
+                        return (&#34;Connection failed code:&#34; + str(results) + &#34;\n&#34; + child.before.decode() + after + child.readline().decode()).rstrip()
                     if results == 8:
                         if len(passwords) &gt; 0:
                             child.sendline(passwords[i])

@@ -7,9 +7,10 @@ tasks:
   nodes: #List of nodes to work on. Mandatory
   - 'router1@office' #You can add specific nodes
   - '@aws'  #entire folders or subfolders
-  - '@office':   #or filter inside a folder or subfolder
+  - '@office':   #filter inside a folder or subfolder
     - 'router2'
     - 'router7'
+  - 'router[0-9]' # Or use regular expressions
 
   commands: #List of commands to send, use {name} to pass variables
   - 'term len 0'
