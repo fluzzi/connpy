@@ -104,6 +104,10 @@ def main():
     elif wordsnumber >= 4 and words[0] == "export" and words[1] != "--help":
         strings = [item for item in folders if not any(word in item for word in words[:-1])]
 
+    elif wordsnumber >= 4 and words[0] in ["list", "ls"] and words[1] == "nodes":
+        options = ["--format", "--filter"]
+        strings = [item for item in options if not any(word in item for word in words[:-1])]
+
     elif wordsnumber == 4:
           strings=[]
           if words[0] == "profile" and words[1] in ["--rm", "--del", "-r", "--mod", "--edit", "-e", "--show", "-s"]:
@@ -116,6 +120,8 @@ def main():
               strings=["true", "false"]
           if words[0] == "config" and words[1] in ["--configfolder"]:
               strings=_getcwd(words,words[0],True)
+    else:
+        exit()
 
 
     if app == "bash":
