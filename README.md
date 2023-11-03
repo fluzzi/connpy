@@ -105,7 +105,7 @@ print(result)
 
 ### Usage:
 ```
-usage: conn [-h] [--add | --del | --mod | --show | --debug] [node|folder]
+usage: conn [-h] [--add | --del | --mod | --show | --debug] [node|folder] [--sftp]
        conn {profile,move,mv,copy,cp,list,ls,bulk,config} ...
 
 positional arguments:
@@ -124,6 +124,7 @@ positional arguments:
   -e, --mod, --edit  Modify node[@subfolder][@folder]
   -s, --show         Show node[@subfolder][@folder]
   -d, --debug        Display all conections steps
+  -t, --sftp         Connects using sftp instead of ssh
 ```
 
 ### Commands:
