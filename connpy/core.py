@@ -418,16 +418,15 @@ class node:
 
     def _connect(self, debug = False, timeout = 10, max_attempts = 3):
         # Method to connect to the node, it parse all the information, create the ssh/telnet command and login to the node.
-        if self.protocol == "ssh":
-            cmd = "ssh"
+        if self.protocol in ["ssh", "sftp"]:
+            cmd = self.protocol
             if self.idletime > 0:
                 cmd = cmd + " -o ServerAliveInterval=" + str(self.idletime)
-            if self.user == '':
-                cmd = cmd + " {}".format(self.host)
-            else:
-                cmd = cmd + " {}".format("@".join([self.user,self.host]))
             if self.port != '':
-                cmd = cmd + " -p " + self.port
+                if self.protocol == "ssh":
+                    cmd = cmd + " -p " + self.port
+                elif self.protocol == "sftp":
+                    cmd = cmd + " -P " + self.port
             if self.options != '':
                 cmd = cmd + " " + self.options
             if self.logs != '':
@@ -436,6 +435,10 @@ class node:
                 passwords = self._passtx(self.password)
             else:
                 passwords = []
+            if self.user == '':
+                cmd = cmd + " {}".format(self.host)
+            else:
+                cmd = cmd + " {}".format("@".join([self.user,self.host]))
             expects = ['yes/no', 'refused', 'supported', 'cipher', 'ssh-keygen.*\"', 'timeout|timed.out', 'unavailable', 'closed', '[p|P]assword:|[u|U]sername:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching"]
         elif self.protocol == "telnet":
             cmd = "telnet " + self.host
@@ -468,7 +471,7 @@ class node:
                 while True:
                     results = child.expect(expects, timeout=timeout)
                     if results == 0:
-                        if self.protocol == "ssh":
+                        if self.protocol in ["ssh", "sftp"]:
                             child.sendline('yes')
                         elif self.protocol == "telnet":
                             if self.user != '':
@@ -487,7 +490,7 @@ class node:
                                 after = "Connection timeout"
                             else:
                                 after = child.after.decode()
-                        return ("Connection failed code:" + str(results) + "\n" + child.before.decode() + after + child.readline().decode()).rstrip()
+                        return ("Connection failed code:" + str(results) + "\n" + child.before.decode().lstrip() + after + child.readline().decode()).rstrip()
                     if results == 8:
                         if len(passwords) > 0:
                             child.sendline(passwords[i])

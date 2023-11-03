@@ -78,7 +78,8 @@ class connapp:
         nodecrud.add_argument("-r","--del", "--rm", dest="action", action="store_const", help="Delete node[@subfolder][@folder] or [@subfolder]@folder", const="del", default="connect")
         nodecrud.add_argument("-e","--mod", "--edit", dest="action", action="store_const", help="Modify node[@subfolder][@folder]", const="mod", default="connect")
         nodecrud.add_argument("-s","--show", dest="action", action="store_const", help="Show node[@subfolder][@folder]", const="show", default="connect")
-        nodecrud.add_argument("-d","--debug", dest="action", action="store_const", help="Display all conections steps", const="debug", default="connect")
+        nodecrud.add_argument("-d","--debug", dest="debug", action="store_true", help="Display all conections steps")
+        nodeparser.add_argument("-t","--sftp", dest="sftp", action="store_true", help="Connects using sftp instead of ssh")
         nodeparser.set_defaults(func=self._func_node)
         #PROFILEPARSER
         profileparser = subparsers.add_parser("profile", help="Manage profiles") 
@@ -169,7 +170,7 @@ class connapp:
         #Function called when connecting or managing nodes.
         if not self.case and args.data != None:
             args.data = args.data.lower()
-        actions = {"version": self._version, "connect": self._connect, "debug": self._connect, "add": self._add, "del": self._del, "mod": self._mod, "show": self._show}
+        actions = {"version": self._version, "connect": self._connect, "add": self._add, "del": self._del, "mod": self._mod, "show": self._show}
         return actions.get(args.action)(args)
 
     def _version(self, args):
@@ -196,7 +197,9 @@ class connapp:
             exit(7)
         node = self.config.getitem(matches[0])
         node = self.node(matches[0],**node, config = self.config)
-        if args.action == "debug":
+        if args.sftp:
+            node.protocol = "sftp"
+        if args.debug:
             node.interact(debug = True)
         else:
             node.interact()
@@ -1212,7 +1215,7 @@ class connapp:
         if type == "node":
             return "node[@subfolder][@folder]\nConnect to specific node or show all matching nodes\n[@subfolder][@folder]\nShow all available connections globaly or in specified path"
         if type == "usage":
-            return "conn [-h] [--add | --del | --mod | --show | --debug] [node|folder]\n       conn {profile,move,mv,copy,cp,list,ls,bulk,config} ..."
+            return "conn [-h] [--add | --del | --mod | --show | --debug] [node|folder] [--sftp]\n       conn {profile,move,mv,copy,cp,list,ls,bulk,config} ..."
         if type == "end":
             return "Commands:\n  profile        Manage profiles\n  move (mv)      Move node\n  copy (cp)      Copy node\n  list (ls)      List profiles, nodes or folders\n  bulk           Add nodes in bulk\n  export         Export connection folder to Yaml file\n  import         Import connection folder to config from Yaml file\n  run            Run scripts or commands on nodes\n  config         Manage app config\n  api            Start and stop connpy api\n  ai             Make request to an AI"
         if type == "bashcompletion":
