@@ -439,7 +439,7 @@ class node:
                 cmd = cmd + " {}".format(self.host)
             else:
                 cmd = cmd + " {}".format("@".join([self.user,self.host]))
-            expects = ['yes/no', 'refused', 'supported', 'cipher', 'ssh-keygen.*\"', 'timeout|timed.out', 'unavailable', 'closed', '[p|P]assword:|[u|U]sername:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching"]
+            expects = ['yes/no', 'refused', 'supported', 'Invalid|[u|U]sage:', 'ssh-keygen.*\"', 'timeout|timed.out', 'unavailable', 'closed', '[p|P]assword:|[u|U]sername:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching"]
         elif self.protocol == "telnet":
             cmd = "telnet " + self.host
             if self.port != '':

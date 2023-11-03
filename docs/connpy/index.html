@@ -3797,7 +3797,7 @@ tasks:
                 cmd = cmd + &#34; {}&#34;.format(self.host)
             else:
                 cmd = cmd + &#34; {}&#34;.format(&#34;@&#34;.join([self.user,self.host]))
-            expects = [&#39;yes/no&#39;, &#39;refused&#39;, &#39;supported&#39;, &#39;cipher&#39;, &#39;ssh-keygen.*\&#34;&#39;, &#39;timeout|timed.out&#39;, &#39;unavailable&#39;, &#39;closed&#39;, &#39;[p|P]assword:|[u|U]sername:&#39;, r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, &#39;suspend&#39;, pexpect.EOF, pexpect.TIMEOUT, &#34;No route to host&#34;, &#34;resolve hostname&#34;, &#34;no matching&#34;]
+            expects = [&#39;yes/no&#39;, &#39;refused&#39;, &#39;supported&#39;, &#39;Invalid|[u|U]sage:&#39;, &#39;ssh-keygen.*\&#34;&#39;, &#39;timeout|timed.out&#39;, &#39;unavailable&#39;, &#39;closed&#39;, &#39;[p|P]assword:|[u|U]sername:&#39;, r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, &#39;suspend&#39;, pexpect.EOF, pexpect.TIMEOUT, &#34;No route to host&#34;, &#34;resolve hostname&#34;, &#34;no matching&#34;]
         elif self.protocol == &#34;telnet&#34;:
             cmd = &#34;telnet &#34; + self.host
             if self.port != &#39;&#39;:
