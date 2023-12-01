@@ -539,6 +539,7 @@ class connapp:
             newnode["options"] = newnodes["options"]
             newnode["logs"] = newnodes["logs"]
             newnode["tags"] = newnodes["tags"]
+            newnode["jumphost"] = newnodes["jumphost"]
             newnode["user"] = newnodes["user"]
             newnode["password"] = newnodes["password"]
             count +=1
@@ -992,6 +993,23 @@ class connapp:
                 raise inquirer.errors.ValidationError("", reason="Tags should be a python dictionary.".format(current))
         return True
 
+    def _jumphost_validation(self, answers, current):
+        #Validation for Jumphost in inquirer when managing nodes
+        if current.startswith("@"):
+            if current[1:] not in self.profiles:
+                raise inquirer.errors.ValidationError("", reason="Profile {} don't exist".format(current))
+        elif current != "":
+            if current not in self.nodes :
+                raise inquirer.errors.ValidationError("", reason="Node {} don't exist.".format(current))
+        return True
+
+    def _profile_jumphost_validation(self, answers, current):
+        #Validation for Jumphost in inquirer when managing profiles
+        if current != "":
+            if current not in self.nodes :
+                raise inquirer.errors.ValidationError("", reason="Node {} don't exist.".format(current))
+        return True
+
     def _default_validation(self, answers, current):
         #Default validation type used in multiples questions in inquirer
         if current.startswith("@"):
@@ -1039,6 +1057,7 @@ class connapp:
         questions.append(inquirer.Confirm("options", message="Edit Options?"))
         questions.append(inquirer.Confirm("logs", message="Edit logging path/file?"))
         questions.append(inquirer.Confirm("tags", message="Edit tags?"))
+        questions.append(inquirer.Confirm("jumphost", message="Edit jumphost?"))
         questions.append(inquirer.Confirm("user", message="Edit User?"))
         questions.append(inquirer.Confirm("password", message="Edit password?"))
         answers = inquirer.prompt(questions)
@@ -1050,11 +1069,13 @@ class connapp:
             defaults = self.config.getitem(unique)
             if "tags" not in defaults:
                 defaults["tags"] = ""
+            if "jumphost" not in defaults:
+                defaults["jumphost"] = ""
         except:
-            defaults = { "host":"", "protocol":"", "port":"", "user":"", "options":"", "logs":"" , "tags":"", "password":""}
+            defaults = { "host":"", "protocol":"", "port":"", "user":"", "options":"", "logs":"" , "tags":"", "password":"", "jumphost":""}
         node = {}
         if edit == None:
-            edit = { "host":True, "protocol":True, "port":True, "user":True, "password": True,"options":True, "logs":True, "tags":True }
+            edit = { "host":True, "protocol":True, "port":True, "user":True, "password": True,"options":True, "logs":True, "tags":True, "jumphost":True }
         questions = []
         if edit["host"]:
             questions.append(inquirer.Text("host", message="Add Hostname or IP", validate=self._host_validation, default=defaults["host"]))
@@ -1080,6 +1101,10 @@ class connapp:
             questions.append(inquirer.Text("tags", message="Add tags dictionary",  validate=self._tags_validation, default=str(defaults["tags"]).replace("{","{{").replace("}","}}")))
         else:
             node["tags"] = defaults["tags"]
+        if edit["jumphost"]:
+            questions.append(inquirer.Text("jumphost", message="Add Jumphost node",  validate=self._jumphost_validation, default=str(defaults["jumphost"]).replace("{","{{").replace("}","}}")))
+        else:
+            node["jumphost"] = defaults["jumphost"]
         if edit["user"]:
             questions.append(inquirer.Text("user", message="Pick username", validate=self._default_validation, default=defaults["user"]))
         else:
@@ -1118,11 +1143,13 @@ class connapp:
             defaults = self.config.profiles[unique]
             if "tags" not in defaults:
                 defaults["tags"] = ""
+            if "jumphost" not in defaults:
+                defaults["jumphost"] = ""
         except:
-            defaults = { "host":"", "protocol":"", "port":"", "user":"", "options":"", "logs":"", "tags": "" }
+            defaults = { "host":"", "protocol":"", "port":"", "user":"", "options":"", "logs":"", "tags": "", "jumphost": ""}
         profile = {}
         if edit == None:
-            edit = { "host":True, "protocol":True, "port":True, "user":True, "password": True,"options":True, "logs":True, "tags":True }
+            edit = { "host":True, "protocol":True, "port":True, "user":True, "password": True,"options":True, "logs":True, "tags":True, "jumphost":True }
         questions = []
         if edit["host"]:
             questions.append(inquirer.Text("host", message="Add Hostname or IP", default=defaults["host"]))
@@ -1148,6 +1175,10 @@ class connapp:
             questions.append(inquirer.Text("tags", message="Add tags dictionary",  validate=self._profile_tags_validation, default=str(defaults["tags"]).replace("{","{{").replace("}","}}")))
         else:
             profile["tags"] = defaults["tags"]
+        if edit["jumphost"]:
+            questions.append(inquirer.Text("jumphost", message="Add Jumphost node",  validate=self._profile_jumphost_validation, default=str(defaults["jumphost"]).replace("{","{{").replace("}","}}")))
+        else:
+            profile["jumphost"] = defaults["jumphost"]
         if edit["user"]:
             questions.append(inquirer.Text("user", message="Pick username", default=defaults["user"]))
         else:
@@ -1179,6 +1210,7 @@ class connapp:
         questions.append(inquirer.Text("options", message="Pass extra options to protocol", validate=self._default_validation))
         questions.append(inquirer.Text("logs", message="Pick logging path/file ", validate=self._default_validation))
         questions.append(inquirer.Text("tags", message="Add tags dictionary",  validate=self._tags_validation))
+        questions.append(inquirer.Text("jumphost", message="Add Jumphost node",  validate=self._jumphost_validation))
         questions.append(inquirer.Text("user", message="Pick username", validate=self._default_validation))
         questions.append(inquirer.List("password", message="Password: Use a local password, no password or a list of profiles to reference?", choices=["Local Password", "Profiles", "No Password"]))
         answer = inquirer.prompt(questions)
@@ -1201,6 +1233,8 @@ class connapp:
         return answer
 
     def _type_node(self, arg_value, pat=re.compile(r"^[0-9a-zA-Z_.$@#-]+$")):
+        if arg_value == None:
+            raise ValueError("Missing argument node")
         if not pat.match(arg_value):
             raise ValueError(f"Argument error: {arg_value}")
         return arg_value
