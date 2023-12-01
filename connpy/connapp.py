@@ -1213,9 +1213,9 @@ class connapp:
     def _help(self, type):
         #Store text for help and other commands
         if type == "node":
-            return "node[@subfolder][@folder]\nConnect to specific node or show all matching nodes\n[@subfolder][@folder]\nShow all available connections globaly or in specified path"
+            return "node[@subfolder][@folder]\nConnect to specific node or show all matching nodes\n[@subfolder][@folder]\nShow all available connections globally or in specified path"
         if type == "usage":
-            return "conn [-h] [--add | --del | --mod | --show | --debug] [node|folder] [--sftp]\n       conn {profile,move,mv,copy,cp,list,ls,bulk,config} ..."
+            return "conn [-h] [--add | --del | --mod | --show | --debug] [node|folder] [--sftp]\n       conn {profile,move,copy,list,bulk,export,import,run,config,api,ai} ..."
         if type == "end":
             return "Commands:\n  profile        Manage profiles\n  move (mv)      Move node\n  copy (cp)      Copy node\n  list (ls)      List profiles, nodes or folders\n  bulk           Add nodes in bulk\n  export         Export connection folder to Yaml file\n  import         Import connection folder to config from Yaml file\n  run            Run scripts or commands on nodes\n  config         Manage app config\n  api            Start and stop connpy api\n  ai             Make request to an AI"
         if type == "bashcompletion":

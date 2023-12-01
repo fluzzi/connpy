@@ -203,8 +203,8 @@ class node:
         '''
         connect = self._connect(debug = debug)
         if connect == True:
-            size = re.search('columns=([0-9]+).*lines=([0-9]+)',str(os.get_terminal_size()))
-            self.child.setwinsize(int(size.group(2)),int(size.group(1)))
+            # size = re.search('columns=([0-9]+).*lines=([0-9]+)',str(os.get_terminal_size()))
+            # self.child.setwinsize(int(size.group(2)),int(size.group(1)))
             print("Connected to " + self.unique + " at " + self.host + (":" if self.port != '' else '') + self.port + " via: " + self.protocol)
             if 'logfile' in dir(self):
                 # Initialize self.mylog
@@ -439,7 +439,7 @@ class node:
                 cmd = cmd + " {}".format(self.host)
             else:
                 cmd = cmd + " {}".format("@".join([self.user,self.host]))
-            expects = ['yes/no', 'refused', 'supported', 'Invalid|[u|U]sage:', 'ssh-keygen.*\"', 'timeout|timed.out', 'unavailable', 'closed', '[p|P]assword:|[u|U]sername:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching"]
+            expects = ['yes/no', 'refused', 'supported', 'Invalid|[u|U]sage:', 'ssh-keygen.*\"', 'timeout|timed.out', 'unavailable', 'closed', '[p|P]assword:|[u|U]sername:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching", "bad permissions"]
         elif self.protocol == "telnet":
             cmd = "telnet " + self.host
             if self.port != '':
@@ -452,7 +452,7 @@ class node:
                 passwords = self._passtx(self.password)
             else:
                 passwords = []
-            expects = ['[u|U]sername:', 'refused', 'supported', 'cipher', 'ssh-keygen.*\"', 'timeout|timed.out', 'unavailable', 'closed', '[p|P]assword:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching"]
+            expects = ['[u|U]sername:', 'refused', 'supported', 'cipher', 'ssh-keygen.*\"', 'timeout|timed.out', 'unavailable', 'closed', '[p|P]assword:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching", "bad permissions"]
         else:
             raise ValueError("Invalid protocol: " + self.protocol)
         attempts = 1
@@ -479,7 +479,7 @@ class node:
                             else:
                                 self.missingtext = True
                                 break
-                    if results in  [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15]:
+                    if results in  [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15, 16]:
                         child.terminate()
                         if results == 12 and attempts != max_attempts:
                             attempts += 1
