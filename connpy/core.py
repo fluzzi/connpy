@@ -203,8 +203,8 @@ class node:
         '''
         connect = self._connect(debug = debug)
         if connect == True:
-            # size = re.search('columns=([0-9]+).*lines=([0-9]+)',str(os.get_terminal_size()))
-            # self.child.setwinsize(int(size.group(2)),int(size.group(1)))
+            size = re.search('columns=([0-9]+).*lines=([0-9]+)',str(os.get_terminal_size()))
+            self.child.setwinsize(int(size.group(2)),int(size.group(1)))
             print("Connected to " + self.unique + " at " + self.host + (":" if self.port != '' else '') + self.port + " via: " + self.protocol)
             if 'logfile' in dir(self):
                 # Initialize self.mylog
