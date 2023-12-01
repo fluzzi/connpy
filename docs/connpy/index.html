@@ -36,7 +36,7 @@
 </code></pre>
 <h3 id="usage">Usage</h3>
 <pre><code>usage: conn [-h] [--add | --del | --mod | --show | --debug] [node|folder] [--sftp]
-       conn {profile,move,mv,copy,cp,list,ls,bulk,config} ...
+       conn {profile,move,copy,list,bulk,export,import,run,config,api,ai} ...
 
 positional arguments:
   node|folder    node[@subfolder][@folder]
@@ -271,7 +271,7 @@ Connpy is a connection manager that allows you to store nodes to connect them fa
 ### Usage
 ```
 usage: conn [-h] [--add | --del | --mod | --show | --debug] [node|folder] [--sftp]
-       conn {profile,move,mv,copy,cp,list,ls,bulk,config} ...
+       conn {profile,move,copy,list,bulk,export,import,run,config,api,ai} ...
 
 positional arguments:
   node|folder    node[@subfolder][@folder]
@@ -3006,9 +3006,9 @@ Categorize the user&#39;s request based on the operation they want to perform on
     def _help(self, type):
         #Store text for help and other commands
         if type == &#34;node&#34;:
-            return &#34;node[@subfolder][@folder]\nConnect to specific node or show all matching nodes\n[@subfolder][@folder]\nShow all available connections globaly or in specified path&#34;
+            return &#34;node[@subfolder][@folder]\nConnect to specific node or show all matching nodes\n[@subfolder][@folder]\nShow all available connections globally or in specified path&#34;
         if type == &#34;usage&#34;:
-            return &#34;conn [-h] [--add | --del | --mod | --show | --debug] [node|folder] [--sftp]\n       conn {profile,move,mv,copy,cp,list,ls,bulk,config} ...&#34;
+            return &#34;conn [-h] [--add | --del | --mod | --show | --debug] [node|folder] [--sftp]\n       conn {profile,move,copy,list,bulk,export,import,run,config,api,ai} ...&#34;
         if type == &#34;end&#34;:
             return &#34;Commands:\n  profile        Manage profiles\n  move (mv)      Move node\n  copy (cp)      Copy node\n  list (ls)      List profiles, nodes or folders\n  bulk           Add nodes in bulk\n  export         Export connection folder to Yaml file\n  import         Import connection folder to config from Yaml file\n  run            Run scripts or commands on nodes\n  config         Manage app config\n  api            Start and stop connpy api\n  ai             Make request to an AI&#34;
         if type == &#34;bashcompletion&#34;:
@@ -3797,7 +3797,7 @@ tasks:
                 cmd = cmd + &#34; {}&#34;.format(self.host)
             else:
                 cmd = cmd + &#34; {}&#34;.format(&#34;@&#34;.join([self.user,self.host]))
-            expects = [&#39;yes/no&#39;, &#39;refused&#39;, &#39;supported&#39;, &#39;Invalid|[u|U]sage:&#39;, &#39;ssh-keygen.*\&#34;&#39;, &#39;timeout|timed.out&#39;, &#39;unavailable&#39;, &#39;closed&#39;, &#39;[p|P]assword:|[u|U]sername:&#39;, r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, &#39;suspend&#39;, pexpect.EOF, pexpect.TIMEOUT, &#34;No route to host&#34;, &#34;resolve hostname&#34;, &#34;no matching&#34;]
+            expects = [&#39;yes/no&#39;, &#39;refused&#39;, &#39;supported&#39;, &#39;Invalid|[u|U]sage:&#39;, &#39;ssh-keygen.*\&#34;&#39;, &#39;timeout|timed.out&#39;, &#39;unavailable&#39;, &#39;closed&#39;, &#39;[p|P]assword:|[u|U]sername:&#39;, r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, &#39;suspend&#39;, pexpect.EOF, pexpect.TIMEOUT, &#34;No route to host&#34;, &#34;resolve hostname&#34;, &#34;no matching&#34;, &#34;bad permissions&#34;]
         elif self.protocol == &#34;telnet&#34;:
             cmd = &#34;telnet &#34; + self.host
             if self.port != &#39;&#39;:
@@ -3810,7 +3810,7 @@ tasks:
                 passwords = self._passtx(self.password)
             else:
                 passwords = []
-            expects = [&#39;[u|U]sername:&#39;, &#39;refused&#39;, &#39;supported&#39;, &#39;cipher&#39;, &#39;ssh-keygen.*\&#34;&#39;, &#39;timeout|timed.out&#39;, &#39;unavailable&#39;, &#39;closed&#39;, &#39;[p|P]assword:&#39;, r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, &#39;suspend&#39;, pexpect.EOF, pexpect.TIMEOUT, &#34;No route to host&#34;, &#34;resolve hostname&#34;, &#34;no matching&#34;]
+            expects = [&#39;[u|U]sername:&#39;, &#39;refused&#39;, &#39;supported&#39;, &#39;cipher&#39;, &#39;ssh-keygen.*\&#34;&#39;, &#39;timeout|timed.out&#39;, &#39;unavailable&#39;, &#39;closed&#39;, &#39;[p|P]assword:&#39;, r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, &#39;suspend&#39;, pexpect.EOF, pexpect.TIMEOUT, &#34;No route to host&#34;, &#34;resolve hostname&#34;, &#34;no matching&#34;, &#34;bad permissions&#34;]
         else:
             raise ValueError(&#34;Invalid protocol: &#34; + self.protocol)
         attempts = 1
@@ -3837,7 +3837,7 @@ tasks:
                             else:
                                 self.missingtext = True
                                 break
-                    if results in  [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15]:
+                    if results in  [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15, 16]:
                         child.terminate()
                         if results == 12 and attempts != max_attempts:
                             attempts += 1
