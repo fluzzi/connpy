@@ -17,7 +17,7 @@ Connpy is a connection manager that allows you to store nodes to connect them fa
 ### Usage
 ```
 usage: conn [-h] [--add | --del | --mod | --show | --debug] [node|folder] [--sftp]
-       conn {profile,move,mv,copy,cp,list,ls,bulk,config} ...
+       conn {profile,move,copy,list,bulk,export,import,run,config,api,ai} ...
 
 positional arguments:
   node|folder    node[@subfolder][@folder]
