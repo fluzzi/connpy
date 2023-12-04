@@ -127,11 +127,11 @@ class node:
 
             if self.jumphost["protocol"] == "ssh":
                 jumphost_cmd = self.jumphost["protocol"] + " -W %h:%p"
-                if self.port != '':
+                if self.jumphost["port"] != '':
                     jumphost_cmd = jumphost_cmd + " -p " + self.jumphost["port"]
-                if self.options != '':
+                if self.jumphost["options"] != '':
                     jumphost_cmd = jumphost_cmd + " " + self.jumphost["options"]
-                if self.user == '':
+                if self.jumphost["user"] == '':
                     jumphost_cmd = jumphost_cmd + " {}".format(self.jumphost["host"])
                 else:
                     jumphost_cmd = jumphost_cmd + " {}".format("@".join([self.jumphost["user"],self.jumphost["host"]]))
@@ -482,7 +482,7 @@ class node:
                 cmd = cmd + " {}".format(self.host)
             else:
                 cmd = cmd + " {}".format("@".join([self.user,self.host]))
-            expects = ['yes/no', 'refused', 'supported', 'Invalid|[u|U]sage:', 'ssh-keygen.*\"', 'timeout|timed.out', 'unavailable', 'closed', '[p|P]assword:|[u|U]sername:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching", "bad permissions"]
+            expects = ['yes/no', 'refused', 'supported', 'Invalid|[u|U]sage: (ssh|sftp)', 'ssh-keygen.*\"', 'timeout|timed.out', 'unavailable', 'closed', '[p|P]assword:|[u|U]sername:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching", "bad permissions"]
         elif self.protocol == "telnet":
             cmd = "telnet " + self.host
             if self.port != '':
@@ -495,7 +495,7 @@ class node:
                 passwords = self._passtx(self.password)
             else:
                 passwords = []
-            expects = ['[u|U]sername:', 'refused', 'supported', 'cipher', 'ssh-keygen.*\"', 'timeout|timed.out', 'unavailable', 'closed', '[p|P]assword:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching", "bad permissions"]
+            expects = ['[u|U]sername:', 'refused', 'supported', 'invalid option', 'ssh-keygen.*\"', 'timeout|timed.out', 'unavailable', 'closed', '[p|P]assword:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching", "bad permissions"]
         else:
             raise ValueError("Invalid protocol: " + self.protocol)
         attempts = 1
