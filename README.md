@@ -4,11 +4,18 @@
 [![](https://img.shields.io/pypi/l/connpy.svg?style=flat-square)](https://github.com/fluzzi/connpy/blob/main/LICENSE)
 [![](https://img.shields.io/pypi/dm/connpy.svg?style=flat-square)](https://pypi.org/pypi/connpy/)
 
-Connpy is a ssh and telnet connection manager and automation module
+Connpy is a ssh and telnet connection manager and automation module for Linux, Mac and Docker
 
 ## Installation
 
 pip install connpy
+
+### Run it in Windows using docker
+```
+git clone https://github.com/fluzzi/connpy
+docker compose -f path/to/folder/docker-compose.yml build
+docker compose -f path/to/folder/docker-compose.yml run -it connpy-app
+```
 
 ## Automation module usage
 ### Standalone module
