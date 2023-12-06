@@ -33,7 +33,7 @@ class node:
 
         '''
     
-    def __init__(self, unique, host, options='', logs='', password='', port='', protocol='', user='', config='', tags=''):
+    def __init__(self, unique, host, options='', logs='', password='', port='', protocol='', user='', config='', tags='', jumphost=''):
         ''' 
             
         ### Parameters:  
@@ -66,6 +66,8 @@ class node:
 
             - tags   (dict) : Tags useful for automation and personal porpuse
                               like "os", "prompt" and "screenleght_command"
+                              
+            - jumphost (str): Reference another node to be used as a jumphost
         '''
         if config == '':
             self.idletime = 0
@@ -74,7 +76,7 @@ class node:
             self.idletime = config.config["idletime"]
             self.key = config.key
         self.unique = unique
-        attr = {"host": host, "logs": logs, "options":options, "port": port, "protocol": protocol, "user": user, "tags": tags}
+        attr = {"host": host, "logs": logs, "options":options, "port": port, "protocol": protocol, "user": user, "tags": tags, "jumphost": jumphost}
         for key in attr:
             profile = re.search("^@(.*)", str(attr[key]))
             if profile and config != '':
@@ -97,6 +99,45 @@ class node:
                     self.password.append(config.profiles[profile.group(1)]["password"])
         else:
             self.password = [password]
+        if self.jumphost != "" and config != '':
+            self.jumphost = config.getitem(self.jumphost)
+            for key in self.jumphost:
+                profile = re.search("^@(.*)", str(self.jumphost[key]))
+                if profile:
+                    try:
+                        self.jumphost[key] = config.profiles[profile.group(1)][key]
+                    except:
+                        self.jumphost[key] = ""
+                elif self.jumphost[key] == '' and key == "protocol":
+                    try:
+                        self.jumphost[key] = config.profiles["default"][key]
+                    except:
+                        self.jumphost[key] = "ssh"
+            if isinstance(self.jumphost["password"],list):
+                jumphost_password = []
+                for i, s in enumerate(self.jumphost["password"]):
+                    profile = re.search("^@(.*)", self.jumphost["password"][i])
+                    if profile:
+                        jumphost_password.append(config.profiles[profile.group(1)]["password"])
+                self.jumphost["password"] = jumphost_password
+            else:
+                self.jumphost["password"] = [self.jumphost["password"]]
+            if self.jumphost["password"] != [""]:
+                self.password = self.jumphost["password"] + self.password
+
+            if self.jumphost["protocol"] == "ssh":
+                jumphost_cmd = self.jumphost["protocol"] + " -W %h:%p"
+                if self.jumphost["port"] != '':
+                    jumphost_cmd = jumphost_cmd + " -p " + self.jumphost["port"]
+                if self.jumphost["options"] != '':
+                    jumphost_cmd = jumphost_cmd + " " + self.jumphost["options"]
+                if self.jumphost["user"] == '':
+                    jumphost_cmd = jumphost_cmd + " {}".format(self.jumphost["host"])
+                else:
+                    jumphost_cmd = jumphost_cmd + " {}".format("@".join([self.jumphost["user"],self.jumphost["host"]]))
+                self.jumphost = f"-o ProxyCommand=\"{jumphost_cmd}\""
+            else:
+                self.jumphost = ""
 
     def _passtx(self, passwords, *, keyfile=None):
         # decrypts passwords, used by other methdos.
@@ -431,6 +472,8 @@ class node:
                 cmd = cmd + " " + self.options
             if self.logs != '':
                 self.logfile = self._logfile()
+            if self.jumphost != '':
+                cmd = cmd + " " + self.jumphost
             if self.password[0] != '':
                 passwords = self._passtx(self.password)
             else:
@@ -439,7 +482,7 @@ class node:
                 cmd = cmd + " {}".format(self.host)
             else:
                 cmd = cmd + " {}".format("@".join([self.user,self.host]))
-            expects = ['yes/no', 'refused', 'supported', 'Invalid|[u|U]sage:', 'ssh-keygen.*\"', 'timeout|timed.out', 'unavailable', 'closed', '[p|P]assword:|[u|U]sername:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching", "bad permissions"]
+            expects = ['yes/no', 'refused', 'supported', 'Invalid|[u|U]sage: (ssh|sftp)', 'ssh-keygen.*\"', 'timeout|timed.out', 'unavailable', 'closed', '[p|P]assword:|[u|U]sername:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching", "bad permissions"]
         elif self.protocol == "telnet":
             cmd = "telnet " + self.host
             if self.port != '':
@@ -452,7 +495,7 @@ class node:
                 passwords = self._passtx(self.password)
             else:
                 passwords = []
-            expects = ['[u|U]sername:', 'refused', 'supported', 'cipher', 'ssh-keygen.*\"', 'timeout|timed.out', 'unavailable', 'closed', '[p|P]assword:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching", "bad permissions"]
+            expects = ['[u|U]sername:', 'refused', 'supported', 'invalid option', 'ssh-keygen.*\"', 'timeout|timed.out', 'unavailable', 'closed', '[p|P]assword:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching", "bad permissions"]
         else:
             raise ValueError("Invalid protocol: " + self.protocol)
         attempts = 1
