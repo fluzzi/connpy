@@ -1390,7 +1390,7 @@ Categorize the user&#39;s request based on the operation they want to perform on
 
     def _createconfig(self, conf):
         #Create config file
-        defaultconfig = {&#39;config&#39;: {&#39;case&#39;: False, &#39;idletime&#39;: 30, &#39;fzf&#39;: False}, &#39;connections&#39;: {}, &#39;profiles&#39;: { &#34;default&#34;: { &#34;host&#34;:&#34;&#34;, &#34;protocol&#34;:&#34;ssh&#34;, &#34;port&#34;:&#34;&#34;, &#34;user&#34;:&#34;&#34;, &#34;password&#34;:&#34;&#34;, &#34;options&#34;:&#34;&#34;, &#34;logs&#34;:&#34;&#34;, &#34;tags&#34;: &#34;&#34; }}}
+        defaultconfig = {&#39;config&#39;: {&#39;case&#39;: False, &#39;idletime&#39;: 30, &#39;fzf&#39;: False}, &#39;connections&#39;: {}, &#39;profiles&#39;: { &#34;default&#34;: { &#34;host&#34;:&#34;&#34;, &#34;protocol&#34;:&#34;ssh&#34;, &#34;port&#34;:&#34;&#34;, &#34;user&#34;:&#34;&#34;, &#34;password&#34;:&#34;&#34;, &#34;options&#34;:&#34;&#34;, &#34;logs&#34;:&#34;&#34;, &#34;tags&#34;: &#34;&#34;, &#34;jumphost&#34;:&#34;&#34;}}}
         if not os.path.exists(conf):
             with open(conf, &#34;w&#34;) as f:
                 json.dump(defaultconfig, f, indent = 4)
@@ -1536,14 +1536,14 @@ Categorize the user&#39;s request based on the operation they want to perform on
         return nodes
 
 
-    def _connections_add(self,*, id, host, folder=&#39;&#39;, subfolder=&#39;&#39;, options=&#39;&#39;, logs=&#39;&#39;, password=&#39;&#39;, port=&#39;&#39;, protocol=&#39;&#39;, user=&#39;&#39;, tags=&#39;&#39;, type = &#34;connection&#34; ):
+    def _connections_add(self,*, id, host, folder=&#39;&#39;, subfolder=&#39;&#39;, options=&#39;&#39;, logs=&#39;&#39;, password=&#39;&#39;, port=&#39;&#39;, protocol=&#39;&#39;, user=&#39;&#39;, tags=&#39;&#39;, jumphost=&#39;&#39;, type = &#34;connection&#34; ):
         #Add connection from config
         if folder == &#39;&#39;:
-            self.connections[id] = {&#34;host&#34;: host, &#34;options&#34;: options, &#34;logs&#34;: logs, &#34;password&#34;: password, &#34;port&#34;: port, &#34;protocol&#34;: protocol, &#34;user&#34;: user, &#34;tags&#34;: tags,&#34;type&#34;: type}
+            self.connections[id] = {&#34;host&#34;: host, &#34;options&#34;: options, &#34;logs&#34;: logs, &#34;password&#34;: password, &#34;port&#34;: port, &#34;protocol&#34;: protocol, &#34;user&#34;: user, &#34;tags&#34;: tags,&#34;jumphost&#34;: jumphost,&#34;type&#34;: type}
         elif folder != &#39;&#39; and subfolder == &#39;&#39;:
-            self.connections[folder][id] = {&#34;host&#34;: host, &#34;options&#34;: options, &#34;logs&#34;: logs, &#34;password&#34;: password, &#34;port&#34;: port, &#34;protocol&#34;: protocol, &#34;user&#34;: user, &#34;tags&#34;: tags, &#34;type&#34;: type}
+            self.connections[folder][id] = {&#34;host&#34;: host, &#34;options&#34;: options, &#34;logs&#34;: logs, &#34;password&#34;: password, &#34;port&#34;: port, &#34;protocol&#34;: protocol, &#34;user&#34;: user, &#34;tags&#34;: tags, &#34;jumphost&#34;: jumphost, &#34;type&#34;: type}
         elif folder != &#39;&#39; and subfolder != &#39;&#39;:
-            self.connections[folder][subfolder][id] = {&#34;host&#34;: host, &#34;options&#34;: options, &#34;logs&#34;: logs, &#34;password&#34;: password, &#34;port&#34;: port, &#34;protocol&#34;: protocol, &#34;user&#34;: user, &#34;tags&#34;: tags, &#34;type&#34;: type}
+            self.connections[folder][subfolder][id] = {&#34;host&#34;: host, &#34;options&#34;: options, &#34;logs&#34;: logs, &#34;password&#34;: password, &#34;port&#34;: port, &#34;protocol&#34;: protocol, &#34;user&#34;: user, &#34;tags&#34;: tags,  &#34;jumphost&#34;: jumphost, &#34;type&#34;: type}
             
 
     def _connections_del(self,*, id, folder=&#39;&#39;, subfolder=&#39;&#39;):
@@ -1572,9 +1572,9 @@ Categorize the user&#39;s request based on the operation they want to perform on
             del self.connections[folder][subfolder]
 
 
-    def _profiles_add(self,*, id, host = &#39;&#39;, options=&#39;&#39;, logs=&#39;&#39;, password=&#39;&#39;, port=&#39;&#39;, protocol=&#39;&#39;, user=&#39;&#39;, tags=&#39;&#39; ):
+    def _profiles_add(self,*, id, host = &#39;&#39;, options=&#39;&#39;, logs=&#39;&#39;, password=&#39;&#39;, port=&#39;&#39;, protocol=&#39;&#39;, user=&#39;&#39;, tags=&#39;&#39;, jumphost=&#39;&#39; ):
         #Add profile from config
-        self.profiles[id] = {&#34;host&#34;: host, &#34;options&#34;: options, &#34;logs&#34;: logs, &#34;password&#34;: password, &#34;port&#34;: port, &#34;protocol&#34;: protocol, &#34;user&#34;: user, &#34;tags&#34;: tags}
+        self.profiles[id] = {&#34;host&#34;: host, &#34;options&#34;: options, &#34;logs&#34;: logs, &#34;password&#34;: password, &#34;port&#34;: port, &#34;protocol&#34;: protocol, &#34;user&#34;: user, &#34;tags&#34;: tags, &#34;jumphost&#34;: jumphost}
             
 
     def _profiles_del(self,*, id ):
@@ -2332,6 +2332,7 @@ Categorize the user&#39;s request based on the operation they want to perform on
             newnode[&#34;options&#34;] = newnodes[&#34;options&#34;]
             newnode[&#34;logs&#34;] = newnodes[&#34;logs&#34;]
             newnode[&#34;tags&#34;] = newnodes[&#34;tags&#34;]
+            newnode[&#34;jumphost&#34;] = newnodes[&#34;jumphost&#34;]
             newnode[&#34;user&#34;] = newnodes[&#34;user&#34;]
             newnode[&#34;password&#34;] = newnodes[&#34;password&#34;]
             count +=1
@@ -2785,6 +2786,23 @@ Categorize the user&#39;s request based on the operation they want to perform on
                 raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Tags should be a python dictionary.&#34;.format(current))
         return True
 
+    def _jumphost_validation(self, answers, current):
+        #Validation for Jumphost in inquirer when managing nodes
+        if current.startswith(&#34;@&#34;):
+            if current[1:] not in self.profiles:
+                raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Profile {} don&#39;t exist&#34;.format(current))
+        elif current != &#34;&#34;:
+            if current not in self.nodes :
+                raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Node {} don&#39;t exist.&#34;.format(current))
+        return True
+
+    def _profile_jumphost_validation(self, answers, current):
+        #Validation for Jumphost in inquirer when managing profiles
+        if current != &#34;&#34;:
+            if current not in self.nodes :
+                raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Node {} don&#39;t exist.&#34;.format(current))
+        return True
+
     def _default_validation(self, answers, current):
         #Default validation type used in multiples questions in inquirer
         if current.startswith(&#34;@&#34;):
@@ -2832,6 +2850,7 @@ Categorize the user&#39;s request based on the operation they want to perform on
         questions.append(inquirer.Confirm(&#34;options&#34;, message=&#34;Edit Options?&#34;))
         questions.append(inquirer.Confirm(&#34;logs&#34;, message=&#34;Edit logging path/file?&#34;))
         questions.append(inquirer.Confirm(&#34;tags&#34;, message=&#34;Edit tags?&#34;))
+        questions.append(inquirer.Confirm(&#34;jumphost&#34;, message=&#34;Edit jumphost?&#34;))
         questions.append(inquirer.Confirm(&#34;user&#34;, message=&#34;Edit User?&#34;))
         questions.append(inquirer.Confirm(&#34;password&#34;, message=&#34;Edit password?&#34;))
         answers = inquirer.prompt(questions)
@@ -2843,11 +2862,13 @@ Categorize the user&#39;s request based on the operation they want to perform on
             defaults = self.config.getitem(unique)
             if &#34;tags&#34; not in defaults:
                 defaults[&#34;tags&#34;] = &#34;&#34;
+            if &#34;jumphost&#34; not in defaults:
+                defaults[&#34;jumphost&#34;] = &#34;&#34;
         except:
-            defaults = { &#34;host&#34;:&#34;&#34;, &#34;protocol&#34;:&#34;&#34;, &#34;port&#34;:&#34;&#34;, &#34;user&#34;:&#34;&#34;, &#34;options&#34;:&#34;&#34;, &#34;logs&#34;:&#34;&#34; , &#34;tags&#34;:&#34;&#34;, &#34;password&#34;:&#34;&#34;}
+            defaults = { &#34;host&#34;:&#34;&#34;, &#34;protocol&#34;:&#34;&#34;, &#34;port&#34;:&#34;&#34;, &#34;user&#34;:&#34;&#34;, &#34;options&#34;:&#34;&#34;, &#34;logs&#34;:&#34;&#34; , &#34;tags&#34;:&#34;&#34;, &#34;password&#34;:&#34;&#34;, &#34;jumphost&#34;:&#34;&#34;}
         node = {}
         if edit == None:
-            edit = { &#34;host&#34;:True, &#34;protocol&#34;:True, &#34;port&#34;:True, &#34;user&#34;:True, &#34;password&#34;: True,&#34;options&#34;:True, &#34;logs&#34;:True, &#34;tags&#34;:True }
+            edit = { &#34;host&#34;:True, &#34;protocol&#34;:True, &#34;port&#34;:True, &#34;user&#34;:True, &#34;password&#34;: True,&#34;options&#34;:True, &#34;logs&#34;:True, &#34;tags&#34;:True, &#34;jumphost&#34;:True }
         questions = []
         if edit[&#34;host&#34;]:
             questions.append(inquirer.Text(&#34;host&#34;, message=&#34;Add Hostname or IP&#34;, validate=self._host_validation, default=defaults[&#34;host&#34;]))
@@ -2873,6 +2894,10 @@ Categorize the user&#39;s request based on the operation they want to perform on
             questions.append(inquirer.Text(&#34;tags&#34;, message=&#34;Add tags dictionary&#34;,  validate=self._tags_validation, default=str(defaults[&#34;tags&#34;]).replace(&#34;{&#34;,&#34;{{&#34;).replace(&#34;}&#34;,&#34;}}&#34;)))
         else:
             node[&#34;tags&#34;] = defaults[&#34;tags&#34;]
+        if edit[&#34;jumphost&#34;]:
+            questions.append(inquirer.Text(&#34;jumphost&#34;, message=&#34;Add Jumphost node&#34;,  validate=self._jumphost_validation, default=str(defaults[&#34;jumphost&#34;]).replace(&#34;{&#34;,&#34;{{&#34;).replace(&#34;}&#34;,&#34;}}&#34;)))
+        else:
+            node[&#34;jumphost&#34;] = defaults[&#34;jumphost&#34;]
         if edit[&#34;user&#34;]:
             questions.append(inquirer.Text(&#34;user&#34;, message=&#34;Pick username&#34;, validate=self._default_validation, default=defaults[&#34;user&#34;]))
         else:
@@ -2911,11 +2936,13 @@ Categorize the user&#39;s request based on the operation they want to perform on
             defaults = self.config.profiles[unique]
             if &#34;tags&#34; not in defaults:
                 defaults[&#34;tags&#34;] = &#34;&#34;
+            if &#34;jumphost&#34; not in defaults:
+                defaults[&#34;jumphost&#34;] = &#34;&#34;
         except:
-            defaults = { &#34;host&#34;:&#34;&#34;, &#34;protocol&#34;:&#34;&#34;, &#34;port&#34;:&#34;&#34;, &#34;user&#34;:&#34;&#34;, &#34;options&#34;:&#34;&#34;, &#34;logs&#34;:&#34;&#34;, &#34;tags&#34;: &#34;&#34; }
+            defaults = { &#34;host&#34;:&#34;&#34;, &#34;protocol&#34;:&#34;&#34;, &#34;port&#34;:&#34;&#34;, &#34;user&#34;:&#34;&#34;, &#34;options&#34;:&#34;&#34;, &#34;logs&#34;:&#34;&#34;, &#34;tags&#34;: &#34;&#34;, &#34;jumphost&#34;: &#34;&#34;}
         profile = {}
         if edit == None:
-            edit = { &#34;host&#34;:True, &#34;protocol&#34;:True, &#34;port&#34;:True, &#34;user&#34;:True, &#34;password&#34;: True,&#34;options&#34;:True, &#34;logs&#34;:True, &#34;tags&#34;:True }
+            edit = { &#34;host&#34;:True, &#34;protocol&#34;:True, &#34;port&#34;:True, &#34;user&#34;:True, &#34;password&#34;: True,&#34;options&#34;:True, &#34;logs&#34;:True, &#34;tags&#34;:True, &#34;jumphost&#34;:True }
         questions = []
         if edit[&#34;host&#34;]:
             questions.append(inquirer.Text(&#34;host&#34;, message=&#34;Add Hostname or IP&#34;, default=defaults[&#34;host&#34;]))
@@ -2941,6 +2968,10 @@ Categorize the user&#39;s request based on the operation they want to perform on
             questions.append(inquirer.Text(&#34;tags&#34;, message=&#34;Add tags dictionary&#34;,  validate=self._profile_tags_validation, default=str(defaults[&#34;tags&#34;]).replace(&#34;{&#34;,&#34;{{&#34;).replace(&#34;}&#34;,&#34;}}&#34;)))
         else:
             profile[&#34;tags&#34;] = defaults[&#34;tags&#34;]
+        if edit[&#34;jumphost&#34;]:
+            questions.append(inquirer.Text(&#34;jumphost&#34;, message=&#34;Add Jumphost node&#34;,  validate=self._profile_jumphost_validation, default=str(defaults[&#34;jumphost&#34;]).replace(&#34;{&#34;,&#34;{{&#34;).replace(&#34;}&#34;,&#34;}}&#34;)))
+        else:
+            profile[&#34;jumphost&#34;] = defaults[&#34;jumphost&#34;]
         if edit[&#34;user&#34;]:
             questions.append(inquirer.Text(&#34;user&#34;, message=&#34;Pick username&#34;, default=defaults[&#34;user&#34;]))
         else:
@@ -2972,6 +3003,7 @@ Categorize the user&#39;s request based on the operation they want to perform on
         questions.append(inquirer.Text(&#34;options&#34;, message=&#34;Pass extra options to protocol&#34;, validate=self._default_validation))
         questions.append(inquirer.Text(&#34;logs&#34;, message=&#34;Pick logging path/file &#34;, validate=self._default_validation))
         questions.append(inquirer.Text(&#34;tags&#34;, message=&#34;Add tags dictionary&#34;,  validate=self._tags_validation))
+        questions.append(inquirer.Text(&#34;jumphost&#34;, message=&#34;Add Jumphost node&#34;,  validate=self._jumphost_validation))
         questions.append(inquirer.Text(&#34;user&#34;, message=&#34;Pick username&#34;, validate=self._default_validation))
         questions.append(inquirer.List(&#34;password&#34;, message=&#34;Password: Use a local password, no password or a list of profiles to reference?&#34;, choices=[&#34;Local Password&#34;, &#34;Profiles&#34;, &#34;No Password&#34;]))
         answer = inquirer.prompt(questions)
@@ -2994,6 +3026,8 @@ Categorize the user&#39;s request based on the operation they want to perform on
         return answer
 
     def _type_node(self, arg_value, pat=re.compile(r&#34;^[0-9a-zA-Z_.$@#-]+$&#34;)):
+        if arg_value == None:
+            raise ValueError(&#34;Missing argument node&#34;)
         if not pat.match(arg_value):
             raise ValueError(f&#34;Argument error: {arg_value}&#34;)
         return arg_value
@@ -3326,7 +3360,7 @@ tasks:
 </dd>
 <dt id="connpy.node"><code class="flex name class">
 <span>class <span class="ident">node</span></span>
-<span>(</span><span>unique, host, options='', logs='', password='', port='', protocol='', user='', config='', tags='')</span>
+<span>(</span><span>unique, host, options='', logs='', password='', port='', protocol='', user='', config='', tags='', jumphost='')</span>
 </code></dt>
 <dd>
 <div class="desc"><p>This class generates a node object. Containts all the information and methods to connect and interact with a device using ssh or telnet.</p>
@@ -3369,6 +3403,8 @@ tasks:
 
 - tags   (dict) : Tags useful for automation and personal porpuse
                   like "os", "prompt" and "screenleght_command"
+
+- jumphost (str): Reference another node to be used as a jumphost
 </code></pre></div>
 <details class="source">
 <summary>
@@ -3391,7 +3427,7 @@ tasks:
 
         &#39;&#39;&#39;
     
-    def __init__(self, unique, host, options=&#39;&#39;, logs=&#39;&#39;, password=&#39;&#39;, port=&#39;&#39;, protocol=&#39;&#39;, user=&#39;&#39;, config=&#39;&#39;, tags=&#39;&#39;):
+    def __init__(self, unique, host, options=&#39;&#39;, logs=&#39;&#39;, password=&#39;&#39;, port=&#39;&#39;, protocol=&#39;&#39;, user=&#39;&#39;, config=&#39;&#39;, tags=&#39;&#39;, jumphost=&#39;&#39;):
         &#39;&#39;&#39; 
             
         ### Parameters:  
@@ -3424,6 +3460,8 @@ tasks:
 
             - tags   (dict) : Tags useful for automation and personal porpuse
                               like &#34;os&#34;, &#34;prompt&#34; and &#34;screenleght_command&#34;
+                              
+            - jumphost (str): Reference another node to be used as a jumphost
         &#39;&#39;&#39;
         if config == &#39;&#39;:
             self.idletime = 0
@@ -3432,7 +3470,7 @@ tasks:
             self.idletime = config.config[&#34;idletime&#34;]
             self.key = config.key
         self.unique = unique
-        attr = {&#34;host&#34;: host, &#34;logs&#34;: logs, &#34;options&#34;:options, &#34;port&#34;: port, &#34;protocol&#34;: protocol, &#34;user&#34;: user, &#34;tags&#34;: tags}
+        attr = {&#34;host&#34;: host, &#34;logs&#34;: logs, &#34;options&#34;:options, &#34;port&#34;: port, &#34;protocol&#34;: protocol, &#34;user&#34;: user, &#34;tags&#34;: tags, &#34;jumphost&#34;: jumphost}
         for key in attr:
             profile = re.search(&#34;^@(.*)&#34;, str(attr[key]))
             if profile and config != &#39;&#39;:
@@ -3455,6 +3493,45 @@ tasks:
                     self.password.append(config.profiles[profile.group(1)][&#34;password&#34;])
         else:
             self.password = [password]
+        if self.jumphost != &#34;&#34; and config != &#39;&#39;:
+            self.jumphost = config.getitem(self.jumphost)
+            for key in self.jumphost:
+                profile = re.search(&#34;^@(.*)&#34;, str(self.jumphost[key]))
+                if profile:
+                    try:
+                        self.jumphost[key] = config.profiles[profile.group(1)][key]
+                    except:
+                        self.jumphost[key] = &#34;&#34;
+                elif self.jumphost[key] == &#39;&#39; and key == &#34;protocol&#34;:
+                    try:
+                        self.jumphost[key] = config.profiles[&#34;default&#34;][key]
+                    except:
+                        self.jumphost[key] = &#34;ssh&#34;
+            if isinstance(self.jumphost[&#34;password&#34;],list):
+                jumphost_password = []
+                for i, s in enumerate(self.jumphost[&#34;password&#34;]):
+                    profile = re.search(&#34;^@(.*)&#34;, self.jumphost[&#34;password&#34;][i])
+                    if profile:
+                        jumphost_password.append(config.profiles[profile.group(1)][&#34;password&#34;])
+                self.jumphost[&#34;password&#34;] = jumphost_password
+            else:
+                self.jumphost[&#34;password&#34;] = [self.jumphost[&#34;password&#34;]]
+            if self.jumphost[&#34;password&#34;] != [&#34;&#34;]:
+                self.password = self.jumphost[&#34;password&#34;] + self.password
+
+            if self.jumphost[&#34;protocol&#34;] == &#34;ssh&#34;:
+                jumphost_cmd = self.jumphost[&#34;protocol&#34;] + &#34; -W %h:%p&#34;
+                if self.jumphost[&#34;port&#34;] != &#39;&#39;:
+                    jumphost_cmd = jumphost_cmd + &#34; -p &#34; + self.jumphost[&#34;port&#34;]
+                if self.jumphost[&#34;options&#34;] != &#39;&#39;:
+                    jumphost_cmd = jumphost_cmd + &#34; &#34; + self.jumphost[&#34;options&#34;]
+                if self.jumphost[&#34;user&#34;] == &#39;&#39;:
+                    jumphost_cmd = jumphost_cmd + &#34; {}&#34;.format(self.jumphost[&#34;host&#34;])
+                else:
+                    jumphost_cmd = jumphost_cmd + &#34; {}&#34;.format(&#34;@&#34;.join([self.jumphost[&#34;user&#34;],self.jumphost[&#34;host&#34;]]))
+                self.jumphost = f&#34;-o ProxyCommand=\&#34;{jumphost_cmd}\&#34;&#34;
+            else:
+                self.jumphost = &#34;&#34;
 
     def _passtx(self, passwords, *, keyfile=None):
         # decrypts passwords, used by other methdos.
@@ -3789,6 +3866,8 @@ tasks:
                 cmd = cmd + &#34; &#34; + self.options
             if self.logs != &#39;&#39;:
                 self.logfile = self._logfile()
+            if self.jumphost != &#39;&#39;:
+                cmd = cmd + &#34; &#34; + self.jumphost
             if self.password[0] != &#39;&#39;:
                 passwords = self._passtx(self.password)
             else:
@@ -3797,7 +3876,7 @@ tasks:
                 cmd = cmd + &#34; {}&#34;.format(self.host)
             else:
                 cmd = cmd + &#34; {}&#34;.format(&#34;@&#34;.join([self.user,self.host]))
-            expects = [&#39;yes/no&#39;, &#39;refused&#39;, &#39;supported&#39;, &#39;Invalid|[u|U]sage:&#39;, &#39;ssh-keygen.*\&#34;&#39;, &#39;timeout|timed.out&#39;, &#39;unavailable&#39;, &#39;closed&#39;, &#39;[p|P]assword:|[u|U]sername:&#39;, r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, &#39;suspend&#39;, pexpect.EOF, pexpect.TIMEOUT, &#34;No route to host&#34;, &#34;resolve hostname&#34;, &#34;no matching&#34;, &#34;bad permissions&#34;]
+            expects = [&#39;yes/no&#39;, &#39;refused&#39;, &#39;supported&#39;, &#39;Invalid|[u|U]sage: (ssh|sftp)&#39;, &#39;ssh-keygen.*\&#34;&#39;, &#39;timeout|timed.out&#39;, &#39;unavailable&#39;, &#39;closed&#39;, &#39;[p|P]assword:|[u|U]sername:&#39;, r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, &#39;suspend&#39;, pexpect.EOF, pexpect.TIMEOUT, &#34;No route to host&#34;, &#34;resolve hostname&#34;, &#34;no matching&#34;, &#34;bad permissions&#34;]
         elif self.protocol == &#34;telnet&#34;:
             cmd = &#34;telnet &#34; + self.host
             if self.port != &#39;&#39;:
@@ -3810,7 +3889,7 @@ tasks:
                 passwords = self._passtx(self.password)
             else:
                 passwords = []
-            expects = [&#39;[u|U]sername:&#39;, &#39;refused&#39;, &#39;supported&#39;, &#39;cipher&#39;, &#39;ssh-keygen.*\&#34;&#39;, &#39;timeout|timed.out&#39;, &#39;unavailable&#39;, &#39;closed&#39;, &#39;[p|P]assword:&#39;, r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, &#39;suspend&#39;, pexpect.EOF, pexpect.TIMEOUT, &#34;No route to host&#34;, &#34;resolve hostname&#34;, &#34;no matching&#34;, &#34;bad permissions&#34;]
+            expects = [&#39;[u|U]sername:&#39;, &#39;refused&#39;, &#39;supported&#39;, &#39;invalid option&#39;, &#39;ssh-keygen.*\&#34;&#39;, &#39;timeout|timed.out&#39;, &#39;unavailable&#39;, &#39;closed&#39;, &#39;[p|P]assword:&#39;, r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, &#39;suspend&#39;, pexpect.EOF, pexpect.TIMEOUT, &#34;No route to host&#34;, &#34;resolve hostname&#34;, &#34;no matching&#34;, &#34;bad permissions&#34;]
         else:
             raise ValueError(&#34;Invalid protocol: &#34; + self.protocol)
         attempts = 1
