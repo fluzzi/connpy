@@ -1,0 +1,9 @@
+version: "3.8"
+services:
+  connpy-app:
+    build: .
+    image: connpy-app
+    volumes:
+      - ./docker/connpy/:/app
+      - ./docker/logs/:/logs
+      - ./docker/ssh/:/root/.ssh/
