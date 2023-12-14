@@ -49,7 +49,9 @@ class configfile:
         '''
         home = os.path.expanduser("~")
         defaultdir = home + '/.config/conn'
+        self.defaultdir = defaultdir
         Path(defaultdir).mkdir(parents=True, exist_ok=True)
+        Path(f"{defaultdir}/plugins").mkdir(parents=True, exist_ok=True)
         pathfile = defaultdir + '/.folder'
         try:
             with open(pathfile, "r") as f:
