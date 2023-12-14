@@ -17,7 +17,7 @@ Connpy is a connection manager that allows you to store nodes to connect them fa
 ### Usage
 ```
 usage: conn [-h] [--add | --del | --mod | --show | --debug] [node|folder] [--sftp]
-       conn {profile,move,copy,list,bulk,export,import,run,config,api,ai} ...
+       conn {profile,move,mv,copy,cp,list,ls,bulk,export,import,ai,run,api,plugin,config} ...
 
 positional arguments:
   node|folder    node[@subfolder][@folder]
@@ -35,17 +35,18 @@ Options:
   -t, --sftp         Connects using sftp instead of ssh
 
 Commands:
-  profile        Manage profiles
-  move (mv)      Move node
-  copy (cp)      Copy node
-  list (ls)      List profiles, nodes or folders
-  bulk           Add nodes in bulk
-  export         Export connection folder to Yaml file
-  import         Import connection folder to config from Yaml file
-  run            Run scripts or commands on nodes
-  config         Manage app config
-  api            Start and stop connpy api
-  ai             Make request to an AI
+  profile         Manage profiles
+  move(mv)        Move node
+  copy(cp)        Copy node
+  list(ls)        List profiles, nodes or folders
+  bulk            Add nodes in bulk
+  export          Export connection folder to Yaml file
+  import          Import connection folder to config from Yaml file
+  ai              Make request to an AI
+  run             Run scripts or commands on nodes
+  api             Start and stop connpy api
+  plugin          Manage plugins
+  config          Manage app config
 ```
 
 ###   Manage profiles
@@ -75,6 +76,45 @@ options:
    conn pc@office
    conn server
 ``` 
+### General Structure
+- The plugin script must be a Python file.
+- Only the following top-level elements are allowed in the plugin script:
+  - Class definitions
+  - Function definitions
+  - Import statements
+  - The `if __name__ == "__main__":` block for standalone execution
+  - Pass statements
+
+### Specific Class Requirements
+- The plugin script must define at least two specific classes:
+  1. **Class `Parser`**:
+     - Must contain only one method: `__init__`.
+     - The `__init__` method must initialize at least two attributes:
+       - `self.parser`: An instance of `argparse.ArgumentParser`.
+       - `self.description`: A string containing the description of the parser.
+  2. **Class `Entrypoint`**:
+     - Must have an `__init__` method that accepts exactly three parameters besides `self`:
+       - `args`: Arguments passed to the plugin.
+       - The parser instance (typically `self.parser` from the `Parser` class).
+       - The Connapp instance to interact with the Connpy app.
+
+### Executable Block
+- The plugin script can include an executable block:
+  - `if __name__ == "__main__":`
+  - This block allows the plugin to be run as a standalone script for testing or independent use.
+
+### Script Verification
+- The `verify_script` method in `plugins.py` is used to check the plugin script's compliance with these standards.
+- Non-compliant scripts will be rejected to ensure consistency and proper functionality within the plugin system.
+- 
+### Example Script
+
+For a practical example of how to write a compatible plugin script, please refer to the following example:
+
+[Example Plugin Script](https://github.com/fluzzi/awspy)
+
+This script demonstrates the required structure and implementation details according to the plugin system's standards.
+
 ## http API
 With the Connpy API you can run commands on devices using http requests
 
