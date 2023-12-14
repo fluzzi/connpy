@@ -1,0 +1,86 @@
+#!/usr/bin/python3
+import ast
+import importlib.util
+import sys
+import argparse
+import os
+
+class Plugins:
+    def __init__(self):
+        self.plugins = {}
+        self.plugin_parsers = {}
+
+    def verify_script(self, file_path):
+        with open(file_path, 'r') as file:
+            source_code = file.read()
+
+        try:
+            tree = ast.parse(source_code)
+        except SyntaxError as e:
+            return f"Syntax error in file: {e}"
+
+        required_classes = {'Parser', 'Entrypoint'}
+        found_classes = set()
+
+        for node in tree.body:
+            # Allow only function definitions, class definitions, and pass statements at top-level
+            if isinstance(node, ast.If):
+                # Check for the 'if __name__ == "__main__":' block
+                if not (isinstance(node.test, ast.Compare) and
+                        isinstance(node.test.left, ast.Name) and
+                        node.test.left.id == '__name__' and
+                        isinstance(node.test.comparators[0], ast.Str) and
+                        node.test.comparators[0].s == '__main__'):
+                    return "Only __name__ == __main__ If is allowed"
+
+            elif not isinstance(node, (ast.FunctionDef, ast.ClassDef, ast.Import, ast.ImportFrom, ast.Pass)):
+                return f"Plugin can only have pass, functions, classes and imports. {node} is not allowed"  # Reject any other AST types
+
+            if isinstance(node, ast.ClassDef) and node.name in required_classes:
+                found_classes.add(node.name)
+
+                if node.name == 'Parser':
+                    # Ensure Parser class has only the __init__ method and assigns self.parser
+                    if not all(isinstance(method, ast.FunctionDef) and method.name == '__init__' for method in node.body):
+                        return "Parser class should only have __init__ method"
+
+                    # Check if 'self.parser' and 'self.description' are assigned in __init__ method
+                    init_method = node.body[0]
+                    assigned_attrs = [target.attr for expr in init_method.body if isinstance(expr, ast.Assign) for target in expr.targets if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == 'self']
+                    if 'parser' not in assigned_attrs or 'description' not in assigned_attrs:
+                        return "Parser class should set self.parser and self.description" # 'self.parser' or 'self.description' not assigned in __init__
+
+                elif node.name == 'Entrypoint':
+                    init_method = next((item for item in node.body if isinstance(item, ast.FunctionDef) and item.name == '__init__'), None)
+                    if not init_method or len(init_method.args.args) != 4:  # self, args, parser, conapp
+                        return "Entrypoint class should accept only arguments: args, parser and connapp"  # 'Entrypoint' __init__ does not have correct signature
+
+        if required_classes == found_classes:
+            return False
+        else:
+            return "Classes Entrypoint and Parser are mandatory"
+
+    def import_from_path(self, path):
+        spec = importlib.util.spec_from_file_location("module.name", path)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules["module.name"] = module
+        spec.loader.exec_module(module)
+        return module
+
+    def import_plugins_to_argparse(self, directory, subparsers):
+        for filename in os.listdir(directory):
+            commands = subparsers.choices.keys()
+            if filename.endswith(".py"):
+                root_filename = os.path.splitext(filename)[0]
+                if root_filename in commands:
+                    continue
+                # Construct the full path
+                filepath = os.path.join(directory, filename)
+                check_file = self.verify_script(filepath)
+                if check_file:
+                    continue
+                else:
+                    self.plugins[root_filename] = self.import_from_path(filepath)
+                    self.plugin_parsers[root_filename] = self.plugins[root_filename].Parser()
+                    subparsers.add_parser(root_filename, parents=[self.plugin_parsers[root_filename].parser], add_help=False, description=self.plugin_parsers[root_filename].description)
+
