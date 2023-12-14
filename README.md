@@ -17,6 +17,128 @@ docker compose -f path/to/folder/docker-compose.yml build
 docker compose -f path/to/folder/docker-compose.yml run -it connpy-app
 ```
 
+## Connection manager 
+### Features
+    - You can generate profiles and reference them from nodes using @profilename so you dont
+      need to edit multiple nodes when changing password or other information.
+    - Nodes can be stored on @folder or @subfolder@folder to organize your devices. Then can 
+      be referenced using node@subfolder@folder or node@folder
+    - If you have too many nodes. Get completion script using: conn config --completion.
+      Or use fzf installing pyfzf and running conn config --fzf true
+    - Create in bulk, copy, move, export and import nodes for easy management.
+    - Run automation scripts in network devices.
+    - use GPT AI to help you manage your devices.
+    - Add plugins with your own scripts.
+    - Much more!
+
+### Usage:
+```
+usage: conn [-h] [--add | --del | --mod | --show | --debug] [node|folder] [--sftp]
+       conn {profile,move,mv,copy,cp,list,ls,bulk,export,import,ai,run,api,plugin,config} ...
+
+positional arguments:
+  node|folder    node[@subfolder][@folder]
+                 Connect to specific node or show all matching nodes
+                 [@subfolder][@folder]
+                 Show all available connections globaly or in specified path
+```
+
+### Options:
+```
+  -h, --help         show this help message and exit
+  -v, --version      Show version
+  -a, --add          Add new node[@subfolder][@folder] or [@subfolder]@folder
+  -r, --del, --rm    Delete node[@subfolder][@folder] or [@subfolder]@folder
+  -e, --mod, --edit  Modify node[@subfolder][@folder]
+  -s, --show         Show node[@subfolder][@folder]
+  -d, --debug        Display all conections steps
+  -t, --sftp         Connects using sftp instead of ssh
+```
+
+### Commands:
+```
+  profile         Manage profiles
+  move(mv)        Move node
+  copy(cp)        Copy node
+  list(ls)        List profiles, nodes or folders
+  bulk            Add nodes in bulk
+  export          Export connection folder to Yaml file
+  import          Import connection folder to config from Yaml file
+  ai              Make request to an AI
+  run             Run scripts or commands on nodes
+  api             Start and stop connpy api
+  plugin          Manage plugins
+  config          Manage app config
+```
+
+### Manage profiles:
+```
+usage: conn profile [-h] (--add | --del | --mod | --show) profile
+
+positional arguments:
+  profile        Name of profile to manage
+
+options:
+  -h, --help         show this help message and exit
+  -a, --add          Add new profile
+  -r, --del, --rm    Delete profile
+  -e, --mod, --edit  Modify profile
+  -s, --show         Show profile
+
+```
+
+### Examples:
+```
+   conn profile --add office-user
+   conn --add @office
+   conn --add @datacenter@office
+   conn --add server@datacenter@office
+   conn --add pc@office
+   conn --show server@datacenter@office
+   conn pc@office
+   conn server
+``` 
+## Plugin Requirements for Connpy
+
+### General Structure
+- The plugin script must be a Python file.
+- Only the following top-level elements are allowed in the plugin script:
+  - Class definitions
+  - Function definitions
+  - Import statements
+  - The `if __name__ == "__main__":` block for standalone execution
+  - Pass statements
+
+### Specific Class Requirements
+- The plugin script must define at least two specific classes:
+  1. **Class `Parser`**:
+     - Must contain only one method: `__init__`.
+     - The `__init__` method must initialize at least two attributes:
+       - `self.parser`: An instance of `argparse.ArgumentParser`.
+       - `self.description`: A string containing the description of the parser.
+  2. **Class `Entrypoint`**:
+     - Must have an `__init__` method that accepts exactly three parameters besides `self`:
+       - `args`: Arguments passed to the plugin.
+       - The parser instance (typically `self.parser` from the `Parser` class).
+       - The Connapp instance to interact with the Connpy app.
+
+### Executable Block
+- The plugin script can include an executable block:
+  - `if __name__ == "__main__":`
+  - This block allows the plugin to be run as a standalone script for testing or independent use.
+
+### Script Verification
+- The `verify_script` method in `plugins.py` is used to check the plugin script's compliance with these standards.
+- Non-compliant scripts will be rejected to ensure consistency and proper functionality within the plugin system.
+- 
+### Example Script
+
+For a practical example of how to write a compatible plugin script, please refer to the following example:
+
+[Example Plugin Script](https://github.com/fluzzi/awspy)
+
+This script demonstrates the required structure and implementation details according to the plugin system's standards.
+
 ## Automation module usage
 ### Standalone module
 ```
@@ -100,82 +222,6 @@ input = "go to router 1 and get me the full configuration"
 result = myia.ask(input, dryrun = False)
 print(result)
 ```
-## Connection manager 
-### Features
-    - You can generate profiles and reference them from nodes using @profilename so you dont
-      need to edit multiple nodes when changing password or other information.
-    - Nodes can be stored on @folder or @subfolder@folder to organize your devices. Then can 
-      be referenced using node@subfolder@folder or node@folder
-    - If you have too many nodes. Get completion script using: conn config --completion.
-      Or use fzf installing pyfzf and running conn config --fzf true
-    - Much more!
-
-### Usage:
-```
-usage: conn [-h] [--add | --del | --mod | --show | --debug] [node|folder] [--sftp]
-       conn {profile,move,copy,list,bulk,export,import,run,config,api,ai} ...
-
-positional arguments:
-  node|folder    node[@subfolder][@folder]
-                 Connect to specific node or show all matching nodes
-                 [@subfolder][@folder]
-                 Show all available connections globaly or in specified path
-```
-
-### Options:
-```
-  -h, --help         show this help message and exit
-  -v, --version      Show version
-  -a, --add          Add new node[@subfolder][@folder] or [@subfolder]@folder
-  -r, --del, --rm    Delete node[@subfolder][@folder] or [@subfolder]@folder
-  -e, --mod, --edit  Modify node[@subfolder][@folder]
-  -s, --show         Show node[@subfolder][@folder]
-  -d, --debug        Display all conections steps
-  -t, --sftp         Connects using sftp instead of ssh
-```
-
-### Commands:
-```
-  profile        Manage profiles
-  move (mv)      Move node
-  copy (cp)      Copy node
-  list (ls)      List profiles, nodes or folders
-  bulk           Add nodes in bulk
-  export         Export connection folder to Yaml file
-  import         Import connection folder to config from Yaml file
-  run            Run scripts or commands on nodes
-  config         Manage app config
-  api            Start and stop connpy api
-  ai             Make request to an AI
-```
-
-### Manage profiles:
-```
-usage: conn profile [-h] (--add | --del | --mod | --show) profile
-
-positional arguments:
-  profile        Name of profile to manage
-
-options:
-  -h, --help         show this help message and exit
-  -a, --add          Add new profile
-  -r, --del, --rm    Delete profile
-  -e, --mod, --edit  Modify profile
-  -s, --show         Show profile
-
-```
-
-### Examples:
-```
-   conn profile --add office-user
-   conn --add @office
-   conn --add @datacenter@office
-   conn --add server@datacenter@office
-   conn --add pc@office
-   conn --show server@datacenter@office
-   conn pc@office
-   conn server
-``` 
 ## http API
 With the Connpy API you can run commands on devices using http requests
 

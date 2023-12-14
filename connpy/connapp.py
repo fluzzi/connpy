@@ -12,7 +12,9 @@ from .core import node,nodes
 from ._version import __version__
 from .api import start_api,stop_api,debug_api
 from .ai import ai
+from .plugins import Plugins
 import yaml
+import shutil
 class NoAliasDumper(yaml.SafeDumper):
     def ignore_aliases(self, data):
         return True
@@ -23,8 +25,6 @@ try:
     from pyfzf.pyfzf import FzfPrompt
 except:
     FzfPrompt = None
-home = os.path.expanduser("~")
-defaultdir = home + '/.config/conn'
 
 
 
@@ -68,9 +68,9 @@ class connapp:
         ''' 
         #DEFAULTPARSER
         defaultparser = argparse.ArgumentParser(prog = "conn", description = "SSH and Telnet connection manager", formatter_class=argparse.RawTextHelpFormatter)
-        subparsers = defaultparser.add_subparsers(title="Commands")
+        subparsers = defaultparser.add_subparsers(title="Commands", dest="subcommand")
         #NODEPARSER
-        nodeparser = subparsers.add_parser("node",usage=self._help("usage"), help=self._help("node"),epilog=self._help("end"), formatter_class=argparse.RawTextHelpFormatter) 
+        nodeparser = subparsers.add_parser("node", formatter_class=argparse.RawTextHelpFormatter) 
         nodecrud = nodeparser.add_mutually_exclusive_group()
         nodeparser.add_argument("node", metavar="node|folder", nargs='?', default=None, action=self._store_type, help=self._help("node"))
         nodecrud.add_argument("-v","--version", dest="action", action="store_const", help="Show version", const="version", default="connect")
@@ -82,7 +82,7 @@ class connapp:
         nodeparser.add_argument("-t","--sftp", dest="sftp", action="store_true", help="Connects using sftp instead of ssh")
         nodeparser.set_defaults(func=self._func_node)
         #PROFILEPARSER
-        profileparser = subparsers.add_parser("profile", help="Manage profiles") 
+        profileparser = subparsers.add_parser("profile", description="Manage profiles") 
         profileparser.add_argument("profile", nargs=1, action=self._store_type, type=self._type_profile, help="Name of profile to manage")
         profilecrud = profileparser.add_mutually_exclusive_group(required=True)
         profilecrud.add_argument("-a", "--add", dest="action", action="store_const", help="Add new profile", const="add")
@@ -91,53 +91,62 @@ class connapp:
         profilecrud.add_argument("-s", "--show", dest="action", action="store_const", help="Show profile", const="show")
         profileparser.set_defaults(func=self._func_profile)
         #MOVEPARSER
-        moveparser = subparsers.add_parser("move", aliases=["mv"], help="Move node") 
+        moveparser = subparsers.add_parser("move", aliases=["mv"], description="Move node") 
         moveparser.add_argument("move", nargs=2, action=self._store_type, help="Move node[@subfolder][@folder] dest_node[@subfolder][@folder]", default="move", type=self._type_node)
         moveparser.set_defaults(func=self._func_others)
         #COPYPARSER
-        copyparser = subparsers.add_parser("copy", aliases=["cp"], help="Copy node") 
+        copyparser = subparsers.add_parser("copy", aliases=["cp"], description="Copy node") 
         copyparser.add_argument("cp", nargs=2, action=self._store_type, help="Copy node[@subfolder][@folder] new_node[@subfolder][@folder]", default="cp", type=self._type_node)
         copyparser.set_defaults(func=self._func_others)
         #LISTPARSER
-        lsparser = subparsers.add_parser("list", aliases=["ls"], help="List profiles, nodes or folders") 
+        lsparser = subparsers.add_parser("list", aliases=["ls"], description="List profiles, nodes or folders") 
         lsparser.add_argument("ls", action=self._store_type, choices=["profiles","nodes","folders"], help="List profiles, nodes or folders", default=False)
         lsparser.add_argument("--filter", nargs=1, help="Filter results")
         lsparser.add_argument("--format", nargs=1, help="Format of the output of nodes using {name}, {NAME}, {location}, {LOCATION}, {host} and {HOST}")
         lsparser.set_defaults(func=self._func_others)
         #BULKPARSER
-        bulkparser = subparsers.add_parser("bulk", help="Add nodes in bulk") 
+        bulkparser = subparsers.add_parser("bulk", description="Add nodes in bulk") 
         bulkparser.add_argument("bulk", const="bulk", nargs=0, action=self._store_type, help="Add nodes in bulk")
         bulkparser.set_defaults(func=self._func_others)
         # EXPORTPARSER
-        exportparser = subparsers.add_parser("export", help="Export connection folder to Yaml file") 
+        exportparser = subparsers.add_parser("export", description="Export connection folder to Yaml file") 
         exportparser.add_argument("export", nargs="+", action=self._store_type, help="Export /path/to/file.yml [@subfolder1][@folder1] [@subfolderN][@folderN]")
         exportparser.set_defaults(func=self._func_export)
         # IMPORTPARSER
-        importparser = subparsers.add_parser("import", help="Import connection folder to config from Yaml file") 
+        importparser = subparsers.add_parser("import", description="Import connection folder to config from Yaml file") 
         importparser.add_argument("file", nargs=1, action=self._store_type, help="Import /path/to/file.yml")
         importparser.set_defaults(func=self._func_import)
         # AIPARSER
-        aiparser = subparsers.add_parser("ai", help="Make request to an AI") 
+        aiparser = subparsers.add_parser("ai", description="Make request to an AI") 
         aiparser.add_argument("ask", nargs='*', help="Ask connpy AI something")
         aiparser.add_argument("--model", nargs=1, help="Set the OPENAI model id")
         aiparser.add_argument("--org", nargs=1, help="Set the OPENAI organization id")
         aiparser.add_argument("--api_key", nargs=1, help="Set the OPENAI API key")
         aiparser.set_defaults(func=self._func_ai)
         #RUNPARSER
-        runparser = subparsers.add_parser("run", help="Run scripts or commands on nodes", formatter_class=argparse.RawTextHelpFormatter) 
+        runparser = subparsers.add_parser("run", description="Run scripts or commands on nodes", formatter_class=argparse.RawTextHelpFormatter) 
         runparser.add_argument("run", nargs='+', action=self._store_type, help=self._help("run"), default="run")
         runparser.add_argument("-g","--generate", dest="action", action="store_const", help="Generate yaml file template", const="generate", default="run")
         runparser.set_defaults(func=self._func_run)
         #APIPARSER
-        apiparser = subparsers.add_parser("api", help="Start and stop connpy api") 
+        apiparser = subparsers.add_parser("api", description="Start and stop connpy api") 
         apicrud = apiparser.add_mutually_exclusive_group(required=True)
         apicrud.add_argument("-s","--start", dest="start", nargs="?", action=self._store_type, help="Start conppy api", type=int, default=8048, metavar="PORT")
         apicrud.add_argument("-r","--restart", dest="restart", nargs=0, action=self._store_type, help="Restart conppy api")
         apicrud.add_argument("-x","--stop", dest="stop", nargs=0, action=self._store_type, help="Stop conppy api")
         apicrud.add_argument("-d", "--debug", dest="debug", nargs="?", action=self._store_type, help="Run connpy server on debug mode", type=int, default=8048, metavar="PORT")
         apiparser.set_defaults(func=self._func_api)
+        #PLUGINSPARSER
+        pluginparser = subparsers.add_parser("plugin", description="Manage plugins") 
+        plugincrud = pluginparser.add_mutually_exclusive_group(required=True)
+        plugincrud.add_argument("--add", metavar=("PLUGIN", "FILE"), nargs=2, help="Add new plugin")
+        plugincrud.add_argument("--del", dest="delete", metavar="PLUGIN", nargs=1, help="Delete plugin")
+        plugincrud.add_argument("--enable", metavar="PLUGIN", nargs=1, help="Enable plugin")
+        plugincrud.add_argument("--disable", metavar="PLUGIN", nargs=1, help="Disable plugin")
+        plugincrud.add_argument("--list", dest="list", action="store_true", help="Disable plugin")
+        pluginparser.set_defaults(func=self._func_plugin)
         #CONFIGPARSER
-        configparser = subparsers.add_parser("config", help="Manage app config") 
+        configparser = subparsers.add_parser("config", description="Manage app config") 
         configcrud = configparser.add_mutually_exclusive_group(required=True)
         configcrud.add_argument("--allow-uppercase", dest="case", nargs=1, action=self._store_type, help="Allow case sensitive names", choices=["true","false"])
         configcrud.add_argument("--fzf", dest="fzf", nargs=1, action=self._store_type, help="Use fzf for lists", choices=["true","false"])
@@ -148,16 +157,29 @@ class connapp:
         configcrud.add_argument("--openai-api-key", dest="api_key", nargs=1, action=self._store_type, help="Set openai api_key", metavar="API_KEY")
         configcrud.add_argument("--openai-model", dest="model", nargs=1, action=self._store_type, help="Set openai model", metavar="MODEL")
         configparser.set_defaults(func=self._func_others)
+        #Add plugins
+        file_path = self.config.defaultdir + "/plugins"
+        self.plugins = Plugins()
+        self.plugins.import_plugins_to_argparse(file_path, subparsers)
+        #Generate helps
+        nodeparser.usage = self._help("usage", subparsers)
+        nodeparser.epilog = self._help("end", subparsers)
+        nodeparser.help = self._help("node")
         #Manage sys arguments
-        commands = ["node", "profile", "mv", "move","copy", "cp", "bulk", "ls", "list", "run", "config", "api", "ai", "export", "import"]
-        profilecmds = ["--add", "-a", "--del", "--rm",  "-r", "--mod", "--edit", "-e", "--show", "-s"]
+        self.commands = list(subparsers.choices.keys())
+        profilecmds = []
+        for action in profileparser._actions:
+            profilecmds.extend(action.option_strings)
         if len(argv) >= 2 and argv[1] == "profile" and argv[0] in profilecmds:
             argv[1] = argv[0]
             argv[0] = "profile"
-        if len(argv) < 1 or argv[0] not in commands:
+        if len(argv) < 1 or argv[0] not in self.commands:
             argv.insert(0,"node")
         args = defaultparser.parse_args(argv)
-        return args.func(args)
+        if args.subcommand in self.plugins.plugins:
+            self.plugins.plugins[args.subcommand].Entrypoint(args, self.plugins.plugin_parsers[args.subcommand], self)
+        else:
+            return args.func(args)
 
     class _store_type(argparse.Action):
         #Custom store type for cli app.
@@ -580,7 +602,7 @@ class connapp:
         if not os.path.isdir(args.data[0]):
             raise argparse.ArgumentTypeError(f"readable_dir:{args.data[0]} is not a valid path")
         else:
-            pathfile = defaultdir + "/.folder"
+            pathfile = self.config.defaultdir + "/.folder"
             folder = os.path.abspath(args.data[0]).rstrip('/')
             with open(pathfile, "w") as f:
                 f.write(str(folder))
@@ -600,9 +622,106 @@ class connapp:
         self.config._saveconfig(self.config.file)
         print("Config saved")
 
+    def _func_plugin(self, args):
+        if args.add:
+            if not os.path.exists(args.add[1]):
+                print("File {} dosn't exists.".format(args.add[1]))
+                exit(14)
+            if args.add[0].isalpha() and args.add[0].islower() and len(args.add[0]) <= 15:
+                disabled_dest_file = os.path.join(self.config.defaultdir + "/plugins", args.add[0] + ".py.bkp")
+                if args.add[0] in self.commands or os.path.exists(disabled_dest_file):
+                    print("Plugin name can't be the same as other commands.")
+                    exit(15)
+                else:
+                    check_bad_script = self.plugins.verify_script(args.add[1])
+                    if check_bad_script:
+                        print(check_bad_script)
+                        exit(16)
+                    else:
+                        try:
+                            dest_file = os.path.join(self.config.defaultdir + "/plugins", args.add[0] + ".py")
+                            shutil.copy2(args.add[1], dest_file)
+                            print(f"Plugin {args.add[0]} added succesfully.")
+                        except:
+                            print("Failed importing plugin file.")
+                            exit(17)
+            else:
+                print("Plugin name should be lowercase letters up to 15 characters.")
+                exit(15)
+        elif args.delete:
+            plugin_file = os.path.join(self.config.defaultdir + "/plugins", args.delete[0] + ".py")
+            disabled_plugin_file = os.path.join(self.config.defaultdir + "/plugins", args.delete[0] + ".py.bkp")
+            plugin_exist = os.path.exists(plugin_file)
+            disabled_plugin_exist = os.path.exists(disabled_plugin_file)
+            if not plugin_exist and not disabled_plugin_exist:
+                print("Plugin {} dosn't exist.".format(args.delete[0]))
+                exit(14)
+            question = [inquirer.Confirm("delete", message="Are you sure you want to delete {} plugin?".format(args.delete[0]))]
+            confirm = inquirer.prompt(question)
+            if confirm == None:
+                exit(7)
+            if confirm["delete"]:
+                try:
+                    if plugin_exist:
+                        os.remove(plugin_file)
+                    elif disabled_plugin_exist:
+                        os.remove(disabled_plugin_file)
+                    print(f"plugin {args.delete[0]} deleted succesfully.")
+                except:
+                    print("Failed deleting plugin file.")
+                    exit(17)
+        elif args.disable:
+            plugin_file = os.path.join(self.config.defaultdir + "/plugins", args.disable[0] + ".py")
+            disabled_plugin_file = os.path.join(self.config.defaultdir + "/plugins", args.disable[0] + ".py.bkp")
+            if not os.path.exists(plugin_file) or os.path.exists(disabled_plugin_file):
+                print("Plugin {} dosn't exist or it's disabled.".format(args.disable[0]))
+                exit(14)
+            try:
+                os.rename(plugin_file, disabled_plugin_file)
+                print(f"plugin {args.disable[0]} disabled succesfully.")
+            except:
+                print("Failed disabling plugin file.")
+                exit(17)
+        elif args.enable:
+            plugin_file = os.path.join(self.config.defaultdir + "/plugins", args.enable[0] + ".py")
+            disabled_plugin_file = os.path.join(self.config.defaultdir + "/plugins", args.enable[0] + ".py.bkp")
+            if os.path.exists(plugin_file) or not os.path.exists(disabled_plugin_file):
+                print("Plugin {} dosn't exist or it's enabled.".format(args.enable[0]))
+                exit(14)
+            try:
+                os.rename(disabled_plugin_file, plugin_file)
+                print(f"plugin {args.enable[0]} enabled succesfully.")
+            except:
+                print("Failed enabling plugin file.")
+                exit(17)
+        elif args.list:
+            enabled_files = []
+            disabled_files = []
+            plugins = {}
+        
+            # Iterate over all files in the specified folder
+            for file in os.listdir(self.config.defaultdir + "/plugins"):
+                # Check if the file is a Python file
+                if file.endswith('.py'):
+                    enabled_files.append(os.path.splitext(file)[0])
+                # Check if the file is a Python backup file
+                elif file.endswith('.py.bkp'):
+                    disabled_files.append(os.path.splitext(os.path.splitext(file)[0])[0])
+            if enabled_files:
+                plugins["Enabled"] = enabled_files
+            if disabled_files:
+                plugins["Disabled"] = disabled_files
+            if plugins:
+                print(yaml.dump(plugins, sort_keys=False))
+            else:
+                print("There are no plugins added.")
+
+
+
+
     def _func_import(self, args):
         if not os.path.exists(args.data[0]):
-            print("File {} dosn't exists".format(args.data[0]))
+            print("File {} dosn't exist".format(args.data[0]))
             exit(14)
         print("This could overwrite your current configuration!")
         question = [inquirer.Confirm("import", message="Are you sure you want to import {} file?".format(args.data[0]))]
@@ -1244,14 +1363,30 @@ class connapp:
             raise ValueError
         return arg_value
 
-    def _help(self, type):
+    def _help(self, type, parsers = None):
         #Store text for help and other commands
         if type == "node":
             return "node[@subfolder][@folder]\nConnect to specific node or show all matching nodes\n[@subfolder][@folder]\nShow all available connections globally or in specified path"
         if type == "usage":
-            return "conn [-h] [--add | --del | --mod | --show | --debug] [node|folder] [--sftp]\n       conn {profile,move,copy,list,bulk,export,import,run,config,api,ai} ..."
+            commands = []
+            for subcommand, subparser in parsers.choices.items():
+                if subparser.description != None:
+                    commands.append(subcommand)
+            commands = ",".join(commands)
+            usage_help = f"conn [-h] [--add | --del | --mod | --show | --debug] [node|folder] [--sftp]\n       conn {{{commands}}} ..."
+            return usage_help
         if type == "end":
-            return "Commands:\n  profile        Manage profiles\n  move (mv)      Move node\n  copy (cp)      Copy node\n  list (ls)      List profiles, nodes or folders\n  bulk           Add nodes in bulk\n  export         Export connection folder to Yaml file\n  import         Import connection folder to config from Yaml file\n  run            Run scripts or commands on nodes\n  config         Manage app config\n  api            Start and stop connpy api\n  ai             Make request to an AI"
+            help_dict = {}
+            for subcommand, subparser in parsers.choices.items():
+                if subparser.description == None and help_dict:
+                    previous_key = next(reversed(help_dict.keys()))
+                    help_dict[f"{previous_key}({subcommand})"] = help_dict.pop(previous_key)
+                else:
+                    help_dict[subcommand] = subparser.description
+                subparser.description = None
+            commands_help = "Commands:\n"
+            commands_help += "\n".join([f"  {cmd:<15} {help_text}" for cmd, help_text in help_dict.items() if help_text != None])
+            return commands_help
         if type == "bashcompletion":
             return '''
 #Here starts bash completion for conn
