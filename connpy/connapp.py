@@ -177,7 +177,7 @@ class connapp:
             argv.insert(0,"node")
         args = defaultparser.parse_args(argv)
         if args.subcommand in self.plugins.plugins:
-            self.plugins.plugins[args.subcommand].Entrypoint(args, self.plugins.plugin_parsers[args.subcommand], self)
+            self.plugins.plugins[args.subcommand].Entrypoint(args, self.plugins.plugin_parsers[args.subcommand].parser, self)
         else:
             return args.func(args)
 
