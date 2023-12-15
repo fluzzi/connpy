@@ -76,6 +76,7 @@ options:
    conn pc@office
    conn server
 ``` 
+## Plugin Requirements for Connpy
 ### General Structure
 - The plugin script must be a Python file.
 - Only the following top-level elements are allowed in the plugin script:
@@ -312,13 +313,15 @@ from .configfile import configfile
 from .connapp import connapp
 from .api import *
 from .ai import ai
+from .plugins import Plugins
 from ._version import __version__
 from pkg_resources import get_distribution
 
-__all__ = ["node", "nodes", "configfile", "connapp", "ai"]
+__all__ = ["node", "nodes", "configfile", "connapp", "ai", "Plugins"]
 __author__ = "Federico Luzzi"
 __pdoc__ = {
     'core': False,
     'completion': False,
-    'api': False
+    'api': False,
+    'plugins': False
 }
