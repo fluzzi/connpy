@@ -2,6 +2,7 @@ import sys
 import os
 import json
 import glob
+import importlib.util
 
 def _getallnodes(config):
     #get all nodes on configfile
@@ -47,15 +48,49 @@ def _getcwd(words, option, folderonly=False):
         pathstrings = [s for s in pathstrings if os.path.isdir(s)]
     return pathstrings
 
+def _get_plugins(which, defaultdir):
+    enabled_files = []
+    disabled_files = []
+    all_files = []
+    all_plugins = {}
+    # Iterate over all files in the specified folder
+    for file in os.listdir(defaultdir + "/plugins"):
+        # Check if the file is a Python file
+        if file.endswith('.py'):
+            enabled_files.append(os.path.splitext(file)[0])
+            all_plugins[os.path.splitext(file)[0]] = os.path.join(defaultdir + "/plugins", file)
+        # Check if the file is a Python backup file
+        elif file.endswith('.py.bkp'):
+            disabled_files.append(os.path.splitext(os.path.splitext(file)[0])[0])
+
+    if which == "--disable":
+        return enabled_files
+    elif which == "--enable":
+        return disabled_files
+    elif which == "--del":
+        all_files.extend(enabled_files)
+        all_files.extend(disabled_files)
+        return all_files
+    elif which == "all":
+        return all_plugins
+
+
 def main():
     home = os.path.expanduser("~")
     defaultdir = home + '/.config/conn'
-    defaultfile = defaultdir + '/config.json'
+    pathfile = defaultdir + '/.folder'
+    try:
+        with open(pathfile, "r") as f:
+            configdir = f.read().strip()
+    except:
+        configdir = defaultdir
+    defaultfile = configdir + '/config.json'
     jsonconf = open(defaultfile)
     config = json.load(jsonconf)
     nodes = _getallnodes(config)
     folders = _getallfolders(config)
     profiles = list(config["profiles"].keys())
+    plugins = _get_plugins("all", defaultdir)
     app = sys.argv[1]
     if app in ["bash", "zsh"]:
         positions = [2,4]
@@ -64,10 +99,21 @@ def main():
     wordsnumber = int(sys.argv[positions[0]])
     words = sys.argv[positions[1]:]
     if wordsnumber == 2:
-        strings=["--add", "--del", "--rm", "--edit", "--mod", "--show", "mv", "move", "ls", "list", "cp", "copy", "profile", "run", "bulk", "config", "api", "ai", "export", "import", "--help"]
+        strings=["--add", "--del", "--rm", "--edit", "--mod", "--show", "mv", "move", "ls", "list", "cp", "copy", "profile", "run", "bulk", "config", "api", "ai", "export", "import", "--help", "plugin"]
+        if plugins:
+            strings.extend(plugins.keys())
         strings.extend(nodes)
         strings.extend(folders)
 
+    elif wordsnumber >=3 and words[0] in plugins.keys():
+        try:
+            spec = importlib.util.spec_from_file_location("module.name", plugins[words[0]])
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            plugin_completion = getattr(module, "_connpy_completion")
+            strings = plugin_completion(wordsnumber, words)
+        except:
+            exit()
     elif wordsnumber >= 3 and words[0] == "ai":
         if wordsnumber == 3:
             strings = ["--help", "--org", "--model", "--api_key"]
@@ -91,6 +137,8 @@ def main():
             strings.extend(folders)
         if words[0] in ["--rm", "--del", "-r", "--mod", "--edit", "-e", "--show", "-s", "mv", "move", "cp", "copy"]:
             strings.extend(nodes)
+        if words[0] == "plugin":
+            strings = ["--help", "--add", "--del", "--enable", "--disable"]
         if words[0] in ["run", "import", "export"]:
             strings = ["--help"]
             if words[0] == "export":
@@ -120,6 +168,11 @@ def main():
               strings=["true", "false"]
           if words[0] == "config" and words[1] in ["--configfolder"]:
               strings=_getcwd(words,words[0],True)
+          if words[0] == "plugin" and words[1] in ["--del", "--enable", "--disable"]:
+              strings=_get_plugins(words[1], defaultdir)
+
+    elif wordsnumber == 5 and words[0] == "plugin" and words[1] == "--add":
+            strings=_getcwd(words, words[0])
     else:
         exit()
 

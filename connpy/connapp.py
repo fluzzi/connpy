@@ -160,7 +160,7 @@ class connapp:
         #Add plugins
         file_path = self.config.defaultdir + "/plugins"
         self.plugins = Plugins()
-        self.plugins.import_plugins_to_argparse(file_path, subparsers)
+        self.plugins._import_plugins_to_argparse(file_path, subparsers)
         #Generate helps
         nodeparser.usage = self._help("usage", subparsers)
         nodeparser.epilog = self._help("end", subparsers)

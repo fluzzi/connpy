@@ -11,6 +11,36 @@ class Plugins:
         self.plugin_parsers = {}
 
     def verify_script(self, file_path):
+        """
+        Verifies that a given Python script meets specific structural requirements.
+
+        This function checks a Python script for compliance with predefined structural 
+        rules. It ensures that the script contains only allowed top-level elements 
+        (functions, classes, imports, pass statements, and a specific if __name__ block) 
+        and that it includes mandatory classes with specific attributes and methods.
+
+        ### Arguments:
+            - file_path (str): The file path of the Python script to be verified.
+
+        ### Returns:
+            - str: A message indicating the type of violation if the script doesn't meet 
+                 the requirements, or False if all requirements are met.
+
+        ### Verifications:
+            - The presence of only allowed top-level elements.
+            - The existence of two specific classes: 'Parser' and 'Entrypoint'.
+            - 'Parser' class must only have an '__init__' method and must assign 'self.parser'
+              and 'self.description'.
+            - 'Entrypoint' class must have an '__init__' method accepting specific arguments.
+
+        If any of these checks fail, the function returns an error message indicating 
+        the reason. If the script passes all checks, the function returns False, 
+        indicating successful verification.
+
+        ### Exceptions:
+                - SyntaxError: If the script contains a syntax error, it is caught and 
+                               returned as a part of the error message.
+        """
         with open(file_path, 'r') as file:
             source_code = file.read()
 
@@ -60,14 +90,14 @@ class Plugins:
         else:
             return "Classes Entrypoint and Parser are mandatory"
 
-    def import_from_path(self, path):
+    def _import_from_path(self, path):
         spec = importlib.util.spec_from_file_location("module.name", path)
         module = importlib.util.module_from_spec(spec)
         sys.modules["module.name"] = module
         spec.loader.exec_module(module)
         return module
 
-    def import_plugins_to_argparse(self, directory, subparsers):
+    def _import_plugins_to_argparse(self, directory, subparsers):
         for filename in os.listdir(directory):
             commands = subparsers.choices.keys()
             if filename.endswith(".py"):
@@ -80,7 +110,7 @@ class Plugins:
                 if check_file:
                     continue
                 else:
-                    self.plugins[root_filename] = self.import_from_path(filepath)
+                    self.plugins[root_filename] = self._import_from_path(filepath)
                     self.plugin_parsers[root_filename] = self.plugins[root_filename].Parser()
                     subparsers.add_parser(root_filename, parents=[self.plugin_parsers[root_filename].parser], add_help=False, description=self.plugin_parsers[root_filename].description)
 
