@@ -2261,6 +2261,7 @@ Categorize the user&#39;s request based on the operation they want to perform on
         pluginparser = subparsers.add_parser(&#34;plugin&#34;, description=&#34;Manage plugins&#34;) 
         plugincrud = pluginparser.add_mutually_exclusive_group(required=True)
         plugincrud.add_argument(&#34;--add&#34;, metavar=(&#34;PLUGIN&#34;, &#34;FILE&#34;), nargs=2, help=&#34;Add new plugin&#34;)
+        plugincrud.add_argument(&#34;--update&#34;, metavar=(&#34;PLUGIN&#34;, &#34;FILE&#34;), nargs=2, help=&#34;Update plugin&#34;)
         plugincrud.add_argument(&#34;--del&#34;, dest=&#34;delete&#34;, metavar=&#34;PLUGIN&#34;, nargs=1, help=&#34;Delete plugin&#34;)
         plugincrud.add_argument(&#34;--enable&#34;, metavar=&#34;PLUGIN&#34;, nargs=1, help=&#34;Enable plugin&#34;)
         plugincrud.add_argument(&#34;--disable&#34;, metavar=&#34;PLUGIN&#34;, nargs=1, help=&#34;Disable plugin&#34;)
@@ -2763,12 +2764,41 @@ Categorize the user&#39;s request based on the operation they want to perform on
                             dest_file = os.path.join(self.config.defaultdir + &#34;/plugins&#34;, args.add[0] + &#34;.py&#34;)
                             shutil.copy2(args.add[1], dest_file)
                             print(f&#34;Plugin {args.add[0]} added succesfully.&#34;)
-                        except:
-                            print(&#34;Failed importing plugin file.&#34;)
+                        except Exception as e:
+                            print(f&#34;Failed importing plugin file. {e}&#34;)
                             exit(17)
             else:
                 print(&#34;Plugin name should be lowercase letters up to 15 characters.&#34;)
                 exit(15)
+        elif args.update:
+            if not os.path.exists(args.update[1]):
+                print(&#34;File {} dosn&#39;t exists.&#34;.format(args.update[1]))
+                exit(14)
+            plugin_file = os.path.join(self.config.defaultdir + &#34;/plugins&#34;, args.update[0] + &#34;.py&#34;)
+            disabled_plugin_file = os.path.join(self.config.defaultdir + &#34;/plugins&#34;, args.update[0] + &#34;.py.bkp&#34;)
+            plugin_exist = os.path.exists(plugin_file)
+            disabled_plugin_exist = os.path.exists(disabled_plugin_file)
+            if plugin_exist or disabled_plugin_exist:
+                check_bad_script = self.plugins.verify_script(args.update[1])
+                if check_bad_script:
+                    print(check_bad_script)
+                    exit(16)
+                else:
+                    try:
+                        disabled_dest_file = os.path.join(self.config.defaultdir + &#34;/plugins&#34;, args.update[0] + &#34;.py.bkp&#34;)
+                        dest_file = os.path.join(self.config.defaultdir + &#34;/plugins&#34;, args.update[0] + &#34;.py&#34;)
+                        if disabled_plugin_exist:
+                            shutil.copy2(args.update[1], disabled_dest_file)
+                        else:
+                            shutil.copy2(args.update[1], dest_file)
+                        print(f&#34;Plugin {args.update[0]} updated succesfully.&#34;)
+                    except Exception as e:
+                        print(f&#34;Failed updating plugin file. {e}&#34;)
+                        exit(17)
+
+            else:
+                print(&#34;Plugin {} dosn&#39;t exist.&#34;.format(args.update[0]))
+                exit(14)
         elif args.delete:
             plugin_file = os.path.join(self.config.defaultdir + &#34;/plugins&#34;, args.delete[0] + &#34;.py&#34;)
             disabled_plugin_file = os.path.join(self.config.defaultdir + &#34;/plugins&#34;, args.delete[0] + &#34;.py.bkp&#34;)
@@ -2788,8 +2818,8 @@ Categorize the user&#39;s request based on the operation they want to perform on
                     elif disabled_plugin_exist:
                         os.remove(disabled_plugin_file)
                     print(f&#34;plugin {args.delete[0]} deleted succesfully.&#34;)
-                except:
-                    print(&#34;Failed deleting plugin file.&#34;)
+                except Exception as e:
+                    print(f&#34;Failed deleting plugin file. {e}&#34;)
                     exit(17)
         elif args.disable:
             plugin_file = os.path.join(self.config.defaultdir + &#34;/plugins&#34;, args.disable[0] + &#34;.py&#34;)
@@ -2800,8 +2830,8 @@ Categorize the user&#39;s request based on the operation they want to perform on
             try:
                 os.rename(plugin_file, disabled_plugin_file)
                 print(f&#34;plugin {args.disable[0]} disabled succesfully.&#34;)
-            except:
-                print(&#34;Failed disabling plugin file.&#34;)
+            except Exception as e:
+                print(f&#34;Failed disabling plugin file. {e}&#34;)
                 exit(17)
         elif args.enable:
             plugin_file = os.path.join(self.config.defaultdir + &#34;/plugins&#34;, args.enable[0] + &#34;.py&#34;)
@@ -2812,8 +2842,8 @@ Categorize the user&#39;s request based on the operation they want to perform on
             try:
                 os.rename(disabled_plugin_file, plugin_file)
                 print(f&#34;plugin {args.enable[0]} enabled succesfully.&#34;)
-            except:
-                print(&#34;Failed enabling plugin file.&#34;)
+            except Exception as e:
+                print(f&#34;Failed enabling plugin file. {e}&#34;)
                 exit(17)
         elif args.list:
             enabled_files = []
@@ -3799,6 +3829,7 @@ tasks:
     pluginparser = subparsers.add_parser(&#34;plugin&#34;, description=&#34;Manage plugins&#34;) 
     plugincrud = pluginparser.add_mutually_exclusive_group(required=True)
     plugincrud.add_argument(&#34;--add&#34;, metavar=(&#34;PLUGIN&#34;, &#34;FILE&#34;), nargs=2, help=&#34;Add new plugin&#34;)
+    plugincrud.add_argument(&#34;--update&#34;, metavar=(&#34;PLUGIN&#34;, &#34;FILE&#34;), nargs=2, help=&#34;Update plugin&#34;)
     plugincrud.add_argument(&#34;--del&#34;, dest=&#34;delete&#34;, metavar=&#34;PLUGIN&#34;, nargs=1, help=&#34;Delete plugin&#34;)
     plugincrud.add_argument(&#34;--enable&#34;, metavar=&#34;PLUGIN&#34;, nargs=1, help=&#34;Enable plugin&#34;)
     plugincrud.add_argument(&#34;--disable&#34;, metavar=&#34;PLUGIN&#34;, nargs=1, help=&#34;Disable plugin&#34;)
