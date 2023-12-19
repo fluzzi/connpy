@@ -67,7 +67,7 @@ def _get_plugins(which, defaultdir):
         return enabled_files
     elif which == "--enable":
         return disabled_files
-    elif which == "--del":
+    elif which in ["--del", "--update"]:
         all_files.extend(enabled_files)
         all_files.extend(disabled_files)
         return all_files
@@ -91,6 +91,12 @@ def main():
     folders = _getallfolders(config)
     profiles = list(config["profiles"].keys())
     plugins = _get_plugins("all", defaultdir)
+    info = {}
+    info["config"] = config
+    info["nodes"] = nodes
+    info["folders"] = folders
+    info["profiles"] = profiles
+    info["plugins"] = plugins
     app = sys.argv[1]
     if app in ["bash", "zsh"]:
         positions = [2,4]
@@ -111,7 +117,7 @@ def main():
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
             plugin_completion = getattr(module, "_connpy_completion")
-            strings = plugin_completion(wordsnumber, words)
+            strings = plugin_completion(wordsnumber, words, info)
         except:
             exit()
     elif wordsnumber >= 3 and words[0] == "ai":
@@ -138,7 +144,7 @@ def main():
         if words[0] in ["--rm", "--del", "-r", "--mod", "--edit", "-e", "--show", "-s", "mv", "move", "cp", "copy"]:
             strings.extend(nodes)
         if words[0] == "plugin":
-            strings = ["--help", "--add", "--del", "--enable", "--disable"]
+            strings = ["--help", "--add", "--update", "--del", "--enable", "--disable"]
         if words[0] in ["run", "import", "export"]:
             strings = ["--help"]
             if words[0] == "export":
@@ -167,12 +173,12 @@ def main():
           if words[0] == "config" and words[1] in ["--fzf", "--allow-uppercase"]:
               strings=["true", "false"]
           if words[0] == "config" and words[1] in ["--configfolder"]:
-              strings=_getcwd(words,words[0],True)
-          if words[0] == "plugin" and words[1] in ["--del", "--enable", "--disable"]:
+              strings=_getcwd(words,words[1],True)
+          if words[0] == "plugin" and words[1] in ["--update", "--del", "--enable", "--disable"]:
               strings=_get_plugins(words[1], defaultdir)
 
-    elif wordsnumber == 5 and words[0] == "plugin" and words[1] == "--add":
-            strings=_getcwd(words, words[0])
+    elif wordsnumber == 5 and words[0] == "plugin" and words[1] in ["--add", "--update"]:
+            strings=_getcwd(words, words[2])
     else:
         exit()
 

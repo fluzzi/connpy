@@ -140,6 +140,7 @@ class connapp:
         pluginparser = subparsers.add_parser("plugin", description="Manage plugins") 
         plugincrud = pluginparser.add_mutually_exclusive_group(required=True)
         plugincrud.add_argument("--add", metavar=("PLUGIN", "FILE"), nargs=2, help="Add new plugin")
+        plugincrud.add_argument("--update", metavar=("PLUGIN", "FILE"), nargs=2, help="Update plugin")
         plugincrud.add_argument("--del", dest="delete", metavar="PLUGIN", nargs=1, help="Delete plugin")
         plugincrud.add_argument("--enable", metavar="PLUGIN", nargs=1, help="Enable plugin")
         plugincrud.add_argument("--disable", metavar="PLUGIN", nargs=1, help="Disable plugin")
@@ -642,12 +643,41 @@ class connapp:
                             dest_file = os.path.join(self.config.defaultdir + "/plugins", args.add[0] + ".py")
                             shutil.copy2(args.add[1], dest_file)
                             print(f"Plugin {args.add[0]} added succesfully.")
-                        except:
-                            print("Failed importing plugin file.")
+                        except Exception as e:
+                            print(f"Failed importing plugin file. {e}")
                             exit(17)
             else:
                 print("Plugin name should be lowercase letters up to 15 characters.")
                 exit(15)
+        elif args.update:
+            if not os.path.exists(args.update[1]):
+                print("File {} dosn't exists.".format(args.update[1]))
+                exit(14)
+            plugin_file = os.path.join(self.config.defaultdir + "/plugins", args.update[0] + ".py")
+            disabled_plugin_file = os.path.join(self.config.defaultdir + "/plugins", args.update[0] + ".py.bkp")
+            plugin_exist = os.path.exists(plugin_file)
+            disabled_plugin_exist = os.path.exists(disabled_plugin_file)
+            if plugin_exist or disabled_plugin_exist:
+                check_bad_script = self.plugins.verify_script(args.update[1])
+                if check_bad_script:
+                    print(check_bad_script)
+                    exit(16)
+                else:
+                    try:
+                        disabled_dest_file = os.path.join(self.config.defaultdir + "/plugins", args.update[0] + ".py.bkp")
+                        dest_file = os.path.join(self.config.defaultdir + "/plugins", args.update[0] + ".py")
+                        if disabled_plugin_exist:
+                            shutil.copy2(args.update[1], disabled_dest_file)
+                        else:
+                            shutil.copy2(args.update[1], dest_file)
+                        print(f"Plugin {args.update[0]} updated succesfully.")
+                    except Exception as e:
+                        print(f"Failed updating plugin file. {e}")
+                        exit(17)
+
+            else:
+                print("Plugin {} dosn't exist.".format(args.update[0]))
+                exit(14)
         elif args.delete:
             plugin_file = os.path.join(self.config.defaultdir + "/plugins", args.delete[0] + ".py")
             disabled_plugin_file = os.path.join(self.config.defaultdir + "/plugins", args.delete[0] + ".py.bkp")
@@ -667,8 +697,8 @@ class connapp:
                     elif disabled_plugin_exist:
                         os.remove(disabled_plugin_file)
                     print(f"plugin {args.delete[0]} deleted succesfully.")
-                except:
-                    print("Failed deleting plugin file.")
+                except Exception as e:
+                    print(f"Failed deleting plugin file. {e}")
                     exit(17)
         elif args.disable:
             plugin_file = os.path.join(self.config.defaultdir + "/plugins", args.disable[0] + ".py")
@@ -679,8 +709,8 @@ class connapp:
             try:
                 os.rename(plugin_file, disabled_plugin_file)
                 print(f"plugin {args.disable[0]} disabled succesfully.")
-            except:
-                print("Failed disabling plugin file.")
+            except Exception as e:
+                print(f"Failed disabling plugin file. {e}")
                 exit(17)
         elif args.enable:
             plugin_file = os.path.join(self.config.defaultdir + "/plugins", args.enable[0] + ".py")
@@ -691,8 +721,8 @@ class connapp:
             try:
                 os.rename(disabled_plugin_file, plugin_file)
                 print(f"plugin {args.enable[0]} enabled succesfully.")
-            except:
-                print("Failed enabling plugin file.")
+            except Exception as e:
+                print(f"Failed enabling plugin file. {e}")
                 exit(17)
         elif args.list:
             enabled_files = []
