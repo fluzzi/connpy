@@ -5,13 +5,16 @@
 Connpy is a connection manager that allows you to store nodes to connect them fast and password free.
 
 ### Features
-    - You can generate profiles and reference them from nodes using @profilename 
-      so you dont need to edit multiple nodes when changing password or other 
-      information.
-    - Nodes can be stored on @folder or @subfolder@folder to organize your 
-      devices. Then can be referenced using node@subfolder@folder or node@folder
-    - If you have too many nodes. Get completion script using: conn config 
-      --completion, or use fzf installing pyfzf and running conn config --fzf true
+    - You can generate profiles and reference them from nodes using @profilename so you dont
+      need to edit multiple nodes when changing password or other information.
+    - Nodes can be stored on @folder or @subfolder@folder to organize your devices. Then can 
+      be referenced using node@subfolder@folder or node@folder
+    - If you have too many nodes. Get completion script using: conn config --completion.
+      Or use fzf installing pyfzf and running conn config --fzf true
+    - Create in bulk, copy, move, export and import nodes for easy management.
+    - Run automation scripts in network devices.
+    - use GPT AI to help you manage your devices.
+    - Add plugins with your own scripts.
     - Much more!
 
 ### Usage
