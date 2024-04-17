@@ -50,6 +50,7 @@ Commands:
   api             Start and stop connpy api
   plugin          Manage plugins
   config          Manage app config
+  sync            Sync config with Google
 ```
 
 ###   Manage profiles
