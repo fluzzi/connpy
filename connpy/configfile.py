@@ -6,6 +6,8 @@ import re
 from Crypto.PublicKey import RSA
 from pathlib import Path
 from copy import deepcopy
+from .hooks import ConfigHook
+
 
 
 #functions and classes
@@ -105,15 +107,20 @@ class configfile:
         jsonconf.close()
         return jsondata
 
+    @ConfigHook
     def _saveconfig(self, conf):
         #Save config file
         newconfig = {"config":{}, "connections": {}, "profiles": {}}
         newconfig["config"] = self.config
         newconfig["connections"] = self.connections
         newconfig["profiles"] = self.profiles
-        with open(conf, "w") as f:
-            json.dump(newconfig, f, indent = 4)
-            f.close()
+        try:
+            with open(conf, "w") as f:
+                json.dump(newconfig, f, indent = 4)
+                f.close()
+        except:
+            return 1
+        return 0
 
     def _createkey(self, keyfile):
         #Create key file

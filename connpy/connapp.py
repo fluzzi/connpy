@@ -159,9 +159,19 @@ class connapp:
         configcrud.add_argument("--openai-model", dest="model", nargs=1, action=self._store_type, help="Set openai model", metavar="MODEL")
         configparser.set_defaults(func=self._func_others)
         #Add plugins
-        file_path = self.config.defaultdir + "/plugins"
         self.plugins = Plugins()
-        self.plugins._import_plugins_to_argparse(file_path, subparsers)
+        try:
+            core_path = os.path.dirname(os.path.realpath(__file__)) + "/core_plugins"
+            self.plugins._import_plugins_to_argparse(core_path, subparsers)
+        except:
+            pass
+        try:
+            file_path = self.config.defaultdir + "/plugins"
+            self.plugins._import_plugins_to_argparse(file_path, subparsers)
+        except:
+            pass
+        for preload in self.plugins.preloads.values():
+            preload.Preload(self)
         #Generate helps
         nodeparser.usage = self._help("usage", subparsers)
         nodeparser.epilog = self._help("end", subparsers)

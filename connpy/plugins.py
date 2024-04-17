@@ -9,6 +9,7 @@ class Plugins:
     def __init__(self):
         self.plugins = {}
         self.plugin_parsers = {}
+        self.preloads = {}
 
     def verify_script(self, file_path):
         """
@@ -28,7 +29,7 @@ class Plugins:
 
         ### Verifications:
             - The presence of only allowed top-level elements.
-            - The existence of two specific classes: 'Parser' and 'Entrypoint'.
+            - The existence of two specific classes: 'Parser' and 'Entrypoint'. and/or specific class: Preload.
             - 'Parser' class must only have an '__init__' method and must assign 'self.parser'
               and 'self.description'.
             - 'Entrypoint' class must have an '__init__' method accepting specific arguments.
@@ -49,8 +50,10 @@ class Plugins:
         except SyntaxError as e:
             return f"Syntax error in file: {e}"
 
-        required_classes = {'Parser', 'Entrypoint'}
-        found_classes = set()
+
+        has_parser = False
+        has_entrypoint = False
+        has_preload = False
 
         for node in tree.body:
             # Allow only function definitions, class definitions, and pass statements at top-level
@@ -66,10 +69,10 @@ class Plugins:
             elif not isinstance(node, (ast.FunctionDef, ast.ClassDef, ast.Import, ast.ImportFrom, ast.Pass)):
                 return f"Plugin can only have pass, functions, classes and imports. {node} is not allowed"  # Reject any other AST types
 
-            if isinstance(node, ast.ClassDef) and node.name in required_classes:
-                found_classes.add(node.name)
+            if isinstance(node, ast.ClassDef):
 
                 if node.name == 'Parser':
+                    has_parser = True
                     # Ensure Parser class has only the __init__ method and assigns self.parser
                     if not all(isinstance(method, ast.FunctionDef) and method.name == '__init__' for method in node.body):
                         return "Parser class should only have __init__ method"
@@ -81,14 +84,27 @@ class Plugins:
                         return "Parser class should set self.parser and self.description" # 'self.parser' or 'self.description' not assigned in __init__
 
                 elif node.name == 'Entrypoint':
+                    has_entrypoint = True
                     init_method = next((item for item in node.body if isinstance(item, ast.FunctionDef) and item.name == '__init__'), None)
                     if not init_method or len(init_method.args.args) != 4:  # self, args, parser, conapp
-                        return "Entrypoint class should accept only arguments: args, parser and connapp"  # 'Entrypoint' __init__ does not have correct signature
+                        return "Entrypoint class should have method __init__ and accept only arguments: args, parser and connapp"  # 'Entrypoint' __init__ does not have correct signature
 
-        if required_classes == found_classes:
-            return False
-        else:
-            return "Classes Entrypoint and Parser are mandatory"
+                elif node.name == 'Preload':
+                    has_preload = True
+                    init_method = next((item for item in node.body if isinstance(item, ast.FunctionDef) and item.name == '__init__'), None)
+                    if not init_method or len(init_method.args.args) != 2:  # self, connapp
+                        return "Preload class should have method __init__ and accept only argument: connapp"  # 'Preload' __init__ does not have correct signature
+
+        # Applying the combination logic based on class presence
+        if has_parser and not has_entrypoint:
+            return "Parser requires Entrypoint class to be present."
+        elif has_entrypoint and not has_parser:
+            return "Entrypoint requires Parser class to be present."
+    
+        if not (has_parser or has_entrypoint or has_preload):
+            return "No valid class (Parser, Entrypoint, or Preload) found."
+
+        return False  # All requirements met, no error
 
     def _import_from_path(self, path):
         spec = importlib.util.spec_from_file_location("module.name", path)
@@ -108,9 +124,13 @@ class Plugins:
                 filepath = os.path.join(directory, filename)
                 check_file = self.verify_script(filepath)
                 if check_file:
+                    print(f"Failed to load plugin: {filename}. Reason: {check_file}")
                     continue
                 else:
                     self.plugins[root_filename] = self._import_from_path(filepath)
-                    self.plugin_parsers[root_filename] = self.plugins[root_filename].Parser()
-                    subparsers.add_parser(root_filename, parents=[self.plugin_parsers[root_filename].parser], add_help=False, description=self.plugin_parsers[root_filename].description)
+                    if hasattr(self.plugins[root_filename], "Parser"):
+                        self.plugin_parsers[root_filename] = self.plugins[root_filename].Parser()
+                        subparsers.add_parser(root_filename, parents=[self.plugin_parsers[root_filename].parser], add_help=False, description=self.plugin_parsers[root_filename].description)
+                    if hasattr(self.plugins[root_filename], "Preload"):
+                        self.preloads[root_filename] = self.plugins[root_filename]
 
