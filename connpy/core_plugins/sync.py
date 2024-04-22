@@ -6,6 +6,7 @@ import zipfile
 import tempfile
 import io
 import yaml
+import threading
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
@@ -23,8 +24,9 @@ class sync:
         self.file = connapp.config.file
         self.key = connapp.config.key
         self.google_client = f"{os.path.dirname(os.path.abspath(__file__))}/sync_client"
+        self.connapp = connapp
         try:
-            self.sync = connapp.config.config["sync"]
+            self.sync = self.connapp.config.config["sync"]
         except:
             self.sync = False
 
@@ -293,18 +295,29 @@ class sync:
         print(f"Backup from Google Drive restored successfully: {selected_file['name']}")
         return 0
 
-    # @staticmethod
-    def config_listener_post(self, file, result):
+    def config_listener_post(self, args, kwargs):
         if self.sync:
             if self.check_login_status() == True:
-                if not result:
+                if not kwargs["result"]:
                     self.compress_and_upload()
-        return result
+        return kwargs["result"]
+
+    def config_listener_pre(self, *args, **kwargs):
+        try:
+            self.sync = self.connapp.config.config["sync"]
+        except:
+            self.sync = False
+        return args, kwargs
+
+    def start_post_thread(self, *args, **kwargs):
+        post_thread = threading.Thread(target=self.config_listener_post, args=(args,kwargs))
+        post_thread.start()
 
 class Preload:
     def __init__(self, connapp):
         syncapp = sync(connapp)
-        connapp.config._saveconfig.register_post_hook(syncapp.config_listener_post)
+        connapp.config._saveconfig.register_post_hook(syncapp.start_post_thread)
+        connapp.config._saveconfig.register_pre_hook(syncapp.config_listener_pre)
 
 class Parser:
     def __init__(self):
@@ -324,8 +337,6 @@ class Parser:
 class Entrypoint:
     def __init__(self, args, parser, connapp):
         syncapp = sync(connapp)
-        # print(args)
-        # print(syncapp.__dict__)
         if args.command == 'login':
             syncapp.login()
         elif args.command == "status":
@@ -342,81 +353,11 @@ class Entrypoint:
             syncapp.restore_last_config(args.id)
         elif args.command == "logout":
             syncapp.logout()
-        # if args.command == 'netmask':
-            # if args.file:
-                # for line in args.file:
-                    # line = line.strip()
-                    # if line:
-                        # print(NetmaskTools.process_input(args.conversion, line.strip()))
-            # else:
-                # input_str = ' '.join(args.input)
-                # print(NetmaskTools.process_input(args.conversion, input_str))
-        # elif args.command == 'summarize':
-            # with args.file as file:
-                # subnets = [line.strip() for line in file if line.strip()]
-            # summarized = Sumarize.summarize_subnets(subnets, args.mode)
-            # if isinstance(summarized, list):
-                # for subnet in summarized:
-                    # print(subnet)
-            # else:
-                # print(summarized)
-        # elif args.command == 'password':
-            # if connapp:
-                # for passwd in Password.get_passwords(args, connapp):
-                    # print(passwd)
-        # elif args.command == 'connect':
-            # Connect.connect_command(args)
-        # else:
-            # parser.print_help()
-
 
 def _connpy_completion(wordsnumber, words, info = None):
     if wordsnumber == 3:
-        result = ["--help", "netmask", "summarize", "password", "connect"]
+        result = ["--help", "login", "status", "start", "stop", "list", "once", "restore", "logout"]
     #NETMASK_completion
-    if wordsnumber == 4 and words[1] == "netmask":
-        result = ['cidr_to_netmask', 'cidr_to_wildcard', 
-        'netmask_to_cidr', 'wildcard_to_cidr', 
-        'netmask_to_wildcard', 'wildcard_to_netmask', 'cidr_to_range', "--file", "--help"] 
-    elif wordsnumber == 6 and words[1] == "netmask" and words[2] in ["-f", "--file"]:
-        result = ['cidr_to_netmask', 'cidr_to_wildcard', 
-        'netmask_to_cidr', 'wildcard_to_cidr', 
-        'netmask_to_wildcard', 'wildcard_to_netmask'] 
-    elif wordsnumber == 5 and words[1] == "netmask" and words[2] in ["-f", "--file"]:
-        result = _getcwd(words, words[2])
-    elif wordsnumber == 6 and words[1] == "netmask" and words[3] in ["-f", "--file"]:
-        result = _getcwd(words, words[2])
-    #SUMMARIZE_completion
-    elif wordsnumber == 4 and words[1] == "summarize":
-        result = _getcwd(words, words[1])
-        result.extend(["--mode", "--help"])
-    elif wordsnumber == 5 and words[1] == "summarize":
-        if words[2] == "--mode":
-            result = ["strict", "inclusive"]
-        else:
-            result = ["--mode"]
-    elif wordsnumber == 6 and words[1] == "summarize":
-        if words[3] == "--mode":
-            result = ["strict", "inclusive"]
-        elif words[3] in ["strict", "inclusive"]:
-            result = _getcwd(words, words[3])
-    #PASSWORD_completion
-    elif wordsnumber == 4 and words[1] == "password":
-        result = info["nodes"]
-        result.extend(info["profiles"])
-        result.extend(["--help", "--profile"])
-    elif wordsnumber == 5 and words[1] == "password":
-        if words[2] == "--profile":
-            result = info["profiles"]
-        else:
-            result = ["--profile"]
-    #CONNECT_completion
-    elif wordsnumber == 4 and words[1] == "connect":
-        result = ["start", "stop", "restart", "--help"]
-
+    if wordsnumber == 4 and words[1] == "restore":
+            result = ["--help", "--id"]
     return result
-
-if __name__ == "__main__":
-    parser = Parser()
-    args = parser.parser.parse_args()
-    Entrypoint(args, parser.parser, None)

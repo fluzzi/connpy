@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-from connpy import configfile, node, nodes
+from connpy import configfile, node, nodes, hooks
 from connpy.ai import ai as myai
 from waitress import serve
 import os
@@ -126,6 +126,7 @@ def run_commands():
         return({"DataError": error})
     return output
 
+@hooks.MethodHook
 def stop_api():
     # Read the process ID (pid) from the file
     try:
@@ -152,14 +153,17 @@ def stop_api():
     print(f"Server with process ID {pid} stopped.")
     return port
 
+@hooks.MethodHook
 def debug_api(port=8048):
     app.custom_config = configfile()
     app.run(debug=True, port=port)
 
+@hooks.MethodHook
 def start_server(port=8048):
     app.custom_config = configfile()
     serve(app, host='0.0.0.0', port=port)
 
+@hooks.MethodHook
 def start_api(port=8048):
     if os.path.exists(PID_FILE1) or os.path.exists(PID_FILE2):
         print("Connpy server is already running.")

@@ -45,9 +45,13 @@ class connapp:
 
         '''
         self.node = node
-        self.connnodes = nodes
+        self.nodes = nodes
+        self.start_api = start_api
+        self.stop_api = stop_api
+        self.debug_api = debug_api
+        self.ai = ai
         self.config = config
-        self.nodes = self.config._getallnodes()
+        self.nodes_list = self.config._getallnodes()
         self.folders = self.config._getallfolders()
         self.profiles = list(self.config.profiles.keys())
         self.case = self.config.config["case"]
@@ -211,16 +215,16 @@ class connapp:
 
     def _connect(self, args):
         if args.data == None:
-            matches = self.nodes
+            matches = self.nodes_list
             if len(matches) == 0:
                 print("There are no nodes created")
                 print("try: conn --help")
                 exit(9)
         else:
             if args.data.startswith("@"):
-                matches = list(filter(lambda k: args.data in k, self.nodes))
+                matches = list(filter(lambda k: args.data in k, self.nodes_list))
             else:
-                matches = list(filter(lambda k: k.startswith(args.data), self.nodes))
+                matches = list(filter(lambda k: k.startswith(args.data), self.nodes_list))
         if len(matches) == 0:
             print("{} not found".format(args.data))
             exit(2)
@@ -275,10 +279,10 @@ class connapp:
         elif args.data.startswith("@"):
             type = "folder"
             matches = list(filter(lambda k: k == args.data, self.folders))
-            reversematches = list(filter(lambda k: "@" + k == args.data, self.nodes))
+            reversematches = list(filter(lambda k: "@" + k == args.data, self.nodes_list))
         else:
             type = "node"
-            matches = list(filter(lambda k: k == args.data, self.nodes))
+            matches = list(filter(lambda k: k == args.data, self.nodes_list))
             reversematches = list(filter(lambda k: k == "@" + args.data, self.folders))
         if len(matches) > 0:
             print("{} already exist".format(matches[0]))
@@ -326,7 +330,7 @@ class connapp:
         if args.data == None:
             print("Missing argument node")
             exit(3)
-        matches = list(filter(lambda k: k == args.data, self.nodes))
+        matches = list(filter(lambda k: k == args.data, self.nodes_list))
         if len(matches) == 0:
             print("{} not found".format(args.data))
             exit(2)
@@ -511,8 +515,8 @@ class connapp:
         if not self.case:
             args.data[0] = args.data[0].lower()
             args.data[1] = args.data[1].lower()
-        source = list(filter(lambda k: k == args.data[0], self.nodes))
-        dest = list(filter(lambda k: k == args.data[1], self.nodes))
+        source = list(filter(lambda k: k == args.data[0], self.nodes_list))
+        dest = list(filter(lambda k: k == args.data[1], self.nodes_list))
         if len(source) != 1:
             print("{} not found".format(args.data[0]))
             exit(2)
@@ -550,7 +554,7 @@ class connapp:
         count = 0
         for n in ids:
             unique = n + newnodes["location"]
-            matches = list(filter(lambda k: k == unique, self.nodes))
+            matches = list(filter(lambda k: k == unique, self.nodes_list))
             reversematches = list(filter(lambda k: k == "@" + unique, self.folders))
             if len(matches) > 0:
                 print("Node {} already exist, ignoring it".format(unique))
@@ -577,7 +581,7 @@ class connapp:
             newnode["password"] = newnodes["password"]
             count +=1
             self.config._connections_add(**newnode)
-            self.nodes = self.config._getallnodes()
+            self.nodes_list = self.config._getallnodes()
         if count > 0:
             self.config._saveconfig(self.config.file)
             print("Succesfully added {} nodes".format(count))
@@ -829,7 +833,7 @@ class connapp:
             arguments["org"] = args.org[0]
         if args.api_key:
             arguments["api_key"] = args.api_key[0]
-        self.myai = ai(self.config, **arguments)
+        self.myai = self.ai(self.config, **arguments)
         if args.ask:
             input = " ".join(args.ask)
             request = self.myai.ask(input, dryrun = True)
@@ -920,7 +924,7 @@ class connapp:
                         if not confirmation:
                             response = "Request cancelled"
                         else:
-                            nodes = self.connnodes(self.config.getitems(response["nodes"]), config = self.config)
+                            nodes = self.nodes(self.config.getitems(response["nodes"]), config = self.config)
                             if response["action"] == "run":
                                 output = nodes.run(**response["args"])
                                 response = ""
@@ -936,17 +940,17 @@ class connapp:
 
     def _func_api(self, args):
         if args.command == "stop" or args.command == "restart":
-            args.data = stop_api()
+            args.data = self.stop_api()
         if args.command == "start" or args.command == "restart":
             if args.data:
-                start_api(args.data)
+                self.start_api(args.data)
             else:
-                start_api()
+                self.start_api()
         if args.command == "debug":
             if args.data:
-                debug_api(args.data)
+                self.debug_api(args.data)
             else:
-                debug_api()
+                self.debug_api()
         return
 
     def _node_run(self, args):
@@ -997,7 +1001,7 @@ class connapp:
         if len(nodes) == 0:
             print("{} don't match any node".format(nodelist))
             exit(2)
-        nodes = self.connnodes(self.config.getitems(nodes), config = self.config)
+        nodes = self.nodes(self.config.getitems(nodes), config = self.config)
         stdout = False
         if output is None:
             pass
@@ -1158,14 +1162,14 @@ class connapp:
             if current[1:] not in self.profiles:
                 raise inquirer.errors.ValidationError("", reason="Profile {} don't exist".format(current))
         elif current != "":
-            if current not in self.nodes :
+            if current not in self.nodes_list :
                 raise inquirer.errors.ValidationError("", reason="Node {} don't exist.".format(current))
         return True
 
     def _profile_jumphost_validation(self, answers, current):
         #Validation for Jumphost in inquirer when managing profiles
         if current != "":
-            if current not in self.nodes :
+            if current not in self.nodes_list :
                 raise inquirer.errors.ValidationError("", reason="Node {} don't exist.".format(current))
         return True
 
