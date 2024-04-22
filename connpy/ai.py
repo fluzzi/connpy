@@ -6,7 +6,9 @@ import ast
 from textwrap import dedent
 from .core import nodes
 from copy import deepcopy
+from .hooks import ClassHook,MethodHook
 
+@ClassHook
 class ai:
     ''' This class generates a ai object. Containts all the information and methods to make requests to openAI chatGPT to run actions on the application.
 
@@ -175,6 +177,7 @@ Categorize the user's request based on the operation they want to perform on the
         self.__prompt["confirmation_function"]["parameters"]["properties"]["response"]["type"] = "string"
         self.__prompt["confirmation_function"]["parameters"]["required"] = ["result"]
 
+    @MethodHook
     def process_string(self, s):
         if s.startswith('[') and s.endswith(']') and not (s.startswith("['") and s.endswith("']")) and not (s.startswith('["') and s.endswith('"]')):
             # Extract the content inside square brackets and split by comma
@@ -185,6 +188,7 @@ Categorize the user's request based on the operation they want to perform on the
             s = '[' + new_content + ']'
         return s
 
+    @MethodHook
     def _retry_function(self, function, max_retries, backoff_num, *args):
         #Retry openai requests
         retries = 0
@@ -201,6 +205,7 @@ Categorize the user's request based on the operation they want to perform on the
             myfunction = False
         return myfunction
 
+    @MethodHook
     def _clean_command_response(self, raw_response, node_list):
         #Parse response for command request to openAI GPT.
         info_dict = {}
@@ -218,6 +223,7 @@ Categorize the user's request based on the operation they want to perform on the
                 info_dict["variables"][key] = newvalue
         return info_dict
 
+    @MethodHook
     def _get_commands(self, user_input, nodes):
         #Send the request for commands for each device to openAI GPT.
         output_list = []
@@ -257,6 +263,7 @@ Categorize the user's request based on the operation they want to perform on the
         output["response"] = self._clean_command_response(json_result, node_list)
         return output
 
+    @MethodHook
     def _get_filter(self, user_input, chat_history = None):
         #Send the request to identify the filter and other attributes from the user input to GPT.
         message = []
@@ -298,6 +305,7 @@ Categorize the user's request based on the operation they want to perform on the
         output["chat_history"] = chat_history
         return output
         
+    @MethodHook
     def _get_confirmation(self, user_input):
         #Send the request to identify if user is confirming or denying the task
         message = []
@@ -322,6 +330,7 @@ Categorize the user's request based on the operation they want to perform on the
             output["result"] = json_result["response"]
         return output
 
+    @MethodHook
     def confirm(self, user_input, max_retries=3, backoff_num=1):
         '''
         Send the user input to openAI GPT and verify if response is afirmative or negative.
@@ -347,6 +356,7 @@ Categorize the user's request based on the operation they want to perform on the
             output = f"{self.model} api is not responding right now, please try again later."
         return output
 
+    @MethodHook
     def ask(self, user_input, dryrun = False, chat_history = None,  max_retries=3, backoff_num=1):
         '''
         Send the user input to openAI GPT and parse the response to run an action in the application.

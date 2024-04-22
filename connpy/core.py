@@ -12,10 +12,11 @@ import sys
 import threading
 from pathlib import Path
 from copy import deepcopy
+from .hooks import ClassHook, MethodHook
 import io
 
 #functions and classes
-
+@ClassHook
 class node:
     ''' This class generates a node object. Containts all the information and methods to connect and interact with a device using ssh or telnet.
 
@@ -139,6 +140,7 @@ class node:
             else:
                 self.jumphost = ""
 
+    @MethodHook
     def _passtx(self, passwords, *, keyfile=None):
         # decrypts passwords, used by other methdos.
         dpass = []
@@ -161,6 +163,7 @@ class node:
 
     
 
+    @MethodHook
     def _logfile(self, logfile = None):
         # translate logs variables and generate logs path.
         if logfile == None:
@@ -176,6 +179,7 @@ class node:
             logfile = re.sub(r'\$\{date (.*)}',now.strftime(dateconf.group(1)), logfile)
         return logfile
 
+    @MethodHook
     def _logclean(self, logfile, var = False):
         #Remove special ascii characters and other stuff from logfile.
         if var == False:
@@ -202,6 +206,7 @@ class node:
         else:
             return t
 
+    @MethodHook
     def _savelog(self):
         '''Save the log buffer to the file at regular intervals if there are changes.'''
         t = threading.current_thread()
@@ -217,11 +222,13 @@ class node:
                 prev_size = current_size  # Update the previous size
             sleep(5)
 
+    @MethodHook
     def _filter(self, a):
         #Set time for last input when using interact
         self.lastinput = time()
         return a
 
+    @MethodHook
     def _keepalive(self):
         #Send keepalive ctrl+e when idletime passed without new inputs on interact
         self.lastinput = time()
@@ -233,6 +240,7 @@ class node:
             sleep(1)
 
 
+    @MethodHook
     def interact(self, debug = False):
         '''
         Allow user to interact with the node directly, mostly used by connection manager.
@@ -274,6 +282,7 @@ class node:
             print(connect)
             exit(1)
 
+    @MethodHook
     def run(self, commands, vars = None,*, folder = '', prompt = r'>$|#$|\$$|>.$|#.$|\$.$', stdout = False, timeout = 10):
         '''
         Run a command or list of commands on the node and return the output.
@@ -362,6 +371,7 @@ class node:
                     f.close()
             return connect
 
+    @MethodHook
     def test(self, commands, expected, vars = None,*, prompt = r'>$|#$|\$$|>.$|#.$|\$.$', timeout = 10):
         '''
         Run a command or list of commands on the node, then check if expected value appears on the output after the last command.
@@ -457,6 +467,7 @@ class node:
             self.status = 1
             return connect
 
+    @MethodHook
     def _connect(self, debug = False, timeout = 10, max_attempts = 3):
         # Method to connect to the node, it parse all the information, create the ssh/telnet command and login to the node.
         if self.protocol in ["ssh", "sftp"]:
@@ -557,6 +568,7 @@ class node:
         self.child = child
         return True
 
+@ClassHook
 class nodes:
     ''' This class generates a nodes object. Contains a list of node class objects and methods to run multiple tasks on nodes simultaneously.
 
@@ -608,12 +620,14 @@ class nodes:
             setattr(self,n,this)
 
     
+    @MethodHook
     def _splitlist(self, lst, n):
         #split a list in lists of n members.
         for i in range(0, len(lst), n):
             yield lst[i:i + n]
 
 
+    @MethodHook
     def run(self, commands, vars = None,*, folder = None, prompt = None, stdout = None, parallel = 10, timeout = None):
         '''
         Run a command or list of commands on all the nodes in nodelist.
@@ -698,6 +712,7 @@ class nodes:
         self.status = status
         return output
 
+    @MethodHook
     def test(self, commands, expected, vars = None,*, prompt = None, parallel = 10, timeout = None):
         '''
         Run a command or list of commands on all the nodes in nodelist, then check if expected value appears on the output after the last command.

@@ -6,12 +6,13 @@ import re
 from Crypto.PublicKey import RSA
 from pathlib import Path
 from copy import deepcopy
-from .hooks import ConfigHook
+from .hooks import MethodHook, ClassHook
 
 
 
 #functions and classes
 
+@ClassHook
 class configfile:
     ''' This class generates a configfile object. Containts a dictionary storing, config, nodes and profiles, normaly used by connection manager.
 
@@ -107,7 +108,7 @@ class configfile:
         jsonconf.close()
         return jsondata
 
-    @ConfigHook
+    @MethodHook
     def _saveconfig(self, conf):
         #Save config file
         newconfig = {"config":{}, "connections": {}, "profiles": {}}
@@ -131,6 +132,7 @@ class configfile:
             os.chmod(keyfile, 0o600)
         return key
 
+    @MethodHook
     def _explode_unique(self, unique):
         #Divide unique name into folder, subfolder and id
         uniques = unique.split("@")
@@ -151,6 +153,7 @@ class configfile:
             return False
         return result
 
+    @MethodHook
     def getitem(self, unique, keys = None):
         '''
         Get an node or a group of nodes from configfile which can be passed to node/nodes class
@@ -206,6 +209,7 @@ class configfile:
             newnode.pop("type")
             return newnode
 
+    @MethodHook
     def getitems(self, uniques):
         '''
         Get a group of nodes from configfile which can be passed to node/nodes class
@@ -247,6 +251,7 @@ class configfile:
         return nodes
 
 
+    @MethodHook
     def _connections_add(self,*, id, host, folder='', subfolder='', options='', logs='', password='', port='', protocol='', user='', tags='', jumphost='', type = "connection" ):
         #Add connection from config
         if folder == '':
@@ -257,6 +262,7 @@ class configfile:
             self.connections[folder][subfolder][id] = {"host": host, "options": options, "logs": logs, "password": password, "port": port, "protocol": protocol, "user": user, "tags": tags,  "jumphost": jumphost, "type": type}
             
 
+    @MethodHook
     def _connections_del(self,*, id, folder='', subfolder=''):
         #Delete connection from config
         if folder == '':
@@ -266,6 +272,7 @@ class configfile:
         elif folder != '' and subfolder != '':
             del self.connections[folder][subfolder][id]
 
+    @MethodHook
     def _folder_add(self,*, folder, subfolder = ''):
         #Add Folder from config
         if subfolder == '':
@@ -275,6 +282,7 @@ class configfile:
             if subfolder not in self.connections[folder]:
                 self.connections[folder][subfolder] = {"type": "subfolder"}
 
+    @MethodHook
     def _folder_del(self,*, folder, subfolder=''):
         #Delete folder from config
         if subfolder == '':
@@ -283,15 +291,18 @@ class configfile:
             del self.connections[folder][subfolder]
 
 
+    @MethodHook
     def _profiles_add(self,*, id, host = '', options='', logs='', password='', port='', protocol='', user='', tags='', jumphost='' ):
         #Add profile from config
         self.profiles[id] = {"host": host, "options": options, "logs": logs, "password": password, "port": port, "protocol": protocol, "user": user, "tags": tags, "jumphost": jumphost}
             
 
+    @MethodHook
     def _profiles_del(self,*, id ):
         #Delete profile from config
         del self.profiles[id]
         
+    @MethodHook
     def _getallnodes(self, filter = None):
         #get all nodes on configfile
         nodes = []
@@ -314,6 +325,7 @@ class configfile:
                 raise ValueError("filter must be a string or a list of strings")
         return nodes
 
+    @MethodHook
     def _getallnodesfull(self, filter = None, extract = True):
         #get all nodes on configfile with all their attributes.
         nodes = {}
@@ -353,6 +365,7 @@ class configfile:
         return nodes
 
 
+    @MethodHook
     def _getallfolders(self):
         #get all folders on configfile
         folders = ["@" + k for k,v in self.connections.items() if isinstance(v, dict) and v["type"] == "folder"]
@@ -363,6 +376,7 @@ class configfile:
         folders.extend(subfolders)
         return folders
 
+    @MethodHook
     def _profileused(self, profile):
         #Check if profile is used before deleting it
         nodes = []
