@@ -111,17 +111,104 @@ options:
   - Pass statements
 
 ### Specific Class Requirements
-- The plugin script must define at least two specific classes:
+- The plugin script must define specific classes with particular attributes and methods. Each class serves a distinct role within the plugin's architecture:
   1. **Class `Parser`**:
-     - Must contain only one method: `__init__`.
-     - The `__init__` method must initialize at least two attributes:
-       - `self.parser`: An instance of `argparse.ArgumentParser`.
-       - `self.description`: A string containing the description of the parser.
+     - **Purpose**: Handles parsing of command-line arguments.
+     - **Requirements**:
+       - Must contain only one method: `__init__`.
+       - The `__init__` method must initialize at least two attributes:
+         - `self.parser`: An instance of `argparse.ArgumentParser`.
+         - `self.description`: A string containing the description of the parser.
   2. **Class `Entrypoint`**:
-     - Must have an `__init__` method that accepts exactly three parameters besides `self`:
-       - `args`: Arguments passed to the plugin.
-       - The parser instance (typically `self.parser` from the `Parser` class).
-       - The Connapp instance to interact with the Connpy app.
+     - **Purpose**: Acts as the entry point for plugin execution, utilizing parsed arguments and integrating with the main application.
+     - **Requirements**:
+       - Must have an `__init__` method that accepts exactly three parameters besides `self`:
+         - `args`: Arguments passed to the plugin.
+         - The parser instance (typically `self.parser` from the `Parser` class).
+         - The Connapp instance to interact with the Connpy app.
+  3. **Class `Preload`**:
+     - **Purpose**: Performs any necessary preliminary setup or configuration independent of the main parsing and entry logic.
+   - **Requirements**:
+     - Contains at least an `__init__` method that accepts parameter connapp besides `self`.
+
+### Class Dependencies and Combinations
+- **Dependencies**:
+  - `Parser` and `Entrypoint` are interdependent and must both be present if one is included.
+  - `Preload` is independent and may exist alone or alongside the other classes.
+- **Valid Combinations**:
+  - `Parser` and `Entrypoint` together.
+  - `Preload` alone.
+  - All three classes (`Parser`, `Entrypoint`, `Preload`).
+
+### Preload Modifications and Hooks
+
+In the `Preload` class of the plugin system, you have the ability to customize the behavior of existing classes and methods within the application through a robust hooking system. This documentation explains how to use the `modify`, `register_pre_hook`, and `register_post_hook` methods to tailor plugin functionality to your needs.
+
+#### Modifying Classes with `modify`
+The `modify` method allows you to alter instances of a class at the time they are created or after their creation. This is particularly useful for setting or modifying configuration settings, altering default behaviors, or adding new functionalities to existing classes without changing the original class definitions.
+
+- **Usage**: Modify a class to include additional configurations or changes
+- **Modify Method Signature**:
+  - `modify(modification_method)`: A function that is invoked with an instance of the class as its argument. This function should perform any modifications directly on this instance.
+- **Modification Method Signature**:
+  - **Arguments**:
+    - `cls`:  This function accepts a single argument, the class instance, which it then modifies.
+  - **Modifiable Classes**:
+    - `connapp.config`
+    - `connapp.node`
+    - `connapp.nodes`
+    - `connapp.ai`
+  - ```python
+    def modify_config(cls):
+        # Example modification: adding a new attribute or modifying an existing one
+        cls.new_attribute = 'New Value'
+
+    class Preload:
+        def __init__(self, connapp):
+            # Applying modification to the config class instance
+            connapp.config.modify(modify_config)
+    ```
+
+#### Implementing Hooks with `register_pre_hook` and `register_post_hook`
+These methods allow you to define custom logic to be executed before (`register_pre_hook`) or after (`register_post_hook`) the main logic of a method. This is particularly useful for logging, auditing, preprocessing inputs, postprocessing outputs or adding functionalities.
+
+  - **Usage**: Register hooks to methods to execute additional logic before or after the main method execution.
+- **Registration Methods Signature**:
+  - `register_pre_hook(pre_hook_method)`: A function that is invoked before the main method is executed. This function should do preprocessing of the arguments.
+  - `register_post_hook(post_hook_method)`: A function that is invoked after the main method is executed. This function should do postprocessing of the outputs.
+- **Method Signatures for Pre-Hooks**
+  - `pre_hook_method(*args, **kwargs)`
+  - **Arguments**:
+    - `*args`, `**kwargs`: The arguments and keyword arguments that will be passed to the method being hooked. The pre-hook function has the opportunity to inspect and modify these arguments before they are passed to the main method.
+  - **Return**:
+    - Must return a tuple `(args, kwargs)`, which will be used as the new arguments for the main method. If the original arguments are not modified, the function should return them as received.
+- **Method Signatures for Post-Hooks**:
+  - `post_hook_method(*args, **kwargs)`
+  - **Arguments**:
+    - `*args`, `**kwargs`: The arguments and keyword arguments that were passed to the main method.
+      - `kwargs["result"]`: The value returned by the main method. This allows the post-hook to inspect and even alter the result before it is returned to the original caller.
+  - **Return**:
+    - Can return a modified result, which will replace the original result of the main method, or simply return `kwargs["result"]` to return the original method result.    
+  - ```python
+    def pre_processing_hook(*args, **kwargs):
+        print("Pre-processing logic here")
+        # Modify arguments or perform any checks
+        return args, kwargs  # Return modified or unmodified args and kwargs
+
+    def post_processing_hook(*args, **kwargs):
+        print("Post-processing logic here")
+        # Modify the result or perform any final logging or cleanup
+        return kwargs["result"]  # Return the modified or unmodified result
+
+    class Preload:
+        def __init__(self, connapp):
+            # Registering a pre-hook
+            connapp.ai.some_method.register_pre_hook(pre_processing_hook)
+
+            # Registering a post-hook
+            connapp.node.another_method.register_post_hook(post_processing_hook)
+    ```
+  
 
 ### Executable Block
 - The plugin script can include an executable block:
@@ -131,7 +218,7 @@ options:
 ### Script Verification
 - The `verify_script` method in `plugins.py` is used to check the plugin script's compliance with these standards.
 - Non-compliant scripts will be rejected to ensure consistency and proper functionality within the plugin system.
-- 
+ 
 ### Example Script
 
 For a practical example of how to write a compatible plugin script, please refer to the following example:
