@@ -49,31 +49,44 @@ def _getcwd(words, option, folderonly=False):
     return pathstrings
 
 def _get_plugins(which, defaultdir):
-    enabled_files = []
-    disabled_files = []
-    all_files = []
-    all_plugins = {}
-    # Iterate over all files in the specified folder
-    for file in os.listdir(defaultdir + "/plugins"):
-        # Check if the file is a Python file
-        if file.endswith('.py'):
-            enabled_files.append(os.path.splitext(file)[0])
-            all_plugins[os.path.splitext(file)[0]] = os.path.join(defaultdir + "/plugins", file)
-        # Check if the file is a Python backup file
-        elif file.endswith('.py.bkp'):
-            disabled_files.append(os.path.splitext(os.path.splitext(file)[0])[0])
+    # Path to core_plugins relative to this script
+    core_path = os.path.dirname(os.path.realpath(__file__)) + "/core_plugins"
 
+    def get_plugins_from_directory(directory):
+        enabled_files = []
+        disabled_files = []
+        all_plugins = {}
+        # Iterate over all files in the specified folder
+        if os.path.exists(directory):
+            for file in os.listdir(directory):
+                # Check if the file is a Python file
+                if file.endswith('.py'):
+                    enabled_files.append(os.path.splitext(file)[0])
+                    all_plugins[os.path.splitext(file)[0]] = os.path.join(directory, file)
+                # Check if the file is a Python backup file
+                elif file.endswith('.py.bkp'):
+                    disabled_files.append(os.path.splitext(os.path.splitext(file)[0])[0])
+        return enabled_files, disabled_files, all_plugins
+
+    # Get plugins from both directories
+    user_enabled, user_disabled, user_all_plugins = get_plugins_from_directory(defaultdir + "/plugins")
+    core_enabled, core_disabled, core_all_plugins = get_plugins_from_directory(core_path)
+
+    # Combine the results from user and core plugins
+    enabled_files = user_enabled
+    disabled_files = user_disabled
+    all_plugins = {**user_all_plugins, **core_all_plugins}  # Merge dictionaries
+
+    # Return based on the command
     if which == "--disable":
         return enabled_files
     elif which == "--enable":
         return disabled_files
     elif which in ["--del", "--update"]:
-        all_files.extend(enabled_files)
-        all_files.extend(disabled_files)
+        all_files = enabled_files + disabled_files
         return all_files
     elif which == "all":
         return all_plugins
-
 
 def main():
     home = os.path.expanduser("~")
@@ -144,7 +157,7 @@ def main():
         if words[0] in ["--rm", "--del", "-r", "--mod", "--edit", "-e", "--show", "-s", "mv", "move", "cp", "copy"]:
             strings.extend(nodes)
         if words[0] == "plugin":
-            strings = ["--help", "--add", "--update", "--del", "--enable", "--disable"]
+            strings = ["--help", "--add", "--update", "--del", "--enable", "--disable", "--list"]
         if words[0] in ["run", "import", "export"]:
             strings = ["--help"]
             if words[0] == "export":
