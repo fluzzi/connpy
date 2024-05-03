@@ -35,21 +35,34 @@ class sync:
         # The file token.json stores the user's access and refresh tokens.
         if os.path.exists(self.token_file):
             creds = Credentials.from_authorized_user_file(self.token_file, self.scopes)
-        
-        # If there are no valid credentials available, let the user log in.
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
-            else:
-                flow = InstalledAppFlow.from_client_secrets_file(
-                    self.google_client, self.scopes)
-                creds = flow.run_local_server(port=0, access_type='offline')
-            
-            # Save the credentials for the next run
+
+        try:
+            # If there are no valid credentials available, let the user log in.
+            if not creds or not creds.valid:
+                if creds and creds.expired and creds.refresh_token:
+                    creds.refresh(Request())
+                else:
+                    flow = InstalledAppFlow.from_client_secrets_file(
+                        self.google_client, self.scopes)
+                    creds = flow.run_local_server(port=0, access_type='offline')
+
+                # Save the credentials for the next run
+                with open(self.token_file, 'w') as token:
+                    token.write(creds.to_json())
+
+            print("Logged in successfully.")
+
+        except RefreshError as e:
+            # If refresh fails, delete the invalid token file and start a new login flow
+            if os.path.exists(self.token_file):
+                os.remove(self.token_file)
+            print("Existing token was invalid and has been removed. Please log in again.")
+            flow = InstalledAppFlow.from_client_secrets_file(
+                self.google_client, self.scopes)
+            creds = flow.run_local_server(port=0, access_type='offline')
             with open(self.token_file, 'w') as token:
                 token.write(creds.to_json())
-
-        print("Logged in successfully.")
+            print("Logged in successfully after re-authentication.")
 
     def logout(self):
         if os.path.exists(self.token_file):
@@ -300,6 +313,8 @@ class sync:
             if self.check_login_status() == True:
                 if not kwargs["result"]:
                     self.compress_and_upload()
+            else:
+                print("Sync cannot be performed. Please check your login status.")
         return kwargs["result"]
 
     def config_listener_pre(self, *args, **kwargs):
