@@ -4,6 +4,7 @@ import json
 import os
 import re
 from Crypto.PublicKey import RSA
+from Crypto.Cipher import PKCS1_OAEP
 from pathlib import Path
 from copy import deepcopy
 from .hooks import MethodHook, ClassHook
@@ -391,4 +392,33 @@ class configfile:
                 layer3 = [k + "@" + s + "@" + f for k,v in self.connections[f][s].items() if isinstance(v, dict) and v["type"] == "connection" and ("@" + profile in v.values() or ( isinstance(v["password"],list) and "@" + profile in v["password"]))]
                 nodes.extend(layer3)
         return nodes
+
+    @MethodHook
+    def encrypt(self, password, keyfile=None):
+        '''
+        Encrypts password using RSA keyfile
+
+        ### Parameters:  
+
+            - password (str): Plaintext password to encrypt.
+
+        ### Optional Parameters:  
+
+            - keyfile  (str): Path/file to keyfile. Default is config keyfile.
+                              
+
+        ### Returns:  
+
+            str: Encrypted password.
+
+        '''
+        if keyfile is None:
+            keyfile = self.key
+        with open(keyfile) as f:
+            key = RSA.import_key(f.read())
+            f.close()
+        publickey = key.publickey()
+        encryptor = PKCS1_OAEP.new(publickey)
+        password = encryptor.encrypt(password.encode("utf-8"))
+        return str(password)
 

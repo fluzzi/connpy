@@ -149,8 +149,8 @@ The `modify` method allows you to alter instances of a class at the time they ar
             connapp.config.modify(modify_config)
     ```
 
-#### Implementing Hooks with `register_pre_hook` and `register_post_hook`
-These methods allow you to define custom logic to be executed before (`register_pre_hook`) or after (`register_post_hook`) the main logic of a method. This is particularly useful for logging, auditing, preprocessing inputs, postprocessing outputs or adding functionalities.
+#### Implementing Method Hooks
+There are 2 methods that allows you to define custom logic to be executed before (`register_pre_hook`) or after (`register_post_hook`) the main logic of a method. This is particularly useful for logging, auditing, preprocessing inputs, postprocessing outputs or adding functionalities.
 
   - **Usage**: Register hooks to methods to execute additional logic before or after the main method execution.
 - **Registration Methods Signature**:
@@ -392,7 +392,7 @@ import connpy
 conf = connpy.configfile()
 organization = 'openai-org'
 api_key = "openai-key"
-myia = ai(conf, organization, api_key)
+myia = connpy.ai(conf, organization, api_key)
 input = "go to router 1 and get me the full configuration"
 result = myia.ask(input, dryrun = False)
 print(result)
@@ -413,5 +413,14 @@ __pdoc__ = {
     'core': False,
     'completion': False,
     'api': False,
-    'plugins': False
+    'plugins': False,
+    'core_plugins': False,
+    'hooks': False,
+    'connapp.start': False,
+    'ai.deferred_class_hooks': False,
+    'configfile.deferred_class_hooks': False,
+    'node.deferred_class_hooks': False,
+    'nodes.deferred_class_hooks': False,
+    'connapp': False,
+    'connapp.encrypt': True
 }

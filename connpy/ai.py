@@ -178,17 +178,6 @@ Categorize the user's request based on the operation they want to perform on the
         self.__prompt["confirmation_function"]["parameters"]["required"] = ["result"]
 
     @MethodHook
-    def process_string(self, s):
-        if s.startswith('[') and s.endswith(']') and not (s.startswith("['") and s.endswith("']")) and not (s.startswith('["') and s.endswith('"]')):
-            # Extract the content inside square brackets and split by comma
-            content = s[1:-1].split(',')
-            # Add single quotes around each item and join them back together with commas
-            new_content = ', '.join(f"'{item.strip()}'" for item in content)
-            # Replace the old content with the new content
-            s = '[' + new_content + ']'
-        return s
-
-    @MethodHook
     def _retry_function(self, function, max_retries, backoff_num, *args):
         #Retry openai requests
         retries = 0

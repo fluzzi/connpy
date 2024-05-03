@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #Imports
-from functools import wraps, partial
+from functools import wraps, partial, update_wrapper
 
 #functions and classes
 
@@ -59,6 +59,7 @@ class ClassHook:
     """Decorator class to enable Class Modifying"""
     def __init__(self, cls):
         self.cls = cls
+        update_wrapper(self, cls, updated=())  # Update wrapper without changing underlying items
         # Initialize deferred class hooks if they don't already exist
         if not hasattr(cls, 'deferred_class_hooks'):
             cls.deferred_class_hooks = []

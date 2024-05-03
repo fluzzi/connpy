@@ -2,8 +2,6 @@
 #Imports
 import os
 import re
-from Crypto.PublicKey import RSA
-from Crypto.Cipher import PKCS1_OAEP
 import ast
 import argparse
 import sys
@@ -1285,7 +1283,7 @@ class connapp:
                 passa = inquirer.prompt(passq)
                 if passa == None:
                     return False
-                answer["password"] = self.encrypt(passa["password"])
+                answer["password"] = self.config.encrypt(passa["password"])
             elif answer["password"] == "Profiles":
                 passq = [(inquirer.Text("password", message="Set a @profile or a comma separated list of @profiles", validate=self._pass_validation))]
                 passa = inquirer.prompt(passq)
@@ -1355,7 +1353,7 @@ class connapp:
             return False
         if "password" in answer.keys():
             if answer["password"] != "":
-                answer["password"] = self.encrypt(answer["password"])
+                answer["password"] = self.config.encrypt(answer["password"])
         if "tags" in answer.keys() and answer["tags"]:
             answer["tags"] = ast.literal_eval(answer["tags"])
         result = {**answer, **profile}
@@ -1383,7 +1381,7 @@ class connapp:
             if answer["password"] == "Local Password":
                 passq = [inquirer.Password("password", message="Set Password")]
                 passa = inquirer.prompt(passq)
-                answer["password"] = self.encrypt(passa["password"])
+                answer["password"] = self.config.encrypt(passa["password"])
             elif answer["password"] == "Profiles":
                 passq = [(inquirer.Text("password", message="Set a @profile or a comma separated list of @profiles", validate=self._pass_validation))]
                 passa = inquirer.prompt(passq)
@@ -1549,32 +1547,4 @@ tasks:
       id: 5
   output: null
 ...'''
-
-    def encrypt(self, password, keyfile=None):
-        '''
-        Encrypts password using RSA keyfile
-
-        ### Parameters:  
-
-            - password (str): Plaintext password to encrypt.
-
-        ### Optional Parameters:  
-
-            - keyfile  (str): Path/file to keyfile. Default is config keyfile.
-                              
-
-        ### Returns:  
-
-            str: Encrypted password.
-
-        '''
-        if keyfile is None:
-            keyfile = self.config.key
-        with open(keyfile) as f:
-            key = RSA.import_key(f.read())
-            f.close()
-        publickey = key.publickey()
-        encryptor = PKCS1_OAEP.new(publickey)
-        password = encryptor.encrypt(password.encode("utf-8"))
-        return str(password)
 
