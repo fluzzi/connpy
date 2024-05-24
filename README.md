@@ -1,4 +1,9 @@
-# Conn
+<p align="center">
+  <img src="https://private-user-images.githubusercontent.com/5794882/333731702-63c61be7-da16-4d3c-98da-cae54965d0b7.png?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3MTY1ODM3MjQsIm5iZiI6MTcxNjU4MzQyNCwicGF0aCI6Ii81Nzk0ODgyLzMzMzczMTcwMi02M2M2MWJlNy1kYTE2LTRkM2MtOThkYS1jYWU1NDk2NWQwYjcucG5nP1gtQW16LUFsZ29yaXRobT1BV1M0LUhNQUMtU0hBMjU2JlgtQW16LUNyZWRlbnRpYWw9QUtJQVZDT0RZTFNBNTNQUUs0WkElMkYyMDI0MDUyNCUyRnVzLWVhc3QtMSUyRnMzJTJGYXdzNF9yZXF1ZXN0JlgtQW16LURhdGU9MjAyNDA1MjRUMjA0MzQ0WiZYLUFtei1FeHBpcmVzPTMwMCZYLUFtei1TaWduYXR1cmU9MGVjZGI3OTQ1OTFlYjY2OGM2NjQzYWNiYThiZTQ3YWMyMWMyNDZjMWIwMDJlZDVjZTU2OTlkNTM0NWEzYWZkYiZYLUFtei1TaWduZWRIZWFkZXJzPWhvc3QmYWN0b3JfaWQ9MCZrZXlfaWQ9MCZyZXBvX2lkPTAifQ.A3vTyO7h_HWY_IezgEZrBxdIGS_T_gXxLbzP6i2FBwU" alt="App Logo">
+</p>
+
+
+# Connpy
 [![](https://img.shields.io/pypi/v/connpy.svg?style=flat-square)](https://pypi.org/pypi/connpy/)
 [![](https://img.shields.io/pypi/pyversions/connpy.svg?style=flat-square)](https://pypi.org/pypi/connpy/)
 [![](https://img.shields.io/pypi/l/connpy.svg?style=flat-square)](https://github.com/fluzzi/connpy/blob/main/LICENSE)
