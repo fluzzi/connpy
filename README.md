@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://media.discordapp.net/attachments/1243672493340753982/1243672566166720562/CONNPY-resized.png?ex=665253d6&is=66510256&hm=7957c9ec64159244181f20cb67e6d16da8cebdb0f6e2775ed121c77f648ff4a1&=&format=webp&quality=lossless&width=300&height=300" alt="App Logo">
+  <img src="https://nginx.gederico.dynu.net/images/CONNPY-resized.png" alt="App Logo">
 </p>
 
 
@@ -23,6 +23,26 @@ docker compose -f path/to/folder/docker-compose.yml run -it connpy-app
 ```
 
 ## Connection manager 
+### Privacy Policy
+
+Connpy is committed to protecting your privacy. Our privacy policy explains how we handle user data:
+
+- **Data Access**: Connpy accesses data necessary for managing remote host connections, including server addresses, usernames, and passwords. This data is stored locally on your machine and is not transmitted or shared with any third parties.
+- **Data Usage**: User data is used solely for the purpose of managing and automating SSH and Telnet connections.
+- **Data Storage**: All connection details are stored locally and securely on your device. We do not store or process this data on our servers.
+- **Data Sharing**: We do not share any user data with third parties.
+
+### Google Integration
+
+Connpy integrates with Google services for backup purposes:
+
+- **Configuration Backup**: The app allows users to store their device information in the app configuration. This configuration can be synced with Google services to create backups.
+- **Data Access**: Connpy only accesses its own files and does not access any other files on your Google account.
+- **Data Usage**: The data is used solely for backup and restore purposes, ensuring that your device information and configurations are safe and recoverable.
+- **Data Sharing**: Connpy does not share any user data with third parties, including Google. The backup data is only accessible by the user.
+
+For more detailed information, please read our [Privacy Policy](https://connpy.gederico.dynu.net/fluzzi32/connpy/src/branch/main/PRIVATE_POLICY.md).
+
 ### Features
     - You can generate profiles and reference them from nodes using @profilename so you dont
       need to edit multiple nodes when changing password or other information.
