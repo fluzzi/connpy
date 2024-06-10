@@ -484,7 +484,11 @@ class connapp:
         return actions.get(args.command)(args)
 
     def _ls(self, args):
-        items = getattr(self, args.data)
+        if args.data == "nodes":
+            attribute = "nodes_list"
+        else:
+            attribute = args.data
+        items = getattr(self, attribute)
         if args.filter:
             items = [ item for item in items if re.search(args.filter[0], item)]
         if args.format and args.data == "nodes":
