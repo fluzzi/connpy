@@ -312,11 +312,7 @@ class connapp:
                 if uniques == False:
                     print("Invalid node {}".format(args.data))
                     exit(5)
-                print("You can use the configured setting in a profile using @profilename.")
-                print("You can also leave empty any value except hostname/IP.")
-                print("You can pass 1 or more passwords using comma separated @profiles")
-                print("You can use this variables on logging file name: ${id} ${unique} ${host} ${port} ${user} ${protocol}")
-                print("Some useful tags to set for automation are 'os', 'screen_length_command', and 'prompt'.")
+                self._print_instructions()
                 newnode = self._questions_nodes(args.data, uniques)
                 if newnode == False:
                     exit(7)
@@ -1081,16 +1077,16 @@ class connapp:
                 raise inquirer.errors.ValidationError("", reason="Profile {} don't exist".format(current))
         return True
 
-    def _profile_protocol_validation(self, answers, current, regex = "(^ssh$|^telnet$|^$)"):
+    def _profile_protocol_validation(self, answers, current, regex = "(^ssh$|^telnet$|^kubectl$|^docker$|^$)"):
         #Validate protocol in inquirer when managing profiles
         if not re.match(regex, current):
-            raise inquirer.errors.ValidationError("", reason="Pick between ssh, telnet or leave empty")
+            raise inquirer.errors.ValidationError("", reason="Pick between ssh, telnet, kubectl, docker or leave empty")
         return True
 
-    def _protocol_validation(self, answers, current, regex = "(^ssh$|^telnet$|^$|^@.+$)"):
+    def _protocol_validation(self, answers, current, regex = "(^ssh$|^telnet$|^kubectl$|^docker$|^$|^@.+$)"):
         #Validate protocol in inquirer when managing nodes
         if not re.match(regex, current):
-            raise inquirer.errors.ValidationError("", reason="Pick between ssh, telnet, leave empty or @profile")
+            raise inquirer.errors.ValidationError("", reason="Pick between ssh, telnet, kubectl, docker leave empty or @profile")
         if current.startswith("@"):
             if current[1:] not in self.profiles:
                 raise inquirer.errors.ValidationError("", reason="Profile {} don't exist".format(current))
@@ -1111,7 +1107,7 @@ class connapp:
     def _port_validation(self, answers, current, regex = "(^[0-9]*$|^@.+$)"):
         #Validate port in inquirer when managing nodes
         if not re.match(regex, current):
-            raise inquirer.errors.ValidationError("", reason="Pick a port between 1-65535, @profile or leave empty")
+            raise inquirer.errors.ValidationError("", reason="Pick a port between 1-6553/app5, @profile or leave empty")
         try:
             port = int(current)
         except:
@@ -1217,7 +1213,7 @@ class connapp:
         #Inquirer questions when editing nodes or profiles
         questions = []
         questions.append(inquirer.Confirm("host", message="Edit Hostname/IP?"))
-        questions.append(inquirer.Confirm("protocol", message="Edit Protocol?"))
+        questions.append(inquirer.Confirm("protocol", message="Edit Protocol/app?"))
         questions.append(inquirer.Confirm("port", message="Edit Port?"))
         questions.append(inquirer.Confirm("options", message="Edit Options?"))
         questions.append(inquirer.Confirm("logs", message="Edit logging path/file?"))
@@ -1247,7 +1243,7 @@ class connapp:
         else:
             node["host"] = defaults["host"]
         if edit["protocol"]:
-            questions.append(inquirer.Text("protocol", message="Select Protocol", validate=self._protocol_validation, default=defaults["protocol"]))
+            questions.append(inquirer.Text("protocol", message="Select Protocol/app", validate=self._protocol_validation, default=defaults["protocol"]))
         else:
             node["protocol"] = defaults["protocol"]
         if edit["port"]:
@@ -1255,7 +1251,7 @@ class connapp:
         else:
             node["port"] = defaults["port"]
         if edit["options"]:
-            questions.append(inquirer.Text("options", message="Pass extra options to protocol", validate=self._default_validation, default=defaults["options"]))
+            questions.append(inquirer.Text("options", message="Pass extra options to protocol/app", validate=self._default_validation, default=defaults["options"]))
         else:
             node["options"] = defaults["options"]
         if edit["logs"]:
@@ -1321,7 +1317,7 @@ class connapp:
         else:
             profile["host"] = defaults["host"]
         if edit["protocol"]:
-            questions.append(inquirer.Text("protocol", message="Select Protocol", validate=self._profile_protocol_validation, default=defaults["protocol"]))
+            questions.append(inquirer.Text("protocol", message="Select Protocol/app", validate=self._profile_protocol_validation, default=defaults["protocol"]))
         else:
             profile["protocol"] = defaults["protocol"]
         if edit["port"]:
@@ -1329,7 +1325,7 @@ class connapp:
         else:
             profile["port"] = defaults["port"]
         if edit["options"]:
-            questions.append(inquirer.Text("options", message="Pass extra options to protocol", default=defaults["options"]))
+            questions.append(inquirer.Text("options", message="Pass extra options to protocol/app", default=defaults["options"]))
         else:
             profile["options"] = defaults["options"]
         if edit["logs"]:
@@ -1370,9 +1366,9 @@ class connapp:
         questions.append(inquirer.Text("ids", message="add a comma separated list of nodes to add", validate=self._bulk_node_validation))
         questions.append(inquirer.Text("location", message="Add a @folder, @subfolder@folder or leave empty", validate=self._bulk_folder_validation))
         questions.append(inquirer.Text("host", message="Add comma separated list of Hostnames or IPs", validate=self._bulk_host_validation))
-        questions.append(inquirer.Text("protocol", message="Select Protocol", validate=self._protocol_validation))
+        questions.append(inquirer.Text("protocol", message="Select Protocol/app", validate=self._protocol_validation))
         questions.append(inquirer.Text("port", message="Select Port Number", validate=self._port_validation))
-        questions.append(inquirer.Text("options", message="Pass extra options to protocol", validate=self._default_validation))
+        questions.append(inquirer.Text("options", message="Pass extra options to protocol/app", validate=self._default_validation))
         questions.append(inquirer.Text("logs", message="Pick logging path/file ", validate=self._default_validation))
         questions.append(inquirer.Text("tags", message="Add tags dictionary",  validate=self._tags_validation))
         questions.append(inquirer.Text("jumphost", message="Add Jumphost node",  validate=self._jumphost_validation))
@@ -1552,3 +1548,45 @@ tasks:
   output: null
 ...'''
 
+    def _print_instructions(self):
+        instructions = """
+Welcome to Connpy node Addition Wizard!
+
+Here are some important instructions and tips for configuring your new node:
+
+1. **Profiles**:
+   - You can use the configured settings in a profile using `@profilename`.
+
+2. **Available Protocols and Apps**:
+   - ssh
+   - telnet
+   - kubectl (`kubectl exec`)
+   - docker (`docker exec`)
+
+3. **Optional Values**:
+   - You can leave any value empty except for the hostname/IP.
+
+4. **Passwords**:
+   - You can pass one or more passwords using comma-separated `@profiles`.
+
+5. **Logging**:
+   - You can use the following variables in the logging file name:
+     - `${id}`
+     - `${unique}`
+     - `${host}`
+     - `${port}`
+     - `${user}`
+     - `${protocol}`
+
+6. **Well-Known Tags**:
+   - `os`: Identified by AI to generate commands based on the operating system.
+   - `screen_length_command`: Used by automation to avoid pagination on different devices (e.g., `terminal length 0` for Cisco devices).
+   - `prompt`: Replaces default app prompt to identify the end of output or where the user can start inputting commands.
+   - `kube_command`: Replaces the default command (`/bin/bash`) for `kubectl exec`.
+   - `docker_command`: Replaces the default command for `docker exec`.
+
+Please follow these instructions carefully to ensure proper configuration of your new node.
+"""
+
+        # print(instructions)
+        mdprint(Markdown(instructions))
