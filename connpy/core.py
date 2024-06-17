@@ -57,7 +57,7 @@ class node:
             - port     (str): Port to connect to node, default 22 for ssh and 23 
                               for telnet.  
 
-            - protocol (str): Select ssh or telnet. Default is ssh.  
+            - protocol (str): Select ssh, telnet, kubectl or docker. Default is ssh.  
 
             - user     (str): Username to of the node.  
 
@@ -326,6 +326,14 @@ class node:
         connect = self._connect(timeout = timeout)
         now = datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S')
         if connect == True:
+            # Attempt to set the terminal size
+            try:
+                self.child.setwinsize(65535, 65535)
+            except Exception:
+                try:
+                    self.child.setwinsize(10000, 10000)
+                except Exception:
+                    pass
             if "prompt" in self.tags:
                 prompt = self.tags["prompt"]
             expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
@@ -413,6 +421,14 @@ class node:
         '''
         connect = self._connect(timeout = timeout)
         if connect == True:
+            # Attempt to set the terminal size
+            try:
+                self.child.setwinsize(65535, 65535)
+            except Exception:
+                try:
+                    self.child.setwinsize(10000, 10000)
+                except Exception:
+                    pass
             if "prompt" in self.tags:
                 prompt = self.tags["prompt"]
             expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
@@ -468,47 +484,101 @@ class node:
             return connect
 
     @MethodHook
-    def _connect(self, debug = False, timeout = 10, max_attempts = 3):
-        # Method to connect to the node, it parse all the information, create the ssh/telnet command and login to the node.
+    def _generate_ssh_sftp_cmd(self):
+        cmd = self.protocol
+        if self.idletime > 0:
+            cmd += " -o ServerAliveInterval=" + str(self.idletime)
+        if self.port:
+            if self.protocol == "ssh":
+                cmd += " -p " + self.port
+            elif self.protocol == "sftp":
+                cmd += " -P " + self.port
+        if self.options:
+            cmd += " " + self.options
+        if self.jumphost:
+            cmd += " " + self.jumphost
+        user_host = f"{self.user}@{self.host}" if self.user else self.host
+        cmd += f" {user_host}"
+        return cmd
+
+    @MethodHook
+    def _generate_telnet_cmd(self):
+        cmd = f"telnet {self.host}"
+        if self.port:
+            cmd += f" {self.port}"
+        if self.options:
+            cmd += f" {self.options}"
+        return cmd
+
+    @MethodHook
+    def _generate_kube_cmd(self):
+        cmd = f"kubectl exec {self.options} {self.host} -it --"
+        kube_command = self.tags.get("kube_command", "/bin/bash") if isinstance(self.tags, dict) else "/bin/bash"
+        cmd += f" {kube_command}"
+        return cmd
+
+    @MethodHook
+    def _generate_docker_cmd(self):
+        cmd = f"docker {self.options} exec -it {self.host}"
+        docker_command = self.tags.get("docker_command", "/bin/bash") if isinstance(self.tags, dict) else "/bin/bash"
+        cmd += f" {docker_command}"
+        return cmd
+
+    @MethodHook
+    def _get_cmd(self):
         if self.protocol in ["ssh", "sftp"]:
-            cmd = self.protocol
-            if self.idletime > 0:
-                cmd = cmd + " -o ServerAliveInterval=" + str(self.idletime)
-            if self.port != '':
-                if self.protocol == "ssh":
-                    cmd = cmd + " -p " + self.port
-                elif self.protocol == "sftp":
-                    cmd = cmd + " -P " + self.port
-            if self.options != '':
-                cmd = cmd + " " + self.options
-            if self.logs != '':
-                self.logfile = self._logfile()
-            if self.jumphost != '':
-                cmd = cmd + " " + self.jumphost
-            if self.password[0] != '':
-                passwords = self._passtx(self.password)
-            else:
-                passwords = []
-            if self.user == '':
-                cmd = cmd + " {}".format(self.host)
-            else:
-                cmd = cmd + " {}".format("@".join([self.user,self.host]))
-            expects = ['yes/no', 'refused', 'supported', 'Invalid|[u|U]sage: (ssh|sftp)', 'ssh-keygen.*\"', 'timeout|timed.out', 'unavailable', 'closed', '[p|P]assword:|[u|U]sername:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching", "[b|B]ad (owner|permissions)"]
+            return self._generate_ssh_sftp_cmd()
         elif self.protocol == "telnet":
-            cmd = "telnet " + self.host
-            if self.port != '':
-                cmd = cmd + " " + self.port
-            if self.options != '':
-                cmd = cmd + " " + self.options
-            if self.logs != '':
-                self.logfile = self._logfile()
-            if self.password[0] != '':
-                passwords = self._passtx(self.password)
-            else:
-                passwords = []
-            expects = ['[u|U]sername:', 'refused', 'supported', 'invalid option', 'ssh-keygen.*\"', 'timeout|timed.out', 'unavailable', 'closed', '[p|P]assword:', r'>$|#$|\$$|>.$|#.$|\$.$', 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching", "[b|B]ad (owner|permissions)"]
+            return self._generate_telnet_cmd()
+        elif self.protocol == "kubectl":
+            return self._generate_kube_cmd()
+        elif self.protocol == "docker":
+            return self._generate_docker_cmd()
         else:
-            raise ValueError("Invalid protocol: " + self.protocol)
+            raise ValueError(f"Invalid protocol: {self.protocol}")
+
+    @MethodHook
+    def _connect(self, debug=False, timeout=10, max_attempts=3):
+        cmd = self._get_cmd()
+        passwords = self._passtx(self.password) if self.password[0] else []
+        if self.logs != '':
+            self.logfile = self._logfile()
+        default_prompt = r'>$|#$|\$$|>.$|#.$|\$.$'
+        prompt = self.tags.get("prompt", default_prompt) if isinstance(self.tags, dict) else default_prompt
+        password_prompt = '[p|P]assword:|[u|U]sername:' if self.protocol != 'telnet' else '[p|P]assword:'
+
+        expects = {
+            "ssh": ['yes/no', 'refused', 'supported', 'Invalid|[u|U]sage: ssh', 'ssh-keygen.*\"', 'timeout|timed.out', 'unavailable', 'closed', password_prompt, prompt, 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching", "[b|B]ad (owner|permissions)"],
+            "sftp": ['yes/no', 'refused', 'supported', 'Invalid|[u|U]sage: sftp', 'ssh-keygen.*\"', 'timeout|timed.out', 'unavailable', 'closed', password_prompt, prompt, 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching", "[b|B]ad (owner|permissions)"],
+            "telnet": ['[u|U]sername:', 'refused', 'supported', 'invalid|unrecognized option', 'ssh-keygen.*\"', 'timeout|timed.out', 'unavailable', 'closed', password_prompt, prompt, 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching", "[b|B]ad (owner|permissions)"],
+            "kubectl": ['[u|U]sername:', '[r|R]efused', '[E|e]rror', 'DEPRECATED', pexpect.TIMEOUT, password_prompt, prompt, pexpect.EOF, "expired|invalid"],
+            "docker": ['[u|U]sername:', 'Cannot', '[E|e]rror', 'failed', 'not a docker command', 'unknown', 'unable to resolve', pexpect.TIMEOUT, password_prompt, prompt, pexpect.EOF]
+        }
+
+        error_indices = {
+            "ssh": [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15, 16],
+            "sftp": [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15, 16],
+            "telnet": [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15, 16],
+            "kubectl": [1, 2, 3, 4, 8],  # Define error indices for kube
+            "docker": [1, 2, 3, 4, 5, 6, 7]  # Define error indices for docker
+        }
+
+        eof_indices = {
+            "ssh": [8, 9, 10, 11],
+            "sftp": [8, 9, 10, 11],
+            "telnet": [8, 9, 10, 11],
+            "kubectl": [5, 6, 7],  # Define eof indices for kube
+            "docker": [8, 9, 10]  # Define eof indices for docker
+        }
+
+        initial_indices = {
+            "ssh": [0],
+            "sftp": [0],
+            "telnet": [0],
+            "kubectl": [0],  # Define special indices for kube
+            "docker": [0]  # Define special indices for docker
+        }
+
         attempts = 1
         while attempts <= max_attempts:
             child = pexpect.spawn(cmd)
@@ -516,54 +586,55 @@ class node:
                 print(cmd)
                 self.mylog = io.BytesIO()
                 child.logfile_read = self.mylog
-            if len(passwords) > 0:
-                loops = len(passwords)
-            else:
-                loops = 1
+
             endloop = False
-            for i in range(0, loops):
+            for i in range(len(passwords) if passwords else 1):
                 while True:
-                    results = child.expect(expects, timeout=timeout)
-                    if results == 0:
+                    results = child.expect(expects[self.protocol], timeout=timeout)
+                    results_value = expects[self.protocol][results]
+                    
+                    if results in initial_indices[self.protocol]:
                         if self.protocol in ["ssh", "sftp"]:
                             child.sendline('yes')
-                        elif self.protocol == "telnet":
-                            if self.user != '':
+                        elif self.protocol in ["telnet", "kubectl"]:
+                            if self.user:
                                 child.sendline(self.user)
                             else:
                                 self.missingtext = True
                                 break
-                    if results in  [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15, 16]:
+                    
+                    elif results in error_indices[self.protocol]:
                         child.terminate()
-                        if results == 12 and attempts != max_attempts:
+                        if results_value == pexpect.TIMEOUT and attempts != max_attempts:
                             attempts += 1
                             endloop = True
                             break
                         else:
-                            if results == 12:
-                                after = "Connection timeout"
+                            after = "Connection timeout" if results == 12 else child.after.decode()
+                            return f"Connection failed code: {results}\n{child.before.decode().lstrip()}{after}{child.readline().decode()}".rstrip()
+                    
+                    elif results in eof_indices[self.protocol]:
+                        if results_value == password_prompt:
+                            if passwords:
+                                child.sendline(passwords[i])
                             else:
-                                after = child.after.decode()
-                        return ("Connection failed code:" + str(results) + "\n" + child.before.decode().lstrip() + after + child.readline().decode()).rstrip()
-                    if results == 8:
-                        if len(passwords) > 0:
-                            child.sendline(passwords[i])
+                                self.missingtext = True
+                            break
+                        elif results_value == "suspend":
+                            child.sendline("\r")
+                            sleep(2)
                         else:
-                            self.missingtext = True
-                        break
-                    if results in [9, 11]:
-                        endloop = True
-                        child.sendline()
-                        break
-                    if results == 10:
-                        child.sendline("\r")
-                        sleep(2)
+                            endloop = True
+                            child.sendline()
+                            break
+                    
                 if endloop:
                     break
-            if results == 12:
+            if results_value == pexpect.TIMEOUT:
                 continue
             else:
                 break
+
         child.readline(0)
         self.child = child
         return True
