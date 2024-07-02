@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from connpy import configfile, node, nodes, hooks
 from connpy.ai import ai as myai
 from waitress import serve
@@ -6,6 +7,7 @@ import os
 import signal
 
 app = Flask(__name__)
+CORS(app)
 conf = configfile()
 
 PID_FILE1 = "/run/connpy.pid"

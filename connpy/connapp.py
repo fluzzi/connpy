@@ -8,7 +8,7 @@ import sys
 import inquirer
 from .core import node,nodes
 from ._version import __version__
-from .api import start_api,stop_api,debug_api
+from .api import start_api,stop_api,debug_api,app
 from .ai import ai
 from .plugins import Plugins
 import yaml
@@ -42,6 +42,7 @@ class connapp:
                             the config file.
 
         '''
+        self.app = app
         self.node = node
         self.nodes = nodes
         self.start_api = start_api
