@@ -610,7 +610,7 @@ class node:
                             endloop = True
                             break
                         else:
-                            after = "Connection timeout" if results == 12 else child.after.decode()
+                            after = "Connection timeout" if results_value == pexpect.TIMEOUT else child.after.decode()
                             return f"Connection failed code: {results}\n{child.before.decode().lstrip()}{after}{child.readline().decode()}".rstrip()
                     
                     elif results in eof_indices[self.protocol]:
