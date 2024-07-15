@@ -130,3 +130,6 @@ dmypy.json
 
 #clients
 *sync_client*
+
+#App
+connpy-completion-helper
