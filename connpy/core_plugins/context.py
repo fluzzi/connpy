@@ -41,6 +41,9 @@ class context_manager:
         elif context not in self.contexts:
             print(f"Context {context} doesn't exist.")
             exit(4)
+        if context == self.current_context:
+            print(f"Can't delete current context: {self.current_context}")
+            exit(5)
         else:
             self.contexts.pop(context)
             self.connapp._change_settings("contexts", self.contexts)
@@ -152,3 +155,26 @@ class Entrypoint:
             cm.set_context(args.context_name)
         elif args.show:
             cm.show_context(args.context_name)
+
+def _connpy_completion(wordsnumber, words, info=None):
+    if wordsnumber == 3:
+        result = ["--help", "--add", "--del", "--rm", "--ls", "--set", "--show", "--edit", "--mod"]
+    elif wordsnumber == 4 and words[1] in ["--del", "-r", "--rm", "--set", "--edit", "--mod", "-e", "--show", "-s"]:
+        contexts = info["config"]["config"]["contexts"].keys()
+        current_context = info["config"]["config"]["current_context"]
+        default_context = "all"
+        
+        if words[1] in ["--del", "-r", "--rm"]:
+            # Filter out default context and current context
+            result = [context for context in contexts if context not in [default_context, current_context]]
+        elif words[1] == "--set":
+            # Filter out current context
+            result = [context for context in contexts if context != current_context]
+        elif words[1] in ["--edit", "--mod", "-e"]:
+            # Filter out default context
+            result = [context for context in contexts if context != default_context]
+        elif words[1] in ["--show", "-s"]:
+            # No filter for show
+            result = list(contexts)
+    
+    return result

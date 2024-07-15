@@ -23,30 +23,33 @@
 </header>
 <section id="section-intro">
 <h2 id="connection-manager">Connection manager</h2>
-<p>Connpy is a connection manager that allows you to store nodes to connect them fast and password free.</p>
+<p>Connpy is a SSH, SFTP, Telnet, kubectl, and Docker pod connection manager and automation module for Linux, Mac, and Docker.</p>
 <h3 id="features">Features</h3>
-<pre><code>- You can generate profiles and reference them from nodes using @profilename so you dont
-  need to edit multiple nodes when changing password or other information.
-- Nodes can be stored on @folder or @subfolder@folder to organize your devices. Then can 
-  be referenced using node@subfolder@folder or node@folder
-- If you have too many nodes. Get completion script using: conn config --completion.
-  Or use fzf installing pyfzf and running conn config --fzf true
-- Create in bulk, copy, move, export and import nodes for easy management.
-- Run automation scripts in network devices.
-- use GPT AI to help you manage your devices.
+<pre><code>- Manage connections using SSH, SFTP, Telnet, kubectl, and Docker exec.
+- Set contexts to manage specific nodes from specific contexts (work/home/clients/etc).
+- You can generate profiles and reference them from nodes using @profilename so you don't
+  need to edit multiple nodes when changing passwords or other information.
+- Nodes can be stored on @folder or @subfolder@folder to organize your devices. They can
+  be referenced using node@subfolder@folder or node@folder.
+- If you have too many nodes, get a completion script using: conn config --completion.
+  Or use fzf by installing pyfzf and running conn config --fzf true.
+- Create in bulk, copy, move, export, and import nodes for easy management.
+- Run automation scripts on network devices.
+- Use GPT AI to help you manage your devices.
 - Add plugins with your own scripts.
 - Much more!
 </code></pre>
 <h3 id="usage">Usage</h3>
 <pre><code>usage: conn [-h] [--add | --del | --mod | --show | --debug] [node|folder] [--sftp]
-       conn {profile,move,mv,copy,cp,list,ls,bulk,export,import,ai,run,api,plugin,config} ...
+       conn {profile,move,mv,copy,cp,list,ls,bulk,export,import,ai,run,api,plugin,config,sync,context} ...
 
 positional arguments:
-  node|folder    node[@subfolder][@folder]
-                 Connect to specific node or show all matching nodes
-                 [@subfolder][@folder]
-                 Show all available connections globaly or in specified path
-Options:
+  node|folder        node[@subfolder][@folder]
+                     Connect to specific node or show all matching nodes
+                     [@subfolder][@folder]
+                     Show all available connections globally or in specified path
+
+options:
   -h, --help         show this help message and exit
   -v, --version      Show version
   -a, --add          Add new node[@subfolder][@folder] or [@subfolder]@folder
@@ -70,6 +73,7 @@ Commands:
   plugin          Manage plugins
   config          Manage app config
   sync            Sync config with Google
+  context         Manage contexts with regex matching
 </code></pre>
 <h3 id="manage-profiles">Manage profiles</h3>
 <pre><code>usage: conn profile [-h] (--add | --del | --mod | --show) profile
@@ -86,14 +90,26 @@ options:
 
 </code></pre>
 <h3 id="examples">Examples</h3>
-<pre><code>   conn profile --add office-user
+<pre><code>   #Add new profile
+   conn profile --add office-user
+   #Add new folder
    conn --add @office
+   #Add new subfolder
    conn --add @datacenter@office
+   #Add node to subfolder
    conn --add server@datacenter@office
+   #Add node to folder
    conn --add pc@office
+   #Show node information
    conn --show server@datacenter@office
+   #Connect to nodes
    conn pc@office
    conn server
+   #Create and set new context
+   conn context -a office .*@office
+   conn context --set office
+   #Run a command in a node
+   conn run server ls -la
 </code></pre>
 <h2 id="plugin-requirements-for-connpy">Plugin Requirements for Connpy</h2>
 <h3 id="general-structure">General Structure</h3>
@@ -416,32 +432,35 @@ print(result)
 &#39;&#39;&#39;
 ## Connection manager
 
-Connpy is a connection manager that allows you to store nodes to connect them fast and password free.
+Connpy is a SSH, SFTP, Telnet, kubectl, and Docker pod connection manager and automation module for Linux, Mac, and Docker.
 
 ### Features
-    - You can generate profiles and reference them from nodes using @profilename so you dont
-      need to edit multiple nodes when changing password or other information.
-    - Nodes can be stored on @folder or @subfolder@folder to organize your devices. Then can 
-      be referenced using node@subfolder@folder or node@folder
-    - If you have too many nodes. Get completion script using: conn config --completion.
-      Or use fzf installing pyfzf and running conn config --fzf true
-    - Create in bulk, copy, move, export and import nodes for easy management.
-    - Run automation scripts in network devices.
-    - use GPT AI to help you manage your devices.
+    - Manage connections using SSH, SFTP, Telnet, kubectl, and Docker exec.
+    - Set contexts to manage specific nodes from specific contexts (work/home/clients/etc).
+    - You can generate profiles and reference them from nodes using @profilename so you don&#39;t
+      need to edit multiple nodes when changing passwords or other information.
+    - Nodes can be stored on @folder or @subfolder@folder to organize your devices. They can
+      be referenced using node@subfolder@folder or node@folder.
+    - If you have too many nodes, get a completion script using: conn config --completion.
+      Or use fzf by installing pyfzf and running conn config --fzf true.
+    - Create in bulk, copy, move, export, and import nodes for easy management.
+    - Run automation scripts on network devices.
+    - Use GPT AI to help you manage your devices.
     - Add plugins with your own scripts.
     - Much more!
 
 ### Usage
 ```
 usage: conn [-h] [--add | --del | --mod | --show | --debug] [node|folder] [--sftp]
-       conn {profile,move,mv,copy,cp,list,ls,bulk,export,import,ai,run,api,plugin,config} ...
+       conn {profile,move,mv,copy,cp,list,ls,bulk,export,import,ai,run,api,plugin,config,sync,context} ...
 
 positional arguments:
-  node|folder    node[@subfolder][@folder]
-                 Connect to specific node or show all matching nodes
-                 [@subfolder][@folder]
-                 Show all available connections globaly or in specified path
-Options:
+  node|folder        node[@subfolder][@folder]
+                     Connect to specific node or show all matching nodes
+                     [@subfolder][@folder]
+                     Show all available connections globally or in specified path
+
+options:
   -h, --help         show this help message and exit
   -v, --version      Show version
   -a, --add          Add new node[@subfolder][@folder] or [@subfolder]@folder
@@ -465,6 +484,7 @@ Commands:
   plugin          Manage plugins
   config          Manage app config
   sync            Sync config with Google
+  context         Manage contexts with regex matching
 ```
 
 ###   Manage profiles
@@ -485,14 +505,26 @@ options:
 
 ###   Examples
 ```
+   #Add new profile
    conn profile --add office-user
+   #Add new folder
    conn --add @office
+   #Add new subfolder
    conn --add @datacenter@office
+   #Add node to subfolder
    conn --add server@datacenter@office
+   #Add node to folder
    conn --add pc@office
+   #Show node information
    conn --show server@datacenter@office
+   #Connect to nodes
    conn pc@office
    conn server
+   #Create and set new context
+   conn context -a office .*@office
+   conn context --set office
+   #Run a command in a node
+   conn run server ls -la
 ``` 
 ## Plugin Requirements for Connpy
 ### General Structure
@@ -2497,7 +2529,7 @@ def getitems(self, uniques):
 - port     (str): Port to connect to node, default 22 for ssh and 23 
                   for telnet.
 
-- protocol (str): Select ssh or telnet. Default is ssh.
+- protocol (str): Select ssh, telnet, kubectl or docker. Default is ssh.
 
 - user     (str): Username to of the node.
 
@@ -2555,7 +2587,7 @@ class node:
             - port     (str): Port to connect to node, default 22 for ssh and 23 
                               for telnet.  
 
-            - protocol (str): Select ssh or telnet. Default is ssh.  
+            - protocol (str): Select ssh, telnet, kubectl or docker. Default is ssh.  
 
             - user     (str): Username to of the node.  
 
@@ -2824,6 +2856,14 @@ class node:
         connect = self._connect(timeout = timeout)
         now = datetime.datetime.now().strftime(&#39;%Y-%m-%d_%H%M%S&#39;)
         if connect == True:
+            # Attempt to set the terminal size
+            try:
+                self.child.setwinsize(65535, 65535)
+            except Exception:
+                try:
+                    self.child.setwinsize(10000, 10000)
+                except Exception:
+                    pass
             if &#34;prompt&#34; in self.tags:
                 prompt = self.tags[&#34;prompt&#34;]
             expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
@@ -2911,6 +2951,14 @@ class node:
         &#39;&#39;&#39;
         connect = self._connect(timeout = timeout)
         if connect == True:
+            # Attempt to set the terminal size
+            try:
+                self.child.setwinsize(65535, 65535)
+            except Exception:
+                try:
+                    self.child.setwinsize(10000, 10000)
+                except Exception:
+                    pass
             if &#34;prompt&#34; in self.tags:
                 prompt = self.tags[&#34;prompt&#34;]
             expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
@@ -2966,47 +3014,101 @@ class node:
             return connect
 
     @MethodHook
-    def _connect(self, debug = False, timeout = 10, max_attempts = 3):
-        # Method to connect to the node, it parse all the information, create the ssh/telnet command and login to the node.
+    def _generate_ssh_sftp_cmd(self):
+        cmd = self.protocol
+        if self.idletime &gt; 0:
+            cmd += &#34; -o ServerAliveInterval=&#34; + str(self.idletime)
+        if self.port:
+            if self.protocol == &#34;ssh&#34;:
+                cmd += &#34; -p &#34; + self.port
+            elif self.protocol == &#34;sftp&#34;:
+                cmd += &#34; -P &#34; + self.port
+        if self.options:
+            cmd += &#34; &#34; + self.options
+        if self.jumphost:
+            cmd += &#34; &#34; + self.jumphost
+        user_host = f&#34;{self.user}@{self.host}&#34; if self.user else self.host
+        cmd += f&#34; {user_host}&#34;
+        return cmd
+
+    @MethodHook
+    def _generate_telnet_cmd(self):
+        cmd = f&#34;telnet {self.host}&#34;
+        if self.port:
+            cmd += f&#34; {self.port}&#34;
+        if self.options:
+            cmd += f&#34; {self.options}&#34;
+        return cmd
+
+    @MethodHook
+    def _generate_kube_cmd(self):
+        cmd = f&#34;kubectl exec {self.options} {self.host} -it --&#34;
+        kube_command = self.tags.get(&#34;kube_command&#34;, &#34;/bin/bash&#34;) if isinstance(self.tags, dict) else &#34;/bin/bash&#34;
+        cmd += f&#34; {kube_command}&#34;
+        return cmd
+
+    @MethodHook
+    def _generate_docker_cmd(self):
+        cmd = f&#34;docker {self.options} exec -it {self.host}&#34;
+        docker_command = self.tags.get(&#34;docker_command&#34;, &#34;/bin/bash&#34;) if isinstance(self.tags, dict) else &#34;/bin/bash&#34;
+        cmd += f&#34; {docker_command}&#34;
+        return cmd
+
+    @MethodHook
+    def _get_cmd(self):
         if self.protocol in [&#34;ssh&#34;, &#34;sftp&#34;]:
-            cmd = self.protocol
-            if self.idletime &gt; 0:
-                cmd = cmd + &#34; -o ServerAliveInterval=&#34; + str(self.idletime)
-            if self.port != &#39;&#39;:
-                if self.protocol == &#34;ssh&#34;:
-                    cmd = cmd + &#34; -p &#34; + self.port
-                elif self.protocol == &#34;sftp&#34;:
-                    cmd = cmd + &#34; -P &#34; + self.port
-            if self.options != &#39;&#39;:
-                cmd = cmd + &#34; &#34; + self.options
-            if self.logs != &#39;&#39;:
-                self.logfile = self._logfile()
-            if self.jumphost != &#39;&#39;:
-                cmd = cmd + &#34; &#34; + self.jumphost
-            if self.password[0] != &#39;&#39;:
-                passwords = self._passtx(self.password)
-            else:
-                passwords = []
-            if self.user == &#39;&#39;:
-                cmd = cmd + &#34; {}&#34;.format(self.host)
-            else:
-                cmd = cmd + &#34; {}&#34;.format(&#34;@&#34;.join([self.user,self.host]))
-            expects = [&#39;yes/no&#39;, &#39;refused&#39;, &#39;supported&#39;, &#39;Invalid|[u|U]sage: (ssh|sftp)&#39;, &#39;ssh-keygen.*\&#34;&#39;, &#39;timeout|timed.out&#39;, &#39;unavailable&#39;, &#39;closed&#39;, &#39;[p|P]assword:|[u|U]sername:&#39;, r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, &#39;suspend&#39;, pexpect.EOF, pexpect.TIMEOUT, &#34;No route to host&#34;, &#34;resolve hostname&#34;, &#34;no matching&#34;, &#34;[b|B]ad (owner|permissions)&#34;]
+            return self._generate_ssh_sftp_cmd()
         elif self.protocol == &#34;telnet&#34;:
-            cmd = &#34;telnet &#34; + self.host
-            if self.port != &#39;&#39;:
-                cmd = cmd + &#34; &#34; + self.port
-            if self.options != &#39;&#39;:
-                cmd = cmd + &#34; &#34; + self.options
-            if self.logs != &#39;&#39;:
-                self.logfile = self._logfile()
-            if self.password[0] != &#39;&#39;:
-                passwords = self._passtx(self.password)
-            else:
-                passwords = []
-            expects = [&#39;[u|U]sername:&#39;, &#39;refused&#39;, &#39;supported&#39;, &#39;invalid option&#39;, &#39;ssh-keygen.*\&#34;&#39;, &#39;timeout|timed.out&#39;, &#39;unavailable&#39;, &#39;closed&#39;, &#39;[p|P]assword:&#39;, r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, &#39;suspend&#39;, pexpect.EOF, pexpect.TIMEOUT, &#34;No route to host&#34;, &#34;resolve hostname&#34;, &#34;no matching&#34;, &#34;[b|B]ad (owner|permissions)&#34;]
+            return self._generate_telnet_cmd()
+        elif self.protocol == &#34;kubectl&#34;:
+            return self._generate_kube_cmd()
+        elif self.protocol == &#34;docker&#34;:
+            return self._generate_docker_cmd()
         else:
-            raise ValueError(&#34;Invalid protocol: &#34; + self.protocol)
+            raise ValueError(f&#34;Invalid protocol: {self.protocol}&#34;)
+
+    @MethodHook
+    def _connect(self, debug=False, timeout=10, max_attempts=3):
+        cmd = self._get_cmd()
+        passwords = self._passtx(self.password) if self.password[0] else []
+        if self.logs != &#39;&#39;:
+            self.logfile = self._logfile()
+        default_prompt = r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;
+        prompt = self.tags.get(&#34;prompt&#34;, default_prompt) if isinstance(self.tags, dict) else default_prompt
+        password_prompt = &#39;[p|P]assword:|[u|U]sername:&#39; if self.protocol != &#39;telnet&#39; else &#39;[p|P]assword:&#39;
+
+        expects = {
+            &#34;ssh&#34;: [&#39;yes/no&#39;, &#39;refused&#39;, &#39;supported&#39;, &#39;Invalid|[u|U]sage: ssh&#39;, &#39;ssh-keygen.*\&#34;&#39;, &#39;timeout|timed.out&#39;, &#39;unavailable&#39;, &#39;closed&#39;, password_prompt, prompt, &#39;suspend&#39;, pexpect.EOF, pexpect.TIMEOUT, &#34;No route to host&#34;, &#34;resolve hostname&#34;, &#34;no matching&#34;, &#34;[b|B]ad (owner|permissions)&#34;],
+            &#34;sftp&#34;: [&#39;yes/no&#39;, &#39;refused&#39;, &#39;supported&#39;, &#39;Invalid|[u|U]sage: sftp&#39;, &#39;ssh-keygen.*\&#34;&#39;, &#39;timeout|timed.out&#39;, &#39;unavailable&#39;, &#39;closed&#39;, password_prompt, prompt, &#39;suspend&#39;, pexpect.EOF, pexpect.TIMEOUT, &#34;No route to host&#34;, &#34;resolve hostname&#34;, &#34;no matching&#34;, &#34;[b|B]ad (owner|permissions)&#34;],
+            &#34;telnet&#34;: [&#39;[u|U]sername:&#39;, &#39;refused&#39;, &#39;supported&#39;, &#39;invalid|unrecognized option&#39;, &#39;ssh-keygen.*\&#34;&#39;, &#39;timeout|timed.out&#39;, &#39;unavailable&#39;, &#39;closed&#39;, password_prompt, prompt, &#39;suspend&#39;, pexpect.EOF, pexpect.TIMEOUT, &#34;No route to host&#34;, &#34;resolve hostname&#34;, &#34;no matching&#34;, &#34;[b|B]ad (owner|permissions)&#34;],
+            &#34;kubectl&#34;: [&#39;[u|U]sername:&#39;, &#39;[r|R]efused&#39;, &#39;[E|e]rror&#39;, &#39;DEPRECATED&#39;, pexpect.TIMEOUT, password_prompt, prompt, pexpect.EOF, &#34;expired|invalid&#34;],
+            &#34;docker&#34;: [&#39;[u|U]sername:&#39;, &#39;Cannot&#39;, &#39;[E|e]rror&#39;, &#39;failed&#39;, &#39;not a docker command&#39;, &#39;unknown&#39;, &#39;unable to resolve&#39;, pexpect.TIMEOUT, password_prompt, prompt, pexpect.EOF]
+        }
+
+        error_indices = {
+            &#34;ssh&#34;: [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15, 16],
+            &#34;sftp&#34;: [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15, 16],
+            &#34;telnet&#34;: [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15, 16],
+            &#34;kubectl&#34;: [1, 2, 3, 4, 8],  # Define error indices for kube
+            &#34;docker&#34;: [1, 2, 3, 4, 5, 6, 7]  # Define error indices for docker
+        }
+
+        eof_indices = {
+            &#34;ssh&#34;: [8, 9, 10, 11],
+            &#34;sftp&#34;: [8, 9, 10, 11],
+            &#34;telnet&#34;: [8, 9, 10, 11],
+            &#34;kubectl&#34;: [5, 6, 7],  # Define eof indices for kube
+            &#34;docker&#34;: [8, 9, 10]  # Define eof indices for docker
+        }
+
+        initial_indices = {
+            &#34;ssh&#34;: [0],
+            &#34;sftp&#34;: [0],
+            &#34;telnet&#34;: [0],
+            &#34;kubectl&#34;: [0],  # Define special indices for kube
+            &#34;docker&#34;: [0]  # Define special indices for docker
+        }
+
         attempts = 1
         while attempts &lt;= max_attempts:
             child = pexpect.spawn(cmd)
@@ -3014,54 +3116,55 @@ class node:
                 print(cmd)
                 self.mylog = io.BytesIO()
                 child.logfile_read = self.mylog
-            if len(passwords) &gt; 0:
-                loops = len(passwords)
-            else:
-                loops = 1
+
             endloop = False
-            for i in range(0, loops):
+            for i in range(len(passwords) if passwords else 1):
                 while True:
-                    results = child.expect(expects, timeout=timeout)
-                    if results == 0:
+                    results = child.expect(expects[self.protocol], timeout=timeout)
+                    results_value = expects[self.protocol][results]
+                    
+                    if results in initial_indices[self.protocol]:
                         if self.protocol in [&#34;ssh&#34;, &#34;sftp&#34;]:
                             child.sendline(&#39;yes&#39;)
-                        elif self.protocol == &#34;telnet&#34;:
-                            if self.user != &#39;&#39;:
+                        elif self.protocol in [&#34;telnet&#34;, &#34;kubectl&#34;]:
+                            if self.user:
                                 child.sendline(self.user)
                             else:
                                 self.missingtext = True
                                 break
-                    if results in  [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15, 16]:
+                    
+                    elif results in error_indices[self.protocol]:
                         child.terminate()
-                        if results == 12 and attempts != max_attempts:
+                        if results_value == pexpect.TIMEOUT and attempts != max_attempts:
                             attempts += 1
                             endloop = True
                             break
                         else:
-                            if results == 12:
-                                after = &#34;Connection timeout&#34;
+                            after = &#34;Connection timeout&#34; if results_value == pexpect.TIMEOUT else child.after.decode()
+                            return f&#34;Connection failed code: {results}\n{child.before.decode().lstrip()}{after}{child.readline().decode()}&#34;.rstrip()
+                    
+                    elif results in eof_indices[self.protocol]:
+                        if results_value == password_prompt:
+                            if passwords:
+                                child.sendline(passwords[i])
                             else:
-                                after = child.after.decode()
-                        return (&#34;Connection failed code:&#34; + str(results) + &#34;\n&#34; + child.before.decode().lstrip() + after + child.readline().decode()).rstrip()
-                    if results == 8:
-                        if len(passwords) &gt; 0:
-                            child.sendline(passwords[i])
+                                self.missingtext = True
+                            break
+                        elif results_value == &#34;suspend&#34;:
+                            child.sendline(&#34;\r&#34;)
+                            sleep(2)
                         else:
-                            self.missingtext = True
-                        break
-                    if results in [9, 11]:
-                        endloop = True
-                        child.sendline()
-                        break
-                    if results == 10:
-                        child.sendline(&#34;\r&#34;)
-                        sleep(2)
+                            endloop = True
+                            child.sendline()
+                            break
+                    
                 if endloop:
                     break
-            if results == 12:
+            if results_value == pexpect.TIMEOUT:
                 continue
             else:
                 break
+
         child.readline(0)
         self.child = child
         return True</code></pre>
@@ -3208,6 +3311,14 @@ def run(self, commands, vars = None,*, folder = &#39;&#39;, prompt = r&#39;&gt;$
     connect = self._connect(timeout = timeout)
     now = datetime.datetime.now().strftime(&#39;%Y-%m-%d_%H%M%S&#39;)
     if connect == True:
+        # Attempt to set the terminal size
+        try:
+            self.child.setwinsize(65535, 65535)
+        except Exception:
+            try:
+                self.child.setwinsize(10000, 10000)
+            except Exception:
+                pass
         if &#34;prompt&#34; in self.tags:
             prompt = self.tags[&#34;prompt&#34;]
         expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
@@ -3336,6 +3447,14 @@ def test(self, commands, expected, vars = None,*, prompt = r&#39;&gt;$|#$|\$$|&g
     &#39;&#39;&#39;
     connect = self._connect(timeout = timeout)
     if connect == True:
+        # Attempt to set the terminal size
+        try:
+            self.child.setwinsize(65535, 65535)
+        except Exception:
+            try:
+                self.child.setwinsize(10000, 10000)
+            except Exception:
+                pass
         if &#34;prompt&#34; in self.tags:
             prompt = self.tags[&#34;prompt&#34;]
         expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]

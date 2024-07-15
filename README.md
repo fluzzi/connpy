@@ -9,7 +9,8 @@
 [![](https://img.shields.io/pypi/l/connpy.svg?style=flat-square)](https://github.com/fluzzi/connpy/blob/main/LICENSE)
 [![](https://img.shields.io/pypi/dm/connpy.svg?style=flat-square)](https://pypi.org/pypi/connpy/)
 
-Connpy is a ssh and telnet connection manager and automation module for Linux, Mac and Docker
+Connpy is a SSH, SFTP, Telnet, kubectl, and Docker pod connection manager and automation module for Linux, Mac, and Docker.
+
 
 ## Installation
 
@@ -43,33 +44,34 @@ Connpy integrates with Google services for backup purposes:
 
 For more detailed information, please read our [Privacy Policy](https://connpy.gederico.dynu.net/fluzzi32/connpy/src/branch/main/PRIVATE_POLICY.md).
 
+
 ### Features
-    - You can generate profiles and reference them from nodes using @profilename so you dont
-      need to edit multiple nodes when changing password or other information.
-    - Nodes can be stored on @folder or @subfolder@folder to organize your devices. Then can 
-      be referenced using node@subfolder@folder or node@folder
-    - If you have too many nodes. Get completion script using: conn config --completion.
-      Or use fzf installing pyfzf and running conn config --fzf true
-    - Create in bulk, copy, move, export and import nodes for easy management.
-    - Run automation scripts in network devices.
-    - use GPT AI to help you manage your devices.
+    - Manage connections using SSH, SFTP, Telnet, kubectl, and Docker exec.
+    - Set contexts to manage specific nodes from specific contexts (work/home/clients/etc).
+    - You can generate profiles and reference them from nodes using @profilename so you don't
+      need to edit multiple nodes when changing passwords or other information.
+    - Nodes can be stored on @folder or @subfolder@folder to organize your devices. They can
+      be referenced using node@subfolder@folder or node@folder.
+    - If you have too many nodes, get a completion script using: conn config --completion.
+      Or use fzf by installing pyfzf and running conn config --fzf true.
+    - Create in bulk, copy, move, export, and import nodes for easy management.
+    - Run automation scripts on network devices.
+    - Use GPT AI to help you manage your devices.
     - Add plugins with your own scripts.
     - Much more!
 
 ### Usage:
 ```
 usage: conn [-h] [--add | --del | --mod | --show | --debug] [node|folder] [--sftp]
-       conn {profile,move,mv,copy,cp,list,ls,bulk,export,import,ai,run,api,plugin,config} ...
+       conn {profile,move,mv,copy,cp,list,ls,bulk,export,import,ai,run,api,plugin,config,sync,context} ...
 
 positional arguments:
-  node|folder    node[@subfolder][@folder]
-                 Connect to specific node or show all matching nodes
-                 [@subfolder][@folder]
-                 Show all available connections globaly or in specified path
-```
+  node|folder        node[@subfolder][@folder]
+                     Connect to specific node or show all matching nodes
+                     [@subfolder][@folder]
+                     Show all available connections globally or in specified path
 
-### Options:
-```
+options:
   -h, --help         show this help message and exit
   -v, --version      Show version
   -a, --add          Add new node[@subfolder][@folder] or [@subfolder]@folder
@@ -78,10 +80,8 @@ positional arguments:
   -s, --show         Show node[@subfolder][@folder]
   -d, --debug        Display all conections steps
   -t, --sftp         Connects using sftp instead of ssh
-```
 
-### Commands:
-```
+Commands:
   profile         Manage profiles
   move(mv)        Move node
   copy(cp)        Copy node
@@ -95,6 +95,7 @@ positional arguments:
   plugin          Manage plugins
   config          Manage app config
   sync            Sync config with Google
+  context         Manage contexts with regex matching
 ```
 
 ### Manage profiles:
@@ -115,14 +116,26 @@ options:
 
 ### Examples:
 ```
+   #Add new profile
    conn profile --add office-user
+   #Add new folder
    conn --add @office
+   #Add new subfolder
    conn --add @datacenter@office
+   #Add node to subfolder
    conn --add server@datacenter@office
+   #Add node to folder
    conn --add pc@office
+   #Show node information
    conn --show server@datacenter@office
+   #Connect to nodes
    conn pc@office
    conn server
+   #Create and set new context
+   conn context -a office .*@office
+   conn context --set office
+   #Run a command in a node
+   conn run server ls -la
 ``` 
 ## Plugin Requirements for Connpy
 
