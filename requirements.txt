@@ -1,10 +1,11 @@
 Flask>=2.3.2
+Flask_Cors>=4.0.1
 google_api_python_client>=2.125.0
 google_auth_oauthlib>=1.2.0
-inquirer>=3.2.4
+inquirer>=3.3.0
 openai>=0.27.8
 pexpect>=4.8.0
-protobuf>=5.26.1
+protobuf>=5.27.2
 pycryptodome>=3.18.0
 pyfzf>=0.3.1
 PyYAML>=6.0.1
