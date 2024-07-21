@@ -14,7 +14,7 @@ class ai:
 
     ### Attributes:  
 
-        - model        (str): Model of GPT api to use. Default is gpt-3.5-turbo.
+        - model        (str): Model of GPT api to use. Default is gpt-4o-mini.
 
         - temp       (float): Value between 0 and 1 that control the randomness 
                               of generated text, with higher values increasing 
@@ -39,7 +39,7 @@ class ai:
             - api_key (str): A unique authentication token required to access 
                              and interact with the API.
 
-            - model   (str): Model of GPT api to use. Default is gpt-3.5-turbo. 
+            - model   (str): Model of GPT api to use. Default is gpt-4o-mini. 
 
             - temp  (float): Value between 0 and 1 that control the randomness 
                              of generated text, with higher values increasing 
@@ -68,7 +68,7 @@ class ai:
             try:
                 self.model = self.config.config["openai"]["model"]
             except:
-                self.model = "gpt-3.5-turbo"
+                self.model = "gpt-4o-mini"
         self.temp = temp
         self.__prompt = {}
         self.__prompt["original_system"] = """
@@ -128,7 +128,7 @@ Categorize the user's request based on the operation they want to perform on the
         self.__prompt["original_function"]["parameters"]["required"] = ["type", "filter"]
         self.__prompt["command_system"] = """
         For each OS listed below, provide the command(s) needed to perform the specified action, depending on the device OS (e.g., Cisco IOSXR router, Linux server).
-        The application knows how to connect to devices via SSH, so you only need to provide the command(s) to run after connecting. 
+        The application knows how to connect to devices via SSH, so you only need to provide the command(s) to run after connecting. This includes access configuration mode and commiting if required.
         If the commands needed are not for the specific OS type, just send an empty list (e.g., []). 
         Note: Preserving the integrity of user-provided commands is of utmost importance. If a user has provided a specific command to run, include that command exactly as it was given, even if it's not recognized or understood. Under no circumstances should you modify or alter user-provided commands.
     """
@@ -143,7 +143,7 @@ Categorize the user's request based on the operation they want to perform on the
         self.__prompt["command_function"]["name"] = "get_commands"
         self.__prompt["command_function"]["descriptions"] = """ 
         For each OS listed below, provide the command(s) needed to perform the specified action, depending on the device OS (e.g., Cisco IOSXR router, Linux server).
-        The application knows how to connect to devices via SSH, so you only need to provide the command(s) to run after connecting. 
+        The application knows how to connect to devices via SSH, so you only need to provide the command(s) to run after connecting. This includes access configuration mode and commiting if required.
         If the commands needed are not for the specific OS type, just send an empty list (e.g., []). 
     """
         self.__prompt["command_function"]["parameters"] = {}
@@ -196,7 +196,7 @@ Categorize the user's request based on the operation they want to perform on the
 
     @MethodHook
     def _clean_command_response(self, raw_response, node_list):
-        #Parse response for command request to openAI GPT.
+        # Parse response for command request to openAI GPT.
         info_dict = {}
         info_dict["commands"] = []
         info_dict["variables"] = {}
@@ -204,13 +204,23 @@ Categorize the user's request based on the operation they want to perform on the
         for key, value in node_list.items():
             newvalue = {}
             commands = raw_response[value]
-            for i,e in enumerate(commands, start=1):
-                newvalue[f"command{i}"] = e
+            # Ensure commands is a list
+            if isinstance(commands, str):
+                commands = [commands]
+            # Determine the number of digits required for zero-padding
+            num_commands = len(commands)
+            num_digits = len(str(num_commands))
+
+            for i, e in enumerate(commands, start=1):
+                # Zero-pad the command number
+                command_num = f"command{str(i).zfill(num_digits)}"
+                newvalue[command_num] = e
                 if f"{{command{i}}}" not in info_dict["commands"]:
-                    info_dict["commands"].append(f"{{command{i}}}")
-                    info_dict["variables"]["__global__"][f"command{i}"] = ""
+                    info_dict["commands"].append(f"{{{command_num}}}")
+                    info_dict["variables"]["__global__"][command_num] = ""
                 info_dict["variables"][key] = newvalue
         return info_dict
+
 
     @MethodHook
     def _get_commands(self, user_input, nodes):

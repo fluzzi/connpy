@@ -1160,7 +1160,7 @@ indicating successful verification.</p>
 <dd>
 <div class="desc"><p>This class generates a ai object. Containts all the information and methods to make requests to openAI chatGPT to run actions on the application.</p>
 <h3 id="attributes">Attributes:</h3>
-<pre><code>- model        (str): Model of GPT api to use. Default is gpt-3.5-turbo.
+<pre><code>- model        (str): Model of GPT api to use. Default is gpt-4o-mini.
 
 - temp       (float): Value between 0 and 1 that control the randomness 
                       of generated text, with higher values increasing 
@@ -1178,7 +1178,7 @@ indicating successful verification.</p>
 - api_key (str): A unique authentication token required to access 
                  and interact with the API.
 
-- model   (str): Model of GPT api to use. Default is gpt-3.5-turbo.
+- model   (str): Model of GPT api to use. Default is gpt-4o-mini.
 
 - temp  (float): Value between 0 and 1 that control the randomness 
                  of generated text, with higher values increasing 
@@ -1194,7 +1194,7 @@ class ai:
 
     ### Attributes:  
 
-        - model        (str): Model of GPT api to use. Default is gpt-3.5-turbo.
+        - model        (str): Model of GPT api to use. Default is gpt-4o-mini.
 
         - temp       (float): Value between 0 and 1 that control the randomness 
                               of generated text, with higher values increasing 
@@ -1219,7 +1219,7 @@ class ai:
             - api_key (str): A unique authentication token required to access 
                              and interact with the API.
 
-            - model   (str): Model of GPT api to use. Default is gpt-3.5-turbo. 
+            - model   (str): Model of GPT api to use. Default is gpt-4o-mini. 
 
             - temp  (float): Value between 0 and 1 that control the randomness 
                              of generated text, with higher values increasing 
@@ -1248,7 +1248,7 @@ class ai:
             try:
                 self.model = self.config.config[&#34;openai&#34;][&#34;model&#34;]
             except:
-                self.model = &#34;gpt-3.5-turbo&#34;
+                self.model = &#34;gpt-4o-mini&#34;
         self.temp = temp
         self.__prompt = {}
         self.__prompt[&#34;original_system&#34;] = &#34;&#34;&#34;
@@ -1308,7 +1308,7 @@ Categorize the user&#39;s request based on the operation they want to perform on
         self.__prompt[&#34;original_function&#34;][&#34;parameters&#34;][&#34;required&#34;] = [&#34;type&#34;, &#34;filter&#34;]
         self.__prompt[&#34;command_system&#34;] = &#34;&#34;&#34;
         For each OS listed below, provide the command(s) needed to perform the specified action, depending on the device OS (e.g., Cisco IOSXR router, Linux server).
-        The application knows how to connect to devices via SSH, so you only need to provide the command(s) to run after connecting. 
+        The application knows how to connect to devices via SSH, so you only need to provide the command(s) to run after connecting. This includes access configuration mode and commiting if required.
         If the commands needed are not for the specific OS type, just send an empty list (e.g., []). 
         Note: Preserving the integrity of user-provided commands is of utmost importance. If a user has provided a specific command to run, include that command exactly as it was given, even if it&#39;s not recognized or understood. Under no circumstances should you modify or alter user-provided commands.
     &#34;&#34;&#34;
@@ -1323,7 +1323,7 @@ Categorize the user&#39;s request based on the operation they want to perform on
         self.__prompt[&#34;command_function&#34;][&#34;name&#34;] = &#34;get_commands&#34;
         self.__prompt[&#34;command_function&#34;][&#34;descriptions&#34;] = &#34;&#34;&#34; 
         For each OS listed below, provide the command(s) needed to perform the specified action, depending on the device OS (e.g., Cisco IOSXR router, Linux server).
-        The application knows how to connect to devices via SSH, so you only need to provide the command(s) to run after connecting. 
+        The application knows how to connect to devices via SSH, so you only need to provide the command(s) to run after connecting. This includes access configuration mode and commiting if required.
         If the commands needed are not for the specific OS type, just send an empty list (e.g., []). 
     &#34;&#34;&#34;
         self.__prompt[&#34;command_function&#34;][&#34;parameters&#34;] = {}
@@ -1376,7 +1376,7 @@ Categorize the user&#39;s request based on the operation they want to perform on
 
     @MethodHook
     def _clean_command_response(self, raw_response, node_list):
-        #Parse response for command request to openAI GPT.
+        # Parse response for command request to openAI GPT.
         info_dict = {}
         info_dict[&#34;commands&#34;] = []
         info_dict[&#34;variables&#34;] = {}
@@ -1384,13 +1384,23 @@ Categorize the user&#39;s request based on the operation they want to perform on
         for key, value in node_list.items():
             newvalue = {}
             commands = raw_response[value]
-            for i,e in enumerate(commands, start=1):
-                newvalue[f&#34;command{i}&#34;] = e
+            # Ensure commands is a list
+            if isinstance(commands, str):
+                commands = [commands]
+            # Determine the number of digits required for zero-padding
+            num_commands = len(commands)
+            num_digits = len(str(num_commands))
+
+            for i, e in enumerate(commands, start=1):
+                # Zero-pad the command number
+                command_num = f&#34;command{str(i).zfill(num_digits)}&#34;
+                newvalue[command_num] = e
                 if f&#34;{{command{i}}}&#34; not in info_dict[&#34;commands&#34;]:
-                    info_dict[&#34;commands&#34;].append(f&#34;{{command{i}}}&#34;)
-                    info_dict[&#34;variables&#34;][&#34;__global__&#34;][f&#34;command{i}&#34;] = &#34;&#34;
+                    info_dict[&#34;commands&#34;].append(f&#34;{{{command_num}}}&#34;)
+                    info_dict[&#34;variables&#34;][&#34;__global__&#34;][command_num] = &#34;&#34;
                 info_dict[&#34;variables&#34;][key] = newvalue
         return info_dict
+
 
     @MethodHook
     def _get_commands(self, user_input, nodes):
