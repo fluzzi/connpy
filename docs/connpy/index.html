@@ -2,18 +2,32 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
-<meta name="generator" content="pdoc 0.10.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<meta name="generator" content="pdoc3 0.11.5">
 <title>connpy API documentation</title>
-<meta name="description" content="Connection manager …" />
-<link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/sanitize.min.css" integrity="sha256-PK9q560IAAa6WVRRh76LtCaI8pjTJ2z11v0miyNNjrs=" crossorigin>
-<link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/typography.min.css" integrity="sha256-7l/o7C8jubJiy74VsKTidCy1yBkRtiUGbVkYBylBqUg=" crossorigin>
-<link rel="stylesheet preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/styles/github.min.css" crossorigin>
-<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:30px;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:1em 0 .50em 0}h3{font-size:1.4em;margin:25px 0 10px 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .3s ease-in-out}a:hover{color:#e82}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900}pre code{background:#f8f8f8;font-size:.8em;line-height:1.4em}code{background:#f2f2f1;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{background:#f8f8f8;border:0;border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0;padding:1ex}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-weight:bold;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em .5em;margin-bottom:1em}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
-<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.item .name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul{padding-left:1.5em}.toc > ul > li{margin-top:.5em}}</style>
+<meta name="description" content="Connection manager …">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:1.5em;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:2em 0 .50em 0}h3{font-size:1.4em;margin:1.6em 0 .7em 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .2s ease-in-out}a:visited{color:#503}a:hover{color:#b62}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900;font-weight:bold}pre code{font-size:.8em;line-height:1.4em;padding:1em;display:block}code{background:#f3f3f3;font-family:"DejaVu Sans Mono",monospace;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source > summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible;min-width:max-content}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em 1em;margin:1em 0}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul ul{padding-left:1em}.toc > ul > li{margin-top:.5em}}</style>
 <style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/highlight.min.js" integrity="sha256-Uv3H6lx7dJmRfRvH8TH6kJD1TSK1aFcwgx+mdg3epi8=" crossorigin></script>
-<script>window.addEventListener('DOMContentLoaded', () => hljs.initHighlighting())</script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha512-D9gUyxqja7hBtkWpPWGt9wfbfaMGVt9gnyCvYa+jojwwPHLCzUm5i8rpk7vD7wNee9bA35eYIjobYPaQuKS1MQ==" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => {
+hljs.configure({languages: ['bash', 'css', 'diff', 'graphql', 'ini', 'javascript', 'json', 'plaintext', 'python', 'python-repl', 'rust', 'shell', 'sql', 'typescript', 'xml', 'yaml']});
+hljs.highlightAll();
+/* Collapse source docstrings */
+setTimeout(() => {
+[...document.querySelectorAll('.hljs.language-python > .hljs-string')]
+.filter(el => el.innerHTML.length > 200 && ['"""', "'''"].includes(el.innerHTML.substring(0, 3)))
+.forEach(el => {
+let d = document.createElement('details');
+d.classList.add('hljs-string');
+d.innerHTML = '<summary>"""</summary>' + el.innerHTML.substring(3);
+el.replaceWith(d);
+});
+}, 100);
+})</script>
 </head>
 <body>
 <main>
@@ -424,453 +438,6 @@ input = &quot;go to router 1 and get me the full configuration&quot;
 result = myia.ask(input, dryrun = False)
 print(result)
 </code></pre>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">#!/usr/bin/env python3
-&#39;&#39;&#39;
-## Connection manager
-
-Connpy is a SSH, SFTP, Telnet, kubectl, and Docker pod connection manager and automation module for Linux, Mac, and Docker.
-
-### Features
-    - Manage connections using SSH, SFTP, Telnet, kubectl, and Docker exec.
-    - Set contexts to manage specific nodes from specific contexts (work/home/clients/etc).
-    - You can generate profiles and reference them from nodes using @profilename so you don&#39;t
-      need to edit multiple nodes when changing passwords or other information.
-    - Nodes can be stored on @folder or @subfolder@folder to organize your devices. They can
-      be referenced using node@subfolder@folder or node@folder.
-    - If you have too many nodes, get a completion script using: conn config --completion.
-      Or use fzf by installing pyfzf and running conn config --fzf true.
-    - Create in bulk, copy, move, export, and import nodes for easy management.
-    - Run automation scripts on network devices.
-    - Use GPT AI to help you manage your devices.
-    - Add plugins with your own scripts.
-    - Much more!
-
-### Usage
-```
-usage: conn [-h] [--add | --del | --mod | --show | --debug] [node|folder] [--sftp]
-       conn {profile,move,mv,copy,cp,list,ls,bulk,export,import,ai,run,api,plugin,config,sync,context} ...
-
-positional arguments:
-  node|folder        node[@subfolder][@folder]
-                     Connect to specific node or show all matching nodes
-                     [@subfolder][@folder]
-                     Show all available connections globally or in specified path
-
-options:
-  -h, --help         show this help message and exit
-  -v, --version      Show version
-  -a, --add          Add new node[@subfolder][@folder] or [@subfolder]@folder
-  -r, --del, --rm    Delete node[@subfolder][@folder] or [@subfolder]@folder
-  -e, --mod, --edit  Modify node[@subfolder][@folder]
-  -s, --show         Show node[@subfolder][@folder]
-  -d, --debug        Display all conections steps
-  -t, --sftp         Connects using sftp instead of ssh
-
-Commands:
-  profile         Manage profiles
-  move(mv)        Move node
-  copy(cp)        Copy node
-  list(ls)        List profiles, nodes or folders
-  bulk            Add nodes in bulk
-  export          Export connection folder to Yaml file
-  import          Import connection folder to config from Yaml file
-  ai              Make request to an AI
-  run             Run scripts or commands on nodes
-  api             Start and stop connpy api
-  plugin          Manage plugins
-  config          Manage app config
-  sync            Sync config with Google
-  context         Manage contexts with regex matching
-```
-
-###   Manage profiles
-```
-usage: conn profile [-h] (--add | --del | --mod | --show) profile
-
-positional arguments:
-  profile        Name of profile to manage
-
-options:
-  -h, --help         show this help message and exit
-  -a, --add          Add new profile
-  -r, --del, --rm    Delete profile
-  -e, --mod, --edit  Modify profile
-  -s, --show         Show profile
-
-```
-
-###   Examples
-```
-   #Add new profile
-   conn profile --add office-user
-   #Add new folder
-   conn --add @office
-   #Add new subfolder
-   conn --add @datacenter@office
-   #Add node to subfolder
-   conn --add server@datacenter@office
-   #Add node to folder
-   conn --add pc@office
-   #Show node information
-   conn --show server@datacenter@office
-   #Connect to nodes
-   conn pc@office
-   conn server
-   #Create and set new context
-   conn context -a office .*@office
-   conn context --set office
-   #Run a command in a node
-   conn run server ls -la
-``` 
-## Plugin Requirements for Connpy
-### General Structure
-- The plugin script must be a Python file.
-- Only the following top-level elements are allowed in the plugin script:
-  - Class definitions
-  - Function definitions
-  - Import statements
-  - The `if __name__ == &#34;__main__&#34;:` block for standalone execution
-  - Pass statements
-
-### Specific Class Requirements
-- The plugin script must define specific classes with particular attributes and methods. Each class serves a distinct role within the plugin&#39;s architecture:
-  1. **Class `Parser`**:
-     - **Purpose**: Handles parsing of command-line arguments.
-     - **Requirements**:
-       - Must contain only one method: `__init__`.
-       - The `__init__` method must initialize at least two attributes:
-         - `self.parser`: An instance of `argparse.ArgumentParser`.
-         - `self.description`: A string containing the description of the parser.
-  2. **Class `Entrypoint`**:
-     - **Purpose**: Acts as the entry point for plugin execution, utilizing parsed arguments and integrating with the main application.
-     - **Requirements**:
-       - Must have an `__init__` method that accepts exactly three parameters besides `self`:
-         - `args`: Arguments passed to the plugin.
-         - The parser instance (typically `self.parser` from the `Parser` class).
-         - The Connapp instance to interact with the Connpy app.
-  3. **Class `Preload`**:
-     - **Purpose**: Performs any necessary preliminary setup or configuration independent of the main parsing and entry logic.
-   - **Requirements**:
-     - Contains at least an `__init__` method that accepts parameter connapp besides `self`.
-
-### Class Dependencies and Combinations
-- **Dependencies**:
-  - `Parser` and `Entrypoint` are interdependent and must both be present if one is included.
-  - `Preload` is independent and may exist alone or alongside the other classes.
-- **Valid Combinations**:
-  - `Parser` and `Entrypoint` together.
-  - `Preload` alone.
-  - All three classes (`Parser`, `Entrypoint`, `Preload`).
-
-### Preload Modifications and Hooks
-
-In the `Preload` class of the plugin system, you have the ability to customize the behavior of existing classes and methods within the application through a robust hooking system. This documentation explains how to use the `modify`, `register_pre_hook`, and `register_post_hook` methods to tailor plugin functionality to your needs.
-
-#### Modifying Classes with `modify`
-The `modify` method allows you to alter instances of a class at the time they are created or after their creation. This is particularly useful for setting or modifying configuration settings, altering default behaviors, or adding new functionalities to existing classes without changing the original class definitions.
-
-- **Usage**: Modify a class to include additional configurations or changes
-- **Modify Method Signature**:
-  - `modify(modification_method)`: A function that is invoked with an instance of the class as its argument. This function should perform any modifications directly on this instance.
-- **Modification Method Signature**:
-  - **Arguments**:
-    - `cls`:  This function accepts a single argument, the class instance, which it then modifies.
-  - **Modifiable Classes**:
-    - `connapp.config`
-    - `connapp.node`
-    - `connapp.nodes`
-    - `connapp.ai`
-  - ```python
-    def modify_config(cls):
-        # Example modification: adding a new attribute or modifying an existing one
-        cls.new_attribute = &#39;New Value&#39;
-
-    class Preload:
-        def __init__(self, connapp):
-            # Applying modification to the config class instance
-            connapp.config.modify(modify_config)
-    ```
-
-#### Implementing Method Hooks
-There are 2 methods that allows you to define custom logic to be executed before (`register_pre_hook`) or after (`register_post_hook`) the main logic of a method. This is particularly useful for logging, auditing, preprocessing inputs, postprocessing outputs or adding functionalities.
-
-  - **Usage**: Register hooks to methods to execute additional logic before or after the main method execution.
-- **Registration Methods Signature**:
-  - `register_pre_hook(pre_hook_method)`: A function that is invoked before the main method is executed. This function should do preprocessing of the arguments.
-  - `register_post_hook(post_hook_method)`: A function that is invoked after the main method is executed. This function should do postprocessing of the outputs.
-- **Method Signatures for Pre-Hooks**
-  - `pre_hook_method(*args, **kwargs)`
-  - **Arguments**:
-    - `*args`, `**kwargs`: The arguments and keyword arguments that will be passed to the method being hooked. The pre-hook function has the opportunity to inspect and modify these arguments before they are passed to the main method.
-  - **Return**:
-    - Must return a tuple `(args, kwargs)`, which will be used as the new arguments for the main method. If the original arguments are not modified, the function should return them as received.
-- **Method Signatures for Post-Hooks**:
-  - `post_hook_method(*args, **kwargs)`
-  - **Arguments**:
-    - `*args`, `**kwargs`: The arguments and keyword arguments that were passed to the main method.
-      - `kwargs[&#34;result&#34;]`: The value returned by the main method. This allows the post-hook to inspect and even alter the result before it is returned to the original caller.
-  - **Return**:
-    - Can return a modified result, which will replace the original result of the main method, or simply return `kwargs[&#34;result&#34;]` to return the original method result.    
-  - ```python
-    def pre_processing_hook(*args, **kwargs):
-        print(&#34;Pre-processing logic here&#34;)
-        # Modify arguments or perform any checks
-        return args, kwargs  # Return modified or unmodified args and kwargs
-
-    def post_processing_hook(*args, **kwargs):
-        print(&#34;Post-processing logic here&#34;)
-        # Modify the result or perform any final logging or cleanup
-        return kwargs[&#34;result&#34;]  # Return the modified or unmodified result
-
-    class Preload:
-        def __init__(self, connapp):
-            # Registering a pre-hook
-            connapp.ai.some_method.register_pre_hook(pre_processing_hook)
-
-            # Registering a post-hook
-            connapp.node.another_method.register_post_hook(post_processing_hook)
-    ```
-
-### Executable Block
-- The plugin script can include an executable block:
-  - `if __name__ == &#34;__main__&#34;:`
-  - This block allows the plugin to be run as a standalone script for testing or independent use.
-
-### Script Verification
-- The `verify_script` method in `plugins.py` is used to check the plugin script&#39;s compliance with these standards.
-- Non-compliant scripts will be rejected to ensure consistency and proper functionality within the plugin system.
-- 
-### Example Script
-
-For a practical example of how to write a compatible plugin script, please refer to the following example:
-
-[Example Plugin Script](https://github.com/fluzzi/awspy)
-
-This script demonstrates the required structure and implementation details according to the plugin system&#39;s standards.
-
-## http API
-With the Connpy API you can run commands on devices using http requests
-
-### 1. List Nodes
-
-**Endpoint**: `/list_nodes`
-
-**Method**: `POST`
-
-**Description**: This route returns a list of nodes. It can also filter the list based on a given keyword.
-
-#### Request Body:
-
-```json
-{
-  &#34;filter&#34;: &#34;&lt;keyword&gt;&#34;
-}
-```
-
-* `filter` (optional): A keyword to filter the list of nodes. It returns only the nodes that contain the keyword. If not provided, the route will return the entire list of nodes.
-
-#### Response:
-
-- A JSON array containing the filtered list of nodes.
-
----
-
-### 2. Get Nodes
-
-**Endpoint**: `/get_nodes`
-
-**Method**: `POST`
-
-**Description**: This route returns a dictionary of nodes with all their attributes. It can also filter the nodes based on a given keyword.
-
-#### Request Body:
-
-```json
-{
-  &#34;filter&#34;: &#34;&lt;keyword&gt;&#34;
-}
-```
-
-* `filter` (optional): A keyword to filter the nodes. It returns only the nodes that contain the keyword. If not provided, the route will return the entire list of nodes.
-
-#### Response:
-
-- A JSON array containing the filtered nodes.
-
----
-
-### 3. Run Commands
-
-**Endpoint**: `/run_commands`
-
-**Method**: `POST`
-
-**Description**: This route runs commands on selected nodes based on the provided action, nodes, and commands. It also supports executing tests by providing expected results.
-
-#### Request Body:
-
-```json
-{
-  &#34;action&#34;: &#34;&lt;action&gt;&#34;,
-  &#34;nodes&#34;: &#34;&lt;nodes&gt;&#34;,
-  &#34;commands&#34;: &#34;&lt;commands&gt;&#34;,
-  &#34;expected&#34;: &#34;&lt;expected&gt;&#34;,
-  &#34;options&#34;: &#34;&lt;options&gt;&#34;
-}
-```
-
-* `action` (required): The action to be performed. Possible values: `run` or `test`.
-* `nodes` (required): A list of nodes or a single node on which the commands will be executed. The nodes can be specified as individual node names or a node group with the `@` prefix. Node groups can also be specified as arrays with a list of nodes inside the group.
-* `commands` (required): A list of commands to be executed on the specified nodes.
-* `expected` (optional, only used when the action is `test`): A single expected result for the test.
-* `options` (optional): Array to pass options to the run command, options are: `prompt`, `parallel`, `timeout`  
-
-#### Response:
-
-- A JSON object with the results of the executed commands on the nodes.
-
----
-
-### 4. Ask AI
-
-**Endpoint**: `/ask_ai`
-
-**Method**: `POST`
-
-**Description**: This route sends to chatgpt IA a request that will parse it into an understandable output for the application and then run the request.
-
-#### Request Body:
-
-```json
-{
-  &#34;input&#34;: &#34;&lt;user input request&gt;&#34;,
-  &#34;dryrun&#34;: true or false
-}
-```
-
-* `input` (required): The user input requesting the AI to perform an action on some devices or get the devices list.
-* `dryrun` (optional): If set to true, it will return the parameters to run the request but it won&#39;t run it. default is false.
-
-#### Response:
-
-- A JSON array containing the action to run and the parameters and the result of the action.
-
-## Automation module
-The automation module
-### Standalone module
-```
-import connpy
-router = connpy.node(&#34;uniqueName&#34;,&#34;ip/host&#34;, user=&#34;user&#34;, password=&#34;pass&#34;)
-router.run([&#34;term len 0&#34;,&#34;show run&#34;])
-print(router.output)
-hasip = router.test(&#34;show ip int brief&#34;,&#34;1.1.1.1&#34;)
-if hasip:
-    print(&#34;Router has ip 1.1.1.1&#34;)
-else:
-    print(&#34;router does not have ip 1.1.1.1&#34;)
-```
-
-### Using manager configuration
-```
-import connpy
-conf = connpy.configfile()
-device = conf.getitem(&#34;server@office&#34;)
-server = connpy.node(&#34;unique name&#34;, **device, config=conf)
-result = server.run([&#34;cd /&#34;, &#34;ls -la&#34;])
-print(result)
-```
-### Running parallel tasks 
-```
-import connpy
-conf = connpy.configfile()
-#You can get the nodes from the config from a folder and fitlering in it
-nodes = conf.getitem(&#34;@office&#34;, [&#34;router1&#34;, &#34;router2&#34;, &#34;router3&#34;])
-#You can also get each node individually:
-nodes = {}
-nodes[&#34;router1&#34;] = conf.getitem(&#34;router1@office&#34;)
-nodes[&#34;router2&#34;] = conf.getitem(&#34;router2@office&#34;)
-nodes[&#34;router10&#34;] = conf.getitem(&#34;router10@datacenter&#34;)
-#Also, you can create the nodes manually:
-nodes = {}
-nodes[&#34;router1&#34;] = {&#34;host&#34;: &#34;1.1.1.1&#34;, &#34;user&#34;: &#34;user&#34;, &#34;password&#34;: &#34;pass1&#34;}
-nodes[&#34;router2&#34;] = {&#34;host&#34;: &#34;1.1.1.2&#34;, &#34;user&#34;: &#34;user&#34;, &#34;password&#34;: &#34;pass2&#34;}
-nodes[&#34;router3&#34;] = {&#34;host&#34;: &#34;1.1.1.2&#34;, &#34;user&#34;: &#34;user&#34;, &#34;password&#34;: &#34;pass3&#34;}
-#Finally you run some tasks on the nodes
-mynodes = connpy.nodes(nodes, config = conf)
-result = mynodes.test([&#34;show ip int br&#34;], &#34;1.1.1.2&#34;)
-for i in result:
-    print(&#34;---&#34; + i + &#34;---&#34;)
-    print(result[i])
-    print()
-# Or for one specific node
-mynodes.router1.run([&#34;term len 0&#34;. &#34;show run&#34;], folder = &#34;/home/user/logs&#34;)
-```
-### Using variables
-```
-import connpy
-config = connpy.configfile()
-nodes = config.getitem(&#34;@office&#34;, [&#34;router1&#34;, &#34;router2&#34;, &#34;router3&#34;])
-commands = []
-commands.append(&#34;config t&#34;)
-commands.append(&#34;interface lo {id}&#34;)
-commands.append(&#34;ip add {ip} {mask}&#34;)
-commands.append(&#34;end&#34;)
-variables = {}
-variables[&#34;router1@office&#34;] = {&#34;ip&#34;: &#34;10.57.57.1&#34;}
-variables[&#34;router2@office&#34;] = {&#34;ip&#34;: &#34;10.57.57.2&#34;}
-variables[&#34;router3@office&#34;] = {&#34;ip&#34;: &#34;10.57.57.3&#34;}
-variables[&#34;__global__&#34;] = {&#34;id&#34;: &#34;57&#34;}
-variables[&#34;__global__&#34;][&#34;mask&#34;] =  &#34;255.255.255.255&#34;
-expected = &#34;!&#34;
-routers = connpy.nodes(nodes, config = config)
-routers.run(commands, variables)
-routers.test(&#34;ping {ip}&#34;, expected, variables)
-for key in routers.result:
-    print(key, &#39; ---&gt; &#39;, (&#34;pass&#34; if routers.result[key] else &#34;fail&#34;))
-```
-### Using AI
-```
-import connpy
-conf = connpy.configfile()
-organization = &#39;openai-org&#39;
-api_key = &#34;openai-key&#34;
-myia = connpy.ai(conf, organization, api_key)
-input = &#34;go to router 1 and get me the full configuration&#34;
-result = myia.ask(input, dryrun = False)
-print(result)
-```
-&#39;&#39;&#39;
-from .core import node,nodes
-from .configfile import configfile
-from .connapp import connapp
-from .api import *
-from .ai import ai
-from .plugins import Plugins
-from ._version import __version__
-from pkg_resources import get_distribution
-
-__all__ = [&#34;node&#34;, &#34;nodes&#34;, &#34;configfile&#34;, &#34;connapp&#34;, &#34;ai&#34;, &#34;Plugins&#34;]
-__author__ = &#34;Federico Luzzi&#34;
-__pdoc__ = {
-    &#39;core&#39;: False,
-    &#39;completion&#39;: False,
-    &#39;api&#39;: False,
-    &#39;plugins&#39;: False,
-    &#39;core_plugins&#39;: False,
-    &#39;hooks&#39;: False,
-    &#39;connapp.start&#39;: False,
-    &#39;ai.deferred_class_hooks&#39;: False,
-    &#39;configfile.deferred_class_hooks&#39;: False,
-    &#39;node.deferred_class_hooks&#39;: False,
-    &#39;nodes.deferred_class_hooks&#39;: False,
-    &#39;connapp&#39;: False,
-    &#39;connapp.encrypt&#39;: True
-}</code></pre>
-</details>
 </section>
 <section>
 </section>
@@ -885,7 +452,6 @@ __pdoc__ = {
 <span>class <span class="ident">Plugins</span></span>
 </code></dt>
 <dd>
-<div class="desc"></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1019,38 +585,13 @@ __pdoc__ = {
                     if hasattr(self.plugins[root_filename], &#34;Preload&#34;):
                         self.preloads[root_filename] = self.plugins[root_filename]</code></pre>
 </details>
+<div class="desc"></div>
 <h3>Methods</h3>
 <dl>
 <dt id="connpy.Plugins.verify_script"><code class="name flex">
 <span>def <span class="ident">verify_script</span></span>(<span>self, file_path)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Verifies that a given Python script meets specific structural requirements.</p>
-<p>This function checks a Python script for compliance with predefined structural
-rules. It ensures that the script contains only allowed top-level elements
-(functions, classes, imports, pass statements, and a specific if <strong>name</strong> block)
-and that it includes mandatory classes with specific attributes and methods.</p>
-<h3 id="arguments">Arguments:</h3>
-<pre><code>- file_path (str): The file path of the Python script to be verified.
-</code></pre>
-<h3 id="returns">Returns:</h3>
-<pre><code>- str: A message indicating the type of violation if the script doesn't meet 
-     the requirements, or False if all requirements are met.
-</code></pre>
-<h3 id="verifications">Verifications:</h3>
-<pre><code>- The presence of only allowed top-level elements.
-- The existence of two specific classes: 'Parser' and 'Entrypoint'. and/or specific class: Preload.
-- 'Parser' class must only have an '__init__' method and must assign 'self.parser'
-  and 'self.description'.
-- 'Entrypoint' class must have an '__init__' method accepting specific arguments.
-</code></pre>
-<p>If any of these checks fail, the function returns an error message indicating
-the reason. If the script passes all checks, the function returns False,
-indicating successful verification.</p>
-<h3 id="exceptions">Exceptions:</h3>
-<pre><code>    - SyntaxError: If the script contains a syntax error, it is caught and 
-                   returned as a part of the error message.
-</code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1150,6 +691,32 @@ indicating successful verification.</p>
 
     return False  # All requirements met, no error</code></pre>
 </details>
+<div class="desc"><p>Verifies that a given Python script meets specific structural requirements.</p>
+<p>This function checks a Python script for compliance with predefined structural
+rules. It ensures that the script contains only allowed top-level elements
+(functions, classes, imports, pass statements, and a specific if <strong>name</strong> block)
+and that it includes mandatory classes with specific attributes and methods.</p>
+<h3 id="arguments">Arguments:</h3>
+<pre><code>- file_path (str): The file path of the Python script to be verified.
+</code></pre>
+<h3 id="returns">Returns:</h3>
+<pre><code>- str: A message indicating the type of violation if the script doesn't meet 
+     the requirements, or False if all requirements are met.
+</code></pre>
+<h3 id="verifications">Verifications:</h3>
+<pre><code>- The presence of only allowed top-level elements.
+- The existence of two specific classes: 'Parser' and 'Entrypoint'. and/or specific class: Preload.
+- 'Parser' class must only have an '__init__' method and must assign 'self.parser'
+  and 'self.description'.
+- 'Entrypoint' class must have an '__init__' method accepting specific arguments.
+</code></pre>
+<p>If any of these checks fail, the function returns an error message indicating
+the reason. If the script passes all checks, the function returns False,
+indicating successful verification.</p>
+<h3 id="exceptions">Exceptions:</h3>
+<pre><code>    - SyntaxError: If the script contains a syntax error, it is caught and 
+                   returned as a part of the error message.
+</code></pre></div>
 </dd>
 </dl>
 </dd>
@@ -1158,32 +725,6 @@ indicating successful verification.</p>
 <span>(</span><span>config, org=None, api_key=None, model=None, temp=0.7)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>This class generates a ai object. Containts all the information and methods to make requests to openAI chatGPT to run actions on the application.</p>
-<h3 id="attributes">Attributes:</h3>
-<pre><code>- model        (str): Model of GPT api to use. Default is gpt-4o-mini.
-
-- temp       (float): Value between 0 and 1 that control the randomness 
-                      of generated text, with higher values increasing 
-                      creativity. Default is 0.7.
-</code></pre>
-<h3 id="parameters">Parameters:</h3>
-<pre><code>- config (obj): Pass the object created with class configfile with 
-                key for decryption and extra configuration if you 
-                are using connection manager.
-</code></pre>
-<h3 id="optional-parameters">Optional Parameters:</h3>
-<pre><code>- org     (str): A unique token identifying the user organization
-                 to interact with the API.
-
-- api_key (str): A unique authentication token required to access 
-                 and interact with the API.
-
-- model   (str): Model of GPT api to use. Default is gpt-4o-mini.
-
-- temp  (float): Value between 0 and 1 that control the randomness 
-                 of generated text, with higher values increasing 
-                 creativity. Default is 0.7.
-</code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1651,52 +1192,38 @@ Categorize the user&#39;s request based on the operation they want to perform on
                         output[&#34;result&#34;] = mynodes.run(**output[&#34;args&#34;])
         return output</code></pre>
 </details>
+<div class="desc"><p>This class generates a ai object. Containts all the information and methods to make requests to openAI chatGPT to run actions on the application.</p>
+<h3 id="attributes">Attributes:</h3>
+<pre><code>- model        (str): Model of GPT api to use. Default is gpt-4o-mini.
+
+- temp       (float): Value between 0 and 1 that control the randomness 
+                      of generated text, with higher values increasing 
+                      creativity. Default is 0.7.
+</code></pre>
+<h3 id="parameters">Parameters:</h3>
+<pre><code>- config (obj): Pass the object created with class configfile with 
+                key for decryption and extra configuration if you 
+                are using connection manager.
+</code></pre>
+<h3 id="optional-parameters">Optional Parameters:</h3>
+<pre><code>- org     (str): A unique token identifying the user organization
+                 to interact with the API.
+
+- api_key (str): A unique authentication token required to access 
+                 and interact with the API.
+
+- model   (str): Model of GPT api to use. Default is gpt-4o-mini.
+
+- temp  (float): Value between 0 and 1 that control the randomness 
+                 of generated text, with higher values increasing 
+                 creativity. Default is 0.7.
+</code></pre></div>
 <h3>Methods</h3>
 <dl>
 <dt id="connpy.ai.ask"><code class="name flex">
 <span>def <span class="ident">ask</span></span>(<span>self, user_input, dryrun=False, chat_history=None, max_retries=3, backoff_num=1)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Send the user input to openAI GPT and parse the response to run an action in the application.</p>
-<h3 id="parameters">Parameters:</h3>
-<pre><code>- user_input (str): Request to send to openAI that will be parsed
-                    and returned to execute on the application.
-                    AI understands the following tasks:
-                    - Run a command on a group of devices.
-                    - List a group of devices.
-                    - Test a command on a group of devices
-                      and verify if the output contain an
-                      expected value.
-</code></pre>
-<h3 id="optional-parameters">Optional Parameters:</h3>
-<pre><code>- dryrun       (bool): Set to true to get the arguments to use to
-                       run in the app. Default is false and it
-                       will run the actions directly.
-- chat_history (list): List in gpt api format for the chat history.
-- max_retries   (int): Maximum number of retries for gpt api.
-- backoff_num   (int): Backoff factor for exponential wait time
-                       between retries.
-</code></pre>
-<h3 id="returns">Returns:</h3>
-<pre><code>dict: Dictionary formed with the following keys:
-      - input: User input received
-      - app_related: True if GPT detected the request to be related
-        to the application.
-      - dryrun: True/False
-      - response: If the request is not related to the app. this
-        key will contain chatGPT answer.
-      - action: The action detected by the AI to run in the app.
-      - filter: If it was detected by the AI, the filter used
-        to get the list of nodes to work on.
-      - nodes: If it's not a dryrun, the list of nodes matched by
-        the filter.
-      - args: A dictionary of arguments required to run command(s)
-        on the nodes.
-      - result: A dictionary with the output of the commands or 
-        the test.
-      - chat_history: The chat history between user and chatbot.
-        It can be used as an attribute for next request.
-</code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1817,23 +1344,51 @@ def ask(self, user_input, dryrun = False, chat_history = None,  max_retries=3, b
                     output[&#34;result&#34;] = mynodes.run(**output[&#34;args&#34;])
     return output</code></pre>
 </details>
+<div class="desc"><p>Send the user input to openAI GPT and parse the response to run an action in the application.</p>
+<h3 id="parameters">Parameters:</h3>
+<pre><code>- user_input (str): Request to send to openAI that will be parsed
+                    and returned to execute on the application.
+                    AI understands the following tasks:
+                    - Run a command on a group of devices.
+                    - List a group of devices.
+                    - Test a command on a group of devices
+                      and verify if the output contain an
+                      expected value.
+</code></pre>
+<h3 id="optional-parameters">Optional Parameters:</h3>
+<pre><code>- dryrun       (bool): Set to true to get the arguments to use to
+                       run in the app. Default is false and it
+                       will run the actions directly.
+- chat_history (list): List in gpt api format for the chat history.
+- max_retries   (int): Maximum number of retries for gpt api.
+- backoff_num   (int): Backoff factor for exponential wait time
+                       between retries.
+</code></pre>
+<h3 id="returns">Returns:</h3>
+<pre><code>dict: Dictionary formed with the following keys:
+      - input: User input received
+      - app_related: True if GPT detected the request to be related
+        to the application.
+      - dryrun: True/False
+      - response: If the request is not related to the app. this
+        key will contain chatGPT answer.
+      - action: The action detected by the AI to run in the app.
+      - filter: If it was detected by the AI, the filter used
+        to get the list of nodes to work on.
+      - nodes: If it's not a dryrun, the list of nodes matched by
+        the filter.
+      - args: A dictionary of arguments required to run command(s)
+        on the nodes.
+      - result: A dictionary with the output of the commands or 
+        the test.
+      - chat_history: The chat history between user and chatbot.
+        It can be used as an attribute for next request.
+</code></pre></div>
 </dd>
 <dt id="connpy.ai.confirm"><code class="name flex">
 <span>def <span class="ident">confirm</span></span>(<span>self, user_input, max_retries=3, backoff_num=1)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Send the user input to openAI GPT and verify if response is afirmative or negative.</p>
-<h3 id="parameters">Parameters:</h3>
-<pre><code>- user_input (str): User response confirming or denying.
-</code></pre>
-<h3 id="optional-parameters">Optional Parameters:</h3>
-<pre><code>- max_retries (int): Maximum number of retries for gpt api.
-- backoff_num (int): Backoff factor for exponential wait time
-                     between retries.
-</code></pre>
-<h3 id="returns">Returns:</h3>
-<pre><code>bool or str: True, False or str if AI coudn't understand the response
-</code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1864,6 +1419,18 @@ def confirm(self, user_input, max_retries=3, backoff_num=1):
         output = f&#34;{self.model} api is not responding right now, please try again later.&#34;
     return output</code></pre>
 </details>
+<div class="desc"><p>Send the user input to openAI GPT and verify if response is afirmative or negative.</p>
+<h3 id="parameters">Parameters:</h3>
+<pre><code>- user_input (str): User response confirming or denying.
+</code></pre>
+<h3 id="optional-parameters">Optional Parameters:</h3>
+<pre><code>- max_retries (int): Maximum number of retries for gpt api.
+- backoff_num (int): Backoff factor for exponential wait time
+                     between retries.
+</code></pre>
+<h3 id="returns">Returns:</h3>
+<pre><code>bool or str: True, False or str if AI coudn't understand the response
+</code></pre></div>
 </dd>
 </dl>
 </dd>
@@ -1872,34 +1439,6 @@ def confirm(self, user_input, max_retries=3, backoff_num=1):
 <span>(</span><span>conf=None, key=None)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>This class generates a configfile object. Containts a dictionary storing, config, nodes and profiles, normaly used by connection manager.</p>
-<h3 id="attributes">Attributes:</h3>
-<pre><code>- file         (str): Path/file to config file.
-
-- key          (str): Path/file to RSA key file.
-
-- config      (dict): Dictionary containing information of connection
-                      manager configuration.
-
-- connections (dict): Dictionary containing all the nodes added to
-                      connection manager.
-
-- profiles    (dict): Dictionary containing all the profiles added to
-                      connection manager.
-
-- privatekey   (obj): Object containing the private key to encrypt 
-                      passwords.
-
-- publickey    (obj): Object containing the public key to decrypt 
-                      passwords.
-</code></pre>
-<h3 id="optional-parameters">Optional Parameters:</h3>
-<pre><code>- conf (str): Path/file to config file. If left empty default
-              path is ~/.config/conn/config.json
-
-- key  (str): Path/file to RSA key file. If left empty default
-              path is ~/.config/conn/.osk
-</code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -2313,22 +1852,40 @@ class configfile:
         password = encryptor.encrypt(password.encode(&#34;utf-8&#34;))
         return str(password)</code></pre>
 </details>
+<div class="desc"><p>This class generates a configfile object. Containts a dictionary storing, config, nodes and profiles, normaly used by connection manager.</p>
+<h3 id="attributes">Attributes:</h3>
+<pre><code>- file         (str): Path/file to config file.
+
+- key          (str): Path/file to RSA key file.
+
+- config      (dict): Dictionary containing information of connection
+                      manager configuration.
+
+- connections (dict): Dictionary containing all the nodes added to
+                      connection manager.
+
+- profiles    (dict): Dictionary containing all the profiles added to
+                      connection manager.
+
+- privatekey   (obj): Object containing the private key to encrypt 
+                      passwords.
+
+- publickey    (obj): Object containing the public key to decrypt 
+                      passwords.
+</code></pre>
+<h3 id="optional-parameters">Optional Parameters:</h3>
+<pre><code>- conf (str): Path/file to config file. If left empty default
+              path is ~/.config/conn/config.json
+
+- key  (str): Path/file to RSA key file. If left empty default
+              path is ~/.config/conn/.osk
+</code></pre></div>
 <h3>Methods</h3>
 <dl>
 <dt id="connpy.configfile.encrypt"><code class="name flex">
 <span>def <span class="ident">encrypt</span></span>(<span>self, password, keyfile=None)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Encrypts password using RSA keyfile</p>
-<h3 id="parameters">Parameters:</h3>
-<pre><code>- password (str): Plaintext password to encrypt.
-</code></pre>
-<h3 id="optional-parameters">Optional Parameters:</h3>
-<pre><code>- keyfile  (str): Path/file to keyfile. Default is config keyfile.
-</code></pre>
-<h3 id="returns">Returns:</h3>
-<pre><code>str: Encrypted password.
-</code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -2362,25 +1919,21 @@ def encrypt(self, password, keyfile=None):
     password = encryptor.encrypt(password.encode(&#34;utf-8&#34;))
     return str(password)</code></pre>
 </details>
+<div class="desc"><p>Encrypts password using RSA keyfile</p>
+<h3 id="parameters">Parameters:</h3>
+<pre><code>- password (str): Plaintext password to encrypt.
+</code></pre>
+<h3 id="optional-parameters">Optional Parameters:</h3>
+<pre><code>- keyfile  (str): Path/file to keyfile. Default is config keyfile.
+</code></pre>
+<h3 id="returns">Returns:</h3>
+<pre><code>str: Encrypted password.
+</code></pre></div>
 </dd>
 <dt id="connpy.configfile.getitem"><code class="name flex">
 <span>def <span class="ident">getitem</span></span>(<span>self, unique, keys=None)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Get an node or a group of nodes from configfile which can be passed to node/nodes class</p>
-<h3 id="parameters">Parameters:</h3>
-<pre><code>- unique (str): Unique name of the node or folder in config using
-                connection manager style: node[@subfolder][@folder]
-                or [@subfolder]@folder
-</code></pre>
-<h3 id="optional-parameters">Optional Parameters:</h3>
-<pre><code>- keys (list): In case you pass a folder as unique, you can filter
-               nodes inside the folder passing a list.
-</code></pre>
-<h3 id="returns">Returns:</h3>
-<pre><code>dict: Dictionary containing information of node or multiple 
-      dictionaries of multiple nodes.
-</code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -2441,21 +1994,25 @@ def getitem(self, unique, keys = None):
         newnode.pop(&#34;type&#34;)
         return newnode</code></pre>
 </details>
-</dd>
-<dt id="connpy.configfile.getitems"><code class="name flex">
-<span>def <span class="ident">getitems</span></span>(<span>self, uniques)</span>
-</code></dt>
-<dd>
-<div class="desc"><p>Get a group of nodes from configfile which can be passed to node/nodes class</p>
+<div class="desc"><p>Get an node or a group of nodes from configfile which can be passed to node/nodes class</p>
 <h3 id="parameters">Parameters:</h3>
-<pre><code>- uniques (str/list): String name that will match hostnames 
-                      from the connection manager. It can be a 
-                      list of strings.
+<pre><code>- unique (str): Unique name of the node or folder in config using
+                connection manager style: node[@subfolder][@folder]
+                or [@subfolder]@folder
+</code></pre>
+<h3 id="optional-parameters">Optional Parameters:</h3>
+<pre><code>- keys (list): In case you pass a folder as unique, you can filter
+               nodes inside the folder passing a list.
 </code></pre>
 <h3 id="returns">Returns:</h3>
 <pre><code>dict: Dictionary containing information of node or multiple 
       dictionaries of multiple nodes.
 </code></pre></div>
+</dd>
+<dt id="connpy.configfile.getitems"><code class="name flex">
+<span>def <span class="ident">getitems</span></span>(<span>self, uniques)</span>
+</code></dt>
+<dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -2501,57 +2058,24 @@ def getitems(self, uniques):
             nodes[i] = this
     return nodes</code></pre>
 </details>
+<div class="desc"><p>Get a group of nodes from configfile which can be passed to node/nodes class</p>
+<h3 id="parameters">Parameters:</h3>
+<pre><code>- uniques (str/list): String name that will match hostnames 
+                      from the connection manager. It can be a 
+                      list of strings.
+</code></pre>
+<h3 id="returns">Returns:</h3>
+<pre><code>dict: Dictionary containing information of node or multiple 
+      dictionaries of multiple nodes.
+</code></pre></div>
 </dd>
 </dl>
 </dd>
 <dt id="connpy.node"><code class="flex name class">
 <span>class <span class="ident">node</span></span>
-<span>(</span><span>unique, host, options='', logs='', password='', port='', protocol='', user='', config='', tags='', jumphost='')</span>
+<span>(</span><span>unique,<br>host,<br>options='',<br>logs='',<br>password='',<br>port='',<br>protocol='',<br>user='',<br>config='',<br>tags='',<br>jumphost='')</span>
 </code></dt>
 <dd>
-<div class="desc"><p>This class generates a node object. Containts all the information and methods to connect and interact with a device using ssh or telnet.</p>
-<h3 id="attributes">Attributes:</h3>
-<pre><code>- output (str): Output of the commands you ran with run or test 
-                method.
-
-- result(bool): True if expected value is found after running 
-                the commands using test method.
-
-- status (int): 0 if the method run or test run succesfully.
-                1 if connection failed.
-                2 if expect timeouts without prompt or EOF.
-</code></pre>
-<h3 id="parameters">Parameters:</h3>
-<pre><code>- unique (str): Unique name to assign to the node.
-
-- host   (str): IP address or hostname of the node.
-</code></pre>
-<h3 id="optional-parameters">Optional Parameters:</h3>
-<pre><code>- options  (str): Additional options to pass the ssh/telnet for
-                  connection.
-
-- logs     (str): Path/file for storing the logs. You can use 
-                  ${unique},${host}, ${port}, ${user}, ${protocol} 
-                  as variables.
-
-- password (str): Encrypted or plaintext password.
-
-- port     (str): Port to connect to node, default 22 for ssh and 23 
-                  for telnet.
-
-- protocol (str): Select ssh, telnet, kubectl or docker. Default is ssh.
-
-- user     (str): Username to of the node.
-
-- config   (obj): Pass the object created with class configfile with 
-                  key for decryption and extra configuration if you 
-                  are using connection manager.
-
-- tags   (dict) : Tags useful for automation and personal porpuse
-                  like "os", "prompt" and "screenleght_command"
-
-- jumphost (str): Reference another node to be used as a jumphost
-</code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -3136,7 +2660,7 @@ class node:
                     if results in initial_indices[self.protocol]:
                         if self.protocol in [&#34;ssh&#34;, &#34;sftp&#34;]:
                             child.sendline(&#39;yes&#39;)
-                        elif self.protocol in [&#34;telnet&#34;, &#34;kubectl&#34;]:
+                        elif self.protocol in [&#34;telnet&#34;, &#34;kubectl&#34;, &#34;docker&#34;]:
                             if self.user:
                                 child.sendline(self.user)
                             else:
@@ -3179,17 +2703,55 @@ class node:
         self.child = child
         return True</code></pre>
 </details>
+<div class="desc"><p>This class generates a node object. Containts all the information and methods to connect and interact with a device using ssh or telnet.</p>
+<h3 id="attributes">Attributes:</h3>
+<pre><code>- output (str): Output of the commands you ran with run or test 
+                method.
+
+- result(bool): True if expected value is found after running 
+                the commands using test method.
+
+- status (int): 0 if the method run or test run succesfully.
+                1 if connection failed.
+                2 if expect timeouts without prompt or EOF.
+</code></pre>
+<h3 id="parameters">Parameters:</h3>
+<pre><code>- unique (str): Unique name to assign to the node.
+
+- host   (str): IP address or hostname of the node.
+</code></pre>
+<h3 id="optional-parameters">Optional Parameters:</h3>
+<pre><code>- options  (str): Additional options to pass the ssh/telnet for
+                  connection.
+
+- logs     (str): Path/file for storing the logs. You can use 
+                  ${unique},${host}, ${port}, ${user}, ${protocol} 
+                  as variables.
+
+- password (str): Encrypted or plaintext password.
+
+- port     (str): Port to connect to node, default 22 for ssh and 23 
+                  for telnet.
+
+- protocol (str): Select ssh, telnet, kubectl or docker. Default is ssh.
+
+- user     (str): Username to of the node.
+
+- config   (obj): Pass the object created with class configfile with 
+                  key for decryption and extra configuration if you 
+                  are using connection manager.
+
+- tags   (dict) : Tags useful for automation and personal porpuse
+                  like "os", "prompt" and "screenleght_command"
+
+- jumphost (str): Reference another node to be used as a jumphost
+</code></pre></div>
 <h3>Methods</h3>
 <dl>
 <dt id="connpy.node.interact"><code class="name flex">
 <span>def <span class="ident">interact</span></span>(<span>self, debug=False)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Allow user to interact with the node directly, mostly used by connection manager.</p>
-<h3 id="optional-parameters">Optional Parameters:</h3>
-<pre><code>- debug (bool): If True, display all the connecting information 
-                before interact. Default False.
-</code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -3236,43 +2798,16 @@ def interact(self, debug = False):
         print(connect)
         exit(1)</code></pre>
 </details>
+<div class="desc"><p>Allow user to interact with the node directly, mostly used by connection manager.</p>
+<h3 id="optional-parameters">Optional Parameters:</h3>
+<pre><code>- debug (bool): If True, display all the connecting information 
+                before interact. Default False.
+</code></pre></div>
 </dd>
 <dt id="connpy.node.run"><code class="name flex">
-<span>def <span class="ident">run</span></span>(<span>self, commands, vars=None, *, folder='', prompt=&#x27;&gt;$|#$|\\$$|&gt;.$|#.$|\\$.$&#x27;, stdout=False, timeout=10)</span>
+<span>def <span class="ident">run</span></span>(<span>self,<br>commands,<br>vars=None,<br>*,<br>folder='',<br>prompt=&#x27;&gt;$|#$|\\$$|&gt;.$|#.$|\\$.$&#x27;,<br>stdout=False,<br>timeout=10)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Run a command or list of commands on the node and return the output.</p>
-<h3 id="parameters">Parameters:</h3>
-<pre><code>- commands (str/list): Commands to run on the node. Should be 
-                       str or a list of str. You can use variables
-                       as {varname} and defining them in optional
-                       parameter vars.
-</code></pre>
-<h3 id="optional-parameters">Optional Parameters:</h3>
-<pre><code>- vars  (dict): Dictionary containing the definition of variables
-                used in commands parameter.
-                Keys: Variable names.
-                Values: strings.
-</code></pre>
-<h3 id="optional-named-parameters">Optional Named Parameters:</h3>
-<pre><code>- folder (str): Path where output log should be stored, leave 
-                empty to disable logging.
-
-- prompt (str): Prompt to be expected after a command is finished 
-                running. Usually linux uses  "&gt;" or EOF while 
-                routers use "&gt;" or "#". The default value should 
-                work for most nodes. Change it if your connection 
-                need some special symbol.
-
-- stdout (bool):Set True to send the command output to stdout. 
-                default False.
-
-- timeout (int):Time in seconds for expect to wait for prompt/EOF.
-                default 10.
-</code></pre>
-<h3 id="returns">Returns:</h3>
-<pre><code>str: Output of the commands you ran on the node.
-</code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -3374,43 +2909,43 @@ def run(self, commands, vars = None,*, folder = &#39;&#39;, prompt = r&#39;&gt;$
                 f.close()
         return connect</code></pre>
 </details>
-</dd>
-<dt id="connpy.node.test"><code class="name flex">
-<span>def <span class="ident">test</span></span>(<span>self, commands, expected, vars=None, *, prompt=&#x27;&gt;$|#$|\\$$|&gt;.$|#.$|\\$.$&#x27;, timeout=10)</span>
-</code></dt>
-<dd>
-<div class="desc"><p>Run a command or list of commands on the node, then check if expected value appears on the output after the last command.</p>
+<div class="desc"><p>Run a command or list of commands on the node and return the output.</p>
 <h3 id="parameters">Parameters:</h3>
-<pre><code>- commands (str/list): Commands to run on the node. Should be
+<pre><code>- commands (str/list): Commands to run on the node. Should be 
                        str or a list of str. You can use variables
                        as {varname} and defining them in optional
                        parameter vars.
-
-- expected (str)     : Expected text to appear after running 
-                       all the commands on the node.You can use
-                       variables as {varname} and defining them
-                       in optional parameter vars.
 </code></pre>
 <h3 id="optional-parameters">Optional Parameters:</h3>
 <pre><code>- vars  (dict): Dictionary containing the definition of variables
-                used in commands and expected parameters.
+                used in commands parameter.
                 Keys: Variable names.
                 Values: strings.
 </code></pre>
 <h3 id="optional-named-parameters">Optional Named Parameters:</h3>
-<pre><code>- prompt (str): Prompt to be expected after a command is finished
+<pre><code>- folder (str): Path where output log should be stored, leave 
+                empty to disable logging.
+
+- prompt (str): Prompt to be expected after a command is finished 
                 running. Usually linux uses  "&gt;" or EOF while 
                 routers use "&gt;" or "#". The default value should 
                 work for most nodes. Change it if your connection 
                 need some special symbol.
 
+- stdout (bool):Set True to send the command output to stdout. 
+                default False.
+
 - timeout (int):Time in seconds for expect to wait for prompt/EOF.
                 default 10.
 </code></pre>
 <h3 id="returns">Returns:</h3>
-<pre><code>bool: true if expected value is found after running the commands 
-      false if prompt is found before.
+<pre><code>str: Output of the commands you ran on the node.
 </code></pre></div>
+</dd>
+<dt id="connpy.node.test"><code class="name flex">
+<span>def <span class="ident">test</span></span>(<span>self,<br>commands,<br>expected,<br>vars=None,<br>*,<br>prompt=&#x27;&gt;$|#$|\\$$|&gt;.$|#.$|\\$.$&#x27;,<br>timeout=10)</span>
+</code></dt>
+<dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -3519,6 +3054,38 @@ def test(self, commands, expected, vars = None,*, prompt = r&#39;&gt;$|#$|\$$|&g
         self.status = 1
         return connect</code></pre>
 </details>
+<div class="desc"><p>Run a command or list of commands on the node, then check if expected value appears on the output after the last command.</p>
+<h3 id="parameters">Parameters:</h3>
+<pre><code>- commands (str/list): Commands to run on the node. Should be
+                       str or a list of str. You can use variables
+                       as {varname} and defining them in optional
+                       parameter vars.
+
+- expected (str)     : Expected text to appear after running 
+                       all the commands on the node.You can use
+                       variables as {varname} and defining them
+                       in optional parameter vars.
+</code></pre>
+<h3 id="optional-parameters">Optional Parameters:</h3>
+<pre><code>- vars  (dict): Dictionary containing the definition of variables
+                used in commands and expected parameters.
+                Keys: Variable names.
+                Values: strings.
+</code></pre>
+<h3 id="optional-named-parameters">Optional Named Parameters:</h3>
+<pre><code>- prompt (str): Prompt to be expected after a command is finished
+                running. Usually linux uses  "&gt;" or EOF while 
+                routers use "&gt;" or "#". The default value should 
+                work for most nodes. Change it if your connection 
+                need some special symbol.
+
+- timeout (int):Time in seconds for expect to wait for prompt/EOF.
+                default 10.
+</code></pre>
+<h3 id="returns">Returns:</h3>
+<pre><code>bool: true if expected value is found after running the commands 
+      false if prompt is found before.
+</code></pre></div>
 </dd>
 </dl>
 </dd>
@@ -3527,41 +3094,6 @@ def test(self, commands, expected, vars = None,*, prompt = r&#39;&gt;$|#$|\$$|&g
 <span>(</span><span>nodes: dict, config='')</span>
 </code></dt>
 <dd>
-<div class="desc"><p>This class generates a nodes object. Contains a list of node class objects and methods to run multiple tasks on nodes simultaneously.</p>
-<h3 id="attributes">Attributes:</h3>
-<pre><code>- nodelist (list): List of node class objects passed to the init 
-                   function.
-
-- output   (dict): Dictionary formed by nodes unique as keys, 
-                   output of the commands you ran on the node as 
-                   value. Created after running methods run or test.
-
-- result   (dict): Dictionary formed by nodes unique as keys, value 
-                   is True if expected value is found after running 
-                   the commands, False if prompt is found before. 
-                   Created after running method test.
-
-- status   (dict): Dictionary formed by nodes unique as keys, value: 
-                   0 if method run or test ended succesfully.
-                   1 if connection failed.
-                   2 if expect timeouts without prompt or EOF.
-
-- &lt;unique&gt; (obj):  For each item in nodelist, there is an attribute
-                   generated with the node unique.
-</code></pre>
-<h3 id="parameters">Parameters:</h3>
-<pre><code>- nodes (dict): Dictionary formed by node information:  
-                Keys: Unique name for each node.  
-                Mandatory Subkeys: host(str).  
-                Optional Subkeys: options(str), logs(str), password(str),
-                port(str), protocol(str), user(str).  
-                For reference on subkeys check node class.
-</code></pre>
-<h3 id="optional-parameters">Optional Parameters:</h3>
-<pre><code>- config (obj): Pass the object created with class configfile with key 
-                for decryption and extra configuration if you are using 
-                connection manager.
-</code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -3792,51 +3324,47 @@ class nodes:
         self.status = status
         return result</code></pre>
 </details>
+<div class="desc"><p>This class generates a nodes object. Contains a list of node class objects and methods to run multiple tasks on nodes simultaneously.</p>
+<h3 id="attributes">Attributes:</h3>
+<pre><code>- nodelist (list): List of node class objects passed to the init 
+                   function.
+
+- output   (dict): Dictionary formed by nodes unique as keys, 
+                   output of the commands you ran on the node as 
+                   value. Created after running methods run or test.
+
+- result   (dict): Dictionary formed by nodes unique as keys, value 
+                   is True if expected value is found after running 
+                   the commands, False if prompt is found before. 
+                   Created after running method test.
+
+- status   (dict): Dictionary formed by nodes unique as keys, value: 
+                   0 if method run or test ended succesfully.
+                   1 if connection failed.
+                   2 if expect timeouts without prompt or EOF.
+
+- &lt;unique&gt; (obj):  For each item in nodelist, there is an attribute
+                   generated with the node unique.
+</code></pre>
+<h3 id="parameters">Parameters:</h3>
+<pre><code>- nodes (dict): Dictionary formed by node information:  
+                Keys: Unique name for each node.  
+                Mandatory Subkeys: host(str).  
+                Optional Subkeys: options(str), logs(str), password(str),
+                port(str), protocol(str), user(str).  
+                For reference on subkeys check node class.
+</code></pre>
+<h3 id="optional-parameters">Optional Parameters:</h3>
+<pre><code>- config (obj): Pass the object created with class configfile with key 
+                for decryption and extra configuration if you are using 
+                connection manager.
+</code></pre></div>
 <h3>Methods</h3>
 <dl>
 <dt id="connpy.nodes.run"><code class="name flex">
-<span>def <span class="ident">run</span></span>(<span>self, commands, vars=None, *, folder=None, prompt=None, stdout=None, parallel=10, timeout=None)</span>
+<span>def <span class="ident">run</span></span>(<span>self,<br>commands,<br>vars=None,<br>*,<br>folder=None,<br>prompt=None,<br>stdout=None,<br>parallel=10,<br>timeout=None)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Run a command or list of commands on all the nodes in nodelist.</p>
-<h3 id="parameters">Parameters:</h3>
-<pre><code>- commands (str/list): Commands to run on the nodes. Should be str or 
-                       list of str. You can use variables as {varname}
-                       and defining them in optional parameter vars.
-</code></pre>
-<h3 id="optional-parameters">Optional Parameters:</h3>
-<pre><code>- vars  (dict): Dictionary containing the definition of variables for
-                each node, used in commands parameter.
-                Keys should be formed by nodes unique names. Use
-                special key name __global__ for global variables.
-                Subkeys: Variable names.
-                Values: strings.
-</code></pre>
-<h3 id="optional-named-parameters">Optional Named Parameters:</h3>
-<pre><code>- folder   (str): Path where output log should be stored, leave empty 
-                  to disable logging.
-
-- prompt   (str): Prompt to be expected after a command is finished 
-                  running. Usually linux uses  "&gt;" or EOF while routers 
-                  use "&gt;" or "#". The default value should work for 
-                  most nodes. Change it if your connection need some 
-                  special symbol.
-
-- stdout  (bool): Set True to send the command output to stdout. 
-                  Default False.
-
-- parallel (int): Number of nodes to run the commands simultaneously. 
-                  Default is 10, if there are more nodes that this 
-                  value, nodes are groups in groups with max this 
-                  number of members.
-
-- timeout  (int): Time in seconds for expect to wait for prompt/EOF.
-                  default 10.
-</code></pre>
-<h3 id="returns">Returns:</h3>
-<pre><code>dict: Dictionary formed by nodes unique as keys, Output of the 
-      commands you ran on the node as value.
-</code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -3926,34 +3454,32 @@ def run(self, commands, vars = None,*, folder = None, prompt = None, stdout = No
     self.status = status
     return output</code></pre>
 </details>
-</dd>
-<dt id="connpy.nodes.test"><code class="name flex">
-<span>def <span class="ident">test</span></span>(<span>self, commands, expected, vars=None, *, prompt=None, parallel=10, timeout=None)</span>
-</code></dt>
-<dd>
-<div class="desc"><p>Run a command or list of commands on all the nodes in nodelist, then check if expected value appears on the output after the last command.</p>
+<div class="desc"><p>Run a command or list of commands on all the nodes in nodelist.</p>
 <h3 id="parameters">Parameters:</h3>
-<pre><code>- commands (str/list): Commands to run on the node. Should be str or 
-                       list of str.
-
-- expected (str)     : Expected text to appear after running all the 
-                       commands on the node.
+<pre><code>- commands (str/list): Commands to run on the nodes. Should be str or 
+                       list of str. You can use variables as {varname}
+                       and defining them in optional parameter vars.
 </code></pre>
 <h3 id="optional-parameters">Optional Parameters:</h3>
 <pre><code>- vars  (dict): Dictionary containing the definition of variables for
-                each node, used in commands and expected parameters.
+                each node, used in commands parameter.
                 Keys should be formed by nodes unique names. Use
                 special key name __global__ for global variables.
                 Subkeys: Variable names.
                 Values: strings.
 </code></pre>
 <h3 id="optional-named-parameters">Optional Named Parameters:</h3>
-<pre><code>- prompt   (str): Prompt to be expected after a command is finished 
-                  running. Usually linux uses  "&gt;" or EOF while 
-                  routers use "&gt;" or "#". The default value should 
-                  work for most nodes. Change it if your connection 
-                  need some special symbol.
+<pre><code>- folder   (str): Path where output log should be stored, leave empty 
+                  to disable logging.
 
+- prompt   (str): Prompt to be expected after a command is finished 
+                  running. Usually linux uses  "&gt;" or EOF while routers 
+                  use "&gt;" or "#". The default value should work for 
+                  most nodes. Change it if your connection need some 
+                  special symbol.
+
+- stdout  (bool): Set True to send the command output to stdout. 
+                  Default False.
 
 - parallel (int): Number of nodes to run the commands simultaneously. 
                   Default is 10, if there are more nodes that this 
@@ -3964,10 +3490,14 @@ def run(self, commands, vars = None,*, folder = None, prompt = None, stdout = No
                   default 10.
 </code></pre>
 <h3 id="returns">Returns:</h3>
-<pre><code>dict: Dictionary formed by nodes unique as keys, value is True if 
-      expected value is found after running the commands, False 
-      if prompt is found before.
+<pre><code>dict: Dictionary formed by nodes unique as keys, Output of the 
+      commands you ran on the node as value.
 </code></pre></div>
+</dd>
+<dt id="connpy.nodes.test"><code class="name flex">
+<span>def <span class="ident">test</span></span>(<span>self, commands, expected, vars=None, *, prompt=None, parallel=10, timeout=None)</span>
+</code></dt>
+<dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -4054,6 +3584,43 @@ def test(self, commands, expected, vars = None,*, prompt = None, parallel = 10, 
     self.status = status
     return result</code></pre>
 </details>
+<div class="desc"><p>Run a command or list of commands on all the nodes in nodelist, then check if expected value appears on the output after the last command.</p>
+<h3 id="parameters">Parameters:</h3>
+<pre><code>- commands (str/list): Commands to run on the node. Should be str or 
+                       list of str.
+
+- expected (str)     : Expected text to appear after running all the 
+                       commands on the node.
+</code></pre>
+<h3 id="optional-parameters">Optional Parameters:</h3>
+<pre><code>- vars  (dict): Dictionary containing the definition of variables for
+                each node, used in commands and expected parameters.
+                Keys should be formed by nodes unique names. Use
+                special key name __global__ for global variables.
+                Subkeys: Variable names.
+                Values: strings.
+</code></pre>
+<h3 id="optional-named-parameters">Optional Named Parameters:</h3>
+<pre><code>- prompt   (str): Prompt to be expected after a command is finished 
+                  running. Usually linux uses  "&gt;" or EOF while 
+                  routers use "&gt;" or "#". The default value should 
+                  work for most nodes. Change it if your connection 
+                  need some special symbol.
+
+
+- parallel (int): Number of nodes to run the commands simultaneously. 
+                  Default is 10, if there are more nodes that this 
+                  value, nodes are groups in groups with max this 
+                  number of members.
+
+- timeout  (int): Time in seconds for expect to wait for prompt/EOF.
+                  default 10.
+</code></pre>
+<h3 id="returns">Returns:</h3>
+<pre><code>dict: Dictionary formed by nodes unique as keys, value is True if 
+      expected value is found after running the commands, False 
+      if prompt is found before.
+</code></pre></div>
 </dd>
 </dl>
 </dd>
@@ -4061,7 +3628,6 @@ def test(self, commands, expected, vars = None,*, prompt = None, parallel = 10, 
 </section>
 </article>
 <nav id="sidebar">
-<h1>Index</h1>
 <div class="toc">
 <ul>
 <li><a href="#connection-manager">Connection manager</a><ul>
@@ -4163,7 +3729,7 @@ def test(self, commands, expected, vars = None,*, prompt = None, parallel = 10, 
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.10.0</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
 </footer>
 </body>
 </html>
