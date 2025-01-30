@@ -596,7 +596,7 @@ class node:
                     if results in initial_indices[self.protocol]:
                         if self.protocol in ["ssh", "sftp"]:
                             child.sendline('yes')
-                        elif self.protocol in ["telnet", "kubectl"]:
+                        elif self.protocol in ["telnet", "kubectl", "docker"]:
                             if self.user:
                                 child.sendline(self.user)
                             else:
