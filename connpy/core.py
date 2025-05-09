@@ -582,6 +582,8 @@ class node:
         attempts = 1
         while attempts <= max_attempts:
             child = pexpect.spawn(cmd)
+            if isinstance(self.tags, dict) and self.tags.get("console"):
+                child.sendline()
             if debug:
                 print(cmd)
                 self.mylog = io.BytesIO()
@@ -635,6 +637,12 @@ class node:
             else:
                 break
 
+        if isinstance(self.tags, dict) and self.tags.get("post_connect_commands"):
+            cmds = self.tags.get("post_connect_commands")
+            commands = [cmds] if isinstance(cmds, str) else cmds
+            for command in commands:
+                child.sendline(command)
+                sleep(1)
         child.readline(0)
         self.child = child
         return True
