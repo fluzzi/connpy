@@ -110,6 +110,7 @@ class connapp:
         #BULKPARSER
         bulkparser = subparsers.add_parser("bulk", description="Add nodes in bulk") 
         bulkparser.add_argument("bulk", const="bulk", nargs=0, action=self._store_type, help="Add nodes in bulk")
+        bulkparser.add_argument("-f", "--file", nargs=1, help="Import nodes from a file. First line nodes, second line hosts")
         bulkparser.set_defaults(func=self._func_others)
         # EXPORTPARSER
         exportparser = subparsers.add_parser("export", description="Export connection folder to Yaml file") 
@@ -340,7 +341,7 @@ class connapp:
             elif isinstance(v, dict):
                 print(k + ":")
                 for i,d in v.items():
-                    print("  - " + i + ": " + d)
+                    print("  - " + i + ": " + str(d))
 
     def _mod(self, args):
         if args.data == None:
@@ -439,7 +440,7 @@ class connapp:
             elif isinstance(v, dict):
                 print(k + ":")
                 for i,d in v.items():
-                    print("  - " + i + ": " + d)
+                    print("  - " + i + ": " + str(d))
 
     def _profile_add(self, args):
         matches = list(filter(lambda k: k == args.data[0], self.profiles))
@@ -542,7 +543,19 @@ class connapp:
         print("{} {} succesfully to {}".format(args.data[0],action, args.data[1]))
 
     def _bulk(self, args):
-        newnodes = self._questions_bulk()
+        if args.file and os.path.isfile(args.file[0]):
+            with open(args.file[0], 'r') as f:
+                lines = f.readlines()
+
+            # Expecting exactly 2 lines
+            if len(lines) < 2:
+                raise ValueError("The file must contain at least two lines: one for nodes, one for hosts.")
+
+            nodes = lines[0].strip()
+            hosts = lines[1].strip()
+            newnodes = self._questions_bulk(nodes, hosts)
+        else:
+            newnodes = self._questions_bulk()
         if newnodes == False:
             exit(7)
         if not self.case:
@@ -1361,12 +1374,12 @@ class connapp:
         result["id"] = unique
         return result
 
-    def _questions_bulk(self):
+    def _questions_bulk(self, nodes="", hosts=""):
         #Questions when using bulk command
         questions = []
-        questions.append(inquirer.Text("ids", message="add a comma separated list of nodes to add", validate=self._bulk_node_validation))
+        questions.append(inquirer.Text("ids", message="add a comma separated list of nodes to add", default=nodes, validate=self._bulk_node_validation))
         questions.append(inquirer.Text("location", message="Add a @folder, @subfolder@folder or leave empty", validate=self._bulk_folder_validation))
-        questions.append(inquirer.Text("host", message="Add comma separated list of Hostnames or IPs", validate=self._bulk_host_validation))
+        questions.append(inquirer.Text("host", message="Add comma separated list of Hostnames or IPs", default=hosts, validate=self._bulk_host_validation))
         questions.append(inquirer.Text("protocol", message="Select Protocol/app", validate=self._protocol_validation))
         questions.append(inquirer.Text("port", message="Select Port Number", validate=self._port_validation))
         questions.append(inquirer.Text("options", message="Pass extra options to protocol/app", validate=self._default_validation))
