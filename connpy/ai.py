@@ -1,4 +1,4 @@
-import openai
+from openai import OpenAI
 import time
 import json
 import re
@@ -22,7 +22,7 @@ class ai:
 
         '''
 
-    def __init__(self, config, org = None, api_key = None, model = None, temp = 0.7):
+    def __init__(self, config, org = None, api_key = None, model = None):
         ''' 
             
         ### Parameters:  
@@ -48,28 +48,24 @@ class ai:
 
         '''
         self.config = config
-        if org:
-            openai.organization = org
-        else:
-            try: 
-                openai.organization = self.config.config["openai"]["organization"]
-            except:
-                raise ValueError("Missing openai organization")
-        if api_key:
-            openai.api_key = api_key
-        else:
-            try: 
-                openai.api_key = self.config.config["openai"]["api_key"]
-            except:
-                raise ValueError("Missing openai api_key")
+        try:
+            final_api_key = api_key if api_key else self.config.config["openai"]["api_key"]
+        except Exception:
+            raise ValueError("Missing openai api_key")
+
+        try:
+            final_org = org if org else self.config.config["openai"]["organization"]
+        except Exception:
+            raise ValueError("Missing openai organization")
+
+        self.client = OpenAI(api_key=final_api_key, organization=final_org)
         if model:
             self.model = model
         else:
             try:
                 self.model = self.config.config["openai"]["model"]
             except:
-                self.model = "gpt-4o-mini"
-        self.temp = temp
+                self.model = "o4-mini"
         self.__prompt = {}
         self.__prompt["original_system"] = """
             You are the AI chatbot and assistant of a network connection manager and automation app called connpy. When provided with user input analyze the input and extract the following information. If user wants to chat just reply and don't call a function:
@@ -249,17 +245,22 @@ Categorize the user's request based on the operation they want to perform on the
         message.append({"role": "assistant", "content": None, "function_call": self.__prompt["command_assistant"]})
         message.append({"role": "user", "content": command_input})
         functions = [command_function]
-        response = openai.ChatCompletion.create(
+        response = self.client.chat.completions.create(
             model=self.model,
             messages=message,
             functions=functions,
             function_call={"name": "get_commands"},
-            temperature=self.temp
             )
         output = {}
-        result = response["choices"][0]["message"].to_dict()
-        json_result = json.loads(result["function_call"]["arguments"])
-        output["response"] = self._clean_command_response(json_result, node_list)
+        msg = response.choices[0].message  # Es un objeto ChatCompletionMessage
+
+        # Puede que function_call sea None. Verificá primero.
+        if msg.function_call and msg.function_call.arguments:
+            json_result = json.loads(msg.function_call.arguments)
+            output["response"] = self._clean_command_response(json_result, node_list)
+        else:
+            # Manejo de error o fallback, según tu lógica
+            output["response"] = None
         return output
 
     @MethodHook
@@ -274,32 +275,45 @@ Categorize the user's request based on the operation they want to perform on the
             chat_history = []
         chat_history.append({"role": "user", "content": user_input})
         message.extend(chat_history)
-        response = openai.ChatCompletion.create(
+        response = self.client.chat.completions.create(
             model=self.model,
             messages=message,
             functions=functions,
             function_call="auto",
-            temperature=self.temp,
             top_p=1
             )
-
         def extract_quoted_strings(text):
             pattern = r'["\'](.*?)["\']'
             matches = re.findall(pattern, text)
             return matches
         expected = extract_quoted_strings(user_input)
         output = {}
-        result = response["choices"][0]["message"].to_dict()
-        if result["content"]:
+        msg = response.choices[0].message  # Objeto ChatCompletionMessage
+
+        if msg.content:  # Si hay texto libre del modelo (caso "no app-related")
             output["app_related"] = False
-            chat_history.append({"role": "assistant", "content": result["content"]})
-            output["response"] = result["content"]
+            chat_history.append({"role": "assistant", "content": msg.content})
+            output["response"] = msg.content
         else:
-            json_result = json.loads(result["function_call"]["arguments"])
-            output["app_related"] = True
-            output["filter"] = json_result["filter"]
-            output["type"] = json_result["type"]
-            chat_history.append({"role": "assistant", "content": result["content"], "function_call": {"name": result["function_call"]["name"], "arguments": json.dumps(json_result)}})
+            # Si hay function_call, es app-related
+            if msg.function_call and msg.function_call.arguments:
+                json_result = json.loads(msg.function_call.arguments)
+                output["app_related"] = True
+                output["filter"] = json_result["filter"]
+                output["type"] = json_result["type"]
+                chat_history.append({
+                    "role": "assistant",
+                    "content": msg.content,
+                    "function_call": {
+                        "name": msg.function_call.name,
+                        "arguments": json.dumps(json_result)
+                    }
+                })
+            else:
+                # Fallback defensivo si no hay nada
+                output["app_related"] = False
+                output["response"] = None
+
         output["expected"] = expected
         output["chat_history"] = chat_history
         return output
@@ -310,23 +324,27 @@ Categorize the user's request based on the operation they want to perform on the
         message = []
         message.append({"role": "user", "content": user_input})
         functions = [self.__prompt["confirmation_function"]]
-        response = openai.ChatCompletion.create(
+        response = self.client.chat.completions.create(
             model=self.model,
             messages=message,
             functions=functions,
             function_call={"name": "get_confirmation"},
-            temperature=self.temp,
             top_p=1
             )
-        result = response["choices"][0]["message"].to_dict()
-        json_result = json.loads(result["function_call"]["arguments"])
+        msg = response.choices[0].message  # Es un objeto ChatCompletionMessage
         output = {}
-        if json_result["result"] == "true":
-            output["result"] = True
-        elif json_result["result"] == "false":
-            output["result"] = False
-        elif json_result["result"] == "none":
-            output["result"] = json_result["response"]
+
+        if msg.function_call and msg.function_call.arguments:
+            json_result = json.loads(msg.function_call.arguments)
+            if json_result["result"] == "true":
+                output["result"] = True
+            elif json_result["result"] == "false":
+                output["result"] = False
+            elif json_result["result"] == "none":
+                output["result"] = json_result.get("response")  # .get para evitar KeyError si falta
+        else:
+            output["result"] = None  # O el valor que tenga sentido para tu caso
+
         return output
 
     @MethodHook

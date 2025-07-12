@@ -722,7 +722,7 @@ indicating successful verification.</p>
 </dd>
 <dt id="connpy.ai"><code class="flex name class">
 <span>class <span class="ident">ai</span></span>
-<span>(</span><span>config, org=None, api_key=None, model=None, temp=0.7)</span>
+<span>(</span><span>config, org=None, api_key=None, model=None)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -743,7 +743,7 @@ class ai:
 
         &#39;&#39;&#39;
 
-    def __init__(self, config, org = None, api_key = None, model = None, temp = 0.7):
+    def __init__(self, config, org = None, api_key = None, model = None):
         &#39;&#39;&#39; 
             
         ### Parameters:  
@@ -769,28 +769,24 @@ class ai:
 
         &#39;&#39;&#39;
         self.config = config
-        if org:
-            openai.organization = org
-        else:
-            try: 
-                openai.organization = self.config.config[&#34;openai&#34;][&#34;organization&#34;]
-            except:
-                raise ValueError(&#34;Missing openai organization&#34;)
-        if api_key:
-            openai.api_key = api_key
-        else:
-            try: 
-                openai.api_key = self.config.config[&#34;openai&#34;][&#34;api_key&#34;]
-            except:
-                raise ValueError(&#34;Missing openai api_key&#34;)
+        try:
+            final_api_key = api_key if api_key else self.config.config[&#34;openai&#34;][&#34;api_key&#34;]
+        except Exception:
+            raise ValueError(&#34;Missing openai api_key&#34;)
+
+        try:
+            final_org = org if org else self.config.config[&#34;openai&#34;][&#34;organization&#34;]
+        except Exception:
+            raise ValueError(&#34;Missing openai organization&#34;)
+
+        self.client = OpenAI(api_key=final_api_key, organization=final_org)
         if model:
             self.model = model
         else:
             try:
                 self.model = self.config.config[&#34;openai&#34;][&#34;model&#34;]
             except:
-                self.model = &#34;gpt-4o-mini&#34;
-        self.temp = temp
+                self.model = &#34;o4-mini&#34;
         self.__prompt = {}
         self.__prompt[&#34;original_system&#34;] = &#34;&#34;&#34;
             You are the AI chatbot and assistant of a network connection manager and automation app called connpy. When provided with user input analyze the input and extract the following information. If user wants to chat just reply and don&#39;t call a function:
@@ -970,17 +966,22 @@ Categorize the user&#39;s request based on the operation they want to perform on
         message.append({&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: None, &#34;function_call&#34;: self.__prompt[&#34;command_assistant&#34;]})
         message.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: command_input})
         functions = [command_function]
-        response = openai.ChatCompletion.create(
+        response = self.client.chat.completions.create(
             model=self.model,
             messages=message,
             functions=functions,
             function_call={&#34;name&#34;: &#34;get_commands&#34;},
-            temperature=self.temp
             )
         output = {}
-        result = response[&#34;choices&#34;][0][&#34;message&#34;].to_dict()
-        json_result = json.loads(result[&#34;function_call&#34;][&#34;arguments&#34;])
-        output[&#34;response&#34;] = self._clean_command_response(json_result, node_list)
+        msg = response.choices[0].message  # Es un objeto ChatCompletionMessage
+
+        # Puede que function_call sea None. Verificá primero.
+        if msg.function_call and msg.function_call.arguments:
+            json_result = json.loads(msg.function_call.arguments)
+            output[&#34;response&#34;] = self._clean_command_response(json_result, node_list)
+        else:
+            # Manejo de error o fallback, según tu lógica
+            output[&#34;response&#34;] = None
         return output
 
     @MethodHook
@@ -995,32 +996,45 @@ Categorize the user&#39;s request based on the operation they want to perform on
             chat_history = []
         chat_history.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: user_input})
         message.extend(chat_history)
-        response = openai.ChatCompletion.create(
+        response = self.client.chat.completions.create(
             model=self.model,
             messages=message,
             functions=functions,
             function_call=&#34;auto&#34;,
-            temperature=self.temp,
             top_p=1
             )
-
         def extract_quoted_strings(text):
             pattern = r&#39;[&#34;\&#39;](.*?)[&#34;\&#39;]&#39;
             matches = re.findall(pattern, text)
             return matches
         expected = extract_quoted_strings(user_input)
         output = {}
-        result = response[&#34;choices&#34;][0][&#34;message&#34;].to_dict()
-        if result[&#34;content&#34;]:
+        msg = response.choices[0].message  # Objeto ChatCompletionMessage
+
+        if msg.content:  # Si hay texto libre del modelo (caso &#34;no app-related&#34;)
             output[&#34;app_related&#34;] = False
-            chat_history.append({&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: result[&#34;content&#34;]})
-            output[&#34;response&#34;] = result[&#34;content&#34;]
+            chat_history.append({&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: msg.content})
+            output[&#34;response&#34;] = msg.content
         else:
-            json_result = json.loads(result[&#34;function_call&#34;][&#34;arguments&#34;])
-            output[&#34;app_related&#34;] = True
-            output[&#34;filter&#34;] = json_result[&#34;filter&#34;]
-            output[&#34;type&#34;] = json_result[&#34;type&#34;]
-            chat_history.append({&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: result[&#34;content&#34;], &#34;function_call&#34;: {&#34;name&#34;: result[&#34;function_call&#34;][&#34;name&#34;], &#34;arguments&#34;: json.dumps(json_result)}})
+            # Si hay function_call, es app-related
+            if msg.function_call and msg.function_call.arguments:
+                json_result = json.loads(msg.function_call.arguments)
+                output[&#34;app_related&#34;] = True
+                output[&#34;filter&#34;] = json_result[&#34;filter&#34;]
+                output[&#34;type&#34;] = json_result[&#34;type&#34;]
+                chat_history.append({
+                    &#34;role&#34;: &#34;assistant&#34;,
+                    &#34;content&#34;: msg.content,
+                    &#34;function_call&#34;: {
+                        &#34;name&#34;: msg.function_call.name,
+                        &#34;arguments&#34;: json.dumps(json_result)
+                    }
+                })
+            else:
+                # Fallback defensivo si no hay nada
+                output[&#34;app_related&#34;] = False
+                output[&#34;response&#34;] = None
+
         output[&#34;expected&#34;] = expected
         output[&#34;chat_history&#34;] = chat_history
         return output
@@ -1031,23 +1045,27 @@ Categorize the user&#39;s request based on the operation they want to perform on
         message = []
         message.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: user_input})
         functions = [self.__prompt[&#34;confirmation_function&#34;]]
-        response = openai.ChatCompletion.create(
+        response = self.client.chat.completions.create(
             model=self.model,
             messages=message,
             functions=functions,
             function_call={&#34;name&#34;: &#34;get_confirmation&#34;},
-            temperature=self.temp,
             top_p=1
             )
-        result = response[&#34;choices&#34;][0][&#34;message&#34;].to_dict()
-        json_result = json.loads(result[&#34;function_call&#34;][&#34;arguments&#34;])
+        msg = response.choices[0].message  # Es un objeto ChatCompletionMessage
         output = {}
-        if json_result[&#34;result&#34;] == &#34;true&#34;:
-            output[&#34;result&#34;] = True
-        elif json_result[&#34;result&#34;] == &#34;false&#34;:
-            output[&#34;result&#34;] = False
-        elif json_result[&#34;result&#34;] == &#34;none&#34;:
-            output[&#34;result&#34;] = json_result[&#34;response&#34;]
+
+        if msg.function_call and msg.function_call.arguments:
+            json_result = json.loads(msg.function_call.arguments)
+            if json_result[&#34;result&#34;] == &#34;true&#34;:
+                output[&#34;result&#34;] = True
+            elif json_result[&#34;result&#34;] == &#34;false&#34;:
+                output[&#34;result&#34;] = False
+            elif json_result[&#34;result&#34;] == &#34;none&#34;:
+                output[&#34;result&#34;] = json_result.get(&#34;response&#34;)  # .get para evitar KeyError si falta
+        else:
+            output[&#34;result&#34;] = None  # O el valor que tenga sentido para tu caso
+
         return output
 
     @MethodHook
