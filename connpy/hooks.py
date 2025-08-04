@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 #Imports
 from functools import wraps, partial, update_wrapper
+from . import printer
 
 #functions and classes
 
@@ -19,7 +20,7 @@ class MethodHook:
             try:
                 args, kwargs = hook(*args, **kwargs)
             except Exception as e:
-                print(f"{self.func.__name__} Pre-hook {hook.__name__} raised an exception: {e}")
+                printer.error(f"{self.func.__name__} Pre-hook {hook.__name__} raised an exception: {e}")
 
         try:
             result = self.func(*args, **kwargs)
@@ -30,7 +31,7 @@ class MethodHook:
                 try:
                     result = hook(*args, **kwargs, result=result)  # Pass result to hooks
                 except Exception as e:
-                    print(f"{self.func.__name__} Post-hook {hook.__name__} raised an exception: {e}")
+                    printer.error(f"{self.func.__name__} Post-hook {hook.__name__} raised an exception: {e}")
 
         return result
 

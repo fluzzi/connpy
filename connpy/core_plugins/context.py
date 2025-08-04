@@ -1,6 +1,7 @@
 import argparse
 import yaml
 import re
+from connpy import printer
 
 
 class context_manager:
@@ -14,10 +15,10 @@ class context_manager:
 
     def add_context(self, context, regex):
         if not context.isalnum():
-            print("Context name has to be alphanumeric.")
+            printer.error("Context name has to be alphanumeric.")
             exit(1)
         elif context in self.contexts:
-            print(f"Context {context} already exists.")
+            printer.error(f"Context {context} already exists.")
             exit(2)
         else:
             self.contexts[context] = regex
@@ -25,10 +26,10 @@ class context_manager:
 
     def modify_context(self, context, regex):
         if context == "all":
-            print("Can't modify default context: all")
+            printer.error("Can't modify default context: all")
             exit(3)
         elif context not in self.contexts:
-            print(f"Context {context} doesn't exist.")
+            printer.error(f"Context {context} doesn't exist.")
             exit(4)
         else:
             self.contexts[context] = regex
@@ -36,13 +37,13 @@ class context_manager:
 
     def delete_context(self, context):
         if context == "all":
-            print("Can't delete default context: all")
+            printer.error("Can't delete default context: all")
             exit(3)
         elif context not in self.contexts:
-            print(f"Context {context} doesn't exist.")
+            printer.error(f"Context {context} doesn't exist.")
             exit(4)
         if context == self.current_context:
-            print(f"Can't delete current context: {self.current_context}")
+            printer.error(f"Can't delete current context: {self.current_context}")
             exit(5)
         else:
             self.contexts.pop(context)
@@ -51,26 +52,27 @@ class context_manager:
     def list_contexts(self):
         for key in self.contexts.keys():
             if key == self.current_context:
-                print(f"{key} * (active)")
+                printer.success(f"{key} (active)")
             else:
-                print(key)
+                printer.custom(" ",key)
 
     def set_context(self, context):
         if context not in self.contexts:
-            print(f"Context {context} doesn't exist.")
+            printer.error(f"Context {context} doesn't exist.")
             exit(4)
         elif context == self.current_context:
-            print(f"Context {context} already set")
+            printer.info(f"Context {context} already set")
             exit(0)
         else:
             self.connapp._change_settings("current_context", context)
 
     def show_context(self, context):
         if context not in self.contexts:
-            print(f"Context {context} doesn't exist.")
+            printer.error(f"Context {context} doesn't exist.")
             exit(4)
         else:
             yaml_output = yaml.dump(self.contexts[context], sort_keys=False, default_flow_style=False)
+            printer.custom(context,"")
             print(yaml_output)
 
 
@@ -113,18 +115,17 @@ class Preload:
 class Parser:
     def __init__(self):
         self.parser = argparse.ArgumentParser(description="Manage contexts with regex matching", formatter_class=argparse.RawTextHelpFormatter)
-        self.description = "Manage contexts with regex matching"
         
         # Define the context name as a positional argument
         self.parser.add_argument("context_name", help="Name of the context", nargs='?')
 
         group = self.parser.add_mutually_exclusive_group(required=True)
-        group.add_argument("-a", "--add", nargs='+', help='Add a new context with regex values. Usage: context -a name "regex1" "regex2"')
-        group.add_argument("-r", "--rm", "--del", action='store_true', help="Delete a context. Usage: context -d name")
-        group.add_argument("--ls", action='store_true', help="List all contexts. Usage: context --list")
-        group.add_argument("--set", action='store_true', help="Set the used context. Usage: context --set name")
-        group.add_argument("-s", "--show", action='store_true', help="Show the defined regex of a context. Usage: context --show name")
-        group.add_argument("-e", "--edit", "--mod", nargs='+', help='Modify an existing context. Usage: context --mod name "regex1" "regex2"')
+        group.add_argument("-a", "--add", nargs='+', help='Add a new context with regex values.\nUsage: context -a name "regex1" "regex2"')
+        group.add_argument("-r", "--rm", "--del", action='store_true', help="Delete a context.\nUsage: context -d name")
+        group.add_argument("--ls", action='store_true', help="List all contexts.\nUsage: context --ls")
+        group.add_argument("--set", action='store_true', help="Set the used context.\nUsage: context --set name")
+        group.add_argument("-s", "--show", action='store_true', help="Show the defined regex of a context.\nUsage: context --show name")
+        group.add_argument("-e", "--edit", "--mod", nargs='+', help='Modify an existing context.\nUsage: context --mod name "regex1" "regex2"')
 
 class Entrypoint:
     def __init__(self, args, parser, connapp):
