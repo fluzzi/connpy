@@ -4,6 +4,7 @@ import importlib.util
 import sys
 import argparse
 import os
+from connpy import printer
 
 class Plugins:
     def __init__(self):
@@ -30,8 +31,7 @@ class Plugins:
         ### Verifications:
             - The presence of only allowed top-level elements.
             - The existence of two specific classes: 'Parser' and 'Entrypoint'. and/or specific class: Preload.
-            - 'Parser' class must only have an '__init__' method and must assign 'self.parser'
-              and 'self.description'.
+            - 'Parser' class must only have an '__init__' method and must assign 'self.parser'.
             - 'Entrypoint' class must have an '__init__' method accepting specific arguments.
 
         If any of these checks fail, the function returns an error message indicating 
@@ -77,11 +77,12 @@ class Plugins:
                     if not all(isinstance(method, ast.FunctionDef) and method.name == '__init__' for method in node.body):
                         return "Parser class should only have __init__ method"
 
-                    # Check if 'self.parser' and 'self.description' are assigned in __init__ method
+                    # Check if 'self.parser' is assigned in __init__ method
                     init_method = node.body[0]
                     assigned_attrs = [target.attr for expr in init_method.body if isinstance(expr, ast.Assign) for target in expr.targets if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == 'self']
-                    if 'parser' not in assigned_attrs or 'description' not in assigned_attrs:
-                        return "Parser class should set self.parser and self.description" # 'self.parser' or 'self.description' not assigned in __init__
+                    if 'parser' not in assigned_attrs:
+                        return "Parser class should set self.parser"
+
 
                 elif node.name == 'Entrypoint':
                     has_entrypoint = True
@@ -124,13 +125,14 @@ class Plugins:
                 filepath = os.path.join(directory, filename)
                 check_file = self.verify_script(filepath)
                 if check_file:
-                    print(f"Failed to load plugin: {filename}. Reason: {check_file}")
+                    printer.error(f"Failed to load plugin: {filename}. Reason: {check_file}")
                     continue
                 else:
                     self.plugins[root_filename] = self._import_from_path(filepath)
                     if hasattr(self.plugins[root_filename], "Parser"):
                         self.plugin_parsers[root_filename] = self.plugins[root_filename].Parser()
-                        subparsers.add_parser(root_filename, parents=[self.plugin_parsers[root_filename].parser], add_help=False, description=self.plugin_parsers[root_filename].description)
+                        plugin = self.plugin_parsers[root_filename]
+                        subparsers.add_parser(root_filename, parents=[self.plugin_parsers[root_filename].parser], add_help=False, usage=plugin.parser.usage, description=plugin.parser.description, epilog=plugin.parser.epilog, formatter_class=plugin.parser.formatter_class)
                     if hasattr(self.plugins[root_filename], "Preload"):
                         self.preloads[root_filename] = self.plugins[root_filename]
 
