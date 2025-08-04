@@ -13,6 +13,7 @@ import threading
 from pathlib import Path
 from copy import deepcopy
 from .hooks import ClassHook, MethodHook
+from . import printer
 import io
 
 #functions and classes
@@ -28,7 +29,7 @@ class node:
         - result(bool): True if expected value is found after running 
                         the commands using test method.
 
-        - status (int): 0 if the method run or test run succesfully.
+        - status (int): 0 if the method run or test run successfully.
                         1 if connection failed.
                         2 if expect timeouts without prompt or EOF.
 
@@ -254,7 +255,7 @@ class node:
         if connect == True:
             size = re.search('columns=([0-9]+).*lines=([0-9]+)',str(os.get_terminal_size()))
             self.child.setwinsize(int(size.group(2)),int(size.group(1)))
-            print("Connected to " + self.unique + " at " + self.host + (":" if self.port != '' else '') + self.port + " via: " + self.protocol)
+            printer.success("Connected to " + self.unique + " at " + self.host + (":" if self.port != '' else '') + self.port + " via: " + self.protocol)
             if 'logfile' in dir(self):
                 # Initialize self.mylog
                 if not 'mylog' in dir(self):
@@ -279,7 +280,7 @@ class node:
                     f.write(self._logclean(self.mylog.getvalue().decode(), True))
 
         else:
-            print(connect)
+            printer.error(connect)
             exit(1)
 
     @MethodHook
@@ -585,7 +586,7 @@ class node:
             if isinstance(self.tags, dict) and self.tags.get("console"):
                 child.sendline()
             if debug:
-                print(cmd)
+                printer.debug(f"Command:\n{cmd}")
                 self.mylog = io.BytesIO()
                 child.logfile_read = self.mylog
 
@@ -645,6 +646,8 @@ class node:
                 sleep(1)
         child.readline(0)
         self.child = child
+        from pexpect import fdpexpect
+        self.raw_child = fdpexpect.fdspawn(self.child.child_fd)
         return True
 
 @ClassHook
@@ -666,7 +669,7 @@ class nodes:
                            Created after running method test.  
 
         - status   (dict): Dictionary formed by nodes unique as keys, value: 
-                           0 if method run or test ended succesfully.
+                           0 if method run or test ended successfully.
                            1 if connection failed.
                            2 if expect timeouts without prompt or EOF.
 

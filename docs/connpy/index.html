@@ -143,9 +143,8 @@ options:
 <li><strong>Purpose</strong>: Handles parsing of command-line arguments.</li>
 <li><strong>Requirements</strong>:</li>
 <li>Must contain only one method: <code>__init__</code>.</li>
-<li>The <code>__init__</code> method must initialize at least two attributes:<ul>
+<li>The <code>__init__</code> method must initialize at least one attribute:<ul>
 <li><code>self.parser</code>: An instance of <code>argparse.ArgumentParser</code>.</li>
-<li><code>self.description</code>: A string containing the description of the parser.</li>
 </ul>
 </li>
 </ul>
@@ -270,6 +269,89 @@ connapp.ai.some_method.register_pre_hook(pre_processing_hook)</p>
 <li><code>if __name__ == "__main__":</code></li>
 <li>This block allows the plugin to be run as a standalone script for testing or independent use.</li>
 </ul>
+<h3 id="command-completion-support">Command Completion Support</h3>
+<p>Plugins can provide intelligent <strong>tab completion</strong> by defining a function called <code>_connpy_completion</code> in the plugin script. This function will be called by Connpy to assist with command-line completion when the user types partial input.</p>
+<h4 id="function-signature">Function Signature</h4>
+<pre><code>def _connpy_completion(wordsnumber, words, info=None):
+    ...
+</code></pre>
+<h4 id="parameters">Parameters</h4>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>wordsnumber</code></td>
+<td>Integer indicating the number of words (space-separated tokens) currently on the command line. For plugins, this typically starts at 3 (e.g., <code>connpy &lt;plugin&gt; ...</code>).</td>
+</tr>
+<tr>
+<td><code>words</code></td>
+<td>A list of tokens (words) already typed. <code>words[0]</code> is always the name of the plugin, followed by any subcommands or arguments.</td>
+</tr>
+<tr>
+<td><code>info</code></td>
+<td>A dictionary of structured context data provided by Connpy to help with suggestions.</td>
+</tr>
+</tbody>
+</table>
+<h4 id="contents-of-info">Contents of <code>info</code></h4>
+<p>The <code>info</code> dictionary contains helpful context to generate completions:</p>
+<pre><code>info = {
+    &quot;config&quot;: config_dict,     # The full loaded configuration
+    &quot;nodes&quot;: node_list,        # List of all known node names
+    &quot;folders&quot;: folder_list,    # List of all defined folder names
+    &quot;profiles&quot;: profile_list,  # List of all profile names
+    &quot;plugins&quot;: plugin_list     # List of all plugin names
+}
+</code></pre>
+<p>You can use this data to generate suggestions based on the current input.</p>
+<h4 id="return-value">Return Value</h4>
+<p>The function must return a list of suggestion strings to be presented to the user.</p>
+<h4 id="example">Example</h4>
+<pre><code>def _connpy_completion(wordsnumber, words, info=None):
+    if wordsnumber == 3:
+        return [&quot;--help&quot;, &quot;--verbose&quot;, &quot;start&quot;, &quot;stop&quot;]
+
+    elif wordsnumber == 4 and words[2] == &quot;start&quot;:
+        return info[&quot;nodes&quot;]  # Suggest node names
+
+    return []
+</code></pre>
+<blockquote>
+<p>In this example, if the user types <code><a title="connpy" href="#connpy">connpy</a> myplugin start </code> and presses Tab, it will suggest node names.</p>
+</blockquote>
+<h3 id="handling-unknown-arguments">Handling Unknown Arguments</h3>
+<p>Plugins can choose to accept and process unknown arguments that are <strong>not explicitly defined</strong> in the parser. To enable this behavior, the plugin must define the following hidden argument in its <code>Parser</code> class:</p>
+<pre><code>self.parser.add_argument(
+    &quot;--unknown-args&quot;,
+    action=&quot;store_true&quot;,
+    default=True,
+    help=argparse.SUPPRESS
+)
+</code></pre>
+<h4 id="behavior">Behavior:</h4>
+<ul>
+<li>When this argument is present, Connpy will parse the known arguments and capture any extra (unknown) ones.</li>
+<li>These unknown arguments will be passed to the plugin as <code>args.unknown_args</code> inside the <code>Entrypoint</code>.</li>
+<li>If the user does not pass any unknown arguments, <code>args.unknown_args</code> will contain the default value (<code>True</code>, unless overridden).</li>
+</ul>
+<h4 id="example_1">Example:</h4>
+<p>If a plugin accepts unknown tcpdump flags like this:</p>
+<pre><code>connpy myplugin -nn -s0
+</code></pre>
+<p>And defines the hidden <code>--unknown-args</code> flag as shown above, then:</p>
+<ul>
+<li><code>args.unknown_args</code> inside <code>Entrypoint.__init__()</code> will be: <code>['-nn', '-s0']</code></li>
+</ul>
+<blockquote>
+<p>This allows the plugin to receive and process arguments intended for external tools (e.g., <code>tcpdump</code>) without argparse raising an error.</p>
+</blockquote>
+<h4 id="note">Note:</h4>
+<p>If a plugin does <strong>not</strong> define <code>--unknown-args</code>, any extra arguments passed will cause argparse to fail with an unrecognized arguments error.</p>
 <h3 id="script-verification">Script Verification</h3>
 <ul>
 <li>The <code>verify_script</code> method in <code>plugins.py</code> is used to check the plugin script's compliance with these standards.</li>
@@ -481,8 +563,7 @@ print(result)
         ### Verifications:
             - The presence of only allowed top-level elements.
             - The existence of two specific classes: &#39;Parser&#39; and &#39;Entrypoint&#39;. and/or specific class: Preload.
-            - &#39;Parser&#39; class must only have an &#39;__init__&#39; method and must assign &#39;self.parser&#39;
-              and &#39;self.description&#39;.
+            - &#39;Parser&#39; class must only have an &#39;__init__&#39; method and must assign &#39;self.parser&#39;.
             - &#39;Entrypoint&#39; class must have an &#39;__init__&#39; method accepting specific arguments.
 
         If any of these checks fail, the function returns an error message indicating 
@@ -528,11 +609,12 @@ print(result)
                     if not all(isinstance(method, ast.FunctionDef) and method.name == &#39;__init__&#39; for method in node.body):
                         return &#34;Parser class should only have __init__ method&#34;
 
-                    # Check if &#39;self.parser&#39; and &#39;self.description&#39; are assigned in __init__ method
+                    # Check if &#39;self.parser&#39; is assigned in __init__ method
                     init_method = node.body[0]
                     assigned_attrs = [target.attr for expr in init_method.body if isinstance(expr, ast.Assign) for target in expr.targets if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == &#39;self&#39;]
-                    if &#39;parser&#39; not in assigned_attrs or &#39;description&#39; not in assigned_attrs:
-                        return &#34;Parser class should set self.parser and self.description&#34; # &#39;self.parser&#39; or &#39;self.description&#39; not assigned in __init__
+                    if &#39;parser&#39; not in assigned_attrs:
+                        return &#34;Parser class should set self.parser&#34;
+
 
                 elif node.name == &#39;Entrypoint&#39;:
                     has_entrypoint = True
@@ -575,13 +657,14 @@ print(result)
                 filepath = os.path.join(directory, filename)
                 check_file = self.verify_script(filepath)
                 if check_file:
-                    print(f&#34;Failed to load plugin: {filename}. Reason: {check_file}&#34;)
+                    printer.error(f&#34;Failed to load plugin: {filename}. Reason: {check_file}&#34;)
                     continue
                 else:
                     self.plugins[root_filename] = self._import_from_path(filepath)
                     if hasattr(self.plugins[root_filename], &#34;Parser&#34;):
                         self.plugin_parsers[root_filename] = self.plugins[root_filename].Parser()
-                        subparsers.add_parser(root_filename, parents=[self.plugin_parsers[root_filename].parser], add_help=False, description=self.plugin_parsers[root_filename].description)
+                        plugin = self.plugin_parsers[root_filename]
+                        subparsers.add_parser(root_filename, parents=[self.plugin_parsers[root_filename].parser], add_help=False, usage=plugin.parser.usage, description=plugin.parser.description, epilog=plugin.parser.epilog, formatter_class=plugin.parser.formatter_class)
                     if hasattr(self.plugins[root_filename], &#34;Preload&#34;):
                         self.preloads[root_filename] = self.plugins[root_filename]</code></pre>
 </details>
@@ -615,8 +698,7 @@ print(result)
     ### Verifications:
         - The presence of only allowed top-level elements.
         - The existence of two specific classes: &#39;Parser&#39; and &#39;Entrypoint&#39;. and/or specific class: Preload.
-        - &#39;Parser&#39; class must only have an &#39;__init__&#39; method and must assign &#39;self.parser&#39;
-          and &#39;self.description&#39;.
+        - &#39;Parser&#39; class must only have an &#39;__init__&#39; method and must assign &#39;self.parser&#39;.
         - &#39;Entrypoint&#39; class must have an &#39;__init__&#39; method accepting specific arguments.
 
     If any of these checks fail, the function returns an error message indicating 
@@ -662,11 +744,12 @@ print(result)
                 if not all(isinstance(method, ast.FunctionDef) and method.name == &#39;__init__&#39; for method in node.body):
                     return &#34;Parser class should only have __init__ method&#34;
 
-                # Check if &#39;self.parser&#39; and &#39;self.description&#39; are assigned in __init__ method
+                # Check if &#39;self.parser&#39; is assigned in __init__ method
                 init_method = node.body[0]
                 assigned_attrs = [target.attr for expr in init_method.body if isinstance(expr, ast.Assign) for target in expr.targets if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == &#39;self&#39;]
-                if &#39;parser&#39; not in assigned_attrs or &#39;description&#39; not in assigned_attrs:
-                    return &#34;Parser class should set self.parser and self.description&#34; # &#39;self.parser&#39; or &#39;self.description&#39; not assigned in __init__
+                if &#39;parser&#39; not in assigned_attrs:
+                    return &#34;Parser class should set self.parser&#34;
+
 
             elif node.name == &#39;Entrypoint&#39;:
                 has_entrypoint = True
@@ -706,8 +789,7 @@ and that it includes mandatory classes with specific attributes and methods.</p>
 <h3 id="verifications">Verifications:</h3>
 <pre><code>- The presence of only allowed top-level elements.
 - The existence of two specific classes: 'Parser' and 'Entrypoint'. and/or specific class: Preload.
-- 'Parser' class must only have an '__init__' method and must assign 'self.parser'
-  and 'self.description'.
+- 'Parser' class must only have an '__init__' method and must assign 'self.parser'.
 - 'Entrypoint' class must have an '__init__' method accepting specific arguments.
 </code></pre>
 <p>If any of these checks fail, the function returns an error message indicating
@@ -2110,7 +2192,7 @@ class node:
         - result(bool): True if expected value is found after running 
                         the commands using test method.
 
-        - status (int): 0 if the method run or test run succesfully.
+        - status (int): 0 if the method run or test run successfully.
                         1 if connection failed.
                         2 if expect timeouts without prompt or EOF.
 
@@ -2336,7 +2418,7 @@ class node:
         if connect == True:
             size = re.search(&#39;columns=([0-9]+).*lines=([0-9]+)&#39;,str(os.get_terminal_size()))
             self.child.setwinsize(int(size.group(2)),int(size.group(1)))
-            print(&#34;Connected to &#34; + self.unique + &#34; at &#34; + self.host + (&#34;:&#34; if self.port != &#39;&#39; else &#39;&#39;) + self.port + &#34; via: &#34; + self.protocol)
+            printer.success(&#34;Connected to &#34; + self.unique + &#34; at &#34; + self.host + (&#34;:&#34; if self.port != &#39;&#39; else &#39;&#39;) + self.port + &#34; via: &#34; + self.protocol)
             if &#39;logfile&#39; in dir(self):
                 # Initialize self.mylog
                 if not &#39;mylog&#39; in dir(self):
@@ -2361,7 +2443,7 @@ class node:
                     f.write(self._logclean(self.mylog.getvalue().decode(), True))
 
         else:
-            print(connect)
+            printer.error(connect)
             exit(1)
 
     @MethodHook
@@ -2667,7 +2749,7 @@ class node:
             if isinstance(self.tags, dict) and self.tags.get(&#34;console&#34;):
                 child.sendline()
             if debug:
-                print(cmd)
+                printer.debug(f&#34;Command:\n{cmd}&#34;)
                 self.mylog = io.BytesIO()
                 child.logfile_read = self.mylog
 
@@ -2727,6 +2809,8 @@ class node:
                 sleep(1)
         child.readline(0)
         self.child = child
+        from pexpect import fdpexpect
+        self.raw_child = fdpexpect.fdspawn(self.child.child_fd)
         return True</code></pre>
 </details>
 <div class="desc"><p>This class generates a node object. Containts all the information and methods to connect and interact with a device using ssh or telnet.</p>
@@ -2737,7 +2821,7 @@ class node:
 - result(bool): True if expected value is found after running 
                 the commands using test method.
 
-- status (int): 0 if the method run or test run succesfully.
+- status (int): 0 if the method run or test run successfully.
                 1 if connection failed.
                 2 if expect timeouts without prompt or EOF.
 </code></pre>
@@ -2796,7 +2880,7 @@ def interact(self, debug = False):
     if connect == True:
         size = re.search(&#39;columns=([0-9]+).*lines=([0-9]+)&#39;,str(os.get_terminal_size()))
         self.child.setwinsize(int(size.group(2)),int(size.group(1)))
-        print(&#34;Connected to &#34; + self.unique + &#34; at &#34; + self.host + (&#34;:&#34; if self.port != &#39;&#39; else &#39;&#39;) + self.port + &#34; via: &#34; + self.protocol)
+        printer.success(&#34;Connected to &#34; + self.unique + &#34; at &#34; + self.host + (&#34;:&#34; if self.port != &#39;&#39; else &#39;&#39;) + self.port + &#34; via: &#34; + self.protocol)
         if &#39;logfile&#39; in dir(self):
             # Initialize self.mylog
             if not &#39;mylog&#39; in dir(self):
@@ -2821,7 +2905,7 @@ def interact(self, debug = False):
                 f.write(self._logclean(self.mylog.getvalue().decode(), True))
 
     else:
-        print(connect)
+        printer.error(connect)
         exit(1)</code></pre>
 </details>
 <div class="desc"><p>Allow user to interact with the node directly, mostly used by connection manager.</p>
@@ -3143,7 +3227,7 @@ class nodes:
                            Created after running method test.  
 
         - status   (dict): Dictionary formed by nodes unique as keys, value: 
-                           0 if method run or test ended succesfully.
+                           0 if method run or test ended successfully.
                            1 if connection failed.
                            2 if expect timeouts without prompt or EOF.
 
@@ -3365,7 +3449,7 @@ class nodes:
                    Created after running method test.
 
 - status   (dict): Dictionary formed by nodes unique as keys, value: 
-                   0 if method run or test ended succesfully.
+                   0 if method run or test ended successfully.
                    1 if connection failed.
                    2 if expect timeouts without prompt or EOF.
 
@@ -3673,6 +3757,20 @@ def test(self, commands, expected, vars = None,*, prompt = None, parallel = 10, 
 </ul>
 </li>
 <li><a href="#executable-block">Executable Block</a></li>
+<li><a href="#command-completion-support">Command Completion Support</a><ul>
+<li><a href="#function-signature">Function Signature</a></li>
+<li><a href="#parameters">Parameters</a></li>
+<li><a href="#contents-of-info">Contents of info</a></li>
+<li><a href="#return-value">Return Value</a></li>
+<li><a href="#example">Example</a></li>
+</ul>
+</li>
+<li><a href="#handling-unknown-arguments">Handling Unknown Arguments</a><ul>
+<li><a href="#behavior">Behavior:</a></li>
+<li><a href="#example_1">Example:</a></li>
+<li><a href="#note">Note:</a></li>
+</ul>
+</li>
 <li><a href="#script-verification">Script Verification</a></li>
 <li><a href="#example-script">Example Script</a></li>
 </ul>

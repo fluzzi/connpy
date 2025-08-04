@@ -112,9 +112,8 @@ options:
      - **Purpose**: Handles parsing of command-line arguments.
      - **Requirements**:
        - Must contain only one method: `__init__`.
-       - The `__init__` method must initialize at least two attributes:
+       - The `__init__` method must initialize at least one attribute:
          - `self.parser`: An instance of `argparse.ArgumentParser`.
-         - `self.description`: A string containing the description of the parser.
   2. **Class `Entrypoint`**:
      - **Purpose**: Acts as the entry point for plugin execution, utilizing parsed arguments and integrating with the main application.
      - **Requirements**:
@@ -209,6 +208,97 @@ There are 2 methods that allows you to define custom logic to be executed before
 - The plugin script can include an executable block:
   - `if __name__ == "__main__":`
   - This block allows the plugin to be run as a standalone script for testing or independent use.
+
+### Command Completion Support
+
+Plugins can provide intelligent **tab completion** by defining a function called `_connpy_completion` in the plugin script. This function will be called by Connpy to assist with command-line completion when the user types partial input.
+
+#### Function Signature
+
+```
+def _connpy_completion(wordsnumber, words, info=None):
+    ...
+```
+
+#### Parameters
+
+| Parameter      | Description |
+|----------------|-------------|
+| `wordsnumber`  | Integer indicating the number of words (space-separated tokens) currently on the command line. For plugins, this typically starts at 3 (e.g., `connpy <plugin> ...`). |
+| `words`        | A list of tokens (words) already typed. `words[0]` is always the name of the plugin, followed by any subcommands or arguments. |
+| `info`         | A dictionary of structured context data provided by Connpy to help with suggestions. |
+
+#### Contents of `info`
+
+The `info` dictionary contains helpful context to generate completions:
+
+```
+info = {
+    "config": config_dict,     # The full loaded configuration
+    "nodes": node_list,        # List of all known node names
+    "folders": folder_list,    # List of all defined folder names
+    "profiles": profile_list,  # List of all profile names
+    "plugins": plugin_list     # List of all plugin names
+}
+```
+
+You can use this data to generate suggestions based on the current input.
+
+#### Return Value
+
+The function must return a list of suggestion strings to be presented to the user.
+
+#### Example
+
+```
+def _connpy_completion(wordsnumber, words, info=None):
+    if wordsnumber == 3:
+        return ["--help", "--verbose", "start", "stop"]
+
+    elif wordsnumber == 4 and words[2] == "start":
+        return info["nodes"]  # Suggest node names
+
+    return []
+```
+
+> In this example, if the user types `connpy myplugin start ` and presses Tab, it will suggest node names.
+
+### Handling Unknown Arguments
+
+Plugins can choose to accept and process unknown arguments that are **not explicitly defined** in the parser. To enable this behavior, the plugin must define the following hidden argument in its `Parser` class:
+
+```
+self.parser.add_argument(
+    "--unknown-args",
+    action="store_true",
+    default=True,
+    help=argparse.SUPPRESS
+)
+```
+
+#### Behavior:
+
+- When this argument is present, Connpy will parse the known arguments and capture any extra (unknown) ones.
+- These unknown arguments will be passed to the plugin as `args.unknown_args` inside the `Entrypoint`.
+- If the user does not pass any unknown arguments, `args.unknown_args` will contain the default value (`True`, unless overridden).
+
+#### Example:
+
+If a plugin accepts unknown tcpdump flags like this:
+
+```
+connpy myplugin -nn -s0
+```
+
+And defines the hidden `--unknown-args` flag as shown above, then:
+
+- `args.unknown_args` inside `Entrypoint.__init__()` will be: `['-nn', '-s0']`
+
+> This allows the plugin to receive and process arguments intended for external tools (e.g., `tcpdump`) without argparse raising an error.
+
+#### Note:
+
+If a plugin does **not** define `--unknown-args`, any extra arguments passed will cause argparse to fail with an unrecognized arguments error.
 
 ### Script Verification
 - The `verify_script` method in `plugins.py` is used to check the plugin script's compliance with these standards.
@@ -422,8 +512,9 @@ from .ai import ai
 from .plugins import Plugins
 from ._version import __version__
 from pkg_resources import get_distribution
+from . import printer
 
-__all__ = ["node", "nodes", "configfile", "connapp", "ai", "Plugins"]
+__all__ = ["node", "nodes", "configfile", "connapp", "ai", "Plugins", "printer"]
 __author__ = "Federico Luzzi"
 __pdoc__ = {
     'core': False,
@@ -438,5 +529,6 @@ __pdoc__ = {
     'node.deferred_class_hooks': False,
     'nodes.deferred_class_hooks': False,
     'connapp': False,
-    'connapp.encrypt': True
+    'connapp.encrypt': True,
+    'printer': False
 }

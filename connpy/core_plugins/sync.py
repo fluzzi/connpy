@@ -7,6 +7,7 @@ import tempfile
 import io
 import yaml
 import threading
+from connpy import printer
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
@@ -50,33 +51,33 @@ class sync:
                 with open(self.token_file, 'w') as token:
                     token.write(creds.to_json())
 
-            print("Logged in successfully.")
+            printer.success("Logged in successfully.")
 
         except RefreshError as e:
             # If refresh fails, delete the invalid token file and start a new login flow
             if os.path.exists(self.token_file):
                 os.remove(self.token_file)
-            print("Existing token was invalid and has been removed. Please log in again.")
+            printer.warning("Existing token was invalid and has been removed. Please log in again.")
             flow = InstalledAppFlow.from_client_secrets_file(
                 self.google_client, self.scopes)
             creds = flow.run_local_server(port=0, access_type='offline')
             with open(self.token_file, 'w') as token:
                 token.write(creds.to_json())
-            print("Logged in successfully after re-authentication.")
+            printer.success("Logged in successfully after re-authentication.")
 
     def logout(self):
         if os.path.exists(self.token_file):
             os.remove(self.token_file)
-            print("Logged out successfully.")
+            printer.success("Logged out successfully.")
         else:
-            print("No credentials file found. Already logged out.")
+            printer.info("No credentials file found. Already logged out.")
 
     def get_credentials(self):
         # Load credentials from token.json
         if os.path.exists(self.token_file):
             creds = Credentials.from_authorized_user_file(self.token_file, self.scopes)
         else:
-            print("Credentials file not found.")
+            printer.error("Credentials file not found.")
             return 0
         
         # If there are no valid credentials available, ask the user to log in again
@@ -85,10 +86,10 @@ class sync:
                 try:
                     creds.refresh(Request())
                 except RefreshError:
-                    print("Could not refresh access token. Please log in again.")
+                    printer.warning("Could not refresh access token. Please log in again.")
                     return 0
             else:
-                print("Credentials are missing or invalid. Please log in.")
+                printer.warning("Credentials are missing or invalid. Please log in.")
                 return 0
         return creds
 
@@ -114,8 +115,8 @@ class sync:
             return False
 
     def status(self):
-        print(f"Login: {self.check_login_status()}")
-        print(f"Sync: {self.sync}")
+        printer.info(f"Login: {self.check_login_status()}")
+        printer.info(f"Sync: {self.sync}")
 
 
     def get_appdata_files(self):
@@ -151,17 +152,18 @@ class sync:
             return files_info
 
         except HttpError as error:
-            print(f"An error occurred: {error}")
+            printer.error(f"An error occurred: {error}")
             return 0
 
 
     def dump_appdata_files_yaml(self):
         files_info = self.get_appdata_files()
         if not files_info:
-            print("Failed to retrieve files or no files found.")
+            printer.error("Failed to retrieve files or no files found.")
             return
         # Pretty print as YAML
         yaml_output = yaml.dump(files_info, sort_keys=False, default_flow_style=False)
+        printer.custom("backups","")
         print(yaml_output)
 
 
@@ -233,16 +235,16 @@ class sync:
                 oldest_file = min(app_data_files, key=lambda x: x['timestamp'])
                 delete_old = self.delete_file_by_id(oldest_file['id'])
                 if delete_old:
-                    print(delete_old)
+                    printer.error(delete_old)
                     return 1
 
             # Upload the new file
             upload_new = self.backup_file_to_drive(zip_path, timestamp)
             if upload_new:
-                print(upload_new)
+                printer.error(upload_new)
                 return 1
             
-            print("Backup to google uploaded successfully.")
+            printer.success("Backup to google uploaded successfully.")
             return 0
 
     def decompress_zip(self, zip_path):
@@ -253,7 +255,7 @@ class sync:
                 zipf.extract(".osk", os.path.dirname(self.key))
             return 0
         except Exception as e:
-            print(f"An error occurred: {e}")
+            printer.error(f"An error occurred: {e}")
             return 1
 
     def download_file_by_id(self, file_id, destination_path):
@@ -282,14 +284,14 @@ class sync:
         # Get the files in the app data folder
         app_data_files = self.get_appdata_files()
         if not app_data_files:
-            print("No files found in app data folder.")
+            printer.error("No files found in app data folder.")
             return 1
 
         # Check if a specific file_id was provided and if it exists in the list
         if file_id:
             selected_file = next((f for f in app_data_files if f['id'] == file_id), None)
             if not selected_file:
-                print(f"No file found with ID: {file_id}")
+                printer.error(f"No file found with ID: {file_id}")
                 return 1
         else:
             # Find the latest file based on timestamp
@@ -302,10 +304,10 @@ class sync:
 
         # Unzip the downloaded file to the destination folder
         if self.decompress_zip(temp_download_path):
-            print("Failed to decompress the file.")
+            printer.error("Failed to decompress the file.")
             return 1
 
-        print(f"Backup from Google Drive restored successfully: {selected_file['name']}")
+        printer.success(f"Backup from Google Drive restored successfully: {selected_file['name']}")
         return 0
 
     def config_listener_post(self, args, kwargs):
@@ -314,7 +316,7 @@ class sync:
                 if not kwargs["result"]:
                     self.compress_and_upload()
             else:
-                print("Sync cannot be performed. Please check your login status.")
+                printer.warning("Sync cannot be performed. Please check your login status.")
         return kwargs["result"]
 
     def config_listener_pre(self, *args, **kwargs):
@@ -337,7 +339,6 @@ class Preload:
 class Parser:
     def __init__(self):
         self.parser = argparse.ArgumentParser(description="Sync config with Google")
-        self.description = "Sync config with Google"
         subparsers = self.parser.add_subparsers(title="Commands", dest='command',metavar="")
         login_parser = subparsers.add_parser("login", help="Login to Google to enable synchronization")
         logout_parser = subparsers.add_parser("logout", help="Logout from Google")

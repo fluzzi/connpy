@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from connpy import configfile, node, nodes, hooks
+from connpy import configfile, node, nodes, hooks, printer
 from connpy.ai import ai as myai
 from waitress import serve
 import os
@@ -143,7 +143,7 @@ def stop_api():
                 port = int(f.readline().strip())
             PID_FILE=PID_FILE2
         except:
-            print("Connpy api server is not running.")
+            printer.warning("Connpy API server is not running.")
             return 
     # Send a SIGTERM signal to the process
     try:
@@ -152,7 +152,7 @@ def stop_api():
         pass
     # Delete the PID file
     os.remove(PID_FILE)
-    print(f"Server with process ID {pid} stopped.")
+    printer.info(f"Server with process ID {pid} stopped.")
     return port
 
 @hooks.MethodHook
@@ -168,7 +168,7 @@ def start_server(port=8048):
 @hooks.MethodHook
 def start_api(port=8048):
     if os.path.exists(PID_FILE1) or os.path.exists(PID_FILE2):
-        print("Connpy server is already running.")
+        printer.warning("Connpy server is already running.")
         return
     pid = os.fork()
     if pid == 0:
@@ -182,7 +182,7 @@ def start_api(port=8048):
                 with open(PID_FILE2, "w") as f:
                     f.write(str(pid) + "\n" + str(port))
             except:
-                print("Cound't create PID file")
-                return
-        print(f'Server is running with process ID {pid} in port {port}')
+                printer.error("Couldn't create PID file.")
+                exit(1)
+        printer.start(f"Server is running with process ID {pid} on port {port}")
 
