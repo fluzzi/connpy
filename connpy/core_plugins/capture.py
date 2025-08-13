@@ -42,6 +42,7 @@ class RemoteCapture:
         self.wireshark_path = connapp.config.config.get("wireshark_path")
 
     def _start_local_listener(self, port, ws_proc=None):
+        self.fake_connection = False
         self.listener_active = True
         self.listener_conn = None
         self.listener_connected = threading.Event()
@@ -55,7 +56,8 @@ class RemoteCapture:
                 
                 conn, addr = s.accept()
                 self.listener_conn = conn
-                printer.start(f"Connection from {addr}")
+                if not self.fake_connection:
+                    printer.start(f"Connection from {addr}")
                 self.listener_connected.set()
 
                 try:
@@ -131,7 +133,7 @@ class RemoteCapture:
             try:
                 self.node.child.sendline(cmd)
                 start_time = time.time()
-                while time.time() - start_time < 5:
+                while time.time() - start_time < 3:
                     try:
                         index = self.node.child.expect([
                             r'listening on',
@@ -193,6 +195,8 @@ class RemoteCapture:
                     r'Unable',
                     r'No such',
                     r'illegal',
+                    r'not found',
+                    r'non-ether',
                     r'syntax error'
                 ], timeout=5)
 
@@ -215,7 +219,7 @@ class RemoteCapture:
                     return f"{error}"
                 else:
                     before_last_line = self.node.child.before.decode().splitlines()[-1]
-                    error = f"Tcpdump error detected:" \
+                    error = f"Tcpdump error detected: " \
                             f"{before_last_line}{self.node.child.after.decode()}{self.node.child.readline().decode()}".rstrip()
                     return f"{error}"
 
@@ -224,6 +228,7 @@ class RemoteCapture:
                 return False
 
         return False
+
 
     def _build_tcpdump_command(self):
         base = f"tcpdump -i {self.interface}"
@@ -297,6 +302,13 @@ class RemoteCapture:
                     printer.error(f"{result}")
                 else:
                     printer.error("Listener connection failed after all retries.")
+                    printer.debug(f"Command used:\n{tcpdump_cmd}")
+                if not self.listener_conn:
+                    try:
+                        self.fake_connection = True
+                        socket.create_connection(("localhost", self.local_port), timeout=1).close()
+                    except:
+                        pass
                 self.listener_active = False
                 return
 
