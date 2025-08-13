@@ -65,7 +65,7 @@ class ai:
             try:
                 self.model = self.config.config["openai"]["model"]
             except:
-                self.model = "o4-mini"
+                self.model = "gpt-5-nano"
         self.__prompt = {}
         self.__prompt["original_system"] = """
             You are the AI chatbot and assistant of a network connection manager and automation app called connpy. When provided with user input analyze the input and extract the following information. If user wants to chat just reply and don't call a function:
