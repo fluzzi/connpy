@@ -95,7 +95,7 @@ def main():
     try:
         with open(pathfile, "r") as f:
             configdir = f.read().strip()
-    except:
+    except (FileNotFoundError, IOError):
         configdir = defaultdir
     defaultfile = configdir + '/config.json'
     jsonconf = open(defaultfile)
@@ -131,7 +131,7 @@ def main():
             spec.loader.exec_module(module)
             plugin_completion = getattr(module, "_connpy_completion")
             strings = plugin_completion(wordsnumber, words, info)
-        except:
+        except Exception:
             exit()
     elif wordsnumber >= 3 and words[0] == "ai":
         if wordsnumber == 3:

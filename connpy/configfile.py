@@ -8,6 +8,7 @@ from Crypto.Cipher import PKCS1_OAEP
 from pathlib import Path
 from copy import deepcopy
 from .hooks import MethodHook, ClassHook
+from . import printer
 
 
 
@@ -60,7 +61,7 @@ class configfile:
         try:
             with open(pathfile, "r") as f:
                 configdir = f.read().strip()
-        except:
+        except (FileNotFoundError, IOError):
             with open(pathfile, "w") as f:
                 f.write(str(defaultdir))
             configdir = defaultdir
@@ -120,7 +121,8 @@ class configfile:
             with open(conf, "w") as f:
                 json.dump(newconfig, f, indent = 4)
                 f.close()
-        except:
+        except (IOError, OSError) as e:
+            printer.error(f"Failed to save config: {e}")
             return 1
         return 0
 
@@ -205,12 +207,12 @@ class configfile:
                         if profile:
                             try:
                                 newfolder[node_name][key] = self.profiles[profile.group(1)][key]
-                            except:
+                            except KeyError:
                                 newfolder[node_name][key] = ""
                         elif value == '' and key == "protocol":
                             try:
                                 newfolder[node_name][key] = self.profiles["default"][key]
-                            except:
+                            except KeyError:
                                 newfolder[node_name][key] = "ssh"
             
             newfolder = {"{}{}".format(k,unique):v for k,v in newfolder.items()}
@@ -231,12 +233,12 @@ class configfile:
                     if profile:
                         try:
                             newnode[key] = self.profiles[profile.group(1)][key]
-                        except:
+                        except KeyError:
                             newnode[key] = ""
                     elif value == '' and key == "protocol":
                         try:
                             newnode[key] = self.profiles["default"][key]
-                        except:
+                        except KeyError:
                             newnode[key] = "ssh"
             return newnode
 
@@ -391,12 +393,12 @@ class configfile:
                     if profile:
                         try:
                             nodes[node][key] = self.profiles[profile.group(1)][key]
-                        except:
+                        except KeyError:
                             nodes[node][key] = ""
                     elif value == '' and key == "protocol":
                         try:
                             nodes[node][key] = self.profiles["default"][key]
-                        except:
+                        except KeyError:
                             nodes[node][key] = "ssh"
         return nodes
 

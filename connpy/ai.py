@@ -396,7 +396,7 @@ class ai:
         if isinstance(commands, str):
             try:
                 commands = json.loads(commands)
-            except:
+            except ValueError:
                 commands = [c.strip() for c in commands.split('\n') if c.strip()]
         
         # Expand multi-line commands within a list (in case the AI packs them)
@@ -795,9 +795,10 @@ class ai:
                         response = completion(model=model, messages=safe_messages, tools=[], api_key=key)
                         resp_msg = response.choices[0].message
                         messages.append(resp_msg.model_dump(exclude_none=True))
-                    except:
-                        pass
-                    
+                    except Exception as e:
+                        if status:
+                            status.update(f"[bold red]Error fetching summary: {e}[/bold red]")
+                        printer.warning(f"Failed to fetch final summary from LLM: {e}")
         except KeyboardInterrupt:
             if status: status.update("[bold red]Interrupted! Closing pending tasks...")
             last_msg = messages[-1]
@@ -810,7 +811,7 @@ class ai:
                 response = completion(model=model, messages=safe_messages, tools=tools, api_key=key)
                 resp_msg = response.choices[0].message
                 messages.append(resp_msg.model_dump(exclude_none=True))
-            except: pass
+            except Exception: pass
         finally:
             try:
                 log_dir = self.config.defaultdir
@@ -820,7 +821,7 @@ class ai:
                 if os.path.exists(log_path):
                     try:
                         with open(log_path, "r") as f: hist = json.load(f)
-                    except: hist = []
+                    except (IOError, json.JSONDecodeError): hist = []
                 hist.append({"timestamp": datetime.datetime.now().isoformat(), "roles": {"strategic_engine": self.architect_model, "execution_engine": self.engineer_model}, "session": messages})
                 with open(log_path, "w") as f: json.dump(hist[-10:], f, indent=4)
             except Exception as e:

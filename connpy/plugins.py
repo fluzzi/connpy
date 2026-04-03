@@ -62,8 +62,8 @@ class Plugins:
                 if not (isinstance(node.test, ast.Compare) and
                         isinstance(node.test.left, ast.Name) and
                         node.test.left.id == '__name__' and
-                        isinstance(node.test.comparators[0], ast.Str) and
-                        node.test.comparators[0].s == '__main__'):
+                        ((hasattr(ast, 'Str') and isinstance(node.test.comparators[0], getattr(ast, 'Str')) and node.test.comparators[0].s == '__main__') or
+                         (hasattr(ast, 'Constant') and isinstance(node.test.comparators[0], getattr(ast, 'Constant')) and node.test.comparators[0].value == '__main__'))):
                     return "Only __name__ == __main__ If is allowed"
 
             elif not isinstance(node, (ast.FunctionDef, ast.ClassDef, ast.Import, ast.ImportFrom, ast.Pass)):

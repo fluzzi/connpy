@@ -35,7 +35,7 @@ def list_nodes():
             else:
                 filter = filter.lower()
         output = conf._getallnodes(filter)
-    except:
+    except Exception:
         output = conf._getallnodes()
     return jsonify(output)
 
@@ -52,7 +52,7 @@ def get_nodes():
             else:
                 filter = filter.lower()
         output = conf._getallnodesfull(filter)
-    except:
+    except Exception:
         output = conf._getallnodesfull()
     return jsonify(output)
 
@@ -109,13 +109,13 @@ def run_commands():
     mynodes = nodes(mynodes, config=conf)
     try:
         args["vars"] = data["vars"]
-    except:
+    except Exception:
         pass
     try:
         options = data["options"]
         thisoptions = {k: v for k, v in options.items() if k in ["prompt", "parallel", "timeout"]}
         args.update(thisoptions)
-    except:
+    except Exception:
         options = None
     if action == "run":
         output = mynodes.run(**args)
@@ -136,20 +136,20 @@ def stop_api():
             pid = int(f.readline().strip())
             port = int(f.readline().strip())
         PID_FILE=PID_FILE1
-    except:
+    except (FileNotFoundError, ValueError, OSError):
         try:
             with open(PID_FILE2, "r") as f:
                 pid = int(f.readline().strip())
                 port = int(f.readline().strip())
             PID_FILE=PID_FILE2
-        except:
+        except (FileNotFoundError, ValueError, OSError):
             printer.warning("Connpy API server is not running.")
             return 
     # Send a SIGTERM signal to the process
     try:
         os.kill(pid, signal.SIGTERM)
-    except:
-        pass
+    except OSError as e:
+        printer.warning(f"Process kill failed (maybe already dead): {e}")
     # Delete the PID file
     os.remove(PID_FILE)
     printer.info(f"Server with process ID {pid} stopped.")
@@ -177,11 +177,11 @@ def start_api(port=8048):
         try:
             with open(PID_FILE1, "w") as f:
                 f.write(str(pid) + "\n" + str(port))
-        except:
+        except OSError:
             try:
                 with open(PID_FILE2, "w") as f:
                     f.write(str(pid) + "\n" + str(port))
-            except:
+            except OSError:
                 printer.error("Couldn't create PID file.")
                 exit(1)
         printer.start(f"Server is running with process ID {pid} on port {port}")

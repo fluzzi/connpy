@@ -542,7 +542,6 @@ from .api import *
 from .ai import ai
 from .plugins import Plugins
 from ._version import __version__
-from pkg_resources import get_distribution
 from . import printer
 
 __all__ = ["node", "nodes", "configfile", "connapp", "ai", "Plugins", "printer"]

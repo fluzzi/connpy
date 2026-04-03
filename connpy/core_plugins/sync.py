@@ -28,7 +28,7 @@ class sync:
         self.connapp = connapp
         try:
             self.sync = self.connapp.config.config["sync"]
-        except:
+        except KeyError:
             self.sync = False
 
     def login(self):
@@ -322,7 +322,7 @@ class sync:
     def config_listener_pre(self, *args, **kwargs):
         try:
             self.sync = self.connapp.config.config["sync"]
-        except:
+        except KeyError:
             self.sync = False
         return args, kwargs
 

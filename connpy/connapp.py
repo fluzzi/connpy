@@ -17,7 +17,6 @@ import shutil
 class NoAliasDumper(yaml.SafeDumper):
     def ignore_aliases(self, data):
         return True
-import ast
 from rich.markdown import Markdown
 from rich.console import Console, Group
 from rich.panel import Panel
@@ -29,7 +28,7 @@ mdprint = Console().print
 console = Console()
 try:
     from pyfzf.pyfzf import FzfPrompt
-except:
+except ImportError:
     FzfPrompt = None
 
 
@@ -64,7 +63,7 @@ class connapp:
         self.case = self.config.config["case"]
         try:
             self.fzf = self.config.config["fzf"]
-        except:
+        except KeyError:
             self.fzf = False
 
 
@@ -178,13 +177,13 @@ class connapp:
         try:
             core_path = os.path.dirname(os.path.realpath(__file__)) + "/core_plugins"
             self.plugins._import_plugins_to_argparse(core_path, subparsers)
-        except:
-            pass
+        except Exception as e:
+            printer.warning(e)
         try:
             file_path = self.config.defaultdir + "/plugins"
             self.plugins._import_plugins_to_argparse(file_path, subparsers)
-        except:
-            pass
+        except Exception as e:
+            printer.warning(e)
         for preload in self.plugins.preloads.values():
             preload.Preload(self)
         #Generate helps
@@ -826,7 +825,7 @@ class connapp:
             try:
                 with open(args.data[0]) as file:
                     imported = yaml.load(file, Loader=yaml.FullLoader)
-            except:
+            except Exception:
                 printer.error("failed reading file {}".format(args.data[0]))
                 exit(10)
             for k,v in imported.items():
@@ -1013,7 +1012,7 @@ class connapp:
         try:
             with open(args.data[0]) as file:
                 scripts = yaml.load(file, Loader=yaml.FullLoader)
-        except:
+        except Exception:
             printer.error("failed reading file {}".format(args.data[0]))
             exit(10)
         for script in scripts["tasks"]:
@@ -1053,13 +1052,13 @@ class connapp:
             options = script["options"]
             thisoptions = {k: v for k, v in options.items() if k in ["prompt", "parallel", "timeout"]}
             args.update(thisoptions)
-        except:
+        except KeyError:
             options = None
         try:
             size = str(os.get_terminal_size())
             p = re.search(r'.*columns=([0-9]+)', size)
             columns = int(p.group(1))
-        except:
+        except (ValueError, OSError):
             columns = 80
 
         PANEL_WIDTH = columns
@@ -1182,7 +1181,7 @@ class connapp:
             raise inquirer.errors.ValidationError("", reason="Pick a port between 1-65535, @profile o leave empty")
         try:
             port = int(current)
-        except:
+        except ValueError:
             port = 0
         if current != "" and not 1 <= int(port) <= 65535:
             raise inquirer.errors.ValidationError("", reason="Pick a port between 1-65535 or leave empty")
@@ -1194,7 +1193,7 @@ class connapp:
             raise inquirer.errors.ValidationError("", reason="Pick a port between 1-6553/app5, @profile or leave empty")
         try:
             port = int(current)
-        except:
+        except ValueError:
             port = 0
         if current.startswith("@"):
             if current[1:] not in self.profiles:
@@ -1220,7 +1219,7 @@ class connapp:
             isdict = False
             try:
                 isdict = ast.literal_eval(current)
-            except:
+            except Exception:
                 pass
             if not isinstance (isdict, dict):
                 raise inquirer.errors.ValidationError("", reason="Tags should be a python dictionary.".format(current))
@@ -1232,7 +1231,7 @@ class connapp:
             isdict = False
             try:
                 isdict = ast.literal_eval(current)
-            except:
+            except Exception:
                 pass
             if not isinstance (isdict, dict):
                 raise inquirer.errors.ValidationError("", reason="Tags should be a python dictionary.".format(current))
@@ -1316,7 +1315,7 @@ class connapp:
                 defaults["tags"] = ""
             if "jumphost" not in defaults:
                 defaults["jumphost"] = ""
-        except:
+        except KeyError:
             defaults = { "host":"", "protocol":"", "port":"", "user":"", "options":"", "logs":"" , "tags":"", "password":"", "jumphost":""}
         node = {}
         if edit == None:
@@ -1390,7 +1389,7 @@ class connapp:
                 defaults["tags"] = ""
             if "jumphost" not in defaults:
                 defaults["jumphost"] = ""
-        except:
+        except KeyError:
             defaults = { "host":"", "protocol":"", "port":"", "user":"", "options":"", "logs":"", "tags": "", "jumphost": ""}
         profile = {}
         if edit == None:

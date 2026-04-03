@@ -176,7 +176,7 @@ class RemoteCapture:
                 printer.success("Tcpdump finished capturing packets.")
 
             self.listener_active = False
-        except:
+        except Exception:
             pass
 
     def _sendline_until_connected(self, cmd, retries=5, interval=2):
@@ -307,7 +307,7 @@ class RemoteCapture:
                     try:
                         self.fake_connection = True
                         socket.create_connection(("localhost", self.local_port), timeout=1).close()
-                    except:
+                    except OSError:
                         pass
                 self.listener_active = False
                 return
@@ -324,7 +324,7 @@ class RemoteCapture:
                 try:
                     self.listener_conn.shutdown(socket.SHUT_RDWR)
                     self.listener_conn.close()
-                except:
+                except OSError:
                     pass
             if hasattr(self.node, "child"):
                 self.node.child.close(force=True)

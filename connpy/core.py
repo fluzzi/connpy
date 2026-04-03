@@ -84,12 +84,12 @@ class node:
             if profile and config != '':
                 try:
                     setattr(self,key,config.profiles[profile.group(1)][key])
-                except:
+                except KeyError:
                     setattr(self,key,"")
             elif attr[key] == '' and key == "protocol":
                 try:
                     setattr(self,key,config.profiles["default"][key])
-                except:
+                except (KeyError, AttributeError):
                     setattr(self,key,"ssh")
             else: 
                 setattr(self,key,attr[key])
@@ -108,12 +108,12 @@ class node:
                 if profile:
                     try:
                         self.jumphost[key] = config.profiles[profile.group(1)][key]
-                    except:
+                    except KeyError:
                         self.jumphost[key] = ""
                 elif self.jumphost[key] == '' and key == "protocol":
                     try:
                         self.jumphost[key] = config.profiles["default"][key]
-                    except:
+                    except KeyError:
                         self.jumphost[key] = "ssh"
             if isinstance(self.jumphost["password"],list):
                 jumphost_password = []
@@ -158,7 +158,7 @@ class node:
                 try:
                     decrypted = decryptor.decrypt(ast.literal_eval(passwd)).decode("utf-8")
                     dpass.append(decrypted)
-                except:
+                except Exception:
                     raise ValueError("Missing or corrupted key")
         return dpass
 
