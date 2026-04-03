@@ -15,7 +15,8 @@ Connpy is a SSH, SFTP, Telnet, kubectl, and Docker pod connection manager and au
       Or use fzf by installing pyfzf and running conn config --fzf true.
     - Create in bulk, copy, move, export, and import nodes for easy management.
     - Run automation scripts on network devices.
-    - Use GPT AI to help you manage your devices.
+    - Use AI with a multi-agent system (Engineer/Architect) to help you manage your devices.
+      Supports any LLM provider via litellm (OpenAI, Anthropic, Google, etc.).
     - Add plugins with your own scripts.
     - Much more!
 
@@ -496,12 +497,42 @@ for key in routers.result:
 ```
 import connpy
 conf = connpy.configfile()
-organization = 'openai-org'
-api_key = "openai-key"
-myia = connpy.ai(conf, organization, api_key)
-input = "go to router 1 and get me the full configuration"
-result = myia.ask(input, dryrun = False)
-print(result)
+# Uses models and API keys from config, or override them:
+myai = connpy.ai(conf, engineer_model="gemini/gemini-2.5-flash", engineer_api_key="your-key")
+result = myai.ask("go to router1 and show me the running configuration")
+print(result["response"])
+# Streaming is enabled by default for CLI, disable for programmatic use:
+result = myai.ask("show interfaces on all routers", stream=False)
+print(result["response"])
+```
+
+#### AI Plugin Tool Registration
+Plugins can register custom tools with the AI system using `register_ai_tool()` in their `Preload` class:
+```
+def _register_my_tools(ai_instance):
+    tool_def = {
+        "type": "function",
+        "function": {
+            "name": "my_custom_tool",
+            "description": "Does something useful.",
+            "parameters": {
+                "type": "object",
+                "properties": {"query": {"type": "string"}},
+                "required": ["query"]
+            }
+        }
+    }
+    ai_instance.register_ai_tool(
+        tool_definition=tool_def,
+        handler=my_handler_function,
+        target="engineer",  # or "architect" or "both"
+        engineer_prompt="- My tool: does X.",
+        architect_prompt="  * My tool (my_custom_tool)."
+    )
+
+class Preload:
+    def __init__(self, connapp):
+        connapp.ai.modify(_register_my_tools)
 ```
 '''
 from .core import node,nodes

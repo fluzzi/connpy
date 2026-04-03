@@ -710,7 +710,7 @@ class nodes:
 
 
     @MethodHook
-    def run(self, commands, vars = None,*, folder = None, prompt = None, stdout = None, parallel = 10, timeout = None):
+    def run(self, commands, vars = None,*, folder = None, prompt = None, stdout = None, parallel = 10, timeout = None, on_complete = None):
         '''
         Run a command or list of commands on all the nodes in nodelist.
 
@@ -751,6 +751,11 @@ class nodes:
             - timeout  (int): Time in seconds for expect to wait for prompt/EOF.
                               default 10.
 
+            - on_complete (callable): Optional callback called when each node 
+                                      finishes. Receives (unique, output, status).
+                                      Called from the node's thread so it must
+                                      be thread-safe.
+
         ###Returns:  
 
             dict: Dictionary formed by nodes unique as keys, Output of the 
@@ -765,13 +770,20 @@ class nodes:
             Path(folder).mkdir(parents=True, exist_ok=True)
         if prompt != None:
             args["prompt"] = prompt
-        if stdout != None:
+        if stdout != None and on_complete is None:
             args["stdout"] = stdout
         if timeout != None:
             args["timeout"] = timeout
         output = {}
         status = {}
         tasks = []
+
+        def _run_node(node_obj, node_args, callback):
+            """Wrapper that runs a node and fires the callback on completion."""
+            node_obj.run(**node_args)
+            if callback:
+                callback(node_obj.unique, node_obj.output, node_obj.status)
+
         for n in self.nodelist:
             nodesargs[n.unique] = deepcopy(args)
             if vars != None:
@@ -780,7 +792,10 @@ class nodes:
                     nodesargs[n.unique]["vars"].update(vars["__global__"])
                 if n.unique in vars.keys():
                     nodesargs[n.unique]["vars"].update(vars[n.unique])
-            tasks.append(threading.Thread(target=n.run, kwargs=nodesargs[n.unique]))
+            if on_complete:
+                tasks.append(threading.Thread(target=_run_node, args=(n, nodesargs[n.unique], on_complete)))
+            else:
+                tasks.append(threading.Thread(target=n.run, kwargs=nodesargs[n.unique]))
         taskslist = list(self._splitlist(tasks, parallel))
         for t in taskslist:
             for i in t:

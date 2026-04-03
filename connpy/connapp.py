@@ -24,7 +24,9 @@ from rich.panel import Panel
 from rich.text import Text
 from rich.rule import Rule
 from rich.style import Style
+from rich.prompt import Prompt
 mdprint = Console().print
+console = Console()
 try:
     from pyfzf.pyfzf import FzfPrompt
 except:
@@ -129,9 +131,11 @@ class connapp:
         # AIPARSER
         aiparser = subparsers.add_parser("ai", description="Make request to an AI") 
         aiparser.add_argument("ask", nargs='*', help="Ask connpy AI something")
-        aiparser.add_argument("--model", nargs=1, help="Set the OPENAI model id")
-        aiparser.add_argument("--org", nargs=1, help="Set the OPENAI organization id")
-        aiparser.add_argument("--api_key", nargs=1, help="Set the OPENAI API key")
+        aiparser.add_argument("--engineer-model", nargs=1, help="Override engineer model")
+        aiparser.add_argument("--engineer-api-key", nargs=1, help="Override engineer api key")
+        aiparser.add_argument("--architect-model", nargs=1, help="Override architect model")
+        aiparser.add_argument("--architect-api-key", nargs=1, help="Override architect api key")
+        aiparser.add_argument("--debug", action="store_true", help="Show AI reasoning and tool calls")
         aiparser.set_defaults(func=self._func_ai)
         #RUNPARSER
         runparser = subparsers.add_parser("run", description="Run scripts or commands on nodes", formatter_class=argparse.RawTextHelpFormatter) 
@@ -164,9 +168,10 @@ class connapp:
         configcrud.add_argument("--keepalive", dest="idletime", nargs=1, action=self._store_type, help="Set keepalive time in seconds, 0 to disable", type=int, metavar="INT")
         configcrud.add_argument("--completion", dest="completion", nargs=1, choices=["bash","zsh"], action=self._store_type, help="Get terminal completion configuration for conn")
         configcrud.add_argument("--configfolder", dest="configfolder", nargs=1, action=self._store_type, help="Set the default location for config file", metavar="FOLDER")
-        configcrud.add_argument("--openai-org", dest="organization", nargs=1, action=self._store_type, help="Set openai organization", metavar="ORGANIZATION")
-        configcrud.add_argument("--openai-api-key", dest="api_key", nargs=1, action=self._store_type, help="Set openai api_key", metavar="API_KEY")
-        configcrud.add_argument("--openai-model", dest="model", nargs=1, action=self._store_type, help="Set openai model", metavar="MODEL")
+        configcrud.add_argument("--engineer-model", dest="engineer_model", nargs=1, action=self._store_type, help="Set engineer model", metavar="MODEL")
+        configcrud.add_argument("--engineer-api-key", dest="engineer_api_key", nargs=1, action=self._store_type, help="Set engineer api_key", metavar="API_KEY")
+        configcrud.add_argument("--architect-model", dest="architect_model", nargs=1, action=self._store_type, help="Set architect model", metavar="MODEL")
+        configcrud.add_argument("--architect-api-key", dest="architect_api_key", nargs=1, action=self._store_type, help="Set architect api_key", metavar="API_KEY")
         configparser.set_defaults(func=self._func_others)
         #Add plugins
         self.plugins = Plugins()
@@ -478,8 +483,16 @@ class connapp:
     
     def _func_others(self, args):
         #Function called when using other commands
-        actions = {"ls": self._ls, "move": self._mvcp, "cp": self._mvcp, "bulk": self._bulk, "completion": self._completion, "case": self._case, "fzf": self._fzf, "idletime": self._idletime, "configfolder": self._configfolder, "organization": self._openai, "api_key": self._openai, "model": self._openai}
+        actions = {"ls": self._ls, "move": self._mvcp, "cp": self._mvcp, "bulk": self._bulk, "completion": self._completion, "case": self._case, "fzf": self._fzf, "idletime": self._idletime, "configfolder": self._configfolder, "engineer_model": self._ai_config, "engineer_api_key": self._ai_config, "architect_model": self._ai_config, "architect_api_key": self._ai_config}
         return actions.get(args.command)(args)
+
+    def _ai_config(self, args):
+        if "ai" in self.config.config:
+            aiconfig = self.config.config["ai"]
+        else:
+            aiconfig = {}
+        aiconfig[args.command] = args.data[0]
+        self._change_settings("ai", aiconfig)
 
     def _ls(self, args):
         if args.data == "nodes":
@@ -646,6 +659,26 @@ class connapp:
             openaikeys = {}
         openaikeys[args.command] = args.data[0]
         self._change_settings("openai", openaikeys)
+
+    def _anthropic(self, args):
+        if "anthropic" in self.config.config:
+            anthropickeys = self.config.config["anthropic"]
+        else:
+            anthropickeys = {}
+        # Mapear el nombre del argumento al nombre de la clave en el config (sin el prefijo 'anthropic_')
+        key_name = args.command.replace("anthropic_", "")
+        anthropickeys[key_name] = args.data[0]
+        self._change_settings("anthropic", anthropickeys)
+
+    def _google(self, args):
+        if "google" in self.config.config:
+            googlekeys = self.config.config["google"]
+        else:
+            googlekeys = {}
+        # Mapear el nombre del argumento al nombre de la clave en el config (sin el prefijo 'google_')
+        key_name = args.command.replace("google_", "")
+        googlekeys[key_name] = args.data[0]
+        self._change_settings("google", googlekeys)
 
 
     def _change_settings(self, name, value):
@@ -844,58 +877,93 @@ class connapp:
 
     def _func_ai(self, args):
         arguments = {}
-        if args.model:
-            arguments["model"] = args.model[0]
-        if args.org:
-            arguments["org"] = args.org[0]
-        if args.api_key:
-            arguments["api_key"] = args.api_key[0]
+        
+        if args.engineer_model:
+            arguments["engineer_model"] = args.engineer_model[0]
+        if args.engineer_api_key:
+            arguments["engineer_api_key"] = args.engineer_api_key[0]
+        if args.architect_model:
+            arguments["architect_model"] = args.architect_model[0]
+        if args.architect_api_key:
+            arguments["architect_api_key"] = args.architect_api_key[0]
+        
         self.myai = self.ai(self.config, **arguments)
+        
         if args.ask:
-            input = " ".join(args.ask)
-            request = self.myai.ask(input, dryrun = True)
-            if not request["app_related"]:
-                mdprint(Markdown(request["response"]))
-                print("\r")
+            # Single question mode
+            query = " ".join(args.ask)
+            with console.status("[bold green]Agent is thinking and analyzing...") as status:
+                result = self.myai.ask(query, status=status, debug=args.debug)
+            
+            # Determine title and color based on responder
+            responder = result.get("responder", "engineer")
+            if responder == "architect":
+                title = "[bold purple]Network Architect[/bold purple]"
+                border_style = "purple"
             else:
-                if request["action"] == "list_nodes":
-                    if request["filter"]:
-                        nodes = self.config._getallnodes(request["filter"])
-                    else:
-                        nodes = self.config._getallnodes()
-                    list = "\n".join(nodes)
-                    print(list)
-                else:
-                    yaml_data = yaml.dump(request["task"])
-                    confirmation = f"I'm going to run the following task:\n```{yaml_data}```"
-                    mdprint(Markdown(confirmation))
-                    question = [inquirer.Confirm("task", message="Are you sure you want to continue?")]
-                    print("\r")
-                    confirm = inquirer.prompt(question)
-                    if confirm == None:
-                        exit(7)
-                    if confirm["task"]:
-                        script = {}
-                        script["name"] = "RESULT"
-                        script["output"] = "stdout"
-                        script["nodes"] = request["nodes"]
-                        script["action"] = request["action"]
-                        if "expected" in request:
-                            script["expected"] = request["expected"]
-                        script.update(request["args"])
-                        self._cli_run(script)
+                title = "[bold blue]Network Engineer[/bold blue]"
+                border_style = "blue"
+            
+            # Only render in panel if response wasn't already streamed
+            if not result.get("streamed"):
+                mdprint(Panel(Markdown(result["response"]), title=title, border_style=border_style, expand=False))
+            
+            # Mostrar tokens consumidos
+            if "usage" in result:
+                u = result["usage"]
+                console.print(f"[dim]Tokens: {u['total']} (Input: {u['input']}, Output: {u['output']})[/dim]")
+            
+            print("\r")
         else:
+            # Interactive chat mode
             history = None
-            mdprint(Markdown("**Chatbot**: Hi! How can I help you today?\n\n---"))
+            mdprint(Rule(style="bold blue"))
+            mdprint(Markdown("**Networking Expert Agent**: Hi! I'm your assistant. I can help you diagnose issues, run commands, and manage your nodes.\nType 'exit' to quit.\n"))
+            mdprint(Rule(style="bold blue"))
+            
             while True:
-                questions = [
-                        inquirer.Text('message', message="User", validate=self._ai_validation),
-                    ]
-                answers = inquirer.prompt(questions)
-                if answers == None:
-                    exit(7)
-                response, history = self._process_input(answers["message"], history)
-                mdprint(Markdown(f"""**Chatbot**:\n{response}\n\n---"""))
+                try:
+                    user_query = Prompt.ask("[bold cyan]User[/bold cyan]")
+                    
+                    if not user_query.strip():
+                        continue
+                        
+                    if user_query.lower() in ['exit', 'quit', 'bye']:
+                        break
+                    
+                    # User message is already in the prompt, no need to print it again
+
+                    try:
+                        with console.status("[bold green]Agent is thinking...") as status:
+                            result = self.myai.ask(user_query, chat_history=history, status=status, debug=args.debug)
+                    except KeyboardInterrupt:
+                        # La interrupción ahora se maneja dentro de myai.ask para no perder el contexto
+                        # y generar un resumen de lo que se estaba haciendo.
+                        continue
+                    
+                    history = result.get("chat_history")
+                    
+                    # Determine title and color based on responder
+                    responder = result.get("responder", "engineer")
+                    if responder == "architect":
+                        title = "[bold purple]Network Architect[/bold purple]"
+                        border_style = "purple"
+                    else:
+                        title = "[bold blue]Network Engineer[/bold blue]"
+                        border_style = "blue"
+                    
+                    # Only render in panel if response wasn't already streamed
+                    if not result.get("streamed"):
+                        mdprint(Panel(Markdown(result["response"]), title=title, border_style=border_style, expand=False))
+                    
+                    # Mostrar tokens consumidos
+                    if "usage" in result:
+                        u = result["usage"]
+                        console.print(f"[dim]Tokens: {u['total']} (Input: {u['input']}, Output: {u['output']})[/dim]")
+                    
+                    print("\r")
+                except KeyboardInterrupt:
+                    break
         return
 
 
@@ -904,56 +972,6 @@ class connapp:
         if not re.match(regex, current):
             raise inquirer.errors.ValidationError("", reason="Can't send empty messages")
         return True
-
-    def _process_input(self, input, history):
-        response = self.myai.ask(input , chat_history = history, dryrun = True)
-        if not response["app_related"]:
-            try:
-                if not history:
-                    history = []
-                history.extend(response["chat_history"])
-            except:
-                if not history:
-                    history = None
-            return response["response"], history
-        else:
-            history = None
-            if response["action"] == "list_nodes":
-                if response["filter"]:
-                    nodes = self.config._getallnodes(response["filter"])
-                else:
-                    nodes = self.config._getallnodes()
-                list = "\n".join(nodes)
-                response = f"```{list}\n```"
-            else:
-                yaml_data = yaml.dump(response["task"])
-                confirmresponse = f"I'm going to run the following task:\n```{yaml_data}```\nPlease confirm"
-                while True:
-                    mdprint(Markdown(f"""**Chatbot**:\n{confirmresponse}"""))
-                    questions = [
-                            inquirer.Text('message', message="User", validate=self._ai_validation),
-                        ]
-                    answers = inquirer.prompt(questions)
-                    if answers == None:
-                        exit(7)
-                    confirmation = self.myai.confirm(answers["message"])
-                    if isinstance(confirmation, bool):
-                        if not confirmation:
-                            response = "Request cancelled"
-                        else:
-                            nodes = self.nodes(self.config.getitems(response["nodes"]), config = self.config)
-                            if response["action"] == "run":
-                                output = nodes.run(**response["args"])
-                                response = ""
-                            elif response["action"] == "test":
-                                result = nodes.test(**response["args"])
-                                yaml_result = yaml.dump(result,default_flow_style=False, indent=4)
-                                output = nodes.output
-                                response = f"This is the result for your test:\n```\n{yaml_result}\n```"
-                            for k,v in output.items():
-                                response += f"\n***{k}***:\n```\n{v}\n```\n"
-                        break
-            return response, history
 
     def _func_api(self, args):
         if args.command == "stop" or args.command == "restart":
@@ -1003,6 +1021,7 @@ class connapp:
 
 
     def _cli_run(self, script):
+        import threading as _threading
         args = {}
         try:
             action = script["action"]
@@ -1043,33 +1062,62 @@ class connapp:
         except:
             columns = 80
 
-
         PANEL_WIDTH = columns
+        header = f"{script['name'].upper()}"
 
+        # Streaming mode: print each node's panel as it completes
+        if action == "run" and stdout:
+            mdprint(Rule(header, style="bold cyan"))
+            print_lock = _threading.Lock()
+
+            def _on_node_complete(unique, node_output, node_status):
+                if node_status == 0:
+                    status_str = "[bold green]✓ PASS[/bold green]"
+                    border = "green"
+                    title_line = f"[bold]{unique}[/bold] — {status_str}"
+                else:
+                    status_str = f"[bold red]✗ FAIL({node_status})[/bold red]"
+                    border = "red"
+                    title_line = f"[bold]{unique}[/bold] — {status_str}"
+                stripped = node_output.strip() if node_output else ""
+                code_block = Text(stripped + "\n") if stripped else Text()
+                panel_content = Group(Text(), Text(""), code_block)
+                with print_lock:
+                    mdprint(Panel(panel_content, title=title_line, width=PANEL_WIDTH, border_style=border))
+
+            nodes.run(**args, on_complete=_on_node_complete)
+            return
+
+        # Batch mode: wait for all nodes, then print
         if action == "run":
             nodes.run(**args)
-            header = f"{script['name'].upper()}"
         elif action == "test":
             nodes.test(**args)
-            header = f"{script['name'].upper()}"
         else:
             printer.error(f"Wrong action '{action}'")
             exit(13)
 
-        mdprint(Rule(header, style="white"))
+        mdprint(Rule(header, style="bold cyan"))
 
         for node in nodes.status:
-            status_str = "[✓] PASS(0)" if nodes.status[node] == 0 else f"[x] FAIL({nodes.status[node]})"
-            title_line = f"{node} — {status_str}"
+            if nodes.status[node] == 0:
+                status_str = "[bold green]✓ PASS[/bold green]"
+                border = "green"
+            else:
+                status_str = f"[bold red]✗ FAIL({nodes.status[node]})[/bold red]"
+                border = "red"
+            title_line = f"[bold]{node}[/bold] — {status_str}"
 
             test_output = Text()
             if action == "test" and nodes.status[node] == 0:
                 results = nodes.result[node]
-                test_output.append("TEST RESULTS:\n")
+                test_output.append("TEST RESULTS:\n", style="bold cyan")
                 max_key_len = max(len(k) for k in results.keys())
                 for k, v in results.items():
-                    status = "[✓]" if str(v).upper() == "TRUE" else "[x]"
-                    test_output.append(f"  {k.ljust(max_key_len)}  {status}\n")
+                    if str(v).upper() == "TRUE":
+                        test_output.append(f"  {k.ljust(max_key_len)}  ✓\n", style="green")
+                    else:
+                        test_output.append(f"  {k.ljust(max_key_len)}  ✗\n", style="red")
 
             output = nodes.output[node].strip()
             code_block = Text()
@@ -1080,8 +1128,10 @@ class connapp:
                     highlight_words = [k for k, v in nodes.result[node].items() if str(v).upper() == "TRUE"]
                     code_block.highlight_words(highlight_words, style=Style(color="green", bold=True, underline=True))
 
+
             panel_content = Group(test_output, Text(""), code_block)
-            mdprint(Panel(panel_content, title=title_line, width=PANEL_WIDTH, border_style="white"))
+            mdprint(Panel(panel_content, title=title_line, width=PANEL_WIDTH, border_style=border))
+
 
     def _choose(self, list, name, action):
         #Generates an inquirer list to pick

@@ -133,3 +133,12 @@ dmypy.json
 
 #App
 connpy-completion-helper
+
+# Gemini & AI Tools
+.gemini/
+GEMINI.md
+
+# Node.js (used by Gemini CLI or plugins)
+node_modules/
+package-lock.json
+package.json
