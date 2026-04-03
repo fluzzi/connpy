@@ -135,15 +135,15 @@ def main():
             exit()
     elif wordsnumber >= 3 and words[0] == "ai":
         if wordsnumber == 3:
-            strings = ["--help", "--org", "--model", "--api_key"]
+            strings = ["--help", "--engineer-model", "--engineer-api-key", "--architect-model", "--architect-api-key", "--debug"]
         else:
-            strings = ["--org", "--model", "--api_key"]
+            strings = ["--engineer-model", "--engineer-api-key", "--architect-model", "--architect-api-key", "--debug"]
     elif wordsnumber == 3:
         strings=[]
         if words[0] == "profile":
             strings=["--add", "--rm", "--del", "--edit", "--mod", "--show", "--help"]
         if words[0] == "config":
-            strings=["--allow-uppercase", "--keepalive", "--completion", "--fzf", "--configfolder", "--openai-org", "--openai-org-api-key", "--openai-org-model","--help"]
+            strings=["--allow-uppercase", "--keepalive", "--completion", "--fzf", "--configfolder", "--engineer-model", "--engineer-api-key", "--architect-model", "--architect-api-key", "--help"]
         if words[0] == "api":
             strings=["--start", "--stop", "--restart", "--debug", "--help"]
         if words[0] in ["--mod", "--edit", "-e", "--show", "-s", "--add", "-a", "--rm", "--del", "-r"]:

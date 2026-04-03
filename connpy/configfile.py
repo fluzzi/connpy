@@ -155,7 +155,7 @@ class configfile:
         return result
 
     @MethodHook
-    def getitem(self, unique, keys = None):
+    def getitem(self, unique, keys = None, extract = False):
         '''
         Get an node or a group of nodes from configfile which can be passed to node/nodes class
 
@@ -169,6 +169,8 @@ class configfile:
 
             - keys (list): In case you pass a folder as unique, you can filter
                            nodes inside the folder passing a list.
+            - extract (bool): If True, extract information from profiles. 
+                              Default False.
 
         ### Returns:  
 
@@ -184,21 +186,35 @@ class configfile:
                 folder = self.connections[uniques["folder"]]
             newfolder = deepcopy(folder)
             newfolder.pop("type")
-            for node in folder.keys():
-                if node == "type":
+            for node_name in folder.keys():
+                if node_name == "type":
                     continue
-                if "type" in newfolder[node].keys():
-                    if newfolder[node]["type"] == "subfolder":
-                        newfolder.pop(node)
+                if "type" in newfolder[node_name].keys():
+                    if newfolder[node_name]["type"] == "subfolder":
+                        newfolder.pop(node_name)
                     else:
-                        newfolder[node].pop("type")
-            if keys == None:
-                newfolder = {"{}{}".format(k,unique):v for k,v in newfolder.items()}
-                return newfolder
-            else:
-                f_newfolder = dict((k, newfolder[k]) for k in keys)
-                f_newfolder = {"{}{}".format(k,unique):v for k,v in f_newfolder.items()}
-                return f_newfolder
+                        newfolder[node_name].pop("type")
+            
+            if keys != None:
+                newfolder = dict((k, newfolder[k]) for k in keys)
+            
+            if extract:
+                for node_name, node_keys in newfolder.items():
+                    for key, value in node_keys.items():
+                        profile = re.search("^@(.*)", str(value))
+                        if profile:
+                            try:
+                                newfolder[node_name][key] = self.profiles[profile.group(1)][key]
+                            except:
+                                newfolder[node_name][key] = ""
+                        elif value == '' and key == "protocol":
+                            try:
+                                newfolder[node_name][key] = self.profiles["default"][key]
+                            except:
+                                newfolder[node_name][key] = "ssh"
+            
+            newfolder = {"{}{}".format(k,unique):v for k,v in newfolder.items()}
+            return newfolder
         else:
             if uniques.keys() >= {"folder", "subfolder"}:
                 node = self.connections[uniques["folder"]][uniques["subfolder"]][uniques["id"]]
@@ -208,10 +224,24 @@ class configfile:
                 node = self.connections[uniques["id"]]
             newnode = deepcopy(node)
             newnode.pop("type")
+            
+            if extract:
+                for key, value in newnode.items():
+                    profile = re.search("^@(.*)", str(value))
+                    if profile:
+                        try:
+                            newnode[key] = self.profiles[profile.group(1)][key]
+                        except:
+                            newnode[key] = ""
+                    elif value == '' and key == "protocol":
+                        try:
+                            newnode[key] = self.profiles["default"][key]
+                        except:
+                            newnode[key] = "ssh"
             return newnode
 
     @MethodHook
-    def getitems(self, uniques):
+    def getitems(self, uniques, extract = False):
         '''
         Get a group of nodes from configfile which can be passed to node/nodes class
 
@@ -220,6 +250,11 @@ class configfile:
             - uniques (str/list): String name that will match hostnames 
                                   from the connection manager. It can be a 
                                   list of strings.
+
+        ### Optional Parameters:
+
+            - extract (bool): If True, extract information from profiles. 
+                              Default False.
 
         ### Returns:  
 
@@ -237,17 +272,17 @@ class configfile:
                 if not self.config["case"]:
                     name = name.lower()
                     mylist = [item.lower() for item in mylist]
-                this = self.getitem(name, mylist)
+                this = self.getitem(name, mylist, extract = extract)
                 nodes.update(this)
             elif i.startswith("@"):
                 if not self.config["case"]:
                     i = i.lower()
-                this = self.getitem(i)
+                this = self.getitem(i, extract = extract)
                 nodes.update(this)
             else:
                 if not self.config["case"]:
                     i = i.lower()
-                this = self.getitem(i)
+                this = self.getitem(i, extract = extract)
                 nodes[i] = this
         return nodes
 
@@ -360,7 +395,7 @@ class configfile:
                             nodes[node][key] = ""
                     elif value == '' and key == "protocol":
                         try:
-                            nodes[node][key] = config.profiles["default"][key]
+                            nodes[node][key] = self.profiles["default"][key]
                         except:
                             nodes[node][key] = "ssh"
         return nodes
