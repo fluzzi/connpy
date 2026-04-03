@@ -142,3 +142,6 @@ GEMINI.md
 node_modules/
 package-lock.json
 package.json
+
+# Development docs
+connpy_roadmap.md

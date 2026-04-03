@@ -166,6 +166,7 @@ class connapp:
         configcrud.add_argument("--fzf", dest="fzf", nargs=1, action=self._store_type, help="Use fzf for lists", choices=["true","false"])
         configcrud.add_argument("--keepalive", dest="idletime", nargs=1, action=self._store_type, help="Set keepalive time in seconds, 0 to disable", type=int, metavar="INT")
         configcrud.add_argument("--completion", dest="completion", nargs=1, choices=["bash","zsh"], action=self._store_type, help="Get terminal completion configuration for conn")
+        configcrud.add_argument("--fzf-wrapper", dest="fzf_wrapper", nargs=1, choices=["bash","zsh"], action=self._store_type, help="Get 0ms latency fzf bash/zsh wrapper")
         configcrud.add_argument("--configfolder", dest="configfolder", nargs=1, action=self._store_type, help="Set the default location for config file", metavar="FOLDER")
         configcrud.add_argument("--engineer-model", dest="engineer_model", nargs=1, action=self._store_type, help="Set engineer model", metavar="MODEL")
         configcrud.add_argument("--engineer-api-key", dest="engineer_api_key", nargs=1, action=self._store_type, help="Set engineer api_key", metavar="API_KEY")
@@ -186,6 +187,10 @@ class connapp:
             printer.warning(e)
         for preload in self.plugins.preloads.values():
             preload.Preload(self)
+            
+        if not os.path.exists(self.config.fzf_cachefile):
+            self.config._generate_nodes_cache()
+            
         #Generate helps
         nodeparser.usage = self._help("usage", subparsers)
         nodeparser.epilog = self._help("end", subparsers)
@@ -482,7 +487,7 @@ class connapp:
     
     def _func_others(self, args):
         #Function called when using other commands
-        actions = {"ls": self._ls, "move": self._mvcp, "cp": self._mvcp, "bulk": self._bulk, "completion": self._completion, "case": self._case, "fzf": self._fzf, "idletime": self._idletime, "configfolder": self._configfolder, "engineer_model": self._ai_config, "engineer_api_key": self._ai_config, "architect_model": self._ai_config, "architect_api_key": self._ai_config}
+        actions = {"ls": self._ls, "move": self._mvcp, "cp": self._mvcp, "bulk": self._bulk, "completion": self._completion, "fzf_wrapper": self._fzf_wrapper, "case": self._case, "fzf": self._fzf, "idletime": self._idletime, "configfolder": self._configfolder, "engineer_model": self._ai_config, "engineer_api_key": self._ai_config, "architect_model": self._ai_config, "architect_api_key": self._ai_config}
         return actions.get(args.command)(args)
 
     def _ai_config(self, args):
@@ -621,6 +626,12 @@ class connapp:
             print(self._help("bashcompletion"))
         elif args.data[0] == "zsh":
             print(self._help("zshcompletion"))
+
+    def _fzf_wrapper(self, args):
+        if args.data[0] == "bash":
+            print(self._help("fzf_wrapper_bash"))
+        elif args.data[0] == "zsh":
+            print(self._help("fzf_wrapper_zsh"))
 
     def _case(self, args):
         if args.data[0] == "true":
@@ -1520,10 +1531,10 @@ _conn()
         mapfile -t strings < <(connpy-completion-helper "bash" "${#COMP_WORDS[@]}" "${COMP_WORDS[@]}")
         local IFS=$'\t\n'
         local home_dir=$(eval echo ~)
-        local last_word=${COMP_WORDS[-1]/\~/$home_dir}
+        local last_word=${COMP_WORDS[-1]/\\~/$home_dir}
         COMPREPLY=($(compgen -W "$(printf '%s' "${strings[@]}")" -- "$last_word"))
         if [ "$last_word" != "${COMP_WORDS[-1]}" ]; then
-            COMPREPLY=(${COMPREPLY[@]/$home_dir/\~})
+            COMPREPLY=(${COMPREPLY[@]/$home_dir/\\~})
         fi
 }
 
@@ -1538,12 +1549,12 @@ autoload -U compinit && compinit
 _conn()
 {
     local home_dir=$(eval echo ~)
-    last_word=${words[-1]/\~/$home_dir}
+    last_word=${words[-1]/\\~/$home_dir}
     strings=($(connpy-completion-helper "zsh" ${#words} $words[1,-2] $last_word))
     for string in "${strings[@]}"; do
         #Replace the expanded home directory with ~
         if [ "$last_word" != "$words[-1]" ]; then
-            string=${string/$home_dir/\~}
+            string=${string/$home_dir/\\~}
         fi
         if [[ "${string}" =~ .*/$ ]]; then
             # If the string ends with a '/', do not append a space
@@ -1558,10 +1569,51 @@ compdef _conn conn
 compdef _conn connpy
 #Here ends zsh completion for conn
             '''
+        if type == "fzf_wrapper_bash":
+            return '''\n#Here starts bash 0ms fzf wrapper for connpy
+connpy() {
+    if [ $# -eq 0 ]; then
+        local selected
+        if [ -f ~/.config/conn/.fzf_nodes_cache.txt ]; then
+            selected=$(cat ~/.config/conn/.fzf_nodes_cache.txt | fzf-tmux -d 25% --reverse)
+        else
+            command connpy
+            return
+        fi
+        if [ -n "$selected" ]; then
+            command connpy "$selected"
+        fi
+    else
+        command connpy "$@"
+    fi
+}
+alias c="connpy"
+#Here ends bash 0ms fzf wrapper\n'''
+
+        if type == "fzf_wrapper_zsh":
+            return '''\n#Here starts zsh 0ms fzf wrapper for connpy
+connpy() {
+    if [ $# -eq 0 ]; then
+        local selected
+        if [ -f ~/.config/conn/.fzf_nodes_cache.txt ]; then
+            selected=$(cat ~/.config/conn/.fzf_nodes_cache.txt | fzf-tmux -d 25% --reverse)
+        else
+            command connpy
+            return
+        fi
+        if [ -n "$selected" ]; then
+            command connpy "$selected"
+        fi
+    else
+        command connpy "$@"
+    fi
+}
+alias c="connpy"
+#Here ends zsh 0ms fzf wrapper\n'''
         if type == "run":
             return "node[@subfolder][@folder] commmand to run\nRun the specific command on the node and print output\n/path/to/file.yaml\nUse a yaml file to run an automation script"
         if type == "generate":
-            return '''---
+            return r'''---
 tasks:
 - name: "Config"
 

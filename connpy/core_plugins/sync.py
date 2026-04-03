@@ -213,7 +213,7 @@ class sync:
 
     def compress_specific_files(self, zip_path):
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            zipf.write(self.file, "config.json")
+            zipf.write(self.file, os.path.basename(self.file))
             zipf.write(self.key, ".osk")
 
     def compress_and_upload(self):
@@ -251,8 +251,23 @@ class sync:
         try:
             with zipfile.ZipFile(zip_path, 'r') as zipf:
                 # Extract the specific file to the specified destination
-                zipf.extract("config.json", os.path.dirname(self.file))
-                zipf.extract(".osk", os.path.dirname(self.key))
+                names = zipf.namelist()
+                if "config.yaml" in names:
+                    zipf.extract("config.yaml", os.path.dirname(self.file))
+                elif "config.json" in names:
+                    zipf.extract("config.json", os.path.dirname(self.file))
+                
+                if ".osk" in names:
+                    zipf.extract(".osk", os.path.dirname(self.key))
+            
+            # Delete caches to force auto-regeneration on next run
+            try:
+                if os.path.exists(self.connapp.config.cachefile):
+                    os.remove(self.connapp.config.cachefile)
+                if os.path.exists(self.connapp.config.fzf_cachefile):
+                    os.remove(self.connapp.config.fzf_cachefile)
+            except Exception:
+                pass
             return 0
         except Exception as e:
             printer.error(f"An error occurred: {e}")

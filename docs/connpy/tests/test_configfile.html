@@ -383,9 +383,9 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">class TestConfigfileInit:
     def test_creates_default_config(self, tmp_config_dir):
-        &#34;&#34;&#34;Creates config.json with defaults when it doesn&#39;t exist.&#34;&#34;&#34;
-        config_file = tmp_config_dir / &#34;config.json&#34;
-        config_file.unlink()  # Remove existing
+        &#34;&#34;&#34;Creates config.yaml with defaults when it doesn&#39;t exist.&#34;&#34;&#34;
+        config_file = tmp_config_dir / &#34;config.yaml&#34;
+        config_file.unlink(missing_ok=True)  # Remove existing
         key_file = tmp_config_dir / &#34;.osk&#34;
 
         from connpy.configfile import configfile
@@ -402,7 +402,7 @@ el.replaceWith(d);
         key_file.unlink()  # Remove existing
 
         from connpy.configfile import configfile
-        conf = configfile(conf=str(tmp_config_dir / &#34;config.json&#34;), key=str(key_file))
+        conf = configfile(conf=str(tmp_config_dir / &#34;config.yaml&#34;), key=str(key_file))
 
         assert key_file.exists()
         assert conf.privatekey is not None
@@ -416,8 +416,8 @@ el.replaceWith(d);
 
     def test_config_file_permissions(self, tmp_config_dir):
         &#34;&#34;&#34;Config is created with 0o600 permissions.&#34;&#34;&#34;
-        config_file = tmp_config_dir / &#34;config.json&#34;
-        config_file.unlink()
+        config_file = tmp_config_dir / &#34;config.yaml&#34;
+        config_file.unlink(missing_ok=True)
 
         from connpy.configfile import configfile
         configfile(conf=str(config_file), key=str(tmp_config_dir / &#34;.osk&#34;))
@@ -437,7 +437,7 @@ el.replaceWith(d);
         (dot_folder / &#34;.folder&#34;).write_text(str(config_dir))
         (dot_folder / &#34;plugins&#34;).mkdir(exist_ok=True)
 
-        conf_path = str(config_dir / &#34;my_config.json&#34;)
+        conf_path = str(config_dir / &#34;my_config.yaml&#34;)
         key_path = str(config_dir / &#34;my_key&#34;)
 
         from connpy.configfile import configfile
@@ -459,8 +459,8 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def test_config_file_permissions(self, tmp_config_dir):
     &#34;&#34;&#34;Config is created with 0o600 permissions.&#34;&#34;&#34;
-    config_file = tmp_config_dir / &#34;config.json&#34;
-    config_file.unlink()
+    config_file = tmp_config_dir / &#34;config.yaml&#34;
+    config_file.unlink(missing_ok=True)
 
     from connpy.configfile import configfile
     configfile(conf=str(config_file), key=str(tmp_config_dir / &#34;.osk&#34;))
@@ -479,9 +479,9 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def test_creates_default_config(self, tmp_config_dir):
-    &#34;&#34;&#34;Creates config.json with defaults when it doesn&#39;t exist.&#34;&#34;&#34;
-    config_file = tmp_config_dir / &#34;config.json&#34;
-    config_file.unlink()  # Remove existing
+    &#34;&#34;&#34;Creates config.yaml with defaults when it doesn&#39;t exist.&#34;&#34;&#34;
+    config_file = tmp_config_dir / &#34;config.yaml&#34;
+    config_file.unlink(missing_ok=True)  # Remove existing
     key_file = tmp_config_dir / &#34;.osk&#34;
 
     from connpy.configfile import configfile
@@ -492,7 +492,7 @@ el.replaceWith(d);
     assert conf.config[&#34;idletime&#34;] == 30
     assert &#34;default&#34; in conf.profiles</code></pre>
 </details>
-<div class="desc"><p>Creates config.json with defaults when it doesn't exist.</p></div>
+<div class="desc"><p>Creates config.yaml with defaults when it doesn't exist.</p></div>
 </dd>
 <dt id="connpy.tests.test_configfile.TestConfigfileInit.test_creates_rsa_key"><code class="name flex">
 <span>def <span class="ident">test_creates_rsa_key</span></span>(<span>self, tmp_config_dir)</span>
@@ -508,7 +508,7 @@ el.replaceWith(d);
     key_file.unlink()  # Remove existing
 
     from connpy.configfile import configfile
-    conf = configfile(conf=str(tmp_config_dir / &#34;config.json&#34;), key=str(key_file))
+    conf = configfile(conf=str(tmp_config_dir / &#34;config.yaml&#34;), key=str(key_file))
 
     assert key_file.exists()
     assert conf.privatekey is not None
@@ -536,7 +536,7 @@ el.replaceWith(d);
     (dot_folder / &#34;.folder&#34;).write_text(str(config_dir))
     (dot_folder / &#34;plugins&#34;).mkdir(exist_ok=True)
 
-    conf_path = str(config_dir / &#34;my_config.json&#34;)
+    conf_path = str(config_dir / &#34;my_config.yaml&#34;)
     key_path = str(config_dir / &#34;my_key&#34;)
 
     from connpy.configfile import configfile
@@ -846,7 +846,7 @@ el.replaceWith(d);
 
     def test_profileused(self, tmp_config_dir):
         &#34;&#34;&#34;Detects nodes using a specific profile.&#34;&#34;&#34;
-        config_file = tmp_config_dir / &#34;config.json&#34;
+        config_file = tmp_config_dir / &#34;config.yaml&#34;
         data = {
             &#34;config&#34;: {&#34;case&#34;: False, &#34;idletime&#34;: 30, &#34;fzf&#34;: False},
             &#34;connections&#34;: {
@@ -872,7 +872,7 @@ el.replaceWith(d);
                              &#34;options&#34;: &#34;&#34;, &#34;logs&#34;: &#34;&#34;, &#34;tags&#34;: &#34;&#34;, &#34;jumphost&#34;: &#34;&#34;}
             }
         }
-        config_file.write_text(json.dumps(data, indent=4))
+        config_file.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False))
         from connpy.configfile import configfile
         conf = configfile(conf=str(config_file), key=str(tmp_config_dir / &#34;.osk&#34;))
 
@@ -1014,7 +1014,7 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def test_profileused(self, tmp_config_dir):
     &#34;&#34;&#34;Detects nodes using a specific profile.&#34;&#34;&#34;
-    config_file = tmp_config_dir / &#34;config.json&#34;
+    config_file = tmp_config_dir / &#34;config.yaml&#34;
     data = {
         &#34;config&#34;: {&#34;case&#34;: False, &#34;idletime&#34;: 30, &#34;fzf&#34;: False},
         &#34;connections&#34;: {
@@ -1040,7 +1040,7 @@ el.replaceWith(d);
                          &#34;options&#34;: &#34;&#34;, &#34;logs&#34;: &#34;&#34;, &#34;tags&#34;: &#34;&#34;, &#34;jumphost&#34;: &#34;&#34;}
         }
     }
-    config_file.write_text(json.dumps(data, indent=4))
+    config_file.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False))
     from connpy.configfile import configfile
     conf = configfile(conf=str(config_file), key=str(tmp_config_dir / &#34;.osk&#34;))
 
@@ -1111,7 +1111,7 @@ el.replaceWith(d);
 
     def test_getitem_with_profile_extraction(self, tmp_config_dir):
         &#34;&#34;&#34;extract=True resolves @profile references.&#34;&#34;&#34;
-        config_file = tmp_config_dir / &#34;config.json&#34;
+        config_file = tmp_config_dir / &#34;config.yaml&#34;
         data = {
             &#34;config&#34;: {&#34;case&#34;: False, &#34;idletime&#34;: 30, &#34;fzf&#34;: False},
             &#34;connections&#34;: {
@@ -1131,7 +1131,7 @@ el.replaceWith(d);
                                &#34;options&#34;: &#34;&#34;, &#34;logs&#34;: &#34;&#34;, &#34;tags&#34;: &#34;&#34;, &#34;jumphost&#34;: &#34;&#34;}
             }
         }
-        config_file.write_text(json.dumps(data, indent=4))
+        config_file.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False))
 
         from connpy.configfile import configfile
         conf = configfile(conf=str(config_file), key=str(tmp_config_dir / &#34;.osk&#34;))
@@ -1235,7 +1235,7 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def test_getitem_with_profile_extraction(self, tmp_config_dir):
     &#34;&#34;&#34;extract=True resolves @profile references.&#34;&#34;&#34;
-    config_file = tmp_config_dir / &#34;config.json&#34;
+    config_file = tmp_config_dir / &#34;config.yaml&#34;
     data = {
         &#34;config&#34;: {&#34;case&#34;: False, &#34;idletime&#34;: 30, &#34;fzf&#34;: False},
         &#34;connections&#34;: {
@@ -1255,7 +1255,7 @@ el.replaceWith(d);
                            &#34;options&#34;: &#34;&#34;, &#34;logs&#34;: &#34;&#34;, &#34;tags&#34;: &#34;&#34;, &#34;jumphost&#34;: &#34;&#34;}
         }
     }
-    config_file.write_text(json.dumps(data, indent=4))
+    config_file.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False))
 
     from connpy.configfile import configfile
     conf = configfile(conf=str(config_file), key=str(tmp_config_dir / &#34;.osk&#34;))

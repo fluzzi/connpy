@@ -3,14 +3,15 @@ import json
 import os
 import re
 import pytest
+import yaml
 from copy import deepcopy
 
 
 class TestConfigfileInit:
     def test_creates_default_config(self, tmp_config_dir):
-        """Creates config.json with defaults when it doesn't exist."""
-        config_file = tmp_config_dir / "config.json"
-        config_file.unlink()  # Remove existing
+        """Creates config.yaml with defaults when it doesn't exist."""
+        config_file = tmp_config_dir / "config.yaml"
+        config_file.unlink(missing_ok=True)  # Remove existing
         key_file = tmp_config_dir / ".osk"
 
         from connpy.configfile import configfile
@@ -27,7 +28,7 @@ class TestConfigfileInit:
         key_file.unlink()  # Remove existing
 
         from connpy.configfile import configfile
-        conf = configfile(conf=str(tmp_config_dir / "config.json"), key=str(key_file))
+        conf = configfile(conf=str(tmp_config_dir / "config.yaml"), key=str(key_file))
 
         assert key_file.exists()
         assert conf.privatekey is not None
@@ -41,8 +42,8 @@ class TestConfigfileInit:
 
     def test_config_file_permissions(self, tmp_config_dir):
         """Config is created with 0o600 permissions."""
-        config_file = tmp_config_dir / "config.json"
-        config_file.unlink()
+        config_file = tmp_config_dir / "config.yaml"
+        config_file.unlink(missing_ok=True)
 
         from connpy.configfile import configfile
         configfile(conf=str(config_file), key=str(tmp_config_dir / ".osk"))
@@ -62,7 +63,7 @@ class TestConfigfileInit:
         (dot_folder / ".folder").write_text(str(config_dir))
         (dot_folder / "plugins").mkdir(exist_ok=True)
 
-        conf_path = str(config_dir / "my_config.json")
+        conf_path = str(config_dir / "my_config.yaml")
         key_path = str(config_dir / "my_key")
 
         from connpy.configfile import configfile
@@ -248,7 +249,7 @@ class TestGetItem:
 
     def test_getitem_with_profile_extraction(self, tmp_config_dir):
         """extract=True resolves @profile references."""
-        config_file = tmp_config_dir / "config.json"
+        config_file = tmp_config_dir / "config.yaml"
         data = {
             "config": {"case": False, "idletime": 30, "fzf": False},
             "connections": {
@@ -268,7 +269,7 @@ class TestGetItem:
                                "options": "", "logs": "", "tags": "", "jumphost": ""}
             }
         }
-        config_file.write_text(json.dumps(data, indent=4))
+        config_file.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False))
 
         from connpy.configfile import configfile
         conf = configfile(conf=str(config_file), key=str(tmp_config_dir / ".osk"))
@@ -326,7 +327,7 @@ class TestGetAll:
 
     def test_profileused(self, tmp_config_dir):
         """Detects nodes using a specific profile."""
-        config_file = tmp_config_dir / "config.json"
+        config_file = tmp_config_dir / "config.yaml"
         data = {
             "config": {"case": False, "idletime": 30, "fzf": False},
             "connections": {
@@ -352,7 +353,7 @@ class TestGetAll:
                              "options": "", "logs": "", "tags": "", "jumphost": ""}
             }
         }
-        config_file.write_text(json.dumps(data, indent=4))
+        config_file.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False))
         from connpy.configfile import configfile
         conf = configfile(conf=str(config_file), key=str(tmp_config_dir / ".osk"))
 

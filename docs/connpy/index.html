@@ -2259,16 +2259,40 @@ class configfile:
             with open(pathfile, &#34;w&#34;) as f:
                 f.write(str(defaultdir))
             configdir = defaultdir
-        defaultfile = configdir + &#39;/config.json&#39;
+        defaultfile = configdir + &#39;/config.yaml&#39;
+        self.cachefile = configdir + &#39;/.config.cache.json&#39;
+        self.fzf_cachefile = configdir + &#39;/.fzf_nodes_cache.txt&#39;
         defaultkey = configdir + &#39;/.osk&#39;
         if conf == None:
             self.file = defaultfile
+            
+            # Backwards compatibility: Migrate from JSON to YAML
+            legacy_json = configdir + &#39;/config.json&#39;
+            legacy_noext = configdir + &#39;/config&#39;
+            legacy_file = None
+            if os.path.exists(legacy_json): legacy_file = legacy_json
+            elif os.path.exists(legacy_noext): legacy_file = legacy_noext
+            
+            if not os.path.exists(self.file) and legacy_file:
+                try:
+                    with open(legacy_file, &#39;r&#39;) as f:
+                        old_data = json.load(f)
+                    with open(self.file, &#39;w&#39;) as f:
+                        yaml.dump(old_data, f, default_flow_style=False, sort_keys=False)
+                    with open(self.cachefile, &#39;w&#39;) as f:
+                        json.dump(old_data, f)
+                    shutil.move(legacy_file, legacy_file + &#34;.backup&#34;)
+                    printer.success(f&#34;Migrated legacy config ({len(old_data.get(&#39;connections&#39;,{}))} folders/nodes) into YAML and Cache successfully!&#34;)
+                except Exception as e:
+                    printer.warning(f&#34;Failed to migrate legacy config: {e}&#34;)
         else:
             self.file = conf
+            
         if key == None:
             self.key = defaultkey
         else:
             self.key = key
+            
         if os.path.exists(self.file):
             config = self._loadconfig(self.file)
         else:
@@ -2285,23 +2309,38 @@ class configfile:
 
 
     def _loadconfig(self, conf):
-        #Loads config file
-        jsonconf = open(conf)
-        jsondata = json.load(jsonconf)
-        jsonconf.close()
-        return jsondata
+        #Loads config file using dual cache
+        cache_exists = os.path.exists(self.cachefile)
+        yaml_time = os.path.getmtime(conf) if os.path.exists(conf) else 0
+        cache_time = os.path.getmtime(self.cachefile) if cache_exists else 0
+
+        if not cache_exists or yaml_time &gt; cache_time:
+            with open(conf, &#39;r&#39;) as f:
+                data = yaml.safe_load(f)
+            try:
+                with open(self.cachefile, &#39;w&#39;) as f:
+                    json.dump(data, f)
+            except Exception:
+                pass
+            return data
+        else:
+            with open(self.cachefile, &#39;r&#39;) as f:
+                return json.load(f)
 
     def _createconfig(self, conf):
         #Create config file
         defaultconfig = {&#39;config&#39;: {&#39;case&#39;: False, &#39;idletime&#39;: 30, &#39;fzf&#39;: False}, &#39;connections&#39;: {}, &#39;profiles&#39;: { &#34;default&#34;: { &#34;host&#34;:&#34;&#34;, &#34;protocol&#34;:&#34;ssh&#34;, &#34;port&#34;:&#34;&#34;, &#34;user&#34;:&#34;&#34;, &#34;password&#34;:&#34;&#34;, &#34;options&#34;:&#34;&#34;, &#34;logs&#34;:&#34;&#34;, &#34;tags&#34;: &#34;&#34;, &#34;jumphost&#34;:&#34;&#34;}}}
         if not os.path.exists(conf):
             with open(conf, &#34;w&#34;) as f:
-                json.dump(defaultconfig, f, indent = 4)
-                f.close()
+                yaml.dump(defaultconfig, f, default_flow_style=False, sort_keys=False)
                 os.chmod(conf, 0o600)
-        jsonconf = open(conf)
-        jsondata = json.load(jsonconf)
-        jsonconf.close()
+            try:
+                with open(self.cachefile, &#39;w&#39;) as f:
+                    json.dump(defaultconfig, f)
+            except Exception:
+                pass
+        with open(conf, &#39;r&#39;) as f:
+            jsondata = yaml.safe_load(f)
         return jsondata
 
     @MethodHook
@@ -2313,12 +2352,22 @@ class configfile:
         newconfig[&#34;profiles&#34;] = self.profiles
         try:
             with open(conf, &#34;w&#34;) as f:
-                json.dump(newconfig, f, indent = 4)
-                f.close()
+                yaml.dump(newconfig, f, default_flow_style=False, sort_keys=False)
+            with open(self.cachefile, &#34;w&#34;) as f:
+                json.dump(newconfig, f)
+            self._generate_nodes_cache()
         except (IOError, OSError) as e:
             printer.error(f&#34;Failed to save config: {e}&#34;)
             return 1
         return 0
+
+    def _generate_nodes_cache(self):
+        try:
+            nodes = self._getallnodes()
+            with open(self.fzf_cachefile, &#34;w&#34;) as f:
+                f.write(&#34;\n&#34;.join(nodes))
+        except Exception:
+            pass
 
     def _createkey(self, keyfile):
         #Create key file
@@ -2538,15 +2587,15 @@ class configfile:
     def _getallnodes(self, filter = None):
         #get all nodes on configfile
         nodes = []
-        layer1 = [k for k,v in self.connections.items() if isinstance(v, dict) and v[&#34;type&#34;] == &#34;connection&#34;]
-        folders = [k for k,v in self.connections.items() if isinstance(v, dict) and v[&#34;type&#34;] == &#34;folder&#34;]
+        layer1 = [k for k,v in self.connections.items() if isinstance(v, dict) and v.get(&#34;type&#34;) == &#34;connection&#34;]
+        folders = [k for k,v in self.connections.items() if isinstance(v, dict) and v.get(&#34;type&#34;) == &#34;folder&#34;]
         nodes.extend(layer1)
         for f in folders:
-            layer2 = [k + &#34;@&#34; + f for k,v in self.connections[f].items() if isinstance(v, dict) and v[&#34;type&#34;] == &#34;connection&#34;]
+            layer2 = [k + &#34;@&#34; + f for k,v in self.connections[f].items() if isinstance(v, dict) and v.get(&#34;type&#34;) == &#34;connection&#34;]
             nodes.extend(layer2)
-            subfolders = [k for k,v in self.connections[f].items() if isinstance(v, dict) and v[&#34;type&#34;] == &#34;subfolder&#34;]
+            subfolders = [k for k,v in self.connections[f].items() if isinstance(v, dict) and v.get(&#34;type&#34;) == &#34;subfolder&#34;]
             for s in subfolders:
-                layer3 = [k + &#34;@&#34; + s + &#34;@&#34; + f for k,v in self.connections[f][s].items() if isinstance(v, dict) and v[&#34;type&#34;] == &#34;connection&#34;]
+                layer3 = [k + &#34;@&#34; + s + &#34;@&#34; + f for k,v in self.connections[f][s].items() if isinstance(v, dict) and v.get(&#34;type&#34;) == &#34;connection&#34;]
                 nodes.extend(layer3)
         if filter:
             if isinstance(filter, str):
@@ -2561,15 +2610,15 @@ class configfile:
     def _getallnodesfull(self, filter = None, extract = True):
         #get all nodes on configfile with all their attributes.
         nodes = {}
-        layer1 = {k:v for k,v in self.connections.items() if isinstance(v, dict) and v[&#34;type&#34;] == &#34;connection&#34;}
-        folders = [k for k,v in self.connections.items() if isinstance(v, dict) and v[&#34;type&#34;] == &#34;folder&#34;]
+        layer1 = {k:v for k,v in self.connections.items() if isinstance(v, dict) and v.get(&#34;type&#34;) == &#34;connection&#34;}
+        folders = [k for k,v in self.connections.items() if isinstance(v, dict) and v.get(&#34;type&#34;) == &#34;folder&#34;]
         nodes.update(layer1)
         for f in folders:
-            layer2 = {k + &#34;@&#34; + f:v for k,v in self.connections[f].items() if isinstance(v, dict) and v[&#34;type&#34;] == &#34;connection&#34;}
+            layer2 = {k + &#34;@&#34; + f:v for k,v in self.connections[f].items() if isinstance(v, dict) and v.get(&#34;type&#34;) == &#34;connection&#34;}
             nodes.update(layer2)
-            subfolders = [k for k,v in self.connections[f].items() if isinstance(v, dict) and v[&#34;type&#34;] == &#34;subfolder&#34;]
+            subfolders = [k for k,v in self.connections[f].items() if isinstance(v, dict) and v.get(&#34;type&#34;) == &#34;subfolder&#34;]
             for s in subfolders:
-                layer3 = {k + &#34;@&#34; + s + &#34;@&#34; + f:v for k,v in self.connections[f][s].items() if isinstance(v, dict) and v[&#34;type&#34;] == &#34;connection&#34;}
+                layer3 = {k + &#34;@&#34; + s + &#34;@&#34; + f:v for k,v in self.connections[f][s].items() if isinstance(v, dict) and v.get(&#34;type&#34;) == &#34;connection&#34;}
                 nodes.update(layer3)
         if filter:
             if isinstance(filter, str):
@@ -2600,27 +2649,27 @@ class configfile:
     @MethodHook
     def _getallfolders(self):
         #get all folders on configfile
-        folders = [&#34;@&#34; + k for k,v in self.connections.items() if isinstance(v, dict) and v[&#34;type&#34;] == &#34;folder&#34;]
+        folders = [&#34;@&#34; + k for k,v in self.connections.items() if isinstance(v, dict) and v.get(&#34;type&#34;) == &#34;folder&#34;]
         subfolders = []
         for f in folders:
-            s = [&#34;@&#34; + k + f for k,v in self.connections[f[1:]].items() if isinstance(v, dict) and v[&#34;type&#34;] == &#34;subfolder&#34;]
+            s = [&#34;@&#34; + k + f for k,v in self.connections[f[1:]].items() if isinstance(v, dict) and v.get(&#34;type&#34;) == &#34;subfolder&#34;]
             subfolders.extend(s)
         folders.extend(subfolders)
         return folders
 
     @MethodHook
     def _profileused(self, profile):
-        #Check if profile is used before deleting it
+        #Return all the nodes that uses this profile.
         nodes = []
-        layer1 = [k for k,v in self.connections.items() if isinstance(v, dict) and v[&#34;type&#34;] == &#34;connection&#34; and (&#34;@&#34; + profile in v.values() or ( isinstance(v[&#34;password&#34;],list) and &#34;@&#34; + profile in v[&#34;password&#34;]))]
-        folders = [k for k,v in self.connections.items() if isinstance(v, dict) and v[&#34;type&#34;] == &#34;folder&#34;]
+        layer1 = [k for k,v in self.connections.items() if isinstance(v, dict) and v.get(&#34;type&#34;) == &#34;connection&#34; and (&#34;@&#34; + profile in v.values() or ( isinstance(v.get(&#34;password&#34;),list) and &#34;@&#34; + profile in v.get(&#34;password&#34;)))]
+        folders = [k for k,v in self.connections.items() if isinstance(v, dict) and v.get(&#34;type&#34;) == &#34;folder&#34;]
         nodes.extend(layer1)
         for f in folders:
-            layer2 = [k + &#34;@&#34; + f for k,v in self.connections[f].items() if isinstance(v, dict) and v[&#34;type&#34;] == &#34;connection&#34; and (&#34;@&#34; + profile in v.values() or ( isinstance(v[&#34;password&#34;],list) and &#34;@&#34; + profile in v[&#34;password&#34;]))]
+            layer2 = [k + &#34;@&#34; + f for k,v in self.connections[f].items() if isinstance(v, dict) and v.get(&#34;type&#34;) == &#34;connection&#34; and (&#34;@&#34; + profile in v.values() or ( isinstance(v.get(&#34;password&#34;),list) and &#34;@&#34; + profile in v.get(&#34;password&#34;)))]
             nodes.extend(layer2)
-            subfolders = [k for k,v in self.connections[f].items() if isinstance(v, dict) and v[&#34;type&#34;] == &#34;subfolder&#34;]
+            subfolders = [k for k,v in self.connections[f].items() if isinstance(v, dict) and v.get(&#34;type&#34;) == &#34;subfolder&#34;]
             for s in subfolders:
-                layer3 = [k + &#34;@&#34; + s + &#34;@&#34; + f for k,v in self.connections[f][s].items() if isinstance(v, dict) and v[&#34;type&#34;] == &#34;connection&#34; and (&#34;@&#34; + profile in v.values() or ( isinstance(v[&#34;password&#34;],list) and &#34;@&#34; + profile in v[&#34;password&#34;]))]
+                layer3 = [k + &#34;@&#34; + s + &#34;@&#34; + f for k,v in self.connections[f][s].items() if isinstance(v, dict) and v.get(&#34;type&#34;) == &#34;connection&#34; and (&#34;@&#34; + profile in v.values() or ( isinstance(v.get(&#34;password&#34;),list) and &#34;@&#34; + profile in v.get(&#34;password&#34;)))]
                 nodes.extend(layer3)
         return nodes
 

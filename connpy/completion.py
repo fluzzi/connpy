@@ -97,9 +97,21 @@ def main():
             configdir = f.read().strip()
     except (FileNotFoundError, IOError):
         configdir = defaultdir
-    defaultfile = configdir + '/config.json'
-    jsonconf = open(defaultfile)
-    config = json.load(jsonconf)
+    cachefile = configdir + '/.config.cache.json'
+    try:
+        with open(cachefile, "r") as jsonconf:
+            config = json.load(jsonconf)
+    except FileNotFoundError:
+        try:
+            import yaml
+            with open(configdir + '/config.yaml', "r") as yamlconf:
+                config = yaml.safe_load(yamlconf)
+        except Exception:
+            try:
+                with open(configdir + '/config.json', "r") as jsonconf:
+                    config = json.load(jsonconf)
+            except Exception:
+                exit()
     nodes = _getallnodes(config)
     folders = _getallfolders(config)
     profiles = list(config["profiles"].keys())
