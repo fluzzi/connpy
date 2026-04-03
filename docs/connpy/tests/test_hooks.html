@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<meta name="generator" content="pdoc3 0.11.6">
+<title>connpy.tests.test_hooks API documentation</title>
+<meta name="description" content="Tests for connpy.hooks module — MethodHook and ClassHook.">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:1.5em;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:2em 0 .50em 0}h3{font-size:1.4em;margin:1.6em 0 .7em 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .2s ease-in-out}a:visited{color:#503}a:hover{color:#b62}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900;font-weight:bold}pre code{font-size:.8em;line-height:1.4em;padding:1em;display:block}code{background:#f3f3f3;font-family:"DejaVu Sans Mono",monospace;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source > summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible;min-width:max-content}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em 1em;margin:1em 0}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul ul{padding-left:1em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha512-D9gUyxqja7hBtkWpPWGt9wfbfaMGVt9gnyCvYa+jojwwPHLCzUm5i8rpk7vD7wNee9bA35eYIjobYPaQuKS1MQ==" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => {
+hljs.configure({languages: ['bash', 'css', 'diff', 'graphql', 'ini', 'javascript', 'json', 'plaintext', 'python', 'python-repl', 'rust', 'shell', 'sql', 'typescript', 'xml', 'yaml']});
+hljs.highlightAll();
+/* Collapse source docstrings */
+setTimeout(() => {
+[...document.querySelectorAll('.hljs.language-python > .hljs-string')]
+.filter(el => el.innerHTML.length > 200 && ['"""', "'''"].includes(el.innerHTML.substring(0, 3)))
+.forEach(el => {
+let d = document.createElement('details');
+d.classList.add('hljs-string');
+d.innerHTML = '<summary>"""</summary>' + el.innerHTML.substring(3);
+el.replaceWith(d);
+});
+}, 100);
+})</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>connpy.tests.test_hooks</code></h1>
+</header>
+<section id="section-intro">
+<p>Tests for connpy.hooks module — MethodHook and ClassHook.</p>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="connpy.tests.test_hooks.TestClassHook"><code class="flex name class">
+<span>class <span class="ident">TestClassHook</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestClassHook:
+    def test_creates_instance(self):
+        &#34;&#34;&#34;ClassHook still creates instances normally.&#34;&#34;&#34;
+        @ClassHook
+        class MyClass:
+            def __init__(self, value):
+                self.value = value
+
+        obj = MyClass(42)
+        assert obj.value == 42
+
+    def test_modify_future_instances(self):
+        &#34;&#34;&#34;modify() affects all future instances.&#34;&#34;&#34;
+        @ClassHook
+        class MyClass:
+            def __init__(self):
+                self.x = 1
+
+        def set_x_to_99(instance):
+            instance.x = 99
+
+        MyClass.modify(set_x_to_99)
+        obj = MyClass()
+        assert obj.x == 99
+
+    def test_modify_does_not_affect_past(self):
+        &#34;&#34;&#34;modify() does not affect already-created instances.&#34;&#34;&#34;
+        @ClassHook
+        class MyClass:
+            def __init__(self):
+                self.x = 1
+
+        old_obj = MyClass()
+
+        def set_x_to_99(instance):
+            instance.x = 99
+
+        MyClass.modify(set_x_to_99)
+        assert old_obj.x == 1  # Not affected
+        assert MyClass().x == 99  # New instance IS affected
+
+    def test_instance_modify(self):
+        &#34;&#34;&#34;instance.modify() only affects that specific instance.&#34;&#34;&#34;
+        @ClassHook
+        class MyClass:
+            def __init__(self):
+                self.x = 1
+
+        obj1 = MyClass()
+        obj2 = MyClass()
+
+        obj1.modify(lambda inst: setattr(inst, &#39;x&#39;, 999))
+        assert obj1.x == 999
+        assert obj2.x == 1
+
+    def test_multiple_deferred_hooks(self):
+        &#34;&#34;&#34;Multiple modify() calls apply in order.&#34;&#34;&#34;
+        @ClassHook
+        class MyClass:
+            def __init__(self):
+                self.log = []
+
+        MyClass.modify(lambda inst: inst.log.append(&#34;first&#34;))
+        MyClass.modify(lambda inst: inst.log.append(&#34;second&#34;))
+
+        obj = MyClass()
+        assert obj.log == [&#34;first&#34;, &#34;second&#34;]
+
+    def test_getattr_delegation(self):
+        &#34;&#34;&#34;ClassHook delegates attribute access to the wrapped class.&#34;&#34;&#34;
+        @ClassHook
+        class MyClass:
+            class_var = &#34;hello&#34;
+            def __init__(self):
+                pass
+
+        assert MyClass.class_var == &#34;hello&#34;</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_hooks.TestClassHook.test_creates_instance"><code class="name flex">
+<span>def <span class="ident">test_creates_instance</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_creates_instance(self):
+    &#34;&#34;&#34;ClassHook still creates instances normally.&#34;&#34;&#34;
+    @ClassHook
+    class MyClass:
+        def __init__(self, value):
+            self.value = value
+
+    obj = MyClass(42)
+    assert obj.value == 42</code></pre>
+</details>
+<div class="desc"><p>ClassHook still creates instances normally.</p></div>
+</dd>
+<dt id="connpy.tests.test_hooks.TestClassHook.test_getattr_delegation"><code class="name flex">
+<span>def <span class="ident">test_getattr_delegation</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_getattr_delegation(self):
+    &#34;&#34;&#34;ClassHook delegates attribute access to the wrapped class.&#34;&#34;&#34;
+    @ClassHook
+    class MyClass:
+        class_var = &#34;hello&#34;
+        def __init__(self):
+            pass
+
+    assert MyClass.class_var == &#34;hello&#34;</code></pre>
+</details>
+<div class="desc"><p>ClassHook delegates attribute access to the wrapped class.</p></div>
+</dd>
+<dt id="connpy.tests.test_hooks.TestClassHook.test_instance_modify"><code class="name flex">
+<span>def <span class="ident">test_instance_modify</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_instance_modify(self):
+    &#34;&#34;&#34;instance.modify() only affects that specific instance.&#34;&#34;&#34;
+    @ClassHook
+    class MyClass:
+        def __init__(self):
+            self.x = 1
+
+    obj1 = MyClass()
+    obj2 = MyClass()
+
+    obj1.modify(lambda inst: setattr(inst, &#39;x&#39;, 999))
+    assert obj1.x == 999
+    assert obj2.x == 1</code></pre>
+</details>
+<div class="desc"><p>instance.modify() only affects that specific instance.</p></div>
+</dd>
+<dt id="connpy.tests.test_hooks.TestClassHook.test_modify_does_not_affect_past"><code class="name flex">
+<span>def <span class="ident">test_modify_does_not_affect_past</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_modify_does_not_affect_past(self):
+    &#34;&#34;&#34;modify() does not affect already-created instances.&#34;&#34;&#34;
+    @ClassHook
+    class MyClass:
+        def __init__(self):
+            self.x = 1
+
+    old_obj = MyClass()
+
+    def set_x_to_99(instance):
+        instance.x = 99
+
+    MyClass.modify(set_x_to_99)
+    assert old_obj.x == 1  # Not affected
+    assert MyClass().x == 99  # New instance IS affected</code></pre>
+</details>
+<div class="desc"><p>modify() does not affect already-created instances.</p></div>
+</dd>
+<dt id="connpy.tests.test_hooks.TestClassHook.test_modify_future_instances"><code class="name flex">
+<span>def <span class="ident">test_modify_future_instances</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_modify_future_instances(self):
+    &#34;&#34;&#34;modify() affects all future instances.&#34;&#34;&#34;
+    @ClassHook
+    class MyClass:
+        def __init__(self):
+            self.x = 1
+
+    def set_x_to_99(instance):
+        instance.x = 99
+
+    MyClass.modify(set_x_to_99)
+    obj = MyClass()
+    assert obj.x == 99</code></pre>
+</details>
+<div class="desc"><p>modify() affects all future instances.</p></div>
+</dd>
+<dt id="connpy.tests.test_hooks.TestClassHook.test_multiple_deferred_hooks"><code class="name flex">
+<span>def <span class="ident">test_multiple_deferred_hooks</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_multiple_deferred_hooks(self):
+    &#34;&#34;&#34;Multiple modify() calls apply in order.&#34;&#34;&#34;
+    @ClassHook
+    class MyClass:
+        def __init__(self):
+            self.log = []
+
+    MyClass.modify(lambda inst: inst.log.append(&#34;first&#34;))
+    MyClass.modify(lambda inst: inst.log.append(&#34;second&#34;))
+
+    obj = MyClass()
+    assert obj.log == [&#34;first&#34;, &#34;second&#34;]</code></pre>
+</details>
+<div class="desc"><p>Multiple modify() calls apply in order.</p></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.tests.test_hooks.TestMethodHook"><code class="flex name class">
+<span>class <span class="ident">TestMethodHook</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestMethodHook:
+    def test_basic_call(self):
+        &#34;&#34;&#34;Decorated function executes normally.&#34;&#34;&#34;
+        @MethodHook
+        def add(a, b):
+            return a + b
+        assert add(2, 3) == 5
+
+    def test_pre_hook_modifies_args(self):
+        &#34;&#34;&#34;Pre-hook can modify arguments before execution.&#34;&#34;&#34;
+        @MethodHook
+        def greet(name):
+            return f&#34;Hello {name}&#34;
+
+        def uppercase_hook(name):
+            return (name.upper(),), {}
+
+        greet.register_pre_hook(uppercase_hook)
+        assert greet(&#34;world&#34;) == &#34;Hello WORLD&#34;
+
+    def test_post_hook_modifies_result(self):
+        &#34;&#34;&#34;Post-hook can modify the return value.&#34;&#34;&#34;
+        @MethodHook
+        def compute(x):
+            return x * 2
+
+        def double_result(*args, **kwargs):
+            return kwargs[&#34;result&#34;] * 2
+
+        compute.register_post_hook(double_result)
+        assert compute(5) == 20  # 5*2=10, then 10*2=20
+
+    def test_multiple_pre_hooks_order(self):
+        &#34;&#34;&#34;Pre-hooks execute in registration order.&#34;&#34;&#34;
+        calls = []
+
+        @MethodHook
+        def func(x):
+            return x
+
+        def hook1(x):
+            calls.append(&#34;hook1&#34;)
+            return (x,), {}
+
+        def hook2(x):
+            calls.append(&#34;hook2&#34;)
+            return (x,), {}
+
+        func.register_pre_hook(hook1)
+        func.register_pre_hook(hook2)
+        func(1)
+        assert calls == [&#34;hook1&#34;, &#34;hook2&#34;]
+
+    def test_multiple_post_hooks_order(self):
+        &#34;&#34;&#34;Post-hooks execute in registration order.&#34;&#34;&#34;
+        calls = []
+
+        @MethodHook
+        def func(x):
+            return x
+
+        def hook1(*args, **kwargs):
+            calls.append(&#34;hook1&#34;)
+            return kwargs[&#34;result&#34;]
+
+        def hook2(*args, **kwargs):
+            calls.append(&#34;hook2&#34;)
+            return kwargs[&#34;result&#34;]
+
+        func.register_post_hook(hook1)
+        func.register_post_hook(hook2)
+        func(1)
+        assert calls == [&#34;hook1&#34;, &#34;hook2&#34;]
+
+    def test_pre_hook_exception_continues(self, capsys):
+        &#34;&#34;&#34;If a pre-hook raises, the function still executes.&#34;&#34;&#34;
+        @MethodHook
+        def func(x):
+            return x + 1
+
+        def bad_hook(x):
+            raise RuntimeError(&#34;broken hook&#34;)
+
+        func.register_pre_hook(bad_hook)
+        # Should not raise — the hook error is printed but execution continues
+        result = func(5)
+        assert result == 6
+
+    def test_post_hook_exception_continues(self, capsys):
+        &#34;&#34;&#34;If a post-hook raises, the result is still returned.&#34;&#34;&#34;
+        @MethodHook
+        def func(x):
+            return x + 1
+
+        def bad_hook(*args, **kwargs):
+            raise RuntimeError(&#34;broken post hook&#34;)
+
+        func.register_post_hook(bad_hook)
+        result = func(5)
+        assert result == 6
+
+    def test_method_hook_as_instance_method(self):
+        &#34;&#34;&#34;MethodHook works as a descriptor on a class.&#34;&#34;&#34;
+        class MyClass:
+            @MethodHook
+            def double(self, x):
+                return x * 2
+
+        obj = MyClass()
+        assert obj.double(5) == 10
+
+    def test_method_hook_instance_hook_registration(self):
+        &#34;&#34;&#34;Can register hooks via instance method access.&#34;&#34;&#34;
+        class MyClass:
+            @MethodHook
+            def process(self, x):
+                return x
+
+        def add_ten(*args, **kwargs):
+            return kwargs[&#34;result&#34;] + 10
+
+        obj = MyClass()
+        obj.process.register_post_hook(add_ten)
+        assert obj.process(5) == 15</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_hooks.TestMethodHook.test_basic_call"><code class="name flex">
+<span>def <span class="ident">test_basic_call</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_basic_call(self):
+    &#34;&#34;&#34;Decorated function executes normally.&#34;&#34;&#34;
+    @MethodHook
+    def add(a, b):
+        return a + b
+    assert add(2, 3) == 5</code></pre>
+</details>
+<div class="desc"><p>Decorated function executes normally.</p></div>
+</dd>
+<dt id="connpy.tests.test_hooks.TestMethodHook.test_method_hook_as_instance_method"><code class="name flex">
+<span>def <span class="ident">test_method_hook_as_instance_method</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_method_hook_as_instance_method(self):
+    &#34;&#34;&#34;MethodHook works as a descriptor on a class.&#34;&#34;&#34;
+    class MyClass:
+        @MethodHook
+        def double(self, x):
+            return x * 2
+
+    obj = MyClass()
+    assert obj.double(5) == 10</code></pre>
+</details>
+<div class="desc"><p>MethodHook works as a descriptor on a class.</p></div>
+</dd>
+<dt id="connpy.tests.test_hooks.TestMethodHook.test_method_hook_instance_hook_registration"><code class="name flex">
+<span>def <span class="ident">test_method_hook_instance_hook_registration</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_method_hook_instance_hook_registration(self):
+    &#34;&#34;&#34;Can register hooks via instance method access.&#34;&#34;&#34;
+    class MyClass:
+        @MethodHook
+        def process(self, x):
+            return x
+
+    def add_ten(*args, **kwargs):
+        return kwargs[&#34;result&#34;] + 10
+
+    obj = MyClass()
+    obj.process.register_post_hook(add_ten)
+    assert obj.process(5) == 15</code></pre>
+</details>
+<div class="desc"><p>Can register hooks via instance method access.</p></div>
+</dd>
+<dt id="connpy.tests.test_hooks.TestMethodHook.test_multiple_post_hooks_order"><code class="name flex">
+<span>def <span class="ident">test_multiple_post_hooks_order</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_multiple_post_hooks_order(self):
+    &#34;&#34;&#34;Post-hooks execute in registration order.&#34;&#34;&#34;
+    calls = []
+
+    @MethodHook
+    def func(x):
+        return x
+
+    def hook1(*args, **kwargs):
+        calls.append(&#34;hook1&#34;)
+        return kwargs[&#34;result&#34;]
+
+    def hook2(*args, **kwargs):
+        calls.append(&#34;hook2&#34;)
+        return kwargs[&#34;result&#34;]
+
+    func.register_post_hook(hook1)
+    func.register_post_hook(hook2)
+    func(1)
+    assert calls == [&#34;hook1&#34;, &#34;hook2&#34;]</code></pre>
+</details>
+<div class="desc"><p>Post-hooks execute in registration order.</p></div>
+</dd>
+<dt id="connpy.tests.test_hooks.TestMethodHook.test_multiple_pre_hooks_order"><code class="name flex">
+<span>def <span class="ident">test_multiple_pre_hooks_order</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_multiple_pre_hooks_order(self):
+    &#34;&#34;&#34;Pre-hooks execute in registration order.&#34;&#34;&#34;
+    calls = []
+
+    @MethodHook
+    def func(x):
+        return x
+
+    def hook1(x):
+        calls.append(&#34;hook1&#34;)
+        return (x,), {}
+
+    def hook2(x):
+        calls.append(&#34;hook2&#34;)
+        return (x,), {}
+
+    func.register_pre_hook(hook1)
+    func.register_pre_hook(hook2)
+    func(1)
+    assert calls == [&#34;hook1&#34;, &#34;hook2&#34;]</code></pre>
+</details>
+<div class="desc"><p>Pre-hooks execute in registration order.</p></div>
+</dd>
+<dt id="connpy.tests.test_hooks.TestMethodHook.test_post_hook_exception_continues"><code class="name flex">
+<span>def <span class="ident">test_post_hook_exception_continues</span></span>(<span>self, capsys)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_post_hook_exception_continues(self, capsys):
+    &#34;&#34;&#34;If a post-hook raises, the result is still returned.&#34;&#34;&#34;
+    @MethodHook
+    def func(x):
+        return x + 1
+
+    def bad_hook(*args, **kwargs):
+        raise RuntimeError(&#34;broken post hook&#34;)
+
+    func.register_post_hook(bad_hook)
+    result = func(5)
+    assert result == 6</code></pre>
+</details>
+<div class="desc"><p>If a post-hook raises, the result is still returned.</p></div>
+</dd>
+<dt id="connpy.tests.test_hooks.TestMethodHook.test_post_hook_modifies_result"><code class="name flex">
+<span>def <span class="ident">test_post_hook_modifies_result</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_post_hook_modifies_result(self):
+    &#34;&#34;&#34;Post-hook can modify the return value.&#34;&#34;&#34;
+    @MethodHook
+    def compute(x):
+        return x * 2
+
+    def double_result(*args, **kwargs):
+        return kwargs[&#34;result&#34;] * 2
+
+    compute.register_post_hook(double_result)
+    assert compute(5) == 20  # 5*2=10, then 10*2=20</code></pre>
+</details>
+<div class="desc"><p>Post-hook can modify the return value.</p></div>
+</dd>
+<dt id="connpy.tests.test_hooks.TestMethodHook.test_pre_hook_exception_continues"><code class="name flex">
+<span>def <span class="ident">test_pre_hook_exception_continues</span></span>(<span>self, capsys)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_pre_hook_exception_continues(self, capsys):
+    &#34;&#34;&#34;If a pre-hook raises, the function still executes.&#34;&#34;&#34;
+    @MethodHook
+    def func(x):
+        return x + 1
+
+    def bad_hook(x):
+        raise RuntimeError(&#34;broken hook&#34;)
+
+    func.register_pre_hook(bad_hook)
+    # Should not raise — the hook error is printed but execution continues
+    result = func(5)
+    assert result == 6</code></pre>
+</details>
+<div class="desc"><p>If a pre-hook raises, the function still executes.</p></div>
+</dd>
+<dt id="connpy.tests.test_hooks.TestMethodHook.test_pre_hook_modifies_args"><code class="name flex">
+<span>def <span class="ident">test_pre_hook_modifies_args</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_pre_hook_modifies_args(self):
+    &#34;&#34;&#34;Pre-hook can modify arguments before execution.&#34;&#34;&#34;
+    @MethodHook
+    def greet(name):
+        return f&#34;Hello {name}&#34;
+
+    def uppercase_hook(name):
+        return (name.upper(),), {}
+
+    greet.register_pre_hook(uppercase_hook)
+    assert greet(&#34;world&#34;) == &#34;Hello WORLD&#34;</code></pre>
+</details>
+<div class="desc"><p>Pre-hook can modify arguments before execution.</p></div>
+</dd>
+</dl>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="connpy.tests" href="index.html">connpy.tests</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="connpy.tests.test_hooks.TestClassHook" href="#connpy.tests.test_hooks.TestClassHook">TestClassHook</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_hooks.TestClassHook.test_creates_instance" href="#connpy.tests.test_hooks.TestClassHook.test_creates_instance">test_creates_instance</a></code></li>
+<li><code><a title="connpy.tests.test_hooks.TestClassHook.test_getattr_delegation" href="#connpy.tests.test_hooks.TestClassHook.test_getattr_delegation">test_getattr_delegation</a></code></li>
+<li><code><a title="connpy.tests.test_hooks.TestClassHook.test_instance_modify" href="#connpy.tests.test_hooks.TestClassHook.test_instance_modify">test_instance_modify</a></code></li>
+<li><code><a title="connpy.tests.test_hooks.TestClassHook.test_modify_does_not_affect_past" href="#connpy.tests.test_hooks.TestClassHook.test_modify_does_not_affect_past">test_modify_does_not_affect_past</a></code></li>
+<li><code><a title="connpy.tests.test_hooks.TestClassHook.test_modify_future_instances" href="#connpy.tests.test_hooks.TestClassHook.test_modify_future_instances">test_modify_future_instances</a></code></li>
+<li><code><a title="connpy.tests.test_hooks.TestClassHook.test_multiple_deferred_hooks" href="#connpy.tests.test_hooks.TestClassHook.test_multiple_deferred_hooks">test_multiple_deferred_hooks</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.tests.test_hooks.TestMethodHook" href="#connpy.tests.test_hooks.TestMethodHook">TestMethodHook</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_hooks.TestMethodHook.test_basic_call" href="#connpy.tests.test_hooks.TestMethodHook.test_basic_call">test_basic_call</a></code></li>
+<li><code><a title="connpy.tests.test_hooks.TestMethodHook.test_method_hook_as_instance_method" href="#connpy.tests.test_hooks.TestMethodHook.test_method_hook_as_instance_method">test_method_hook_as_instance_method</a></code></li>
+<li><code><a title="connpy.tests.test_hooks.TestMethodHook.test_method_hook_instance_hook_registration" href="#connpy.tests.test_hooks.TestMethodHook.test_method_hook_instance_hook_registration">test_method_hook_instance_hook_registration</a></code></li>
+<li><code><a title="connpy.tests.test_hooks.TestMethodHook.test_multiple_post_hooks_order" href="#connpy.tests.test_hooks.TestMethodHook.test_multiple_post_hooks_order">test_multiple_post_hooks_order</a></code></li>
+<li><code><a title="connpy.tests.test_hooks.TestMethodHook.test_multiple_pre_hooks_order" href="#connpy.tests.test_hooks.TestMethodHook.test_multiple_pre_hooks_order">test_multiple_pre_hooks_order</a></code></li>
+<li><code><a title="connpy.tests.test_hooks.TestMethodHook.test_post_hook_exception_continues" href="#connpy.tests.test_hooks.TestMethodHook.test_post_hook_exception_continues">test_post_hook_exception_continues</a></code></li>
+<li><code><a title="connpy.tests.test_hooks.TestMethodHook.test_post_hook_modifies_result" href="#connpy.tests.test_hooks.TestMethodHook.test_post_hook_modifies_result">test_post_hook_modifies_result</a></code></li>
+<li><code><a title="connpy.tests.test_hooks.TestMethodHook.test_pre_hook_exception_continues" href="#connpy.tests.test_hooks.TestMethodHook.test_pre_hook_exception_continues">test_pre_hook_exception_continues</a></code></li>
+<li><code><a title="connpy.tests.test_hooks.TestMethodHook.test_pre_hook_modifies_args" href="#connpy.tests.test_hooks.TestMethodHook.test_pre_hook_modifies_args">test_pre_hook_modifies_args</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+</footer>
+</body>
+</html>

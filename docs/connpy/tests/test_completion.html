@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<meta name="generator" content="pdoc3 0.11.6">
+<title>connpy.tests.test_completion API documentation</title>
+<meta name="description" content="Tests for connpy.completion module.">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:1.5em;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:2em 0 .50em 0}h3{font-size:1.4em;margin:1.6em 0 .7em 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .2s ease-in-out}a:visited{color:#503}a:hover{color:#b62}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900;font-weight:bold}pre code{font-size:.8em;line-height:1.4em;padding:1em;display:block}code{background:#f3f3f3;font-family:"DejaVu Sans Mono",monospace;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source > summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible;min-width:max-content}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em 1em;margin:1em 0}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul ul{padding-left:1em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha512-D9gUyxqja7hBtkWpPWGt9wfbfaMGVt9gnyCvYa+jojwwPHLCzUm5i8rpk7vD7wNee9bA35eYIjobYPaQuKS1MQ==" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => {
+hljs.configure({languages: ['bash', 'css', 'diff', 'graphql', 'ini', 'javascript', 'json', 'plaintext', 'python', 'python-repl', 'rust', 'shell', 'sql', 'typescript', 'xml', 'yaml']});
+hljs.highlightAll();
+/* Collapse source docstrings */
+setTimeout(() => {
+[...document.querySelectorAll('.hljs.language-python > .hljs-string')]
+.filter(el => el.innerHTML.length > 200 && ['"""', "'''"].includes(el.innerHTML.substring(0, 3)))
+.forEach(el => {
+let d = document.createElement('details');
+d.classList.add('hljs-string');
+d.innerHTML = '<summary>"""</summary>' + el.innerHTML.substring(3);
+el.replaceWith(d);
+});
+}, 100);
+})</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>connpy.tests.test_completion</code></h1>
+</header>
+<section id="section-intro">
+<p>Tests for connpy.completion module.</p>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="connpy.tests.test_completion.TestGetAllFolders"><code class="flex name class">
+<span>class <span class="ident">TestGetAllFolders</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestGetAllFolders:
+    def test_basic_folders(self):
+        config = {
+            &#34;connections&#34;: {
+                &#34;office&#34;: {&#34;type&#34;: &#34;folder&#34;},
+                &#34;home&#34;: {&#34;type&#34;: &#34;folder&#34;}
+            }
+        }
+        folders = _getallfolders(config)
+        assert &#34;@office&#34; in folders
+        assert &#34;@home&#34; in folders
+
+    def test_with_subfolders(self):
+        config = {
+            &#34;connections&#34;: {
+                &#34;office&#34;: {
+                    &#34;type&#34;: &#34;folder&#34;,
+                    &#34;datacenter&#34;: {&#34;type&#34;: &#34;subfolder&#34;},
+                    &#34;server1&#34;: {&#34;type&#34;: &#34;connection&#34;}
+                }
+            }
+        }
+        folders = _getallfolders(config)
+        assert &#34;@office&#34; in folders
+        assert &#34;@datacenter@office&#34; in folders
+
+    def test_empty(self):
+        config = {&#34;connections&#34;: {}}
+        folders = _getallfolders(config)
+        assert folders == []</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_completion.TestGetAllFolders.test_basic_folders"><code class="name flex">
+<span>def <span class="ident">test_basic_folders</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_basic_folders(self):
+    config = {
+        &#34;connections&#34;: {
+            &#34;office&#34;: {&#34;type&#34;: &#34;folder&#34;},
+            &#34;home&#34;: {&#34;type&#34;: &#34;folder&#34;}
+        }
+    }
+    folders = _getallfolders(config)
+    assert &#34;@office&#34; in folders
+    assert &#34;@home&#34; in folders</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_completion.TestGetAllFolders.test_empty"><code class="name flex">
+<span>def <span class="ident">test_empty</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_empty(self):
+    config = {&#34;connections&#34;: {}}
+    folders = _getallfolders(config)
+    assert folders == []</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_completion.TestGetAllFolders.test_with_subfolders"><code class="name flex">
+<span>def <span class="ident">test_with_subfolders</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_with_subfolders(self):
+    config = {
+        &#34;connections&#34;: {
+            &#34;office&#34;: {
+                &#34;type&#34;: &#34;folder&#34;,
+                &#34;datacenter&#34;: {&#34;type&#34;: &#34;subfolder&#34;},
+                &#34;server1&#34;: {&#34;type&#34;: &#34;connection&#34;}
+            }
+        }
+    }
+    folders = _getallfolders(config)
+    assert &#34;@office&#34; in folders
+    assert &#34;@datacenter@office&#34; in folders</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.tests.test_completion.TestGetAllNodes"><code class="flex name class">
+<span>class <span class="ident">TestGetAllNodes</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestGetAllNodes:
+    def test_flat_nodes(self):
+        &#34;&#34;&#34;Nodes without folders.&#34;&#34;&#34;
+        config = {
+            &#34;connections&#34;: {
+                &#34;router1&#34;: {&#34;type&#34;: &#34;connection&#34;},
+                &#34;router2&#34;: {&#34;type&#34;: &#34;connection&#34;}
+            }
+        }
+        nodes = _getallnodes(config)
+        assert &#34;router1&#34; in nodes
+        assert &#34;router2&#34; in nodes
+
+    def test_nested_nodes(self):
+        &#34;&#34;&#34;Nodes in folders and subfolders have correct format.&#34;&#34;&#34;
+        config = {
+            &#34;connections&#34;: {
+                &#34;router1&#34;: {&#34;type&#34;: &#34;connection&#34;},
+                &#34;office&#34;: {
+                    &#34;type&#34;: &#34;folder&#34;,
+                    &#34;server1&#34;: {&#34;type&#34;: &#34;connection&#34;},
+                    &#34;datacenter&#34;: {
+                        &#34;type&#34;: &#34;subfolder&#34;,
+                        &#34;db1&#34;: {&#34;type&#34;: &#34;connection&#34;}
+                    }
+                }
+            }
+        }
+        nodes = _getallnodes(config)
+        assert &#34;router1&#34; in nodes
+        assert &#34;server1@office&#34; in nodes
+        assert &#34;db1@datacenter@office&#34; in nodes
+
+    def test_empty_connections(self):
+        config = {&#34;connections&#34;: {}}
+        nodes = _getallnodes(config)
+        assert nodes == []</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_completion.TestGetAllNodes.test_empty_connections"><code class="name flex">
+<span>def <span class="ident">test_empty_connections</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_empty_connections(self):
+    config = {&#34;connections&#34;: {}}
+    nodes = _getallnodes(config)
+    assert nodes == []</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_completion.TestGetAllNodes.test_flat_nodes"><code class="name flex">
+<span>def <span class="ident">test_flat_nodes</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_flat_nodes(self):
+    &#34;&#34;&#34;Nodes without folders.&#34;&#34;&#34;
+    config = {
+        &#34;connections&#34;: {
+            &#34;router1&#34;: {&#34;type&#34;: &#34;connection&#34;},
+            &#34;router2&#34;: {&#34;type&#34;: &#34;connection&#34;}
+        }
+    }
+    nodes = _getallnodes(config)
+    assert &#34;router1&#34; in nodes
+    assert &#34;router2&#34; in nodes</code></pre>
+</details>
+<div class="desc"><p>Nodes without folders.</p></div>
+</dd>
+<dt id="connpy.tests.test_completion.TestGetAllNodes.test_nested_nodes"><code class="name flex">
+<span>def <span class="ident">test_nested_nodes</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_nested_nodes(self):
+    &#34;&#34;&#34;Nodes in folders and subfolders have correct format.&#34;&#34;&#34;
+    config = {
+        &#34;connections&#34;: {
+            &#34;router1&#34;: {&#34;type&#34;: &#34;connection&#34;},
+            &#34;office&#34;: {
+                &#34;type&#34;: &#34;folder&#34;,
+                &#34;server1&#34;: {&#34;type&#34;: &#34;connection&#34;},
+                &#34;datacenter&#34;: {
+                    &#34;type&#34;: &#34;subfolder&#34;,
+                    &#34;db1&#34;: {&#34;type&#34;: &#34;connection&#34;}
+                }
+            }
+        }
+    }
+    nodes = _getallnodes(config)
+    assert &#34;router1&#34; in nodes
+    assert &#34;server1@office&#34; in nodes
+    assert &#34;db1@datacenter@office&#34; in nodes</code></pre>
+</details>
+<div class="desc"><p>Nodes in folders and subfolders have correct format.</p></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.tests.test_completion.TestGetCwd"><code class="flex name class">
+<span>class <span class="ident">TestGetCwd</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestGetCwd:
+    def test_current_dir(self, tmp_path, monkeypatch):
+        &#34;&#34;&#34;Lists files in current directory.&#34;&#34;&#34;
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / &#34;file1.txt&#34;).touch()
+        (tmp_path / &#34;file2.py&#34;).touch()
+        subdir = tmp_path / &#34;subdir&#34;
+        subdir.mkdir()
+
+        result = _getcwd([&#34;run&#34;, &#34;run&#34;], &#34;run&#34;)
+        # Should list files
+        assert any(&#34;file1.txt&#34; in r for r in result)
+        assert any(&#34;subdir/&#34; in r for r in result)
+
+    def test_specific_path(self, tmp_path, monkeypatch):
+        &#34;&#34;&#34;Lists files matching a partial path.&#34;&#34;&#34;
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / &#34;script.yaml&#34;).touch()
+        (tmp_path / &#34;script2.yaml&#34;).touch()
+
+        result = _getcwd([&#34;run&#34;, &#34;script&#34;], &#34;run&#34;)
+        assert any(&#34;script&#34; in r for r in result)
+
+    def test_folder_only(self, tmp_path, monkeypatch):
+        &#34;&#34;&#34;folderonly=True returns only directories.&#34;&#34;&#34;
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / &#34;file.txt&#34;).touch()
+        subdir = tmp_path / &#34;mydir&#34;
+        subdir.mkdir()
+
+        result = _getcwd([&#34;export&#34;, &#34;export&#34;], &#34;export&#34;, folderonly=True)
+        files_in_result = [r for r in result if &#34;file.txt&#34; in r]
+        assert len(files_in_result) == 0
+        dirs_in_result = [r for r in result if &#34;mydir&#34; in r]
+        assert len(dirs_in_result) &gt; 0</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_completion.TestGetCwd.test_current_dir"><code class="name flex">
+<span>def <span class="ident">test_current_dir</span></span>(<span>self, tmp_path, monkeypatch)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_current_dir(self, tmp_path, monkeypatch):
+    &#34;&#34;&#34;Lists files in current directory.&#34;&#34;&#34;
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / &#34;file1.txt&#34;).touch()
+    (tmp_path / &#34;file2.py&#34;).touch()
+    subdir = tmp_path / &#34;subdir&#34;
+    subdir.mkdir()
+
+    result = _getcwd([&#34;run&#34;, &#34;run&#34;], &#34;run&#34;)
+    # Should list files
+    assert any(&#34;file1.txt&#34; in r for r in result)
+    assert any(&#34;subdir/&#34; in r for r in result)</code></pre>
+</details>
+<div class="desc"><p>Lists files in current directory.</p></div>
+</dd>
+<dt id="connpy.tests.test_completion.TestGetCwd.test_folder_only"><code class="name flex">
+<span>def <span class="ident">test_folder_only</span></span>(<span>self, tmp_path, monkeypatch)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_folder_only(self, tmp_path, monkeypatch):
+    &#34;&#34;&#34;folderonly=True returns only directories.&#34;&#34;&#34;
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / &#34;file.txt&#34;).touch()
+    subdir = tmp_path / &#34;mydir&#34;
+    subdir.mkdir()
+
+    result = _getcwd([&#34;export&#34;, &#34;export&#34;], &#34;export&#34;, folderonly=True)
+    files_in_result = [r for r in result if &#34;file.txt&#34; in r]
+    assert len(files_in_result) == 0
+    dirs_in_result = [r for r in result if &#34;mydir&#34; in r]
+    assert len(dirs_in_result) &gt; 0</code></pre>
+</details>
+<div class="desc"><p>folderonly=True returns only directories.</p></div>
+</dd>
+<dt id="connpy.tests.test_completion.TestGetCwd.test_specific_path"><code class="name flex">
+<span>def <span class="ident">test_specific_path</span></span>(<span>self, tmp_path, monkeypatch)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_specific_path(self, tmp_path, monkeypatch):
+    &#34;&#34;&#34;Lists files matching a partial path.&#34;&#34;&#34;
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / &#34;script.yaml&#34;).touch()
+    (tmp_path / &#34;script2.yaml&#34;).touch()
+
+    result = _getcwd([&#34;run&#34;, &#34;script&#34;], &#34;run&#34;)
+    assert any(&#34;script&#34; in r for r in result)</code></pre>
+</details>
+<div class="desc"><p>Lists files matching a partial path.</p></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.tests.test_completion.TestGetPlugins"><code class="flex name class">
+<span>class <span class="ident">TestGetPlugins</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestGetPlugins:
+    def test_get_plugins_disable(self, tmp_path):
+        &#34;&#34;&#34;--disable returns enabled plugins.&#34;&#34;&#34;
+        plugin_dir = tmp_path / &#34;plugins&#34;
+        plugin_dir.mkdir()
+        (plugin_dir / &#34;active.py&#34;).touch()
+        (plugin_dir / &#34;disabled.py.bkp&#34;).touch()
+
+        result = _get_plugins(&#34;--disable&#34;, str(tmp_path))
+        assert &#34;active&#34; in result
+        assert &#34;disabled&#34; not in result
+
+    def test_get_plugins_enable(self, tmp_path):
+        &#34;&#34;&#34;--enable returns disabled plugins.&#34;&#34;&#34;
+        plugin_dir = tmp_path / &#34;plugins&#34;
+        plugin_dir.mkdir()
+        (plugin_dir / &#34;active.py&#34;).touch()
+        (plugin_dir / &#34;disabled.py.bkp&#34;).touch()
+
+        result = _get_plugins(&#34;--enable&#34;, str(tmp_path))
+        assert &#34;disabled&#34; in result
+        assert &#34;active&#34; not in result
+
+    def test_get_plugins_del(self, tmp_path):
+        &#34;&#34;&#34;--del returns all plugins.&#34;&#34;&#34;
+        plugin_dir = tmp_path / &#34;plugins&#34;
+        plugin_dir.mkdir()
+        (plugin_dir / &#34;active.py&#34;).touch()
+        (plugin_dir / &#34;disabled.py.bkp&#34;).touch()
+
+        result = _get_plugins(&#34;--del&#34;, str(tmp_path))
+        assert &#34;active&#34; in result
+        assert &#34;disabled&#34; in result
+
+    def test_get_plugins_all(self, tmp_path):
+        &#34;&#34;&#34;&#39;all&#39; returns dict with paths.&#34;&#34;&#34;
+        plugin_dir = tmp_path / &#34;plugins&#34;
+        plugin_dir.mkdir()
+        (plugin_dir / &#34;myplugin.py&#34;).touch()
+
+        result = _get_plugins(&#34;all&#34;, str(tmp_path))
+        assert isinstance(result, dict)
+        assert &#34;myplugin&#34; in result
+
+    def test_get_plugins_empty_dir(self, tmp_path):
+        &#34;&#34;&#34;Empty plugins directory returns empty list.&#34;&#34;&#34;
+        plugin_dir = tmp_path / &#34;plugins&#34;
+        plugin_dir.mkdir()
+
+        result = _get_plugins(&#34;--disable&#34;, str(tmp_path))
+        assert result == []</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_completion.TestGetPlugins.test_get_plugins_all"><code class="name flex">
+<span>def <span class="ident">test_get_plugins_all</span></span>(<span>self, tmp_path)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_get_plugins_all(self, tmp_path):
+    &#34;&#34;&#34;&#39;all&#39; returns dict with paths.&#34;&#34;&#34;
+    plugin_dir = tmp_path / &#34;plugins&#34;
+    plugin_dir.mkdir()
+    (plugin_dir / &#34;myplugin.py&#34;).touch()
+
+    result = _get_plugins(&#34;all&#34;, str(tmp_path))
+    assert isinstance(result, dict)
+    assert &#34;myplugin&#34; in result</code></pre>
+</details>
+<div class="desc"><p>'all' returns dict with paths.</p></div>
+</dd>
+<dt id="connpy.tests.test_completion.TestGetPlugins.test_get_plugins_del"><code class="name flex">
+<span>def <span class="ident">test_get_plugins_del</span></span>(<span>self, tmp_path)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_get_plugins_del(self, tmp_path):
+    &#34;&#34;&#34;--del returns all plugins.&#34;&#34;&#34;
+    plugin_dir = tmp_path / &#34;plugins&#34;
+    plugin_dir.mkdir()
+    (plugin_dir / &#34;active.py&#34;).touch()
+    (plugin_dir / &#34;disabled.py.bkp&#34;).touch()
+
+    result = _get_plugins(&#34;--del&#34;, str(tmp_path))
+    assert &#34;active&#34; in result
+    assert &#34;disabled&#34; in result</code></pre>
+</details>
+<div class="desc"><p>&ndash;del returns all plugins.</p></div>
+</dd>
+<dt id="connpy.tests.test_completion.TestGetPlugins.test_get_plugins_disable"><code class="name flex">
+<span>def <span class="ident">test_get_plugins_disable</span></span>(<span>self, tmp_path)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_get_plugins_disable(self, tmp_path):
+    &#34;&#34;&#34;--disable returns enabled plugins.&#34;&#34;&#34;
+    plugin_dir = tmp_path / &#34;plugins&#34;
+    plugin_dir.mkdir()
+    (plugin_dir / &#34;active.py&#34;).touch()
+    (plugin_dir / &#34;disabled.py.bkp&#34;).touch()
+
+    result = _get_plugins(&#34;--disable&#34;, str(tmp_path))
+    assert &#34;active&#34; in result
+    assert &#34;disabled&#34; not in result</code></pre>
+</details>
+<div class="desc"><p>&ndash;disable returns enabled plugins.</p></div>
+</dd>
+<dt id="connpy.tests.test_completion.TestGetPlugins.test_get_plugins_empty_dir"><code class="name flex">
+<span>def <span class="ident">test_get_plugins_empty_dir</span></span>(<span>self, tmp_path)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_get_plugins_empty_dir(self, tmp_path):
+    &#34;&#34;&#34;Empty plugins directory returns empty list.&#34;&#34;&#34;
+    plugin_dir = tmp_path / &#34;plugins&#34;
+    plugin_dir.mkdir()
+
+    result = _get_plugins(&#34;--disable&#34;, str(tmp_path))
+    assert result == []</code></pre>
+</details>
+<div class="desc"><p>Empty plugins directory returns empty list.</p></div>
+</dd>
+<dt id="connpy.tests.test_completion.TestGetPlugins.test_get_plugins_enable"><code class="name flex">
+<span>def <span class="ident">test_get_plugins_enable</span></span>(<span>self, tmp_path)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_get_plugins_enable(self, tmp_path):
+    &#34;&#34;&#34;--enable returns disabled plugins.&#34;&#34;&#34;
+    plugin_dir = tmp_path / &#34;plugins&#34;
+    plugin_dir.mkdir()
+    (plugin_dir / &#34;active.py&#34;).touch()
+    (plugin_dir / &#34;disabled.py.bkp&#34;).touch()
+
+    result = _get_plugins(&#34;--enable&#34;, str(tmp_path))
+    assert &#34;disabled&#34; in result
+    assert &#34;active&#34; not in result</code></pre>
+</details>
+<div class="desc"><p>&ndash;enable returns disabled plugins.</p></div>
+</dd>
+</dl>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="connpy.tests" href="index.html">connpy.tests</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="connpy.tests.test_completion.TestGetAllFolders" href="#connpy.tests.test_completion.TestGetAllFolders">TestGetAllFolders</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_completion.TestGetAllFolders.test_basic_folders" href="#connpy.tests.test_completion.TestGetAllFolders.test_basic_folders">test_basic_folders</a></code></li>
+<li><code><a title="connpy.tests.test_completion.TestGetAllFolders.test_empty" href="#connpy.tests.test_completion.TestGetAllFolders.test_empty">test_empty</a></code></li>
+<li><code><a title="connpy.tests.test_completion.TestGetAllFolders.test_with_subfolders" href="#connpy.tests.test_completion.TestGetAllFolders.test_with_subfolders">test_with_subfolders</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.tests.test_completion.TestGetAllNodes" href="#connpy.tests.test_completion.TestGetAllNodes">TestGetAllNodes</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_completion.TestGetAllNodes.test_empty_connections" href="#connpy.tests.test_completion.TestGetAllNodes.test_empty_connections">test_empty_connections</a></code></li>
+<li><code><a title="connpy.tests.test_completion.TestGetAllNodes.test_flat_nodes" href="#connpy.tests.test_completion.TestGetAllNodes.test_flat_nodes">test_flat_nodes</a></code></li>
+<li><code><a title="connpy.tests.test_completion.TestGetAllNodes.test_nested_nodes" href="#connpy.tests.test_completion.TestGetAllNodes.test_nested_nodes">test_nested_nodes</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.tests.test_completion.TestGetCwd" href="#connpy.tests.test_completion.TestGetCwd">TestGetCwd</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_completion.TestGetCwd.test_current_dir" href="#connpy.tests.test_completion.TestGetCwd.test_current_dir">test_current_dir</a></code></li>
+<li><code><a title="connpy.tests.test_completion.TestGetCwd.test_folder_only" href="#connpy.tests.test_completion.TestGetCwd.test_folder_only">test_folder_only</a></code></li>
+<li><code><a title="connpy.tests.test_completion.TestGetCwd.test_specific_path" href="#connpy.tests.test_completion.TestGetCwd.test_specific_path">test_specific_path</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.tests.test_completion.TestGetPlugins" href="#connpy.tests.test_completion.TestGetPlugins">TestGetPlugins</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_completion.TestGetPlugins.test_get_plugins_all" href="#connpy.tests.test_completion.TestGetPlugins.test_get_plugins_all">test_get_plugins_all</a></code></li>
+<li><code><a title="connpy.tests.test_completion.TestGetPlugins.test_get_plugins_del" href="#connpy.tests.test_completion.TestGetPlugins.test_get_plugins_del">test_get_plugins_del</a></code></li>
+<li><code><a title="connpy.tests.test_completion.TestGetPlugins.test_get_plugins_disable" href="#connpy.tests.test_completion.TestGetPlugins.test_get_plugins_disable">test_get_plugins_disable</a></code></li>
+<li><code><a title="connpy.tests.test_completion.TestGetPlugins.test_get_plugins_empty_dir" href="#connpy.tests.test_completion.TestGetPlugins.test_get_plugins_empty_dir">test_get_plugins_empty_dir</a></code></li>
+<li><code><a title="connpy.tests.test_completion.TestGetPlugins.test_get_plugins_enable" href="#connpy.tests.test_completion.TestGetPlugins.test_get_plugins_enable">test_get_plugins_enable</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+</footer>
+</body>
+</html>

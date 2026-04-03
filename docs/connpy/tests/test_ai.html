@@ -1,0 +1,1470 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<meta name="generator" content="pdoc3 0.11.6">
+<title>connpy.tests.test_ai API documentation</title>
+<meta name="description" content="Tests for connpy.ai module.">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:1.5em;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:2em 0 .50em 0}h3{font-size:1.4em;margin:1.6em 0 .7em 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .2s ease-in-out}a:visited{color:#503}a:hover{color:#b62}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900;font-weight:bold}pre code{font-size:.8em;line-height:1.4em;padding:1em;display:block}code{background:#f3f3f3;font-family:"DejaVu Sans Mono",monospace;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source > summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible;min-width:max-content}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em 1em;margin:1em 0}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul ul{padding-left:1em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha512-D9gUyxqja7hBtkWpPWGt9wfbfaMGVt9gnyCvYa+jojwwPHLCzUm5i8rpk7vD7wNee9bA35eYIjobYPaQuKS1MQ==" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => {
+hljs.configure({languages: ['bash', 'css', 'diff', 'graphql', 'ini', 'javascript', 'json', 'plaintext', 'python', 'python-repl', 'rust', 'shell', 'sql', 'typescript', 'xml', 'yaml']});
+hljs.highlightAll();
+/* Collapse source docstrings */
+setTimeout(() => {
+[...document.querySelectorAll('.hljs.language-python > .hljs-string')]
+.filter(el => el.innerHTML.length > 200 && ['"""', "'''"].includes(el.innerHTML.substring(0, 3)))
+.forEach(el => {
+let d = document.createElement('details');
+d.classList.add('hljs-string');
+d.innerHTML = '<summary>"""</summary>' + el.innerHTML.substring(3);
+el.replaceWith(d);
+});
+}, 100);
+})</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>connpy.tests.test_ai</code></h1>
+</header>
+<section id="section-intro">
+<p>Tests for connpy.ai module.</p>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="connpy.tests.test_ai.TestAIInit"><code class="flex name class">
+<span>class <span class="ident">TestAIInit</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestAIInit:
+    def test_init_with_keys(self, ai_config, mock_litellm):
+        &#34;&#34;&#34;Initializes correctly when keys are configured.&#34;&#34;&#34;
+        from connpy.ai import ai
+        myai = ai(ai_config)
+        assert myai.engineer_model == &#34;test/test-model&#34;
+        assert myai.architect_model == &#34;test/test-architect&#34;
+
+    def test_init_missing_engineer_key(self, config):
+        &#34;&#34;&#34;Raises ValueError if engineer key is missing.&#34;&#34;&#34;
+        from connpy.ai import ai
+        with pytest.raises(ValueError, match=&#34;Engineer API key&#34;):
+            ai(config)
+
+    def test_init_missing_architect_key_warns(self, ai_config, capsys, mock_litellm):
+        &#34;&#34;&#34;Warns if architect key is missing but doesn&#39;t crash.&#34;&#34;&#34;
+        # Remove architect key
+        ai_config.config[&#34;ai&#34;][&#34;architect_api_key&#34;] = None
+        from connpy.ai import ai
+        # Should not raise
+        myai = ai(ai_config)
+        assert myai.architect_key is None
+
+    def test_default_models(self, config):
+        &#34;&#34;&#34;Default models are set correctly when not configured.&#34;&#34;&#34;
+        config.config[&#34;ai&#34;] = {&#34;engineer_api_key&#34;: &#34;test-key&#34;, &#34;architect_api_key&#34;: &#34;test-key&#34;}
+        from connpy.ai import ai
+        myai = ai(config)
+        assert &#34;gemini&#34; in myai.engineer_model.lower()
+        assert &#34;claude&#34; in myai.architect_model.lower() or &#34;anthropic&#34; in myai.architect_model.lower()
+
+    def test_init_loads_memory(self, ai_config, tmp_path, mock_litellm):
+        &#34;&#34;&#34;Loads long-term memory from file if it exists.&#34;&#34;&#34;
+        memory_path = os.path.expanduser(&#34;~/.config/conn/ai_memory.md&#34;)
+        from connpy.ai import ai
+
+        with patch(&#34;os.path.exists&#34;, side_effect=lambda p: True if p == memory_path else os.path.exists(p)):
+            with patch(&#34;builtins.open&#34;, side_effect=lambda f, *a, **kw: (
+                __import__(&#34;io&#34;).StringIO(&#34;## Memory\nRouter1 is border router&#34;)
+                if f == memory_path else open(f, *a, **kw)
+            )):
+                try:
+                    myai = ai(ai_config)
+                except Exception:
+                    pass  # May fail on other file opens, that&#39;s ok</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_ai.TestAIInit.test_default_models"><code class="name flex">
+<span>def <span class="ident">test_default_models</span></span>(<span>self, config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_default_models(self, config):
+    &#34;&#34;&#34;Default models are set correctly when not configured.&#34;&#34;&#34;
+    config.config[&#34;ai&#34;] = {&#34;engineer_api_key&#34;: &#34;test-key&#34;, &#34;architect_api_key&#34;: &#34;test-key&#34;}
+    from connpy.ai import ai
+    myai = ai(config)
+    assert &#34;gemini&#34; in myai.engineer_model.lower()
+    assert &#34;claude&#34; in myai.architect_model.lower() or &#34;anthropic&#34; in myai.architect_model.lower()</code></pre>
+</details>
+<div class="desc"><p>Default models are set correctly when not configured.</p></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestAIInit.test_init_loads_memory"><code class="name flex">
+<span>def <span class="ident">test_init_loads_memory</span></span>(<span>self, ai_config, tmp_path, mock_litellm)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_init_loads_memory(self, ai_config, tmp_path, mock_litellm):
+    &#34;&#34;&#34;Loads long-term memory from file if it exists.&#34;&#34;&#34;
+    memory_path = os.path.expanduser(&#34;~/.config/conn/ai_memory.md&#34;)
+    from connpy.ai import ai
+
+    with patch(&#34;os.path.exists&#34;, side_effect=lambda p: True if p == memory_path else os.path.exists(p)):
+        with patch(&#34;builtins.open&#34;, side_effect=lambda f, *a, **kw: (
+            __import__(&#34;io&#34;).StringIO(&#34;## Memory\nRouter1 is border router&#34;)
+            if f == memory_path else open(f, *a, **kw)
+        )):
+            try:
+                myai = ai(ai_config)
+            except Exception:
+                pass  # May fail on other file opens, that&#39;s ok</code></pre>
+</details>
+<div class="desc"><p>Loads long-term memory from file if it exists.</p></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestAIInit.test_init_missing_architect_key_warns"><code class="name flex">
+<span>def <span class="ident">test_init_missing_architect_key_warns</span></span>(<span>self, ai_config, capsys, mock_litellm)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_init_missing_architect_key_warns(self, ai_config, capsys, mock_litellm):
+    &#34;&#34;&#34;Warns if architect key is missing but doesn&#39;t crash.&#34;&#34;&#34;
+    # Remove architect key
+    ai_config.config[&#34;ai&#34;][&#34;architect_api_key&#34;] = None
+    from connpy.ai import ai
+    # Should not raise
+    myai = ai(ai_config)
+    assert myai.architect_key is None</code></pre>
+</details>
+<div class="desc"><p>Warns if architect key is missing but doesn't crash.</p></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestAIInit.test_init_missing_engineer_key"><code class="name flex">
+<span>def <span class="ident">test_init_missing_engineer_key</span></span>(<span>self, config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_init_missing_engineer_key(self, config):
+    &#34;&#34;&#34;Raises ValueError if engineer key is missing.&#34;&#34;&#34;
+    from connpy.ai import ai
+    with pytest.raises(ValueError, match=&#34;Engineer API key&#34;):
+        ai(config)</code></pre>
+</details>
+<div class="desc"><p>Raises ValueError if engineer key is missing.</p></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestAIInit.test_init_with_keys"><code class="name flex">
+<span>def <span class="ident">test_init_with_keys</span></span>(<span>self, ai_config, mock_litellm)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_init_with_keys(self, ai_config, mock_litellm):
+    &#34;&#34;&#34;Initializes correctly when keys are configured.&#34;&#34;&#34;
+    from connpy.ai import ai
+    myai = ai(ai_config)
+    assert myai.engineer_model == &#34;test/test-model&#34;
+    assert myai.architect_model == &#34;test/test-architect&#34;</code></pre>
+</details>
+<div class="desc"><p>Initializes correctly when keys are configured.</p></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.tests.test_ai.TestAsk"><code class="flex name class">
+<span>class <span class="ident">TestAsk</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestAsk:
+    @pytest.fixture
+    def myai(self, ai_config, mock_litellm):
+        from connpy.ai import ai
+        return ai(ai_config)
+
+    def test_ask_basic_response(self, myai, mock_litellm):
+        result = myai.ask(&#34;hello&#34;, stream=False)
+        assert &#34;response&#34; in result
+        assert &#34;chat_history&#34; in result
+        assert &#34;usage&#34; in result
+        assert result[&#34;response&#34;] == &#34;Test response from AI&#34;
+
+    def test_ask_sticky_brain_engineer(self, myai, mock_litellm):
+        result = myai.ask(&#34;show me the routers&#34;, stream=False)
+        assert result[&#34;responder&#34;] == &#34;engineer&#34;
+
+    def test_ask_explicit_architect(self, myai, mock_litellm):
+        result = myai.ask(&#34;architect: review the network design&#34;, stream=False)
+        assert result[&#34;responder&#34;] == &#34;architect&#34;
+
+    def test_ask_returns_usage(self, myai, mock_litellm):
+        result = myai.ask(&#34;test&#34;, stream=False)
+        assert result[&#34;usage&#34;][&#34;total&#34;] &gt; 0
+
+    def test_ask_with_chat_history(self, myai, mock_litellm):
+        history = [
+            {&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;previous question&#34;},
+            {&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: &#34;previous answer&#34;}
+        ]
+        result = myai.ask(&#34;follow up&#34;, chat_history=history, stream=False)
+        assert result[&#34;response&#34;] is not None</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_ai.TestAsk.myai"><code class="name flex">
+<span>def <span class="ident">myai</span></span>(<span>self, ai_config, mock_litellm)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@pytest.fixture
+def myai(self, ai_config, mock_litellm):
+    from connpy.ai import ai
+    return ai(ai_config)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestAsk.test_ask_basic_response"><code class="name flex">
+<span>def <span class="ident">test_ask_basic_response</span></span>(<span>self, myai, mock_litellm)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_ask_basic_response(self, myai, mock_litellm):
+    result = myai.ask(&#34;hello&#34;, stream=False)
+    assert &#34;response&#34; in result
+    assert &#34;chat_history&#34; in result
+    assert &#34;usage&#34; in result
+    assert result[&#34;response&#34;] == &#34;Test response from AI&#34;</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestAsk.test_ask_explicit_architect"><code class="name flex">
+<span>def <span class="ident">test_ask_explicit_architect</span></span>(<span>self, myai, mock_litellm)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_ask_explicit_architect(self, myai, mock_litellm):
+    result = myai.ask(&#34;architect: review the network design&#34;, stream=False)
+    assert result[&#34;responder&#34;] == &#34;architect&#34;</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestAsk.test_ask_returns_usage"><code class="name flex">
+<span>def <span class="ident">test_ask_returns_usage</span></span>(<span>self, myai, mock_litellm)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_ask_returns_usage(self, myai, mock_litellm):
+    result = myai.ask(&#34;test&#34;, stream=False)
+    assert result[&#34;usage&#34;][&#34;total&#34;] &gt; 0</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestAsk.test_ask_sticky_brain_engineer"><code class="name flex">
+<span>def <span class="ident">test_ask_sticky_brain_engineer</span></span>(<span>self, myai, mock_litellm)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_ask_sticky_brain_engineer(self, myai, mock_litellm):
+    result = myai.ask(&#34;show me the routers&#34;, stream=False)
+    assert result[&#34;responder&#34;] == &#34;engineer&#34;</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestAsk.test_ask_with_chat_history"><code class="name flex">
+<span>def <span class="ident">test_ask_with_chat_history</span></span>(<span>self, myai, mock_litellm)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_ask_with_chat_history(self, myai, mock_litellm):
+    history = [
+        {&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;previous question&#34;},
+        {&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: &#34;previous answer&#34;}
+    ]
+    result = myai.ask(&#34;follow up&#34;, chat_history=history, stream=False)
+    assert result[&#34;response&#34;] is not None</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.tests.test_ai.TestDynamicPrompts"><code class="flex name class">
+<span>class <span class="ident">TestDynamicPrompts</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestDynamicPrompts:
+    @pytest.fixture
+    def myai(self, ai_config, mock_litellm):
+        from connpy.ai import ai
+        return ai(ai_config)
+
+    def test_engineer_prompt_without_extensions(self, myai):
+        prompt = myai.engineer_system_prompt
+        assert &#34;Plugin Capabilities&#34; not in prompt
+        assert &#34;TECHNICAL EXECUTION ENGINE&#34; in prompt
+
+    def test_engineer_prompt_with_extensions(self, myai):
+        myai.engineer_prompt_extensions.append(&#34;- AWS Cloud Auditing&#34;)
+        prompt = myai.engineer_system_prompt
+        assert &#34;Plugin Capabilities&#34; in prompt
+        assert &#34;AWS Cloud Auditing&#34; in prompt
+
+    def test_architect_prompt_without_extensions(self, myai):
+        prompt = myai.architect_system_prompt
+        assert &#34;Plugin Capabilities&#34; not in prompt
+        assert &#34;STRATEGIC REASONING ENGINE&#34; in prompt
+
+    def test_architect_prompt_with_extensions(self, myai):
+        myai.architect_prompt_extensions.append(&#34;  * Custom tool available&#34;)
+        prompt = myai.architect_system_prompt
+        assert &#34;Plugin Capabilities&#34; in prompt
+        assert &#34;Custom tool available&#34; in prompt</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_ai.TestDynamicPrompts.myai"><code class="name flex">
+<span>def <span class="ident">myai</span></span>(<span>self, ai_config, mock_litellm)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@pytest.fixture
+def myai(self, ai_config, mock_litellm):
+    from connpy.ai import ai
+    return ai(ai_config)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestDynamicPrompts.test_architect_prompt_with_extensions"><code class="name flex">
+<span>def <span class="ident">test_architect_prompt_with_extensions</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_architect_prompt_with_extensions(self, myai):
+    myai.architect_prompt_extensions.append(&#34;  * Custom tool available&#34;)
+    prompt = myai.architect_system_prompt
+    assert &#34;Plugin Capabilities&#34; in prompt
+    assert &#34;Custom tool available&#34; in prompt</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestDynamicPrompts.test_architect_prompt_without_extensions"><code class="name flex">
+<span>def <span class="ident">test_architect_prompt_without_extensions</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_architect_prompt_without_extensions(self, myai):
+    prompt = myai.architect_system_prompt
+    assert &#34;Plugin Capabilities&#34; not in prompt
+    assert &#34;STRATEGIC REASONING ENGINE&#34; in prompt</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestDynamicPrompts.test_engineer_prompt_with_extensions"><code class="name flex">
+<span>def <span class="ident">test_engineer_prompt_with_extensions</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_engineer_prompt_with_extensions(self, myai):
+    myai.engineer_prompt_extensions.append(&#34;- AWS Cloud Auditing&#34;)
+    prompt = myai.engineer_system_prompt
+    assert &#34;Plugin Capabilities&#34; in prompt
+    assert &#34;AWS Cloud Auditing&#34; in prompt</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestDynamicPrompts.test_engineer_prompt_without_extensions"><code class="name flex">
+<span>def <span class="ident">test_engineer_prompt_without_extensions</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_engineer_prompt_without_extensions(self, myai):
+    prompt = myai.engineer_system_prompt
+    assert &#34;Plugin Capabilities&#34; not in prompt
+    assert &#34;TECHNICAL EXECUTION ENGINE&#34; in prompt</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.tests.test_ai.TestManageMemory"><code class="flex name class">
+<span>class <span class="ident">TestManageMemory</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestManageMemory:
+    @pytest.fixture
+    def myai(self, ai_config, mock_litellm, tmp_path):
+        from connpy.ai import ai
+        myai = ai(ai_config)
+        myai.memory_path = str(tmp_path / &#34;ai_memory.md&#34;)
+        return myai
+
+    def test_manage_memory_append(self, myai):
+        result = myai.manage_memory_tool(&#34;Router1 is border router&#34;, action=&#34;append&#34;)
+        assert &#34;successfully&#34; in result.lower()
+        assert os.path.exists(myai.memory_path)
+        content = open(myai.memory_path).read()
+        assert &#34;Router1 is border router&#34; in content
+
+    def test_manage_memory_replace(self, myai):
+        myai.manage_memory_tool(&#34;old content&#34;, action=&#34;append&#34;)
+        myai.manage_memory_tool(&#34;new content only&#34;, action=&#34;replace&#34;)
+        content = open(myai.memory_path).read()
+        assert &#34;new content only&#34; in content
+        assert &#34;old content&#34; not in content
+
+    def test_manage_memory_empty_content(self, myai):
+        result = myai.manage_memory_tool(&#34;&#34;, action=&#34;append&#34;)
+        assert &#34;error&#34; in result.lower() or &#34;Error&#34; in result</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_ai.TestManageMemory.myai"><code class="name flex">
+<span>def <span class="ident">myai</span></span>(<span>self, ai_config, mock_litellm, tmp_path)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@pytest.fixture
+def myai(self, ai_config, mock_litellm, tmp_path):
+    from connpy.ai import ai
+    myai = ai(ai_config)
+    myai.memory_path = str(tmp_path / &#34;ai_memory.md&#34;)
+    return myai</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestManageMemory.test_manage_memory_append"><code class="name flex">
+<span>def <span class="ident">test_manage_memory_append</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_manage_memory_append(self, myai):
+    result = myai.manage_memory_tool(&#34;Router1 is border router&#34;, action=&#34;append&#34;)
+    assert &#34;successfully&#34; in result.lower()
+    assert os.path.exists(myai.memory_path)
+    content = open(myai.memory_path).read()
+    assert &#34;Router1 is border router&#34; in content</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestManageMemory.test_manage_memory_empty_content"><code class="name flex">
+<span>def <span class="ident">test_manage_memory_empty_content</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_manage_memory_empty_content(self, myai):
+    result = myai.manage_memory_tool(&#34;&#34;, action=&#34;append&#34;)
+    assert &#34;error&#34; in result.lower() or &#34;Error&#34; in result</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestManageMemory.test_manage_memory_replace"><code class="name flex">
+<span>def <span class="ident">test_manage_memory_replace</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_manage_memory_replace(self, myai):
+    myai.manage_memory_tool(&#34;old content&#34;, action=&#34;append&#34;)
+    myai.manage_memory_tool(&#34;new content only&#34;, action=&#34;replace&#34;)
+    content = open(myai.memory_path).read()
+    assert &#34;new content only&#34; in content
+    assert &#34;old content&#34; not in content</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.tests.test_ai.TestRegisterAITool"><code class="flex name class">
+<span>class <span class="ident">TestRegisterAITool</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestRegisterAITool:
+    @pytest.fixture
+    def myai(self, ai_config, mock_litellm):
+        from connpy.ai import ai
+        return ai(ai_config)
+
+    def _make_tool_def(self, name=&#34;my_tool&#34;):
+        return {
+            &#34;type&#34;: &#34;function&#34;,
+            &#34;function&#34;: {
+                &#34;name&#34;: name,
+                &#34;description&#34;: &#34;Test tool&#34;,
+                &#34;parameters&#34;: {&#34;type&#34;: &#34;object&#34;, &#34;properties&#34;: {}}
+            }
+        }
+
+    def test_register_tool_engineer(self, myai):
+        tool_def = self._make_tool_def()
+        myai.register_ai_tool(tool_def, lambda self, **kw: &#34;ok&#34;, target=&#34;engineer&#34;)
+        assert len(myai.external_engineer_tools) == 1
+        assert len(myai.external_architect_tools) == 0
+
+    def test_register_tool_architect(self, myai):
+        tool_def = self._make_tool_def()
+        myai.register_ai_tool(tool_def, lambda self, **kw: &#34;ok&#34;, target=&#34;architect&#34;)
+        assert len(myai.external_architect_tools) == 1
+        assert len(myai.external_engineer_tools) == 0
+
+    def test_register_tool_both(self, myai):
+        tool_def = self._make_tool_def()
+        myai.register_ai_tool(tool_def, lambda self, **kw: &#34;ok&#34;, target=&#34;both&#34;)
+        assert len(myai.external_engineer_tools) == 1
+        assert len(myai.external_architect_tools) == 1
+
+    def test_register_tool_handler(self, myai):
+        tool_def = self._make_tool_def(&#34;custom_tool&#34;)
+        handler = lambda self, **kw: &#34;result&#34;
+        myai.register_ai_tool(tool_def, handler)
+        assert &#34;custom_tool&#34; in myai.external_tool_handlers
+        assert myai.external_tool_handlers[&#34;custom_tool&#34;] is handler
+
+    def test_register_tool_prompt_extension(self, myai):
+        tool_def = self._make_tool_def()
+        myai.register_ai_tool(
+            tool_def, lambda self, **kw: &#34;ok&#34;,
+            engineer_prompt=&#34;- Custom capability&#34;,
+            architect_prompt=&#34;  * Custom tool&#34;
+        )
+        assert any(&#34;Custom capability&#34; in ext for ext in myai.engineer_prompt_extensions)
+        assert any(&#34;Custom tool&#34; in ext for ext in myai.architect_prompt_extensions)
+
+    def test_register_tool_status_formatter(self, myai):
+        tool_def = self._make_tool_def(&#34;status_tool&#34;)
+        formatter = lambda args: f&#34;[STATUS] {args}&#34;
+        myai.register_ai_tool(tool_def, lambda self, **kw: &#34;ok&#34;, status_formatter=formatter)
+        assert &#34;status_tool&#34; in myai.tool_status_formatters</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_ai.TestRegisterAITool.myai"><code class="name flex">
+<span>def <span class="ident">myai</span></span>(<span>self, ai_config, mock_litellm)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@pytest.fixture
+def myai(self, ai_config, mock_litellm):
+    from connpy.ai import ai
+    return ai(ai_config)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestRegisterAITool.test_register_tool_architect"><code class="name flex">
+<span>def <span class="ident">test_register_tool_architect</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_register_tool_architect(self, myai):
+    tool_def = self._make_tool_def()
+    myai.register_ai_tool(tool_def, lambda self, **kw: &#34;ok&#34;, target=&#34;architect&#34;)
+    assert len(myai.external_architect_tools) == 1
+    assert len(myai.external_engineer_tools) == 0</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestRegisterAITool.test_register_tool_both"><code class="name flex">
+<span>def <span class="ident">test_register_tool_both</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_register_tool_both(self, myai):
+    tool_def = self._make_tool_def()
+    myai.register_ai_tool(tool_def, lambda self, **kw: &#34;ok&#34;, target=&#34;both&#34;)
+    assert len(myai.external_engineer_tools) == 1
+    assert len(myai.external_architect_tools) == 1</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestRegisterAITool.test_register_tool_engineer"><code class="name flex">
+<span>def <span class="ident">test_register_tool_engineer</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_register_tool_engineer(self, myai):
+    tool_def = self._make_tool_def()
+    myai.register_ai_tool(tool_def, lambda self, **kw: &#34;ok&#34;, target=&#34;engineer&#34;)
+    assert len(myai.external_engineer_tools) == 1
+    assert len(myai.external_architect_tools) == 0</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestRegisterAITool.test_register_tool_handler"><code class="name flex">
+<span>def <span class="ident">test_register_tool_handler</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_register_tool_handler(self, myai):
+    tool_def = self._make_tool_def(&#34;custom_tool&#34;)
+    handler = lambda self, **kw: &#34;result&#34;
+    myai.register_ai_tool(tool_def, handler)
+    assert &#34;custom_tool&#34; in myai.external_tool_handlers
+    assert myai.external_tool_handlers[&#34;custom_tool&#34;] is handler</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestRegisterAITool.test_register_tool_prompt_extension"><code class="name flex">
+<span>def <span class="ident">test_register_tool_prompt_extension</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_register_tool_prompt_extension(self, myai):
+    tool_def = self._make_tool_def()
+    myai.register_ai_tool(
+        tool_def, lambda self, **kw: &#34;ok&#34;,
+        engineer_prompt=&#34;- Custom capability&#34;,
+        architect_prompt=&#34;  * Custom tool&#34;
+    )
+    assert any(&#34;Custom capability&#34; in ext for ext in myai.engineer_prompt_extensions)
+    assert any(&#34;Custom tool&#34; in ext for ext in myai.architect_prompt_extensions)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestRegisterAITool.test_register_tool_status_formatter"><code class="name flex">
+<span>def <span class="ident">test_register_tool_status_formatter</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_register_tool_status_formatter(self, myai):
+    tool_def = self._make_tool_def(&#34;status_tool&#34;)
+    formatter = lambda args: f&#34;[STATUS] {args}&#34;
+    myai.register_ai_tool(tool_def, lambda self, **kw: &#34;ok&#34;, status_formatter=formatter)
+    assert &#34;status_tool&#34; in myai.tool_status_formatters</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.tests.test_ai.TestSanitizeMessages"><code class="flex name class">
+<span>class <span class="ident">TestSanitizeMessages</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestSanitizeMessages:
+    @pytest.fixture
+    def myai(self, ai_config, mock_litellm):
+        from connpy.ai import ai
+        return ai(ai_config)
+
+    def test_sanitize_empty(self, myai):
+        assert myai._sanitize_messages([]) == []
+
+    def test_sanitize_normal_messages(self, myai):
+        messages = [
+            {&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: &#34;You are helpful&#34;},
+            {&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;Hello&#34;},
+            {&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: &#34;Hi there&#34;}
+        ]
+        result = myai._sanitize_messages(messages)
+        assert len(result) == 3
+
+    def test_sanitize_removes_orphan_tool_calls(self, myai):
+        &#34;&#34;&#34;Tool calls at the end without responses are removed.&#34;&#34;&#34;
+        messages = [
+            {&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;do something&#34;},
+            {&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: None, &#34;tool_calls&#34;: [
+                {&#34;id&#34;: &#34;tc1&#34;, &#34;function&#34;: {&#34;name&#34;: &#34;list_nodes&#34;, &#34;arguments&#34;: &#34;{}&#34;}}
+            ]}
+            # No tool response follows!
+        ]
+        result = myai._sanitize_messages(messages)
+        assert len(result) == 1  # Only user message
+        assert result[0][&#34;role&#34;] == &#34;user&#34;
+
+    def test_sanitize_removes_orphan_tool_responses(self, myai):
+        &#34;&#34;&#34;Tool responses without preceding tool_calls are removed.&#34;&#34;&#34;
+        messages = [
+            {&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;hello&#34;},
+            {&#34;role&#34;: &#34;tool&#34;, &#34;tool_call_id&#34;: &#34;tc1&#34;, &#34;name&#34;: &#34;list_nodes&#34;, &#34;content&#34;: &#34;[]&#34;}
+        ]
+        result = myai._sanitize_messages(messages)
+        assert len(result) == 1
+        assert result[0][&#34;role&#34;] == &#34;user&#34;
+
+    def test_sanitize_preserves_valid_tool_pairs(self, myai):
+        &#34;&#34;&#34;Valid assistant+tool_calls followed by tool responses are preserved.&#34;&#34;&#34;
+        messages = [
+            {&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;list nodes&#34;},
+            {&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: None, &#34;tool_calls&#34;: [
+                {&#34;id&#34;: &#34;tc1&#34;, &#34;function&#34;: {&#34;name&#34;: &#34;list_nodes&#34;, &#34;arguments&#34;: &#34;{}&#34;}}
+            ]},
+            {&#34;role&#34;: &#34;tool&#34;, &#34;tool_call_id&#34;: &#34;tc1&#34;, &#34;name&#34;: &#34;list_nodes&#34;, &#34;content&#34;: &#34;[\&#34;r1\&#34;]&#34;},
+            {&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: &#34;Found r1&#34;}
+        ]
+        result = myai._sanitize_messages(messages)
+        assert len(result) == 4</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_ai.TestSanitizeMessages.myai"><code class="name flex">
+<span>def <span class="ident">myai</span></span>(<span>self, ai_config, mock_litellm)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@pytest.fixture
+def myai(self, ai_config, mock_litellm):
+    from connpy.ai import ai
+    return ai(ai_config)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestSanitizeMessages.test_sanitize_empty"><code class="name flex">
+<span>def <span class="ident">test_sanitize_empty</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_sanitize_empty(self, myai):
+    assert myai._sanitize_messages([]) == []</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestSanitizeMessages.test_sanitize_normal_messages"><code class="name flex">
+<span>def <span class="ident">test_sanitize_normal_messages</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_sanitize_normal_messages(self, myai):
+    messages = [
+        {&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: &#34;You are helpful&#34;},
+        {&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;Hello&#34;},
+        {&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: &#34;Hi there&#34;}
+    ]
+    result = myai._sanitize_messages(messages)
+    assert len(result) == 3</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestSanitizeMessages.test_sanitize_preserves_valid_tool_pairs"><code class="name flex">
+<span>def <span class="ident">test_sanitize_preserves_valid_tool_pairs</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_sanitize_preserves_valid_tool_pairs(self, myai):
+    &#34;&#34;&#34;Valid assistant+tool_calls followed by tool responses are preserved.&#34;&#34;&#34;
+    messages = [
+        {&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;list nodes&#34;},
+        {&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: None, &#34;tool_calls&#34;: [
+            {&#34;id&#34;: &#34;tc1&#34;, &#34;function&#34;: {&#34;name&#34;: &#34;list_nodes&#34;, &#34;arguments&#34;: &#34;{}&#34;}}
+        ]},
+        {&#34;role&#34;: &#34;tool&#34;, &#34;tool_call_id&#34;: &#34;tc1&#34;, &#34;name&#34;: &#34;list_nodes&#34;, &#34;content&#34;: &#34;[\&#34;r1\&#34;]&#34;},
+        {&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: &#34;Found r1&#34;}
+    ]
+    result = myai._sanitize_messages(messages)
+    assert len(result) == 4</code></pre>
+</details>
+<div class="desc"><p>Valid assistant+tool_calls followed by tool responses are preserved.</p></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestSanitizeMessages.test_sanitize_removes_orphan_tool_calls"><code class="name flex">
+<span>def <span class="ident">test_sanitize_removes_orphan_tool_calls</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_sanitize_removes_orphan_tool_calls(self, myai):
+    &#34;&#34;&#34;Tool calls at the end without responses are removed.&#34;&#34;&#34;
+    messages = [
+        {&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;do something&#34;},
+        {&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: None, &#34;tool_calls&#34;: [
+            {&#34;id&#34;: &#34;tc1&#34;, &#34;function&#34;: {&#34;name&#34;: &#34;list_nodes&#34;, &#34;arguments&#34;: &#34;{}&#34;}}
+        ]}
+        # No tool response follows!
+    ]
+    result = myai._sanitize_messages(messages)
+    assert len(result) == 1  # Only user message
+    assert result[0][&#34;role&#34;] == &#34;user&#34;</code></pre>
+</details>
+<div class="desc"><p>Tool calls at the end without responses are removed.</p></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestSanitizeMessages.test_sanitize_removes_orphan_tool_responses"><code class="name flex">
+<span>def <span class="ident">test_sanitize_removes_orphan_tool_responses</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_sanitize_removes_orphan_tool_responses(self, myai):
+    &#34;&#34;&#34;Tool responses without preceding tool_calls are removed.&#34;&#34;&#34;
+    messages = [
+        {&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;hello&#34;},
+        {&#34;role&#34;: &#34;tool&#34;, &#34;tool_call_id&#34;: &#34;tc1&#34;, &#34;name&#34;: &#34;list_nodes&#34;, &#34;content&#34;: &#34;[]&#34;}
+    ]
+    result = myai._sanitize_messages(messages)
+    assert len(result) == 1
+    assert result[0][&#34;role&#34;] == &#34;user&#34;</code></pre>
+</details>
+<div class="desc"><p>Tool responses without preceding tool_calls are removed.</p></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.tests.test_ai.TestToolDefinitions"><code class="flex name class">
+<span>class <span class="ident">TestToolDefinitions</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestToolDefinitions:
+    @pytest.fixture
+    def myai(self, ai_config, mock_litellm):
+        from connpy.ai import ai
+        return ai(ai_config)
+
+    def test_engineer_tools_include_core(self, myai):
+        tools = myai._get_engineer_tools()
+        names = [t[&#34;function&#34;][&#34;name&#34;] for t in tools]
+        assert &#34;list_nodes&#34; in names
+        assert &#34;run_commands&#34; in names
+        assert &#34;get_node_info&#34; in names
+        assert &#34;consult_architect&#34; in names
+        assert &#34;escalate_to_architect&#34; in names
+
+    def test_engineer_tools_include_external(self, myai):
+        myai.external_engineer_tools.append({
+            &#34;type&#34;: &#34;function&#34;,
+            &#34;function&#34;: {&#34;name&#34;: &#34;custom_tool&#34;, &#34;description&#34;: &#34;test&#34;, &#34;parameters&#34;: {}}
+        })
+        tools = myai._get_engineer_tools()
+        names = [t[&#34;function&#34;][&#34;name&#34;] for t in tools]
+        assert &#34;custom_tool&#34; in names
+
+    def test_architect_tools_include_core(self, myai):
+        tools = myai._get_architect_tools()
+        names = [t[&#34;function&#34;][&#34;name&#34;] for t in tools]
+        assert &#34;delegate_to_engineer&#34; in names
+        assert &#34;return_to_engineer&#34; in names
+        assert &#34;manage_memory_tool&#34; in names
+
+    def test_architect_tools_include_external(self, myai):
+        myai.external_architect_tools.append({
+            &#34;type&#34;: &#34;function&#34;,
+            &#34;function&#34;: {&#34;name&#34;: &#34;arch_tool&#34;, &#34;description&#34;: &#34;test&#34;, &#34;parameters&#34;: {}}
+        })
+        tools = myai._get_architect_tools()
+        names = [t[&#34;function&#34;][&#34;name&#34;] for t in tools]
+        assert &#34;arch_tool&#34; in names</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_ai.TestToolDefinitions.myai"><code class="name flex">
+<span>def <span class="ident">myai</span></span>(<span>self, ai_config, mock_litellm)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@pytest.fixture
+def myai(self, ai_config, mock_litellm):
+    from connpy.ai import ai
+    return ai(ai_config)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestToolDefinitions.test_architect_tools_include_core"><code class="name flex">
+<span>def <span class="ident">test_architect_tools_include_core</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_architect_tools_include_core(self, myai):
+    tools = myai._get_architect_tools()
+    names = [t[&#34;function&#34;][&#34;name&#34;] for t in tools]
+    assert &#34;delegate_to_engineer&#34; in names
+    assert &#34;return_to_engineer&#34; in names
+    assert &#34;manage_memory_tool&#34; in names</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestToolDefinitions.test_architect_tools_include_external"><code class="name flex">
+<span>def <span class="ident">test_architect_tools_include_external</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_architect_tools_include_external(self, myai):
+    myai.external_architect_tools.append({
+        &#34;type&#34;: &#34;function&#34;,
+        &#34;function&#34;: {&#34;name&#34;: &#34;arch_tool&#34;, &#34;description&#34;: &#34;test&#34;, &#34;parameters&#34;: {}}
+    })
+    tools = myai._get_architect_tools()
+    names = [t[&#34;function&#34;][&#34;name&#34;] for t in tools]
+    assert &#34;arch_tool&#34; in names</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestToolDefinitions.test_engineer_tools_include_core"><code class="name flex">
+<span>def <span class="ident">test_engineer_tools_include_core</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_engineer_tools_include_core(self, myai):
+    tools = myai._get_engineer_tools()
+    names = [t[&#34;function&#34;][&#34;name&#34;] for t in tools]
+    assert &#34;list_nodes&#34; in names
+    assert &#34;run_commands&#34; in names
+    assert &#34;get_node_info&#34; in names
+    assert &#34;consult_architect&#34; in names
+    assert &#34;escalate_to_architect&#34; in names</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestToolDefinitions.test_engineer_tools_include_external"><code class="name flex">
+<span>def <span class="ident">test_engineer_tools_include_external</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_engineer_tools_include_external(self, myai):
+    myai.external_engineer_tools.append({
+        &#34;type&#34;: &#34;function&#34;,
+        &#34;function&#34;: {&#34;name&#34;: &#34;custom_tool&#34;, &#34;description&#34;: &#34;test&#34;, &#34;parameters&#34;: {}}
+    })
+    tools = myai._get_engineer_tools()
+    names = [t[&#34;function&#34;][&#34;name&#34;] for t in tools]
+    assert &#34;custom_tool&#34; in names</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.tests.test_ai.TestToolMethods"><code class="flex name class">
+<span>class <span class="ident">TestToolMethods</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestToolMethods:
+    @pytest.fixture
+    def myai(self, ai_config, mock_litellm):
+        from connpy.ai import ai
+        return ai(ai_config)
+
+    def test_list_nodes_tool_found(self, myai):
+        result = myai.list_nodes_tool(&#34;router.*&#34;)
+        parsed = json.loads(result)
+        assert &#34;router1&#34; in str(parsed)
+
+    def test_list_nodes_tool_not_found(self, myai):
+        result = myai.list_nodes_tool(&#34;nonexistent_pattern_xyz&#34;)
+        assert &#34;No nodes found&#34; in result
+
+    def test_get_node_info_masks_password(self, myai):
+        result = myai.get_node_info_tool(&#34;router1&#34;)
+        parsed = json.loads(result)
+        assert parsed[&#34;password&#34;] == &#34;***&#34;
+
+    def test_is_safe_command_show(self, myai):
+        assert myai._is_safe_command(&#34;show running-config&#34;) == True
+        assert myai._is_safe_command(&#34;show ip int brief&#34;) == True
+
+    def test_is_safe_command_config(self, myai):
+        assert myai._is_safe_command(&#34;config t&#34;) == False
+        assert myai._is_safe_command(&#34;write memory&#34;) == False
+
+    def test_is_safe_command_ls(self, myai):
+        assert myai._is_safe_command(&#34;ls -la&#34;) == True
+
+    def test_is_safe_command_ping(self, myai):
+        assert myai._is_safe_command(&#34;ping 10.0.0.1&#34;) == True</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_ai.TestToolMethods.myai"><code class="name flex">
+<span>def <span class="ident">myai</span></span>(<span>self, ai_config, mock_litellm)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@pytest.fixture
+def myai(self, ai_config, mock_litellm):
+    from connpy.ai import ai
+    return ai(ai_config)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestToolMethods.test_get_node_info_masks_password"><code class="name flex">
+<span>def <span class="ident">test_get_node_info_masks_password</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_get_node_info_masks_password(self, myai):
+    result = myai.get_node_info_tool(&#34;router1&#34;)
+    parsed = json.loads(result)
+    assert parsed[&#34;password&#34;] == &#34;***&#34;</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestToolMethods.test_is_safe_command_config"><code class="name flex">
+<span>def <span class="ident">test_is_safe_command_config</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_is_safe_command_config(self, myai):
+    assert myai._is_safe_command(&#34;config t&#34;) == False
+    assert myai._is_safe_command(&#34;write memory&#34;) == False</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestToolMethods.test_is_safe_command_ls"><code class="name flex">
+<span>def <span class="ident">test_is_safe_command_ls</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_is_safe_command_ls(self, myai):
+    assert myai._is_safe_command(&#34;ls -la&#34;) == True</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestToolMethods.test_is_safe_command_ping"><code class="name flex">
+<span>def <span class="ident">test_is_safe_command_ping</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_is_safe_command_ping(self, myai):
+    assert myai._is_safe_command(&#34;ping 10.0.0.1&#34;) == True</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestToolMethods.test_is_safe_command_show"><code class="name flex">
+<span>def <span class="ident">test_is_safe_command_show</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_is_safe_command_show(self, myai):
+    assert myai._is_safe_command(&#34;show running-config&#34;) == True
+    assert myai._is_safe_command(&#34;show ip int brief&#34;) == True</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestToolMethods.test_list_nodes_tool_found"><code class="name flex">
+<span>def <span class="ident">test_list_nodes_tool_found</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_list_nodes_tool_found(self, myai):
+    result = myai.list_nodes_tool(&#34;router.*&#34;)
+    parsed = json.loads(result)
+    assert &#34;router1&#34; in str(parsed)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestToolMethods.test_list_nodes_tool_not_found"><code class="name flex">
+<span>def <span class="ident">test_list_nodes_tool_not_found</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_list_nodes_tool_not_found(self, myai):
+    result = myai.list_nodes_tool(&#34;nonexistent_pattern_xyz&#34;)
+    assert &#34;No nodes found&#34; in result</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.tests.test_ai.TestTruncate"><code class="flex name class">
+<span>class <span class="ident">TestTruncate</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestTruncate:
+    @pytest.fixture
+    def myai(self, ai_config, mock_litellm):
+        from connpy.ai import ai
+        return ai(ai_config)
+
+    def test_truncate_short_text(self, myai):
+        text = &#34;short text&#34;
+        assert myai._truncate(text) == text
+
+    def test_truncate_long_text(self, myai):
+        text = &#34;x&#34; * 100000
+        result = myai._truncate(text)
+        assert len(result) &lt; 100000
+        assert &#34;[... OUTPUT TRUNCATED ...]&#34; in result
+
+    def test_truncate_custom_limit(self, myai):
+        text = &#34;x&#34; * 1000
+        result = myai._truncate(text, limit=500)
+        assert len(result) &lt; 1000
+        assert &#34;[... OUTPUT TRUNCATED ...]&#34; in result
+
+    def test_truncate_preserves_head_and_tail(self, myai):
+        text = &#34;HEAD&#34; + &#34;x&#34; * 100000 + &#34;TAIL&#34;
+        result = myai._truncate(text)
+        assert result.startswith(&#34;HEAD&#34;)
+        assert result.endswith(&#34;TAIL&#34;)</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_ai.TestTruncate.myai"><code class="name flex">
+<span>def <span class="ident">myai</span></span>(<span>self, ai_config, mock_litellm)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@pytest.fixture
+def myai(self, ai_config, mock_litellm):
+    from connpy.ai import ai
+    return ai(ai_config)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestTruncate.test_truncate_custom_limit"><code class="name flex">
+<span>def <span class="ident">test_truncate_custom_limit</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_truncate_custom_limit(self, myai):
+    text = &#34;x&#34; * 1000
+    result = myai._truncate(text, limit=500)
+    assert len(result) &lt; 1000
+    assert &#34;[... OUTPUT TRUNCATED ...]&#34; in result</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestTruncate.test_truncate_long_text"><code class="name flex">
+<span>def <span class="ident">test_truncate_long_text</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_truncate_long_text(self, myai):
+    text = &#34;x&#34; * 100000
+    result = myai._truncate(text)
+    assert len(result) &lt; 100000
+    assert &#34;[... OUTPUT TRUNCATED ...]&#34; in result</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestTruncate.test_truncate_preserves_head_and_tail"><code class="name flex">
+<span>def <span class="ident">test_truncate_preserves_head_and_tail</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_truncate_preserves_head_and_tail(self, myai):
+    text = &#34;HEAD&#34; + &#34;x&#34; * 100000 + &#34;TAIL&#34;
+    result = myai._truncate(text)
+    assert result.startswith(&#34;HEAD&#34;)
+    assert result.endswith(&#34;TAIL&#34;)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestTruncate.test_truncate_short_text"><code class="name flex">
+<span>def <span class="ident">test_truncate_short_text</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_truncate_short_text(self, myai):
+    text = &#34;short text&#34;
+    assert myai._truncate(text) == text</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="connpy.tests" href="index.html">connpy.tests</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="connpy.tests.test_ai.TestAIInit" href="#connpy.tests.test_ai.TestAIInit">TestAIInit</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_ai.TestAIInit.test_default_models" href="#connpy.tests.test_ai.TestAIInit.test_default_models">test_default_models</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestAIInit.test_init_loads_memory" href="#connpy.tests.test_ai.TestAIInit.test_init_loads_memory">test_init_loads_memory</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestAIInit.test_init_missing_architect_key_warns" href="#connpy.tests.test_ai.TestAIInit.test_init_missing_architect_key_warns">test_init_missing_architect_key_warns</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestAIInit.test_init_missing_engineer_key" href="#connpy.tests.test_ai.TestAIInit.test_init_missing_engineer_key">test_init_missing_engineer_key</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestAIInit.test_init_with_keys" href="#connpy.tests.test_ai.TestAIInit.test_init_with_keys">test_init_with_keys</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.tests.test_ai.TestAsk" href="#connpy.tests.test_ai.TestAsk">TestAsk</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_ai.TestAsk.myai" href="#connpy.tests.test_ai.TestAsk.myai">myai</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestAsk.test_ask_basic_response" href="#connpy.tests.test_ai.TestAsk.test_ask_basic_response">test_ask_basic_response</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestAsk.test_ask_explicit_architect" href="#connpy.tests.test_ai.TestAsk.test_ask_explicit_architect">test_ask_explicit_architect</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestAsk.test_ask_returns_usage" href="#connpy.tests.test_ai.TestAsk.test_ask_returns_usage">test_ask_returns_usage</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestAsk.test_ask_sticky_brain_engineer" href="#connpy.tests.test_ai.TestAsk.test_ask_sticky_brain_engineer">test_ask_sticky_brain_engineer</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestAsk.test_ask_with_chat_history" href="#connpy.tests.test_ai.TestAsk.test_ask_with_chat_history">test_ask_with_chat_history</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.tests.test_ai.TestDynamicPrompts" href="#connpy.tests.test_ai.TestDynamicPrompts">TestDynamicPrompts</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_ai.TestDynamicPrompts.myai" href="#connpy.tests.test_ai.TestDynamicPrompts.myai">myai</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestDynamicPrompts.test_architect_prompt_with_extensions" href="#connpy.tests.test_ai.TestDynamicPrompts.test_architect_prompt_with_extensions">test_architect_prompt_with_extensions</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestDynamicPrompts.test_architect_prompt_without_extensions" href="#connpy.tests.test_ai.TestDynamicPrompts.test_architect_prompt_without_extensions">test_architect_prompt_without_extensions</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestDynamicPrompts.test_engineer_prompt_with_extensions" href="#connpy.tests.test_ai.TestDynamicPrompts.test_engineer_prompt_with_extensions">test_engineer_prompt_with_extensions</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestDynamicPrompts.test_engineer_prompt_without_extensions" href="#connpy.tests.test_ai.TestDynamicPrompts.test_engineer_prompt_without_extensions">test_engineer_prompt_without_extensions</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.tests.test_ai.TestManageMemory" href="#connpy.tests.test_ai.TestManageMemory">TestManageMemory</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_ai.TestManageMemory.myai" href="#connpy.tests.test_ai.TestManageMemory.myai">myai</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestManageMemory.test_manage_memory_append" href="#connpy.tests.test_ai.TestManageMemory.test_manage_memory_append">test_manage_memory_append</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestManageMemory.test_manage_memory_empty_content" href="#connpy.tests.test_ai.TestManageMemory.test_manage_memory_empty_content">test_manage_memory_empty_content</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestManageMemory.test_manage_memory_replace" href="#connpy.tests.test_ai.TestManageMemory.test_manage_memory_replace">test_manage_memory_replace</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.tests.test_ai.TestRegisterAITool" href="#connpy.tests.test_ai.TestRegisterAITool">TestRegisterAITool</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_ai.TestRegisterAITool.myai" href="#connpy.tests.test_ai.TestRegisterAITool.myai">myai</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestRegisterAITool.test_register_tool_architect" href="#connpy.tests.test_ai.TestRegisterAITool.test_register_tool_architect">test_register_tool_architect</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestRegisterAITool.test_register_tool_both" href="#connpy.tests.test_ai.TestRegisterAITool.test_register_tool_both">test_register_tool_both</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestRegisterAITool.test_register_tool_engineer" href="#connpy.tests.test_ai.TestRegisterAITool.test_register_tool_engineer">test_register_tool_engineer</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestRegisterAITool.test_register_tool_handler" href="#connpy.tests.test_ai.TestRegisterAITool.test_register_tool_handler">test_register_tool_handler</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestRegisterAITool.test_register_tool_prompt_extension" href="#connpy.tests.test_ai.TestRegisterAITool.test_register_tool_prompt_extension">test_register_tool_prompt_extension</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestRegisterAITool.test_register_tool_status_formatter" href="#connpy.tests.test_ai.TestRegisterAITool.test_register_tool_status_formatter">test_register_tool_status_formatter</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.tests.test_ai.TestSanitizeMessages" href="#connpy.tests.test_ai.TestSanitizeMessages">TestSanitizeMessages</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_ai.TestSanitizeMessages.myai" href="#connpy.tests.test_ai.TestSanitizeMessages.myai">myai</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestSanitizeMessages.test_sanitize_empty" href="#connpy.tests.test_ai.TestSanitizeMessages.test_sanitize_empty">test_sanitize_empty</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestSanitizeMessages.test_sanitize_normal_messages" href="#connpy.tests.test_ai.TestSanitizeMessages.test_sanitize_normal_messages">test_sanitize_normal_messages</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestSanitizeMessages.test_sanitize_preserves_valid_tool_pairs" href="#connpy.tests.test_ai.TestSanitizeMessages.test_sanitize_preserves_valid_tool_pairs">test_sanitize_preserves_valid_tool_pairs</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestSanitizeMessages.test_sanitize_removes_orphan_tool_calls" href="#connpy.tests.test_ai.TestSanitizeMessages.test_sanitize_removes_orphan_tool_calls">test_sanitize_removes_orphan_tool_calls</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestSanitizeMessages.test_sanitize_removes_orphan_tool_responses" href="#connpy.tests.test_ai.TestSanitizeMessages.test_sanitize_removes_orphan_tool_responses">test_sanitize_removes_orphan_tool_responses</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.tests.test_ai.TestToolDefinitions" href="#connpy.tests.test_ai.TestToolDefinitions">TestToolDefinitions</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_ai.TestToolDefinitions.myai" href="#connpy.tests.test_ai.TestToolDefinitions.myai">myai</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestToolDefinitions.test_architect_tools_include_core" href="#connpy.tests.test_ai.TestToolDefinitions.test_architect_tools_include_core">test_architect_tools_include_core</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestToolDefinitions.test_architect_tools_include_external" href="#connpy.tests.test_ai.TestToolDefinitions.test_architect_tools_include_external">test_architect_tools_include_external</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestToolDefinitions.test_engineer_tools_include_core" href="#connpy.tests.test_ai.TestToolDefinitions.test_engineer_tools_include_core">test_engineer_tools_include_core</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestToolDefinitions.test_engineer_tools_include_external" href="#connpy.tests.test_ai.TestToolDefinitions.test_engineer_tools_include_external">test_engineer_tools_include_external</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.tests.test_ai.TestToolMethods" href="#connpy.tests.test_ai.TestToolMethods">TestToolMethods</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_ai.TestToolMethods.myai" href="#connpy.tests.test_ai.TestToolMethods.myai">myai</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestToolMethods.test_get_node_info_masks_password" href="#connpy.tests.test_ai.TestToolMethods.test_get_node_info_masks_password">test_get_node_info_masks_password</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestToolMethods.test_is_safe_command_config" href="#connpy.tests.test_ai.TestToolMethods.test_is_safe_command_config">test_is_safe_command_config</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestToolMethods.test_is_safe_command_ls" href="#connpy.tests.test_ai.TestToolMethods.test_is_safe_command_ls">test_is_safe_command_ls</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestToolMethods.test_is_safe_command_ping" href="#connpy.tests.test_ai.TestToolMethods.test_is_safe_command_ping">test_is_safe_command_ping</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestToolMethods.test_is_safe_command_show" href="#connpy.tests.test_ai.TestToolMethods.test_is_safe_command_show">test_is_safe_command_show</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestToolMethods.test_list_nodes_tool_found" href="#connpy.tests.test_ai.TestToolMethods.test_list_nodes_tool_found">test_list_nodes_tool_found</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestToolMethods.test_list_nodes_tool_not_found" href="#connpy.tests.test_ai.TestToolMethods.test_list_nodes_tool_not_found">test_list_nodes_tool_not_found</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.tests.test_ai.TestTruncate" href="#connpy.tests.test_ai.TestTruncate">TestTruncate</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_ai.TestTruncate.myai" href="#connpy.tests.test_ai.TestTruncate.myai">myai</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestTruncate.test_truncate_custom_limit" href="#connpy.tests.test_ai.TestTruncate.test_truncate_custom_limit">test_truncate_custom_limit</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestTruncate.test_truncate_long_text" href="#connpy.tests.test_ai.TestTruncate.test_truncate_long_text">test_truncate_long_text</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestTruncate.test_truncate_preserves_head_and_tail" href="#connpy.tests.test_ai.TestTruncate.test_truncate_preserves_head_and_tail">test_truncate_preserves_head_and_tail</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestTruncate.test_truncate_short_text" href="#connpy.tests.test_ai.TestTruncate.test_truncate_short_text">test_truncate_short_text</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+</footer>
+</body>
+</html>

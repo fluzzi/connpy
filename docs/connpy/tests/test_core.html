@@ -1,0 +1,1306 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<meta name="generator" content="pdoc3 0.11.6">
+<title>connpy.tests.test_core API documentation</title>
+<meta name="description" content="Tests for connpy.core module — node and nodes classes.">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:1.5em;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:2em 0 .50em 0}h3{font-size:1.4em;margin:1.6em 0 .7em 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .2s ease-in-out}a:visited{color:#503}a:hover{color:#b62}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900;font-weight:bold}pre code{font-size:.8em;line-height:1.4em;padding:1em;display:block}code{background:#f3f3f3;font-family:"DejaVu Sans Mono",monospace;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source > summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible;min-width:max-content}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em 1em;margin:1em 0}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul ul{padding-left:1em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha512-D9gUyxqja7hBtkWpPWGt9wfbfaMGVt9gnyCvYa+jojwwPHLCzUm5i8rpk7vD7wNee9bA35eYIjobYPaQuKS1MQ==" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => {
+hljs.configure({languages: ['bash', 'css', 'diff', 'graphql', 'ini', 'javascript', 'json', 'plaintext', 'python', 'python-repl', 'rust', 'shell', 'sql', 'typescript', 'xml', 'yaml']});
+hljs.highlightAll();
+/* Collapse source docstrings */
+setTimeout(() => {
+[...document.querySelectorAll('.hljs.language-python > .hljs-string')]
+.filter(el => el.innerHTML.length > 200 && ['"""', "'''"].includes(el.innerHTML.substring(0, 3)))
+.forEach(el => {
+let d = document.createElement('details');
+d.classList.add('hljs-string');
+d.innerHTML = '<summary>"""</summary>' + el.innerHTML.substring(3);
+el.replaceWith(d);
+});
+}, 100);
+})</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>connpy.tests.test_core</code></h1>
+</header>
+<section id="section-intro">
+<p>Tests for connpy.core module — node and nodes classes.</p>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="connpy.tests.test_core.TestCommandGeneration"><code class="flex name class">
+<span>class <span class="ident">TestCommandGeneration</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestCommandGeneration:
+    def _make_node(self, **kwargs):
+        from connpy.core import node
+        defaults = {
+            &#34;unique&#34;: &#34;test&#34;, &#34;host&#34;: &#34;10.0.0.1&#34;, &#34;protocol&#34;: &#34;ssh&#34;,
+            &#34;user&#34;: &#34;admin&#34;, &#34;password&#34;: &#34;&#34;, &#34;port&#34;: &#34;&#34;, &#34;options&#34;: &#34;&#34;,
+            &#34;jumphost&#34;: &#34;&#34;, &#34;tags&#34;: &#34;&#34;, &#34;logs&#34;: &#34;&#34;
+        }
+        defaults.update(kwargs)
+        return node(defaults.pop(&#34;unique&#34;), defaults.pop(&#34;host&#34;), **defaults)
+
+    def test_ssh_cmd_basic(self):
+        n = self._make_node()
+        cmd = n._get_cmd()
+        assert &#34;ssh&#34; in cmd
+        assert &#34;admin@10.0.0.1&#34; in cmd
+
+    def test_ssh_cmd_port(self):
+        n = self._make_node(port=&#34;2222&#34;)
+        cmd = n._get_cmd()
+        assert &#34;-p 2222&#34; in cmd
+
+    def test_ssh_cmd_options(self):
+        n = self._make_node(options=&#34;-o StrictHostKeyChecking=no&#34;)
+        cmd = n._get_cmd()
+        assert &#34;-o StrictHostKeyChecking=no&#34; in cmd
+
+    def test_sftp_cmd_port(self):
+        n = self._make_node(protocol=&#34;sftp&#34;, port=&#34;2222&#34;)
+        cmd = n._get_cmd()
+        assert &#34;-P 2222&#34; in cmd  # SFTP uses uppercase P
+
+    def test_telnet_cmd(self):
+        n = self._make_node(protocol=&#34;telnet&#34;, port=&#34;23&#34;)
+        cmd = n._get_cmd()
+        assert &#34;telnet 10.0.0.1&#34; in cmd
+        assert &#34;23&#34; in cmd
+
+    def test_kubectl_cmd(self):
+        n = self._make_node(protocol=&#34;kubectl&#34;, host=&#34;my-pod&#34;, tags={&#34;kube_command&#34;: &#34;/bin/sh&#34;})
+        cmd = n._get_cmd()
+        assert &#34;kubectl exec&#34; in cmd
+        assert &#34;my-pod&#34; in cmd
+        assert &#34;/bin/sh&#34; in cmd
+
+    def test_kubectl_cmd_default_command(self):
+        n = self._make_node(protocol=&#34;kubectl&#34;, host=&#34;my-pod&#34;)
+        cmd = n._get_cmd()
+        assert &#34;/bin/bash&#34; in cmd
+
+    def test_docker_cmd(self):
+        n = self._make_node(protocol=&#34;docker&#34;, host=&#34;my-container&#34;,
+                           tags={&#34;docker_command&#34;: &#34;/bin/sh&#34;})
+        cmd = n._get_cmd()
+        assert &#34;docker&#34; in cmd
+        assert &#34;my-container&#34; in cmd
+        assert &#34;/bin/sh&#34; in cmd
+
+    def test_invalid_protocol_raises(self):
+        n = self._make_node(protocol=&#34;invalid_proto&#34;)
+        with pytest.raises(ValueError, match=&#34;Invalid protocol&#34;):
+            n._get_cmd()
+
+    def test_ssh_cmd_no_user(self):
+        n = self._make_node(user=&#34;&#34;)
+        cmd = n._get_cmd()
+        assert &#34;10.0.0.1&#34; in cmd
+        assert &#34;@&#34; not in cmd  # No user@ prefix</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_core.TestCommandGeneration.test_docker_cmd"><code class="name flex">
+<span>def <span class="ident">test_docker_cmd</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_docker_cmd(self):
+    n = self._make_node(protocol=&#34;docker&#34;, host=&#34;my-container&#34;,
+                       tags={&#34;docker_command&#34;: &#34;/bin/sh&#34;})
+    cmd = n._get_cmd()
+    assert &#34;docker&#34; in cmd
+    assert &#34;my-container&#34; in cmd
+    assert &#34;/bin/sh&#34; in cmd</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_core.TestCommandGeneration.test_invalid_protocol_raises"><code class="name flex">
+<span>def <span class="ident">test_invalid_protocol_raises</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_invalid_protocol_raises(self):
+    n = self._make_node(protocol=&#34;invalid_proto&#34;)
+    with pytest.raises(ValueError, match=&#34;Invalid protocol&#34;):
+        n._get_cmd()</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_core.TestCommandGeneration.test_kubectl_cmd"><code class="name flex">
+<span>def <span class="ident">test_kubectl_cmd</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_kubectl_cmd(self):
+    n = self._make_node(protocol=&#34;kubectl&#34;, host=&#34;my-pod&#34;, tags={&#34;kube_command&#34;: &#34;/bin/sh&#34;})
+    cmd = n._get_cmd()
+    assert &#34;kubectl exec&#34; in cmd
+    assert &#34;my-pod&#34; in cmd
+    assert &#34;/bin/sh&#34; in cmd</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_core.TestCommandGeneration.test_kubectl_cmd_default_command"><code class="name flex">
+<span>def <span class="ident">test_kubectl_cmd_default_command</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_kubectl_cmd_default_command(self):
+    n = self._make_node(protocol=&#34;kubectl&#34;, host=&#34;my-pod&#34;)
+    cmd = n._get_cmd()
+    assert &#34;/bin/bash&#34; in cmd</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_core.TestCommandGeneration.test_sftp_cmd_port"><code class="name flex">
+<span>def <span class="ident">test_sftp_cmd_port</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_sftp_cmd_port(self):
+    n = self._make_node(protocol=&#34;sftp&#34;, port=&#34;2222&#34;)
+    cmd = n._get_cmd()
+    assert &#34;-P 2222&#34; in cmd  # SFTP uses uppercase P</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_core.TestCommandGeneration.test_ssh_cmd_basic"><code class="name flex">
+<span>def <span class="ident">test_ssh_cmd_basic</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_ssh_cmd_basic(self):
+    n = self._make_node()
+    cmd = n._get_cmd()
+    assert &#34;ssh&#34; in cmd
+    assert &#34;admin@10.0.0.1&#34; in cmd</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_core.TestCommandGeneration.test_ssh_cmd_no_user"><code class="name flex">
+<span>def <span class="ident">test_ssh_cmd_no_user</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_ssh_cmd_no_user(self):
+    n = self._make_node(user=&#34;&#34;)
+    cmd = n._get_cmd()
+    assert &#34;10.0.0.1&#34; in cmd
+    assert &#34;@&#34; not in cmd  # No user@ prefix</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_core.TestCommandGeneration.test_ssh_cmd_options"><code class="name flex">
+<span>def <span class="ident">test_ssh_cmd_options</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_ssh_cmd_options(self):
+    n = self._make_node(options=&#34;-o StrictHostKeyChecking=no&#34;)
+    cmd = n._get_cmd()
+    assert &#34;-o StrictHostKeyChecking=no&#34; in cmd</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_core.TestCommandGeneration.test_ssh_cmd_port"><code class="name flex">
+<span>def <span class="ident">test_ssh_cmd_port</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_ssh_cmd_port(self):
+    n = self._make_node(port=&#34;2222&#34;)
+    cmd = n._get_cmd()
+    assert &#34;-p 2222&#34; in cmd</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_core.TestCommandGeneration.test_telnet_cmd"><code class="name flex">
+<span>def <span class="ident">test_telnet_cmd</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_telnet_cmd(self):
+    n = self._make_node(protocol=&#34;telnet&#34;, port=&#34;23&#34;)
+    cmd = n._get_cmd()
+    assert &#34;telnet 10.0.0.1&#34; in cmd
+    assert &#34;23&#34; in cmd</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.tests.test_core.TestLogHandling"><code class="flex name class">
+<span>class <span class="ident">TestLogHandling</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestLogHandling:
+    def test_logfile_variable_substitution(self):
+        from connpy.core import node
+        n = node(&#34;router1&#34;, &#34;10.0.0.1&#34;, user=&#34;admin&#34;, protocol=&#34;ssh&#34;, port=&#34;22&#34;,
+                 logs=&#34;/logs/${unique}_${host}_${user}&#34;)
+        result = n._logfile()
+        assert result == &#34;/logs/router1_10.0.0.1_admin&#34;
+
+    def test_logfile_date_substitution(self):
+        from connpy.core import node
+        import datetime
+        n = node(&#34;router1&#34;, &#34;10.0.0.1&#34;, logs=&#34;/logs/${date &#39;%Y&#39;}&#34;)
+        result = n._logfile()
+        assert datetime.datetime.now().strftime(&#34;%Y&#34;) in result
+
+    def test_logclean_removes_ansi(self):
+        from connpy.core import node
+        n = node(&#34;test&#34;, &#34;10.0.0.1&#34;)
+        dirty = &#34;\x1B[32mgreen text\x1B[0m&#34;
+        clean = n._logclean(dirty, var=True)
+        assert &#34;\x1B&#34; not in clean
+        assert &#34;green text&#34; in clean
+
+    def test_logclean_removes_backspaces(self):
+        from connpy.core import node
+        n = node(&#34;test&#34;, &#34;10.0.0.1&#34;)
+        dirty = &#34;type\bo&#34;
+        clean = n._logclean(dirty, var=True)
+        assert &#34;\b&#34; not in clean</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_core.TestLogHandling.test_logclean_removes_ansi"><code class="name flex">
+<span>def <span class="ident">test_logclean_removes_ansi</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_logclean_removes_ansi(self):
+    from connpy.core import node
+    n = node(&#34;test&#34;, &#34;10.0.0.1&#34;)
+    dirty = &#34;\x1B[32mgreen text\x1B[0m&#34;
+    clean = n._logclean(dirty, var=True)
+    assert &#34;\x1B&#34; not in clean
+    assert &#34;green text&#34; in clean</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_core.TestLogHandling.test_logclean_removes_backspaces"><code class="name flex">
+<span>def <span class="ident">test_logclean_removes_backspaces</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_logclean_removes_backspaces(self):
+    from connpy.core import node
+    n = node(&#34;test&#34;, &#34;10.0.0.1&#34;)
+    dirty = &#34;type\bo&#34;
+    clean = n._logclean(dirty, var=True)
+    assert &#34;\b&#34; not in clean</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_core.TestLogHandling.test_logfile_date_substitution"><code class="name flex">
+<span>def <span class="ident">test_logfile_date_substitution</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_logfile_date_substitution(self):
+    from connpy.core import node
+    import datetime
+    n = node(&#34;router1&#34;, &#34;10.0.0.1&#34;, logs=&#34;/logs/${date &#39;%Y&#39;}&#34;)
+    result = n._logfile()
+    assert datetime.datetime.now().strftime(&#34;%Y&#34;) in result</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_core.TestLogHandling.test_logfile_variable_substitution"><code class="name flex">
+<span>def <span class="ident">test_logfile_variable_substitution</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_logfile_variable_substitution(self):
+    from connpy.core import node
+    n = node(&#34;router1&#34;, &#34;10.0.0.1&#34;, user=&#34;admin&#34;, protocol=&#34;ssh&#34;, port=&#34;22&#34;,
+             logs=&#34;/logs/${unique}_${host}_${user}&#34;)
+    result = n._logfile()
+    assert result == &#34;/logs/router1_10.0.0.1_admin&#34;</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.tests.test_core.TestNodeInit"><code class="flex name class">
+<span>class <span class="ident">TestNodeInit</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestNodeInit:
+    def test_basic_init(self):
+        &#34;&#34;&#34;Creates node with basic attributes.&#34;&#34;&#34;
+        from connpy.core import node
+        n = node(&#34;router1&#34;, &#34;10.0.0.1&#34;, user=&#34;admin&#34;, password=&#34;pass1&#34;, protocol=&#34;ssh&#34;)
+        assert n.unique == &#34;router1&#34;
+        assert n.host == &#34;10.0.0.1&#34;
+        assert n.user == &#34;admin&#34;
+        assert n.protocol == &#34;ssh&#34;
+        assert n.password == [&#34;pass1&#34;]
+
+    def test_default_protocol(self):
+        &#34;&#34;&#34;Default protocol is ssh.&#34;&#34;&#34;
+        from connpy.core import node
+        n = node(&#34;router1&#34;, &#34;10.0.0.1&#34;)
+        assert n.protocol == &#34;ssh&#34;
+
+    def test_password_as_list_of_profiles(self, populated_config):
+        &#34;&#34;&#34;Password list with @profile references resolves correctly.&#34;&#34;&#34;
+        from connpy.core import node
+        n = node(&#34;router1&#34;, &#34;10.0.0.1&#34;, password=[&#34;@office-user&#34;],
+                 config=populated_config)
+        assert n.password == [&#34;officepass&#34;]
+
+    def test_password_plain_string(self):
+        &#34;&#34;&#34;Plain string password is wrapped in a list.&#34;&#34;&#34;
+        from connpy.core import node
+        n = node(&#34;router1&#34;, &#34;10.0.0.1&#34;, password=&#34;mypass&#34;)
+        assert n.password == [&#34;mypass&#34;]
+
+    def test_node_with_profile(self, populated_config):
+        &#34;&#34;&#34;Resolves @profile references for user.&#34;&#34;&#34;
+        from connpy.core import node
+        n = node(&#34;test1&#34;, &#34;10.0.0.1&#34;, user=&#34;@office-user&#34;, password=&#34;plain&#34;,
+                 config=populated_config)
+        assert n.user == &#34;officeadmin&#34;
+
+    def test_node_tags(self):
+        &#34;&#34;&#34;Tags are stored correctly.&#34;&#34;&#34;
+        from connpy.core import node
+        tags = {&#34;os&#34;: &#34;cisco_ios&#34;, &#34;prompt&#34;: r&#34;Router#&#34;}
+        n = node(&#34;router1&#34;, &#34;10.0.0.1&#34;, tags=tags)
+        assert n.tags[&#34;os&#34;] == &#34;cisco_ios&#34;</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_core.TestNodeInit.test_basic_init"><code class="name flex">
+<span>def <span class="ident">test_basic_init</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_basic_init(self):
+    &#34;&#34;&#34;Creates node with basic attributes.&#34;&#34;&#34;
+    from connpy.core import node
+    n = node(&#34;router1&#34;, &#34;10.0.0.1&#34;, user=&#34;admin&#34;, password=&#34;pass1&#34;, protocol=&#34;ssh&#34;)
+    assert n.unique == &#34;router1&#34;
+    assert n.host == &#34;10.0.0.1&#34;
+    assert n.user == &#34;admin&#34;
+    assert n.protocol == &#34;ssh&#34;
+    assert n.password == [&#34;pass1&#34;]</code></pre>
+</details>
+<div class="desc"><p>Creates node with basic attributes.</p></div>
+</dd>
+<dt id="connpy.tests.test_core.TestNodeInit.test_default_protocol"><code class="name flex">
+<span>def <span class="ident">test_default_protocol</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_default_protocol(self):
+    &#34;&#34;&#34;Default protocol is ssh.&#34;&#34;&#34;
+    from connpy.core import node
+    n = node(&#34;router1&#34;, &#34;10.0.0.1&#34;)
+    assert n.protocol == &#34;ssh&#34;</code></pre>
+</details>
+<div class="desc"><p>Default protocol is ssh.</p></div>
+</dd>
+<dt id="connpy.tests.test_core.TestNodeInit.test_node_tags"><code class="name flex">
+<span>def <span class="ident">test_node_tags</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_node_tags(self):
+    &#34;&#34;&#34;Tags are stored correctly.&#34;&#34;&#34;
+    from connpy.core import node
+    tags = {&#34;os&#34;: &#34;cisco_ios&#34;, &#34;prompt&#34;: r&#34;Router#&#34;}
+    n = node(&#34;router1&#34;, &#34;10.0.0.1&#34;, tags=tags)
+    assert n.tags[&#34;os&#34;] == &#34;cisco_ios&#34;</code></pre>
+</details>
+<div class="desc"><p>Tags are stored correctly.</p></div>
+</dd>
+<dt id="connpy.tests.test_core.TestNodeInit.test_node_with_profile"><code class="name flex">
+<span>def <span class="ident">test_node_with_profile</span></span>(<span>self, populated_config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_node_with_profile(self, populated_config):
+    &#34;&#34;&#34;Resolves @profile references for user.&#34;&#34;&#34;
+    from connpy.core import node
+    n = node(&#34;test1&#34;, &#34;10.0.0.1&#34;, user=&#34;@office-user&#34;, password=&#34;plain&#34;,
+             config=populated_config)
+    assert n.user == &#34;officeadmin&#34;</code></pre>
+</details>
+<div class="desc"><p>Resolves @profile references for user.</p></div>
+</dd>
+<dt id="connpy.tests.test_core.TestNodeInit.test_password_as_list_of_profiles"><code class="name flex">
+<span>def <span class="ident">test_password_as_list_of_profiles</span></span>(<span>self, populated_config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_password_as_list_of_profiles(self, populated_config):
+    &#34;&#34;&#34;Password list with @profile references resolves correctly.&#34;&#34;&#34;
+    from connpy.core import node
+    n = node(&#34;router1&#34;, &#34;10.0.0.1&#34;, password=[&#34;@office-user&#34;],
+             config=populated_config)
+    assert n.password == [&#34;officepass&#34;]</code></pre>
+</details>
+<div class="desc"><p>Password list with @profile references resolves correctly.</p></div>
+</dd>
+<dt id="connpy.tests.test_core.TestNodeInit.test_password_plain_string"><code class="name flex">
+<span>def <span class="ident">test_password_plain_string</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_password_plain_string(self):
+    &#34;&#34;&#34;Plain string password is wrapped in a list.&#34;&#34;&#34;
+    from connpy.core import node
+    n = node(&#34;router1&#34;, &#34;10.0.0.1&#34;, password=&#34;mypass&#34;)
+    assert n.password == [&#34;mypass&#34;]</code></pre>
+</details>
+<div class="desc"><p>Plain string password is wrapped in a list.</p></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.tests.test_core.TestNodeRun"><code class="flex name class">
+<span>class <span class="ident">TestNodeRun</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestNodeRun:
+    def _make_connected_node(self, mock_pexpect_obj, **kwargs):
+        &#34;&#34;&#34;Create a node and mock its _connect to succeed.&#34;&#34;&#34;
+        from connpy.core import node
+        defaults = {
+            &#34;unique&#34;: &#34;router1&#34;, &#34;host&#34;: &#34;10.0.0.1&#34;,
+            &#34;protocol&#34;: &#34;ssh&#34;, &#34;user&#34;: &#34;admin&#34;, &#34;password&#34;: &#34;&#34;
+        }
+        defaults.update(kwargs)
+        n = node(defaults.pop(&#34;unique&#34;), defaults.pop(&#34;host&#34;), **defaults)
+        return n
+
+    def test_run_returns_output(self, mock_pexpect):
+        &#34;&#34;&#34;run() returns string output.&#34;&#34;&#34;
+        child = mock_pexpect[&#34;child&#34;]
+        pexp = mock_pexpect[&#34;pexpect&#34;]
+
+        # Simulate: connect succeeds, command runs, prompt found
+        child.expect.return_value = 9  # prompt index for ssh
+        child.logfile_read = None
+
+        from connpy.core import node
+        n = node(&#34;router1&#34;, &#34;10.0.0.1&#34;, user=&#34;admin&#34;, password=&#34;&#34;)
+
+        # Mock _connect to return True and set up child
+        with patch.object(n, &#39;_connect&#39;, return_value=True):
+            n.child = child
+            log_buffer = io.BytesIO(b&#34;show version\nRouter v1.0\nrouter#&#34;)
+            n.mylog = log_buffer
+            child.logfile_read = log_buffer
+
+            with patch.object(n, &#39;_logclean&#39;, return_value=&#34;Router v1.0&#34;):
+                output = n.run([&#34;show version&#34;])
+
+        assert n.status == 0
+        assert output == &#34;Router v1.0&#34;
+
+    def test_run_status_1_on_failure(self, mock_pexpect):
+        &#34;&#34;&#34;Status 1 when connection fails.&#34;&#34;&#34;
+        from connpy.core import node
+        n = node(&#34;router1&#34;, &#34;10.0.0.1&#34;, user=&#34;admin&#34;, password=&#34;&#34;)
+
+        with patch.object(n, &#39;_connect&#39;, return_value=&#34;Connection failed code: 1\nrefused&#34;):
+            output = n.run([&#34;show version&#34;])
+
+        assert n.status == 1
+        assert &#34;refused&#34; in output
+
+    def test_run_with_variables(self, mock_pexpect):
+        &#34;&#34;&#34;Variables get substituted in commands.&#34;&#34;&#34;
+        child = mock_pexpect[&#34;child&#34;]
+        child.expect.return_value = 9
+
+        from connpy.core import node
+        n = node(&#34;router1&#34;, &#34;10.0.0.1&#34;, user=&#34;admin&#34;, password=&#34;&#34;)
+
+        sent_commands = []
+        child.sendline.side_effect = lambda cmd: sent_commands.append(cmd)
+
+        with patch.object(n, &#39;_connect&#39;, return_value=True):
+            n.child = child
+            n.mylog = io.BytesIO(b&#34;output&#34;)
+            with patch.object(n, &#39;_logclean&#39;, return_value=&#34;output&#34;):
+                n.run([&#34;show ip route {subnet}&#34;], vars={&#34;subnet&#34;: &#34;10.0.0.0/24&#34;})
+
+        assert &#34;show ip route 10.0.0.0/24&#34; in sent_commands
+
+    def test_run_saves_to_folder(self, mock_pexpect, tmp_path):
+        &#34;&#34;&#34;folder param saves log file.&#34;&#34;&#34;
+        child = mock_pexpect[&#34;child&#34;]
+        child.expect.return_value = 9
+
+        from connpy.core import node
+        n = node(&#34;router1&#34;, &#34;10.0.0.1&#34;, user=&#34;admin&#34;, password=&#34;&#34;)
+
+        with patch.object(n, &#39;_connect&#39;, return_value=True):
+            n.child = child
+            n.mylog = io.BytesIO(b&#34;log output&#34;)
+            with patch.object(n, &#39;_logclean&#39;, return_value=&#34;log output&#34;):
+                n.run([&#34;show version&#34;], folder=str(tmp_path))
+
+        log_files = list(tmp_path.glob(&#34;router1_*.txt&#34;))
+        assert len(log_files) == 1
+        assert &#34;log output&#34; in log_files[0].read_text()</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_core.TestNodeRun.test_run_returns_output"><code class="name flex">
+<span>def <span class="ident">test_run_returns_output</span></span>(<span>self, mock_pexpect)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_run_returns_output(self, mock_pexpect):
+    &#34;&#34;&#34;run() returns string output.&#34;&#34;&#34;
+    child = mock_pexpect[&#34;child&#34;]
+    pexp = mock_pexpect[&#34;pexpect&#34;]
+
+    # Simulate: connect succeeds, command runs, prompt found
+    child.expect.return_value = 9  # prompt index for ssh
+    child.logfile_read = None
+
+    from connpy.core import node
+    n = node(&#34;router1&#34;, &#34;10.0.0.1&#34;, user=&#34;admin&#34;, password=&#34;&#34;)
+
+    # Mock _connect to return True and set up child
+    with patch.object(n, &#39;_connect&#39;, return_value=True):
+        n.child = child
+        log_buffer = io.BytesIO(b&#34;show version\nRouter v1.0\nrouter#&#34;)
+        n.mylog = log_buffer
+        child.logfile_read = log_buffer
+
+        with patch.object(n, &#39;_logclean&#39;, return_value=&#34;Router v1.0&#34;):
+            output = n.run([&#34;show version&#34;])
+
+    assert n.status == 0
+    assert output == &#34;Router v1.0&#34;</code></pre>
+</details>
+<div class="desc"><p>run() returns string output.</p></div>
+</dd>
+<dt id="connpy.tests.test_core.TestNodeRun.test_run_saves_to_folder"><code class="name flex">
+<span>def <span class="ident">test_run_saves_to_folder</span></span>(<span>self, mock_pexpect, tmp_path)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_run_saves_to_folder(self, mock_pexpect, tmp_path):
+    &#34;&#34;&#34;folder param saves log file.&#34;&#34;&#34;
+    child = mock_pexpect[&#34;child&#34;]
+    child.expect.return_value = 9
+
+    from connpy.core import node
+    n = node(&#34;router1&#34;, &#34;10.0.0.1&#34;, user=&#34;admin&#34;, password=&#34;&#34;)
+
+    with patch.object(n, &#39;_connect&#39;, return_value=True):
+        n.child = child
+        n.mylog = io.BytesIO(b&#34;log output&#34;)
+        with patch.object(n, &#39;_logclean&#39;, return_value=&#34;log output&#34;):
+            n.run([&#34;show version&#34;], folder=str(tmp_path))
+
+    log_files = list(tmp_path.glob(&#34;router1_*.txt&#34;))
+    assert len(log_files) == 1
+    assert &#34;log output&#34; in log_files[0].read_text()</code></pre>
+</details>
+<div class="desc"><p>folder param saves log file.</p></div>
+</dd>
+<dt id="connpy.tests.test_core.TestNodeRun.test_run_status_1_on_failure"><code class="name flex">
+<span>def <span class="ident">test_run_status_1_on_failure</span></span>(<span>self, mock_pexpect)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_run_status_1_on_failure(self, mock_pexpect):
+    &#34;&#34;&#34;Status 1 when connection fails.&#34;&#34;&#34;
+    from connpy.core import node
+    n = node(&#34;router1&#34;, &#34;10.0.0.1&#34;, user=&#34;admin&#34;, password=&#34;&#34;)
+
+    with patch.object(n, &#39;_connect&#39;, return_value=&#34;Connection failed code: 1\nrefused&#34;):
+        output = n.run([&#34;show version&#34;])
+
+    assert n.status == 1
+    assert &#34;refused&#34; in output</code></pre>
+</details>
+<div class="desc"><p>Status 1 when connection fails.</p></div>
+</dd>
+<dt id="connpy.tests.test_core.TestNodeRun.test_run_with_variables"><code class="name flex">
+<span>def <span class="ident">test_run_with_variables</span></span>(<span>self, mock_pexpect)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_run_with_variables(self, mock_pexpect):
+    &#34;&#34;&#34;Variables get substituted in commands.&#34;&#34;&#34;
+    child = mock_pexpect[&#34;child&#34;]
+    child.expect.return_value = 9
+
+    from connpy.core import node
+    n = node(&#34;router1&#34;, &#34;10.0.0.1&#34;, user=&#34;admin&#34;, password=&#34;&#34;)
+
+    sent_commands = []
+    child.sendline.side_effect = lambda cmd: sent_commands.append(cmd)
+
+    with patch.object(n, &#39;_connect&#39;, return_value=True):
+        n.child = child
+        n.mylog = io.BytesIO(b&#34;output&#34;)
+        with patch.object(n, &#39;_logclean&#39;, return_value=&#34;output&#34;):
+            n.run([&#34;show ip route {subnet}&#34;], vars={&#34;subnet&#34;: &#34;10.0.0.0/24&#34;})
+
+    assert &#34;show ip route 10.0.0.0/24&#34; in sent_commands</code></pre>
+</details>
+<div class="desc"><p>Variables get substituted in commands.</p></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.tests.test_core.TestNodeTest"><code class="flex name class">
+<span>class <span class="ident">TestNodeTest</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestNodeTest:
+    def test_test_returns_dict(self, mock_pexpect):
+        &#34;&#34;&#34;test() returns dict of results.&#34;&#34;&#34;
+        child = mock_pexpect[&#34;child&#34;]
+        child.expect.return_value = 0  # prompt found (index 0 in test expects)
+
+        from connpy.core import node
+        n = node(&#34;router1&#34;, &#34;10.0.0.1&#34;, user=&#34;admin&#34;, password=&#34;&#34;)
+
+        with patch.object(n, &#39;_connect&#39;, return_value=True):
+            n.child = child
+            n.mylog = io.BytesIO(b&#34;1.1.1.1 is up&#34;)
+            with patch.object(n, &#39;_logclean&#39;, return_value=&#34;1.1.1.1 is up&#34;):
+                result = n.test([&#34;ping 1.1.1.1&#34;], &#34;1.1.1.1&#34;)
+
+        assert isinstance(result, dict)
+        assert result.get(&#34;1.1.1.1&#34;) == True
+
+    def test_test_expected_not_found(self, mock_pexpect):
+        &#34;&#34;&#34;Expected text not found returns False.&#34;&#34;&#34;
+        child = mock_pexpect[&#34;child&#34;]
+        child.expect.return_value = 0
+
+        from connpy.core import node
+        n = node(&#34;router1&#34;, &#34;10.0.0.1&#34;, user=&#34;admin&#34;, password=&#34;&#34;)
+
+        with patch.object(n, &#39;_connect&#39;, return_value=True):
+            n.child = child
+            n.mylog = io.BytesIO(b&#34;some other output&#34;)
+            with patch.object(n, &#39;_logclean&#39;, return_value=&#34;some other output&#34;):
+                result = n.test([&#34;ping 1.1.1.1&#34;], &#34;1.1.1.1&#34;)
+
+        assert isinstance(result, dict)
+        assert result.get(&#34;1.1.1.1&#34;) == False</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_core.TestNodeTest.test_test_expected_not_found"><code class="name flex">
+<span>def <span class="ident">test_test_expected_not_found</span></span>(<span>self, mock_pexpect)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_test_expected_not_found(self, mock_pexpect):
+    &#34;&#34;&#34;Expected text not found returns False.&#34;&#34;&#34;
+    child = mock_pexpect[&#34;child&#34;]
+    child.expect.return_value = 0
+
+    from connpy.core import node
+    n = node(&#34;router1&#34;, &#34;10.0.0.1&#34;, user=&#34;admin&#34;, password=&#34;&#34;)
+
+    with patch.object(n, &#39;_connect&#39;, return_value=True):
+        n.child = child
+        n.mylog = io.BytesIO(b&#34;some other output&#34;)
+        with patch.object(n, &#39;_logclean&#39;, return_value=&#34;some other output&#34;):
+            result = n.test([&#34;ping 1.1.1.1&#34;], &#34;1.1.1.1&#34;)
+
+    assert isinstance(result, dict)
+    assert result.get(&#34;1.1.1.1&#34;) == False</code></pre>
+</details>
+<div class="desc"><p>Expected text not found returns False.</p></div>
+</dd>
+<dt id="connpy.tests.test_core.TestNodeTest.test_test_returns_dict"><code class="name flex">
+<span>def <span class="ident">test_test_returns_dict</span></span>(<span>self, mock_pexpect)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_test_returns_dict(self, mock_pexpect):
+    &#34;&#34;&#34;test() returns dict of results.&#34;&#34;&#34;
+    child = mock_pexpect[&#34;child&#34;]
+    child.expect.return_value = 0  # prompt found (index 0 in test expects)
+
+    from connpy.core import node
+    n = node(&#34;router1&#34;, &#34;10.0.0.1&#34;, user=&#34;admin&#34;, password=&#34;&#34;)
+
+    with patch.object(n, &#39;_connect&#39;, return_value=True):
+        n.child = child
+        n.mylog = io.BytesIO(b&#34;1.1.1.1 is up&#34;)
+        with patch.object(n, &#39;_logclean&#39;, return_value=&#34;1.1.1.1 is up&#34;):
+            result = n.test([&#34;ping 1.1.1.1&#34;], &#34;1.1.1.1&#34;)
+
+    assert isinstance(result, dict)
+    assert result.get(&#34;1.1.1.1&#34;) == True</code></pre>
+</details>
+<div class="desc"><p>test() returns dict of results.</p></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.tests.test_core.TestNodes"><code class="flex name class">
+<span>class <span class="ident">TestNodes</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestNodes:
+    def test_nodes_init(self):
+        &#34;&#34;&#34;Creates list of node objects.&#34;&#34;&#34;
+        from connpy.core import nodes
+        nodes_dict = {
+            &#34;r1&#34;: {&#34;host&#34;: &#34;10.0.0.1&#34;, &#34;user&#34;: &#34;admin&#34;, &#34;password&#34;: &#34;&#34;},
+            &#34;r2&#34;: {&#34;host&#34;: &#34;10.0.0.2&#34;, &#34;user&#34;: &#34;admin&#34;, &#34;password&#34;: &#34;&#34;}
+        }
+        mynodes = nodes(nodes_dict)
+        assert len(mynodes.nodelist) == 2
+        assert hasattr(mynodes, &#34;r1&#34;)
+        assert hasattr(mynodes, &#34;r2&#34;)
+
+    def test_nodes_run_parallel(self):
+        &#34;&#34;&#34;run() executes on all nodes and returns dict.&#34;&#34;&#34;
+        from connpy.core import nodes
+
+        nodes_dict = {
+            &#34;r1&#34;: {&#34;host&#34;: &#34;10.0.0.1&#34;, &#34;user&#34;: &#34;admin&#34;, &#34;password&#34;: &#34;&#34;},
+            &#34;r2&#34;: {&#34;host&#34;: &#34;10.0.0.2&#34;, &#34;user&#34;: &#34;admin&#34;, &#34;password&#34;: &#34;&#34;}
+        }
+        mynodes = nodes(nodes_dict)
+
+        # Mock run on each node — must set output AND status on the node
+        for n in mynodes.nodelist:
+            original_node = n  # capture by value
+            def make_mock(node_ref):
+                def mock_run(commands, **kwargs):
+                    node_ref.output = f&#34;output from {node_ref.unique}&#34;
+                    node_ref.status = 0
+                return mock_run
+            n.run = make_mock(n)
+
+        result = mynodes.run([&#34;show version&#34;])
+        assert &#34;r1&#34; in result
+        assert &#34;r2&#34; in result
+
+    def test_nodes_splitlist(self):
+        &#34;&#34;&#34;_splitlist divides list correctly.&#34;&#34;&#34;
+        from connpy.core import nodes
+        mynodes = nodes({&#34;r1&#34;: {&#34;host&#34;: &#34;1.1.1.1&#34;, &#34;user&#34;: &#34;&#34;, &#34;password&#34;: &#34;&#34;}})
+        chunks = list(mynodes._splitlist([1, 2, 3, 4, 5], 2))
+        assert chunks == [[1, 2], [3, 4], [5]]
+
+    def test_nodes_run_with_vars(self):
+        &#34;&#34;&#34;Variables per node and __global__ work.&#34;&#34;&#34;
+        from connpy.core import nodes
+
+        nodes_dict = {
+            &#34;r1&#34;: {&#34;host&#34;: &#34;10.0.0.1&#34;, &#34;user&#34;: &#34;admin&#34;, &#34;password&#34;: &#34;&#34;},
+        }
+        mynodes = nodes(nodes_dict)
+
+        captured_vars = {}
+
+        def mock_run(commands, vars=None, **kwargs):
+            captured_vars.update(vars or {})
+            mynodes.r1.output = &#34;ok&#34;
+            mynodes.r1.status = 0
+
+        mynodes.r1.run = mock_run
+
+        variables = {
+            &#34;__global__&#34;: {&#34;mask&#34;: &#34;255.255.255.0&#34;},
+            &#34;r1&#34;: {&#34;ip&#34;: &#34;10.0.0.1&#34;}
+        }
+        mynodes.run([&#34;show ip&#34;], vars=variables)
+        assert captured_vars.get(&#34;mask&#34;) == &#34;255.255.255.0&#34;
+        assert captured_vars.get(&#34;ip&#34;) == &#34;10.0.0.1&#34;
+
+    def test_nodes_on_complete_callback(self):
+        &#34;&#34;&#34;on_complete callback fires per node.&#34;&#34;&#34;
+        from connpy.core import nodes
+
+        nodes_dict = {
+            &#34;r1&#34;: {&#34;host&#34;: &#34;10.0.0.1&#34;, &#34;user&#34;: &#34;admin&#34;, &#34;password&#34;: &#34;&#34;},
+        }
+        mynodes = nodes(nodes_dict)
+
+        completed = []
+
+        def mock_run(commands, **kwargs):
+            mynodes.r1.output = &#34;done&#34;
+            mynodes.r1.status = 0
+
+        mynodes.r1.run = mock_run
+
+        def on_done(unique, output, status):
+            completed.append(unique)
+
+        mynodes.run([&#34;show version&#34;], on_complete=on_done)
+        assert &#34;r1&#34; in completed</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_core.TestNodes.test_nodes_init"><code class="name flex">
+<span>def <span class="ident">test_nodes_init</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_nodes_init(self):
+    &#34;&#34;&#34;Creates list of node objects.&#34;&#34;&#34;
+    from connpy.core import nodes
+    nodes_dict = {
+        &#34;r1&#34;: {&#34;host&#34;: &#34;10.0.0.1&#34;, &#34;user&#34;: &#34;admin&#34;, &#34;password&#34;: &#34;&#34;},
+        &#34;r2&#34;: {&#34;host&#34;: &#34;10.0.0.2&#34;, &#34;user&#34;: &#34;admin&#34;, &#34;password&#34;: &#34;&#34;}
+    }
+    mynodes = nodes(nodes_dict)
+    assert len(mynodes.nodelist) == 2
+    assert hasattr(mynodes, &#34;r1&#34;)
+    assert hasattr(mynodes, &#34;r2&#34;)</code></pre>
+</details>
+<div class="desc"><p>Creates list of node objects.</p></div>
+</dd>
+<dt id="connpy.tests.test_core.TestNodes.test_nodes_on_complete_callback"><code class="name flex">
+<span>def <span class="ident">test_nodes_on_complete_callback</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_nodes_on_complete_callback(self):
+    &#34;&#34;&#34;on_complete callback fires per node.&#34;&#34;&#34;
+    from connpy.core import nodes
+
+    nodes_dict = {
+        &#34;r1&#34;: {&#34;host&#34;: &#34;10.0.0.1&#34;, &#34;user&#34;: &#34;admin&#34;, &#34;password&#34;: &#34;&#34;},
+    }
+    mynodes = nodes(nodes_dict)
+
+    completed = []
+
+    def mock_run(commands, **kwargs):
+        mynodes.r1.output = &#34;done&#34;
+        mynodes.r1.status = 0
+
+    mynodes.r1.run = mock_run
+
+    def on_done(unique, output, status):
+        completed.append(unique)
+
+    mynodes.run([&#34;show version&#34;], on_complete=on_done)
+    assert &#34;r1&#34; in completed</code></pre>
+</details>
+<div class="desc"><p>on_complete callback fires per node.</p></div>
+</dd>
+<dt id="connpy.tests.test_core.TestNodes.test_nodes_run_parallel"><code class="name flex">
+<span>def <span class="ident">test_nodes_run_parallel</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_nodes_run_parallel(self):
+    &#34;&#34;&#34;run() executes on all nodes and returns dict.&#34;&#34;&#34;
+    from connpy.core import nodes
+
+    nodes_dict = {
+        &#34;r1&#34;: {&#34;host&#34;: &#34;10.0.0.1&#34;, &#34;user&#34;: &#34;admin&#34;, &#34;password&#34;: &#34;&#34;},
+        &#34;r2&#34;: {&#34;host&#34;: &#34;10.0.0.2&#34;, &#34;user&#34;: &#34;admin&#34;, &#34;password&#34;: &#34;&#34;}
+    }
+    mynodes = nodes(nodes_dict)
+
+    # Mock run on each node — must set output AND status on the node
+    for n in mynodes.nodelist:
+        original_node = n  # capture by value
+        def make_mock(node_ref):
+            def mock_run(commands, **kwargs):
+                node_ref.output = f&#34;output from {node_ref.unique}&#34;
+                node_ref.status = 0
+            return mock_run
+        n.run = make_mock(n)
+
+    result = mynodes.run([&#34;show version&#34;])
+    assert &#34;r1&#34; in result
+    assert &#34;r2&#34; in result</code></pre>
+</details>
+<div class="desc"><p>run() executes on all nodes and returns dict.</p></div>
+</dd>
+<dt id="connpy.tests.test_core.TestNodes.test_nodes_run_with_vars"><code class="name flex">
+<span>def <span class="ident">test_nodes_run_with_vars</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_nodes_run_with_vars(self):
+    &#34;&#34;&#34;Variables per node and __global__ work.&#34;&#34;&#34;
+    from connpy.core import nodes
+
+    nodes_dict = {
+        &#34;r1&#34;: {&#34;host&#34;: &#34;10.0.0.1&#34;, &#34;user&#34;: &#34;admin&#34;, &#34;password&#34;: &#34;&#34;},
+    }
+    mynodes = nodes(nodes_dict)
+
+    captured_vars = {}
+
+    def mock_run(commands, vars=None, **kwargs):
+        captured_vars.update(vars or {})
+        mynodes.r1.output = &#34;ok&#34;
+        mynodes.r1.status = 0
+
+    mynodes.r1.run = mock_run
+
+    variables = {
+        &#34;__global__&#34;: {&#34;mask&#34;: &#34;255.255.255.0&#34;},
+        &#34;r1&#34;: {&#34;ip&#34;: &#34;10.0.0.1&#34;}
+    }
+    mynodes.run([&#34;show ip&#34;], vars=variables)
+    assert captured_vars.get(&#34;mask&#34;) == &#34;255.255.255.0&#34;
+    assert captured_vars.get(&#34;ip&#34;) == &#34;10.0.0.1&#34;</code></pre>
+</details>
+<div class="desc"><p>Variables per node and <strong>global</strong> work.</p></div>
+</dd>
+<dt id="connpy.tests.test_core.TestNodes.test_nodes_splitlist"><code class="name flex">
+<span>def <span class="ident">test_nodes_splitlist</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_nodes_splitlist(self):
+    &#34;&#34;&#34;_splitlist divides list correctly.&#34;&#34;&#34;
+    from connpy.core import nodes
+    mynodes = nodes({&#34;r1&#34;: {&#34;host&#34;: &#34;1.1.1.1&#34;, &#34;user&#34;: &#34;&#34;, &#34;password&#34;: &#34;&#34;}})
+    chunks = list(mynodes._splitlist([1, 2, 3, 4, 5], 2))
+    assert chunks == [[1, 2], [3, 4], [5]]</code></pre>
+</details>
+<div class="desc"><p>_splitlist divides list correctly.</p></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.tests.test_core.TestPasswordDecryption"><code class="flex name class">
+<span>class <span class="ident">TestPasswordDecryption</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestPasswordDecryption:
+    def test_passtx_plaintext(self, config):
+        &#34;&#34;&#34;Plaintext passwords pass through unchanged.&#34;&#34;&#34;
+        from connpy.core import node
+        n = node(&#34;test&#34;, &#34;10.0.0.1&#34;, password=&#34;plainpass&#34;, config=config)
+        result = n._passtx([&#34;plainpass&#34;])
+        assert result == [&#34;plainpass&#34;]
+
+    def test_passtx_encrypted(self, config):
+        &#34;&#34;&#34;Encrypted passwords get decrypted.&#34;&#34;&#34;
+        from connpy.core import node
+        encrypted = config.encrypt(&#34;mysecret&#34;)
+        n = node(&#34;test&#34;, &#34;10.0.0.1&#34;, password=encrypted, config=config)
+        result = n._passtx([encrypted])
+        assert result == [&#34;mysecret&#34;]
+
+    def test_passtx_missing_key_raises(self):
+        &#34;&#34;&#34;Missing key file raises ValueError.&#34;&#34;&#34;
+        from connpy.core import node
+        n = node(&#34;test&#34;, &#34;10.0.0.1&#34;, password=&#34;pass&#34;)
+        # A password formatted as encrypted but no valid key
+        with pytest.raises((ValueError, Exception)):
+            n._passtx([&#34;&#34;&#34;b&#39;corrupted_encrypted_data&#39;&#34;&#34;&#34;], keyfile=&#34;/nonexistent&#34;)</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_core.TestPasswordDecryption.test_passtx_encrypted"><code class="name flex">
+<span>def <span class="ident">test_passtx_encrypted</span></span>(<span>self, config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_passtx_encrypted(self, config):
+    &#34;&#34;&#34;Encrypted passwords get decrypted.&#34;&#34;&#34;
+    from connpy.core import node
+    encrypted = config.encrypt(&#34;mysecret&#34;)
+    n = node(&#34;test&#34;, &#34;10.0.0.1&#34;, password=encrypted, config=config)
+    result = n._passtx([encrypted])
+    assert result == [&#34;mysecret&#34;]</code></pre>
+</details>
+<div class="desc"><p>Encrypted passwords get decrypted.</p></div>
+</dd>
+<dt id="connpy.tests.test_core.TestPasswordDecryption.test_passtx_missing_key_raises"><code class="name flex">
+<span>def <span class="ident">test_passtx_missing_key_raises</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_passtx_missing_key_raises(self):
+    &#34;&#34;&#34;Missing key file raises ValueError.&#34;&#34;&#34;
+    from connpy.core import node
+    n = node(&#34;test&#34;, &#34;10.0.0.1&#34;, password=&#34;pass&#34;)
+    # A password formatted as encrypted but no valid key
+    with pytest.raises((ValueError, Exception)):
+        n._passtx([&#34;&#34;&#34;b&#39;corrupted_encrypted_data&#39;&#34;&#34;&#34;], keyfile=&#34;/nonexistent&#34;)</code></pre>
+</details>
+<div class="desc"><p>Missing key file raises ValueError.</p></div>
+</dd>
+<dt id="connpy.tests.test_core.TestPasswordDecryption.test_passtx_plaintext"><code class="name flex">
+<span>def <span class="ident">test_passtx_plaintext</span></span>(<span>self, config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_passtx_plaintext(self, config):
+    &#34;&#34;&#34;Plaintext passwords pass through unchanged.&#34;&#34;&#34;
+    from connpy.core import node
+    n = node(&#34;test&#34;, &#34;10.0.0.1&#34;, password=&#34;plainpass&#34;, config=config)
+    result = n._passtx([&#34;plainpass&#34;])
+    assert result == [&#34;plainpass&#34;]</code></pre>
+</details>
+<div class="desc"><p>Plaintext passwords pass through unchanged.</p></div>
+</dd>
+</dl>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="connpy.tests" href="index.html">connpy.tests</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="connpy.tests.test_core.TestCommandGeneration" href="#connpy.tests.test_core.TestCommandGeneration">TestCommandGeneration</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_core.TestCommandGeneration.test_docker_cmd" href="#connpy.tests.test_core.TestCommandGeneration.test_docker_cmd">test_docker_cmd</a></code></li>
+<li><code><a title="connpy.tests.test_core.TestCommandGeneration.test_invalid_protocol_raises" href="#connpy.tests.test_core.TestCommandGeneration.test_invalid_protocol_raises">test_invalid_protocol_raises</a></code></li>
+<li><code><a title="connpy.tests.test_core.TestCommandGeneration.test_kubectl_cmd" href="#connpy.tests.test_core.TestCommandGeneration.test_kubectl_cmd">test_kubectl_cmd</a></code></li>
+<li><code><a title="connpy.tests.test_core.TestCommandGeneration.test_kubectl_cmd_default_command" href="#connpy.tests.test_core.TestCommandGeneration.test_kubectl_cmd_default_command">test_kubectl_cmd_default_command</a></code></li>
+<li><code><a title="connpy.tests.test_core.TestCommandGeneration.test_sftp_cmd_port" href="#connpy.tests.test_core.TestCommandGeneration.test_sftp_cmd_port">test_sftp_cmd_port</a></code></li>
+<li><code><a title="connpy.tests.test_core.TestCommandGeneration.test_ssh_cmd_basic" href="#connpy.tests.test_core.TestCommandGeneration.test_ssh_cmd_basic">test_ssh_cmd_basic</a></code></li>
+<li><code><a title="connpy.tests.test_core.TestCommandGeneration.test_ssh_cmd_no_user" href="#connpy.tests.test_core.TestCommandGeneration.test_ssh_cmd_no_user">test_ssh_cmd_no_user</a></code></li>
+<li><code><a title="connpy.tests.test_core.TestCommandGeneration.test_ssh_cmd_options" href="#connpy.tests.test_core.TestCommandGeneration.test_ssh_cmd_options">test_ssh_cmd_options</a></code></li>
+<li><code><a title="connpy.tests.test_core.TestCommandGeneration.test_ssh_cmd_port" href="#connpy.tests.test_core.TestCommandGeneration.test_ssh_cmd_port">test_ssh_cmd_port</a></code></li>
+<li><code><a title="connpy.tests.test_core.TestCommandGeneration.test_telnet_cmd" href="#connpy.tests.test_core.TestCommandGeneration.test_telnet_cmd">test_telnet_cmd</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.tests.test_core.TestLogHandling" href="#connpy.tests.test_core.TestLogHandling">TestLogHandling</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_core.TestLogHandling.test_logclean_removes_ansi" href="#connpy.tests.test_core.TestLogHandling.test_logclean_removes_ansi">test_logclean_removes_ansi</a></code></li>
+<li><code><a title="connpy.tests.test_core.TestLogHandling.test_logclean_removes_backspaces" href="#connpy.tests.test_core.TestLogHandling.test_logclean_removes_backspaces">test_logclean_removes_backspaces</a></code></li>
+<li><code><a title="connpy.tests.test_core.TestLogHandling.test_logfile_date_substitution" href="#connpy.tests.test_core.TestLogHandling.test_logfile_date_substitution">test_logfile_date_substitution</a></code></li>
+<li><code><a title="connpy.tests.test_core.TestLogHandling.test_logfile_variable_substitution" href="#connpy.tests.test_core.TestLogHandling.test_logfile_variable_substitution">test_logfile_variable_substitution</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.tests.test_core.TestNodeInit" href="#connpy.tests.test_core.TestNodeInit">TestNodeInit</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_core.TestNodeInit.test_basic_init" href="#connpy.tests.test_core.TestNodeInit.test_basic_init">test_basic_init</a></code></li>
+<li><code><a title="connpy.tests.test_core.TestNodeInit.test_default_protocol" href="#connpy.tests.test_core.TestNodeInit.test_default_protocol">test_default_protocol</a></code></li>
+<li><code><a title="connpy.tests.test_core.TestNodeInit.test_node_tags" href="#connpy.tests.test_core.TestNodeInit.test_node_tags">test_node_tags</a></code></li>
+<li><code><a title="connpy.tests.test_core.TestNodeInit.test_node_with_profile" href="#connpy.tests.test_core.TestNodeInit.test_node_with_profile">test_node_with_profile</a></code></li>
+<li><code><a title="connpy.tests.test_core.TestNodeInit.test_password_as_list_of_profiles" href="#connpy.tests.test_core.TestNodeInit.test_password_as_list_of_profiles">test_password_as_list_of_profiles</a></code></li>
+<li><code><a title="connpy.tests.test_core.TestNodeInit.test_password_plain_string" href="#connpy.tests.test_core.TestNodeInit.test_password_plain_string">test_password_plain_string</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.tests.test_core.TestNodeRun" href="#connpy.tests.test_core.TestNodeRun">TestNodeRun</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_core.TestNodeRun.test_run_returns_output" href="#connpy.tests.test_core.TestNodeRun.test_run_returns_output">test_run_returns_output</a></code></li>
+<li><code><a title="connpy.tests.test_core.TestNodeRun.test_run_saves_to_folder" href="#connpy.tests.test_core.TestNodeRun.test_run_saves_to_folder">test_run_saves_to_folder</a></code></li>
+<li><code><a title="connpy.tests.test_core.TestNodeRun.test_run_status_1_on_failure" href="#connpy.tests.test_core.TestNodeRun.test_run_status_1_on_failure">test_run_status_1_on_failure</a></code></li>
+<li><code><a title="connpy.tests.test_core.TestNodeRun.test_run_with_variables" href="#connpy.tests.test_core.TestNodeRun.test_run_with_variables">test_run_with_variables</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.tests.test_core.TestNodeTest" href="#connpy.tests.test_core.TestNodeTest">TestNodeTest</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_core.TestNodeTest.test_test_expected_not_found" href="#connpy.tests.test_core.TestNodeTest.test_test_expected_not_found">test_test_expected_not_found</a></code></li>
+<li><code><a title="connpy.tests.test_core.TestNodeTest.test_test_returns_dict" href="#connpy.tests.test_core.TestNodeTest.test_test_returns_dict">test_test_returns_dict</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.tests.test_core.TestNodes" href="#connpy.tests.test_core.TestNodes">TestNodes</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_core.TestNodes.test_nodes_init" href="#connpy.tests.test_core.TestNodes.test_nodes_init">test_nodes_init</a></code></li>
+<li><code><a title="connpy.tests.test_core.TestNodes.test_nodes_on_complete_callback" href="#connpy.tests.test_core.TestNodes.test_nodes_on_complete_callback">test_nodes_on_complete_callback</a></code></li>
+<li><code><a title="connpy.tests.test_core.TestNodes.test_nodes_run_parallel" href="#connpy.tests.test_core.TestNodes.test_nodes_run_parallel">test_nodes_run_parallel</a></code></li>
+<li><code><a title="connpy.tests.test_core.TestNodes.test_nodes_run_with_vars" href="#connpy.tests.test_core.TestNodes.test_nodes_run_with_vars">test_nodes_run_with_vars</a></code></li>
+<li><code><a title="connpy.tests.test_core.TestNodes.test_nodes_splitlist" href="#connpy.tests.test_core.TestNodes.test_nodes_splitlist">test_nodes_splitlist</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.tests.test_core.TestPasswordDecryption" href="#connpy.tests.test_core.TestPasswordDecryption">TestPasswordDecryption</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_core.TestPasswordDecryption.test_passtx_encrypted" href="#connpy.tests.test_core.TestPasswordDecryption.test_passtx_encrypted">test_passtx_encrypted</a></code></li>
+<li><code><a title="connpy.tests.test_core.TestPasswordDecryption.test_passtx_missing_key_raises" href="#connpy.tests.test_core.TestPasswordDecryption.test_passtx_missing_key_raises">test_passtx_missing_key_raises</a></code></li>
+<li><code><a title="connpy.tests.test_core.TestPasswordDecryption.test_passtx_plaintext" href="#connpy.tests.test_core.TestPasswordDecryption.test_passtx_plaintext">test_passtx_plaintext</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+</footer>
+</body>
+</html>

@@ -1,0 +1,1403 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<meta name="generator" content="pdoc3 0.11.6">
+<title>connpy.tests.test_configfile API documentation</title>
+<meta name="description" content="Tests for connpy.configfile module.">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:1.5em;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:2em 0 .50em 0}h3{font-size:1.4em;margin:1.6em 0 .7em 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .2s ease-in-out}a:visited{color:#503}a:hover{color:#b62}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900;font-weight:bold}pre code{font-size:.8em;line-height:1.4em;padding:1em;display:block}code{background:#f3f3f3;font-family:"DejaVu Sans Mono",monospace;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source > summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible;min-width:max-content}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em 1em;margin:1em 0}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul ul{padding-left:1em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha512-D9gUyxqja7hBtkWpPWGt9wfbfaMGVt9gnyCvYa+jojwwPHLCzUm5i8rpk7vD7wNee9bA35eYIjobYPaQuKS1MQ==" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => {
+hljs.configure({languages: ['bash', 'css', 'diff', 'graphql', 'ini', 'javascript', 'json', 'plaintext', 'python', 'python-repl', 'rust', 'shell', 'sql', 'typescript', 'xml', 'yaml']});
+hljs.highlightAll();
+/* Collapse source docstrings */
+setTimeout(() => {
+[...document.querySelectorAll('.hljs.language-python > .hljs-string')]
+.filter(el => el.innerHTML.length > 200 && ['"""', "'''"].includes(el.innerHTML.substring(0, 3)))
+.forEach(el => {
+let d = document.createElement('details');
+d.classList.add('hljs-string');
+d.innerHTML = '<summary>"""</summary>' + el.innerHTML.substring(3);
+el.replaceWith(d);
+});
+}, 100);
+})</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>connpy.tests.test_configfile</code></h1>
+</header>
+<section id="section-intro">
+<p>Tests for connpy.configfile module.</p>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="connpy.tests.test_configfile.TestCRUDNodes"><code class="flex name class">
+<span>class <span class="ident">TestCRUDNodes</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestCRUDNodes:
+    def test_add_node_root(self, config):
+        config._connections_add(
+            id=&#34;router1&#34;, host=&#34;10.0.0.1&#34;, protocol=&#34;ssh&#34;,
+            port=&#34;22&#34;, user=&#34;admin&#34;, password=&#34;pass&#34;, options=&#34;&#34;,
+            logs=&#34;&#34;, tags=&#34;&#34;, jumphost=&#34;&#34;
+        )
+        assert &#34;router1&#34; in config.connections
+        assert config.connections[&#34;router1&#34;][&#34;host&#34;] == &#34;10.0.0.1&#34;
+
+    def test_add_node_folder(self, config):
+        config._folder_add(folder=&#34;office&#34;)
+        config._connections_add(
+            id=&#34;server1&#34;, folder=&#34;office&#34;, host=&#34;10.0.1.1&#34;,
+            protocol=&#34;ssh&#34;, port=&#34;&#34;, user=&#34;root&#34;, password=&#34;pass&#34;,
+            options=&#34;&#34;, logs=&#34;&#34;, tags=&#34;&#34;, jumphost=&#34;&#34;
+        )
+        assert &#34;server1&#34; in config.connections[&#34;office&#34;]
+
+    def test_add_node_subfolder(self, config):
+        config._folder_add(folder=&#34;office&#34;)
+        config._folder_add(folder=&#34;office&#34;, subfolder=&#34;dc&#34;)
+        config._connections_add(
+            id=&#34;db1&#34;, folder=&#34;office&#34;, subfolder=&#34;dc&#34;, host=&#34;10.0.2.1&#34;,
+            protocol=&#34;ssh&#34;, port=&#34;&#34;, user=&#34;dbadmin&#34;, password=&#34;pass&#34;,
+            options=&#34;&#34;, logs=&#34;&#34;, tags=&#34;&#34;, jumphost=&#34;&#34;
+        )
+        assert &#34;db1&#34; in config.connections[&#34;office&#34;][&#34;dc&#34;]
+
+    def test_del_node_root(self, config):
+        config._connections_add(
+            id=&#34;router1&#34;, host=&#34;10.0.0.1&#34;, protocol=&#34;ssh&#34;,
+            port=&#34;&#34;, user=&#34;&#34;, password=&#34;&#34;, options=&#34;&#34;,
+            logs=&#34;&#34;, tags=&#34;&#34;, jumphost=&#34;&#34;
+        )
+        config._connections_del(id=&#34;router1&#34;)
+        assert &#34;router1&#34; not in config.connections
+
+    def test_del_node_folder(self, config):
+        config._folder_add(folder=&#34;office&#34;)
+        config._connections_add(
+            id=&#34;server1&#34;, folder=&#34;office&#34;, host=&#34;10.0.1.1&#34;,
+            protocol=&#34;ssh&#34;, port=&#34;&#34;, user=&#34;&#34;, password=&#34;&#34;,
+            options=&#34;&#34;, logs=&#34;&#34;, tags=&#34;&#34;, jumphost=&#34;&#34;
+        )
+        config._connections_del(id=&#34;server1&#34;, folder=&#34;office&#34;)
+        assert &#34;server1&#34; not in config.connections[&#34;office&#34;]
+
+    def test_add_folder(self, config):
+        config._folder_add(folder=&#34;office&#34;)
+        assert &#34;office&#34; in config.connections
+        assert config.connections[&#34;office&#34;][&#34;type&#34;] == &#34;folder&#34;
+
+    def test_add_subfolder(self, config):
+        config._folder_add(folder=&#34;office&#34;)
+        config._folder_add(folder=&#34;office&#34;, subfolder=&#34;dc&#34;)
+        assert &#34;dc&#34; in config.connections[&#34;office&#34;]
+        assert config.connections[&#34;office&#34;][&#34;dc&#34;][&#34;type&#34;] == &#34;subfolder&#34;
+
+    def test_del_folder(self, config):
+        config._folder_add(folder=&#34;office&#34;)
+        config._folder_del(folder=&#34;office&#34;)
+        assert &#34;office&#34; not in config.connections
+
+    def test_del_subfolder(self, config):
+        config._folder_add(folder=&#34;office&#34;)
+        config._folder_add(folder=&#34;office&#34;, subfolder=&#34;dc&#34;)
+        config._folder_del(folder=&#34;office&#34;, subfolder=&#34;dc&#34;)
+        assert &#34;dc&#34; not in config.connections[&#34;office&#34;]</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_configfile.TestCRUDNodes.test_add_folder"><code class="name flex">
+<span>def <span class="ident">test_add_folder</span></span>(<span>self, config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_add_folder(self, config):
+    config._folder_add(folder=&#34;office&#34;)
+    assert &#34;office&#34; in config.connections
+    assert config.connections[&#34;office&#34;][&#34;type&#34;] == &#34;folder&#34;</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestCRUDNodes.test_add_node_folder"><code class="name flex">
+<span>def <span class="ident">test_add_node_folder</span></span>(<span>self, config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_add_node_folder(self, config):
+    config._folder_add(folder=&#34;office&#34;)
+    config._connections_add(
+        id=&#34;server1&#34;, folder=&#34;office&#34;, host=&#34;10.0.1.1&#34;,
+        protocol=&#34;ssh&#34;, port=&#34;&#34;, user=&#34;root&#34;, password=&#34;pass&#34;,
+        options=&#34;&#34;, logs=&#34;&#34;, tags=&#34;&#34;, jumphost=&#34;&#34;
+    )
+    assert &#34;server1&#34; in config.connections[&#34;office&#34;]</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestCRUDNodes.test_add_node_root"><code class="name flex">
+<span>def <span class="ident">test_add_node_root</span></span>(<span>self, config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_add_node_root(self, config):
+    config._connections_add(
+        id=&#34;router1&#34;, host=&#34;10.0.0.1&#34;, protocol=&#34;ssh&#34;,
+        port=&#34;22&#34;, user=&#34;admin&#34;, password=&#34;pass&#34;, options=&#34;&#34;,
+        logs=&#34;&#34;, tags=&#34;&#34;, jumphost=&#34;&#34;
+    )
+    assert &#34;router1&#34; in config.connections
+    assert config.connections[&#34;router1&#34;][&#34;host&#34;] == &#34;10.0.0.1&#34;</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestCRUDNodes.test_add_node_subfolder"><code class="name flex">
+<span>def <span class="ident">test_add_node_subfolder</span></span>(<span>self, config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_add_node_subfolder(self, config):
+    config._folder_add(folder=&#34;office&#34;)
+    config._folder_add(folder=&#34;office&#34;, subfolder=&#34;dc&#34;)
+    config._connections_add(
+        id=&#34;db1&#34;, folder=&#34;office&#34;, subfolder=&#34;dc&#34;, host=&#34;10.0.2.1&#34;,
+        protocol=&#34;ssh&#34;, port=&#34;&#34;, user=&#34;dbadmin&#34;, password=&#34;pass&#34;,
+        options=&#34;&#34;, logs=&#34;&#34;, tags=&#34;&#34;, jumphost=&#34;&#34;
+    )
+    assert &#34;db1&#34; in config.connections[&#34;office&#34;][&#34;dc&#34;]</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestCRUDNodes.test_add_subfolder"><code class="name flex">
+<span>def <span class="ident">test_add_subfolder</span></span>(<span>self, config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_add_subfolder(self, config):
+    config._folder_add(folder=&#34;office&#34;)
+    config._folder_add(folder=&#34;office&#34;, subfolder=&#34;dc&#34;)
+    assert &#34;dc&#34; in config.connections[&#34;office&#34;]
+    assert config.connections[&#34;office&#34;][&#34;dc&#34;][&#34;type&#34;] == &#34;subfolder&#34;</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestCRUDNodes.test_del_folder"><code class="name flex">
+<span>def <span class="ident">test_del_folder</span></span>(<span>self, config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_del_folder(self, config):
+    config._folder_add(folder=&#34;office&#34;)
+    config._folder_del(folder=&#34;office&#34;)
+    assert &#34;office&#34; not in config.connections</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestCRUDNodes.test_del_node_folder"><code class="name flex">
+<span>def <span class="ident">test_del_node_folder</span></span>(<span>self, config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_del_node_folder(self, config):
+    config._folder_add(folder=&#34;office&#34;)
+    config._connections_add(
+        id=&#34;server1&#34;, folder=&#34;office&#34;, host=&#34;10.0.1.1&#34;,
+        protocol=&#34;ssh&#34;, port=&#34;&#34;, user=&#34;&#34;, password=&#34;&#34;,
+        options=&#34;&#34;, logs=&#34;&#34;, tags=&#34;&#34;, jumphost=&#34;&#34;
+    )
+    config._connections_del(id=&#34;server1&#34;, folder=&#34;office&#34;)
+    assert &#34;server1&#34; not in config.connections[&#34;office&#34;]</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestCRUDNodes.test_del_node_root"><code class="name flex">
+<span>def <span class="ident">test_del_node_root</span></span>(<span>self, config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_del_node_root(self, config):
+    config._connections_add(
+        id=&#34;router1&#34;, host=&#34;10.0.0.1&#34;, protocol=&#34;ssh&#34;,
+        port=&#34;&#34;, user=&#34;&#34;, password=&#34;&#34;, options=&#34;&#34;,
+        logs=&#34;&#34;, tags=&#34;&#34;, jumphost=&#34;&#34;
+    )
+    config._connections_del(id=&#34;router1&#34;)
+    assert &#34;router1&#34; not in config.connections</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestCRUDNodes.test_del_subfolder"><code class="name flex">
+<span>def <span class="ident">test_del_subfolder</span></span>(<span>self, config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_del_subfolder(self, config):
+    config._folder_add(folder=&#34;office&#34;)
+    config._folder_add(folder=&#34;office&#34;, subfolder=&#34;dc&#34;)
+    config._folder_del(folder=&#34;office&#34;, subfolder=&#34;dc&#34;)
+    assert &#34;dc&#34; not in config.connections[&#34;office&#34;]</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.tests.test_configfile.TestCRUDProfiles"><code class="flex name class">
+<span>class <span class="ident">TestCRUDProfiles</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestCRUDProfiles:
+    def test_add_profile(self, config):
+        config._profiles_add(
+            id=&#34;myprofile&#34;, host=&#34;&#34;, protocol=&#34;telnet&#34;,
+            port=&#34;23&#34;, user=&#34;user1&#34;, password=&#34;pass1&#34;,
+            options=&#34;&#34;, logs=&#34;&#34;, tags=&#34;&#34;, jumphost=&#34;&#34;
+        )
+        assert &#34;myprofile&#34; in config.profiles
+        assert config.profiles[&#34;myprofile&#34;][&#34;protocol&#34;] == &#34;telnet&#34;
+
+    def test_del_profile(self, config):
+        config._profiles_add(
+            id=&#34;temp&#34;, host=&#34;&#34;, protocol=&#34;ssh&#34;, port=&#34;&#34;,
+            user=&#34;&#34;, password=&#34;&#34;, options=&#34;&#34;, logs=&#34;&#34;, tags=&#34;&#34;, jumphost=&#34;&#34;
+        )
+        config._profiles_del(id=&#34;temp&#34;)
+        assert &#34;temp&#34; not in config.profiles
+
+    def test_default_profile_exists(self, config):
+        assert &#34;default&#34; in config.profiles</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_configfile.TestCRUDProfiles.test_add_profile"><code class="name flex">
+<span>def <span class="ident">test_add_profile</span></span>(<span>self, config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_add_profile(self, config):
+    config._profiles_add(
+        id=&#34;myprofile&#34;, host=&#34;&#34;, protocol=&#34;telnet&#34;,
+        port=&#34;23&#34;, user=&#34;user1&#34;, password=&#34;pass1&#34;,
+        options=&#34;&#34;, logs=&#34;&#34;, tags=&#34;&#34;, jumphost=&#34;&#34;
+    )
+    assert &#34;myprofile&#34; in config.profiles
+    assert config.profiles[&#34;myprofile&#34;][&#34;protocol&#34;] == &#34;telnet&#34;</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestCRUDProfiles.test_default_profile_exists"><code class="name flex">
+<span>def <span class="ident">test_default_profile_exists</span></span>(<span>self, config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_default_profile_exists(self, config):
+    assert &#34;default&#34; in config.profiles</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestCRUDProfiles.test_del_profile"><code class="name flex">
+<span>def <span class="ident">test_del_profile</span></span>(<span>self, config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_del_profile(self, config):
+    config._profiles_add(
+        id=&#34;temp&#34;, host=&#34;&#34;, protocol=&#34;ssh&#34;, port=&#34;&#34;,
+        user=&#34;&#34;, password=&#34;&#34;, options=&#34;&#34;, logs=&#34;&#34;, tags=&#34;&#34;, jumphost=&#34;&#34;
+    )
+    config._profiles_del(id=&#34;temp&#34;)
+    assert &#34;temp&#34; not in config.profiles</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.tests.test_configfile.TestConfigfileInit"><code class="flex name class">
+<span>class <span class="ident">TestConfigfileInit</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestConfigfileInit:
+    def test_creates_default_config(self, tmp_config_dir):
+        &#34;&#34;&#34;Creates config.json with defaults when it doesn&#39;t exist.&#34;&#34;&#34;
+        config_file = tmp_config_dir / &#34;config.json&#34;
+        config_file.unlink()  # Remove existing
+        key_file = tmp_config_dir / &#34;.osk&#34;
+
+        from connpy.configfile import configfile
+        conf = configfile(conf=str(config_file), key=str(key_file))
+
+        assert config_file.exists()
+        assert conf.config[&#34;case&#34;] == False
+        assert conf.config[&#34;idletime&#34;] == 30
+        assert &#34;default&#34; in conf.profiles
+
+    def test_creates_rsa_key(self, tmp_config_dir):
+        &#34;&#34;&#34;Generates RSA key when it doesn&#39;t exist.&#34;&#34;&#34;
+        key_file = tmp_config_dir / &#34;.osk&#34;
+        key_file.unlink()  # Remove existing
+
+        from connpy.configfile import configfile
+        conf = configfile(conf=str(tmp_config_dir / &#34;config.json&#34;), key=str(key_file))
+
+        assert key_file.exists()
+        assert conf.privatekey is not None
+        assert conf.publickey is not None
+
+    def test_loads_existing_config(self, config):
+        &#34;&#34;&#34;Loads correctly from existing config.&#34;&#34;&#34;
+        assert config.config is not None
+        assert config.connections is not None
+        assert config.profiles is not None
+
+    def test_config_file_permissions(self, tmp_config_dir):
+        &#34;&#34;&#34;Config is created with 0o600 permissions.&#34;&#34;&#34;
+        config_file = tmp_config_dir / &#34;config.json&#34;
+        config_file.unlink()
+
+        from connpy.configfile import configfile
+        configfile(conf=str(config_file), key=str(tmp_config_dir / &#34;.osk&#34;))
+
+        stat = os.stat(str(config_file))
+        assert oct(stat.st_mode &amp; 0o777) == oct(0o600)
+
+    def test_custom_paths(self, tmp_path):
+        &#34;&#34;&#34;Accepts custom paths for conf and key.&#34;&#34;&#34;
+        config_dir = tmp_path / &#34;custom&#34;
+        config_dir.mkdir()
+        (config_dir / &#34;plugins&#34;).mkdir()
+
+        # Write .folder for the config dir
+        dot_folder = tmp_path / &#34;.config&#34; / &#34;conn&#34;
+        dot_folder.mkdir(parents=True, exist_ok=True)
+        (dot_folder / &#34;.folder&#34;).write_text(str(config_dir))
+        (dot_folder / &#34;plugins&#34;).mkdir(exist_ok=True)
+
+        conf_path = str(config_dir / &#34;my_config.json&#34;)
+        key_path = str(config_dir / &#34;my_key&#34;)
+
+        from connpy.configfile import configfile
+        conf = configfile(conf=conf_path, key=key_path)
+
+        assert conf.file == conf_path
+        assert conf.key == key_path</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_configfile.TestConfigfileInit.test_config_file_permissions"><code class="name flex">
+<span>def <span class="ident">test_config_file_permissions</span></span>(<span>self, tmp_config_dir)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_config_file_permissions(self, tmp_config_dir):
+    &#34;&#34;&#34;Config is created with 0o600 permissions.&#34;&#34;&#34;
+    config_file = tmp_config_dir / &#34;config.json&#34;
+    config_file.unlink()
+
+    from connpy.configfile import configfile
+    configfile(conf=str(config_file), key=str(tmp_config_dir / &#34;.osk&#34;))
+
+    stat = os.stat(str(config_file))
+    assert oct(stat.st_mode &amp; 0o777) == oct(0o600)</code></pre>
+</details>
+<div class="desc"><p>Config is created with 0o600 permissions.</p></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestConfigfileInit.test_creates_default_config"><code class="name flex">
+<span>def <span class="ident">test_creates_default_config</span></span>(<span>self, tmp_config_dir)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_creates_default_config(self, tmp_config_dir):
+    &#34;&#34;&#34;Creates config.json with defaults when it doesn&#39;t exist.&#34;&#34;&#34;
+    config_file = tmp_config_dir / &#34;config.json&#34;
+    config_file.unlink()  # Remove existing
+    key_file = tmp_config_dir / &#34;.osk&#34;
+
+    from connpy.configfile import configfile
+    conf = configfile(conf=str(config_file), key=str(key_file))
+
+    assert config_file.exists()
+    assert conf.config[&#34;case&#34;] == False
+    assert conf.config[&#34;idletime&#34;] == 30
+    assert &#34;default&#34; in conf.profiles</code></pre>
+</details>
+<div class="desc"><p>Creates config.json with defaults when it doesn't exist.</p></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestConfigfileInit.test_creates_rsa_key"><code class="name flex">
+<span>def <span class="ident">test_creates_rsa_key</span></span>(<span>self, tmp_config_dir)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_creates_rsa_key(self, tmp_config_dir):
+    &#34;&#34;&#34;Generates RSA key when it doesn&#39;t exist.&#34;&#34;&#34;
+    key_file = tmp_config_dir / &#34;.osk&#34;
+    key_file.unlink()  # Remove existing
+
+    from connpy.configfile import configfile
+    conf = configfile(conf=str(tmp_config_dir / &#34;config.json&#34;), key=str(key_file))
+
+    assert key_file.exists()
+    assert conf.privatekey is not None
+    assert conf.publickey is not None</code></pre>
+</details>
+<div class="desc"><p>Generates RSA key when it doesn't exist.</p></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestConfigfileInit.test_custom_paths"><code class="name flex">
+<span>def <span class="ident">test_custom_paths</span></span>(<span>self, tmp_path)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_custom_paths(self, tmp_path):
+    &#34;&#34;&#34;Accepts custom paths for conf and key.&#34;&#34;&#34;
+    config_dir = tmp_path / &#34;custom&#34;
+    config_dir.mkdir()
+    (config_dir / &#34;plugins&#34;).mkdir()
+
+    # Write .folder for the config dir
+    dot_folder = tmp_path / &#34;.config&#34; / &#34;conn&#34;
+    dot_folder.mkdir(parents=True, exist_ok=True)
+    (dot_folder / &#34;.folder&#34;).write_text(str(config_dir))
+    (dot_folder / &#34;plugins&#34;).mkdir(exist_ok=True)
+
+    conf_path = str(config_dir / &#34;my_config.json&#34;)
+    key_path = str(config_dir / &#34;my_key&#34;)
+
+    from connpy.configfile import configfile
+    conf = configfile(conf=conf_path, key=key_path)
+
+    assert conf.file == conf_path
+    assert conf.key == key_path</code></pre>
+</details>
+<div class="desc"><p>Accepts custom paths for conf and key.</p></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestConfigfileInit.test_loads_existing_config"><code class="name flex">
+<span>def <span class="ident">test_loads_existing_config</span></span>(<span>self, config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_loads_existing_config(self, config):
+    &#34;&#34;&#34;Loads correctly from existing config.&#34;&#34;&#34;
+    assert config.config is not None
+    assert config.connections is not None
+    assert config.profiles is not None</code></pre>
+</details>
+<div class="desc"><p>Loads correctly from existing config.</p></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.tests.test_configfile.TestEncryption"><code class="flex name class">
+<span>class <span class="ident">TestEncryption</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestEncryption:
+    def test_encrypt_password(self, config):
+        &#34;&#34;&#34;Encrypts and produces b&#39;...&#39; format.&#34;&#34;&#34;
+        encrypted = config.encrypt(&#34;mysecret&#34;)
+        assert encrypted.startswith(&#34;b&#39;&#34;) or encrypted.startswith(&#39;b&#34;&#39;)
+
+    def test_encrypt_decrypt_roundtrip(self, config):
+        &#34;&#34;&#34;Encrypt then decrypt returns original.&#34;&#34;&#34;
+        from Crypto.PublicKey import RSA
+        from Crypto.Cipher import PKCS1_OAEP
+        import ast
+
+        original = &#34;super_secret_password&#34;
+        encrypted = config.encrypt(original)
+
+        # Decrypt
+        with open(config.key) as f:
+            key = RSA.import_key(f.read())
+        decryptor = PKCS1_OAEP.new(key)
+        decrypted = decryptor.decrypt(ast.literal_eval(encrypted)).decode(&#34;utf-8&#34;)
+        assert decrypted == original</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_configfile.TestEncryption.test_encrypt_decrypt_roundtrip"><code class="name flex">
+<span>def <span class="ident">test_encrypt_decrypt_roundtrip</span></span>(<span>self, config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_encrypt_decrypt_roundtrip(self, config):
+    &#34;&#34;&#34;Encrypt then decrypt returns original.&#34;&#34;&#34;
+    from Crypto.PublicKey import RSA
+    from Crypto.Cipher import PKCS1_OAEP
+    import ast
+
+    original = &#34;super_secret_password&#34;
+    encrypted = config.encrypt(original)
+
+    # Decrypt
+    with open(config.key) as f:
+        key = RSA.import_key(f.read())
+    decryptor = PKCS1_OAEP.new(key)
+    decrypted = decryptor.decrypt(ast.literal_eval(encrypted)).decode(&#34;utf-8&#34;)
+    assert decrypted == original</code></pre>
+</details>
+<div class="desc"><p>Encrypt then decrypt returns original.</p></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestEncryption.test_encrypt_password"><code class="name flex">
+<span>def <span class="ident">test_encrypt_password</span></span>(<span>self, config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_encrypt_password(self, config):
+    &#34;&#34;&#34;Encrypts and produces b&#39;...&#39; format.&#34;&#34;&#34;
+    encrypted = config.encrypt(&#34;mysecret&#34;)
+    assert encrypted.startswith(&#34;b&#39;&#34;) or encrypted.startswith(&#39;b&#34;&#39;)</code></pre>
+</details>
+<div class="desc"><p>Encrypts and produces b'&hellip;' format.</p></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.tests.test_configfile.TestExplodeUnique"><code class="flex name class">
+<span>class <span class="ident">TestExplodeUnique</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestExplodeUnique:
+    def test_simple_node(self, config):
+        result = config._explode_unique(&#34;router1&#34;)
+        assert result == {&#34;id&#34;: &#34;router1&#34;}
+
+    def test_node_with_folder(self, config):
+        result = config._explode_unique(&#34;r1@office&#34;)
+        assert result == {&#34;id&#34;: &#34;r1&#34;, &#34;folder&#34;: &#34;office&#34;}
+
+    def test_node_with_subfolder(self, config):
+        result = config._explode_unique(&#34;r1@dc@office&#34;)
+        assert result == {&#34;id&#34;: &#34;r1&#34;, &#34;folder&#34;: &#34;office&#34;, &#34;subfolder&#34;: &#34;dc&#34;}
+
+    def test_folder_only(self, config):
+        result = config._explode_unique(&#34;@office&#34;)
+        assert result == {&#34;folder&#34;: &#34;office&#34;}
+
+    def test_subfolder_only(self, config):
+        result = config._explode_unique(&#34;@dc@office&#34;)
+        assert result == {&#34;folder&#34;: &#34;office&#34;, &#34;subfolder&#34;: &#34;dc&#34;}
+
+    def test_too_deep(self, config):
+        result = config._explode_unique(&#34;a@b@c@d&#34;)
+        assert result == False
+
+    def test_empty_folder(self, config):
+        result = config._explode_unique(&#34;a@&#34;)
+        assert result == False
+
+    def test_empty_subfolder(self, config):
+        result = config._explode_unique(&#34;a@@office&#34;)
+        assert result == False</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_configfile.TestExplodeUnique.test_empty_folder"><code class="name flex">
+<span>def <span class="ident">test_empty_folder</span></span>(<span>self, config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_empty_folder(self, config):
+    result = config._explode_unique(&#34;a@&#34;)
+    assert result == False</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestExplodeUnique.test_empty_subfolder"><code class="name flex">
+<span>def <span class="ident">test_empty_subfolder</span></span>(<span>self, config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_empty_subfolder(self, config):
+    result = config._explode_unique(&#34;a@@office&#34;)
+    assert result == False</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestExplodeUnique.test_folder_only"><code class="name flex">
+<span>def <span class="ident">test_folder_only</span></span>(<span>self, config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_folder_only(self, config):
+    result = config._explode_unique(&#34;@office&#34;)
+    assert result == {&#34;folder&#34;: &#34;office&#34;}</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestExplodeUnique.test_node_with_folder"><code class="name flex">
+<span>def <span class="ident">test_node_with_folder</span></span>(<span>self, config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_node_with_folder(self, config):
+    result = config._explode_unique(&#34;r1@office&#34;)
+    assert result == {&#34;id&#34;: &#34;r1&#34;, &#34;folder&#34;: &#34;office&#34;}</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestExplodeUnique.test_node_with_subfolder"><code class="name flex">
+<span>def <span class="ident">test_node_with_subfolder</span></span>(<span>self, config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_node_with_subfolder(self, config):
+    result = config._explode_unique(&#34;r1@dc@office&#34;)
+    assert result == {&#34;id&#34;: &#34;r1&#34;, &#34;folder&#34;: &#34;office&#34;, &#34;subfolder&#34;: &#34;dc&#34;}</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestExplodeUnique.test_simple_node"><code class="name flex">
+<span>def <span class="ident">test_simple_node</span></span>(<span>self, config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_simple_node(self, config):
+    result = config._explode_unique(&#34;router1&#34;)
+    assert result == {&#34;id&#34;: &#34;router1&#34;}</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestExplodeUnique.test_subfolder_only"><code class="name flex">
+<span>def <span class="ident">test_subfolder_only</span></span>(<span>self, config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_subfolder_only(self, config):
+    result = config._explode_unique(&#34;@dc@office&#34;)
+    assert result == {&#34;folder&#34;: &#34;office&#34;, &#34;subfolder&#34;: &#34;dc&#34;}</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestExplodeUnique.test_too_deep"><code class="name flex">
+<span>def <span class="ident">test_too_deep</span></span>(<span>self, config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_too_deep(self, config):
+    result = config._explode_unique(&#34;a@b@c@d&#34;)
+    assert result == False</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.tests.test_configfile.TestGetAll"><code class="flex name class">
+<span>class <span class="ident">TestGetAll</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestGetAll:
+    def test_getallnodes_no_filter(self, populated_config):
+        nodes = populated_config._getallnodes()
+        assert &#34;router1&#34; in nodes
+        assert &#34;server1@office&#34; in nodes
+        assert &#34;db1@datacenter@office&#34; in nodes
+
+    def test_getallnodes_string_filter(self, populated_config):
+        nodes = populated_config._getallnodes(&#34;router.*&#34;)
+        assert &#34;router1&#34; in nodes
+        assert &#34;server1@office&#34; not in nodes
+
+    def test_getallnodes_list_filter(self, populated_config):
+        nodes = populated_config._getallnodes([&#34;router.*&#34;, &#34;db.*&#34;])
+        assert &#34;router1&#34; in nodes
+        assert &#34;db1@datacenter@office&#34; in nodes
+        assert &#34;server1@office&#34; not in nodes
+
+    def test_getallnodes_filter_invalid_type(self, populated_config):
+        with pytest.raises(ValueError):
+            populated_config._getallnodes(123)
+
+    def test_getallfolders(self, populated_config):
+        folders = populated_config._getallfolders()
+        assert &#34;@office&#34; in folders
+        assert &#34;@datacenter@office&#34; in folders
+
+    def test_getallnodesfull(self, populated_config):
+        nodes = populated_config._getallnodesfull()
+        assert &#34;router1&#34; in nodes
+        assert nodes[&#34;router1&#34;][&#34;host&#34;] == &#34;10.0.0.1&#34;
+
+    def test_getallnodesfull_with_filter(self, populated_config):
+        nodes = populated_config._getallnodesfull(&#34;router.*&#34;)
+        assert &#34;router1&#34; in nodes
+        assert &#34;server1@office&#34; not in nodes
+
+    def test_profileused(self, tmp_config_dir):
+        &#34;&#34;&#34;Detects nodes using a specific profile.&#34;&#34;&#34;
+        config_file = tmp_config_dir / &#34;config.json&#34;
+        data = {
+            &#34;config&#34;: {&#34;case&#34;: False, &#34;idletime&#34;: 30, &#34;fzf&#34;: False},
+            &#34;connections&#34;: {
+                &#34;router1&#34;: {
+                    &#34;host&#34;: &#34;10.0.0.1&#34;, &#34;protocol&#34;: &#34;ssh&#34;, &#34;port&#34;: &#34;&#34;,
+                    &#34;user&#34;: &#34;@myprofile&#34;, &#34;password&#34;: &#34;pass&#34;,
+                    &#34;options&#34;: &#34;&#34;, &#34;logs&#34;: &#34;&#34;, &#34;tags&#34;: &#34;&#34;, &#34;jumphost&#34;: &#34;&#34;,
+                    &#34;type&#34;: &#34;connection&#34;
+                },
+                &#34;router2&#34;: {
+                    &#34;host&#34;: &#34;10.0.0.2&#34;, &#34;protocol&#34;: &#34;ssh&#34;, &#34;port&#34;: &#34;&#34;,
+                    &#34;user&#34;: &#34;admin&#34;, &#34;password&#34;: &#34;pass&#34;,
+                    &#34;options&#34;: &#34;&#34;, &#34;logs&#34;: &#34;&#34;, &#34;tags&#34;: &#34;&#34;, &#34;jumphost&#34;: &#34;&#34;,
+                    &#34;type&#34;: &#34;connection&#34;
+                }
+            },
+            &#34;profiles&#34;: {
+                &#34;default&#34;: {&#34;host&#34;: &#34;&#34;, &#34;protocol&#34;: &#34;ssh&#34;, &#34;port&#34;: &#34;&#34;,
+                           &#34;user&#34;: &#34;&#34;, &#34;password&#34;: &#34;&#34;, &#34;options&#34;: &#34;&#34;,
+                           &#34;logs&#34;: &#34;&#34;, &#34;tags&#34;: &#34;&#34;, &#34;jumphost&#34;: &#34;&#34;},
+                &#34;myprofile&#34;: {&#34;host&#34;: &#34;&#34;, &#34;protocol&#34;: &#34;ssh&#34;, &#34;port&#34;: &#34;&#34;,
+                             &#34;user&#34;: &#34;profuser&#34;, &#34;password&#34;: &#34;profpass&#34;,
+                             &#34;options&#34;: &#34;&#34;, &#34;logs&#34;: &#34;&#34;, &#34;tags&#34;: &#34;&#34;, &#34;jumphost&#34;: &#34;&#34;}
+            }
+        }
+        config_file.write_text(json.dumps(data, indent=4))
+        from connpy.configfile import configfile
+        conf = configfile(conf=str(config_file), key=str(tmp_config_dir / &#34;.osk&#34;))
+
+        used = conf._profileused(&#34;myprofile&#34;)
+        assert &#34;router1&#34; in used
+        assert &#34;router2&#34; not in used
+
+    def test_saveconfig(self, config):
+        &#34;&#34;&#34;Save and reload correctly.&#34;&#34;&#34;
+        config._connections_add(
+            id=&#34;test_node&#34;, host=&#34;1.2.3.4&#34;, protocol=&#34;ssh&#34;,
+            port=&#34;&#34;, user=&#34;&#34;, password=&#34;&#34;, options=&#34;&#34;,
+            logs=&#34;&#34;, tags=&#34;&#34;, jumphost=&#34;&#34;
+        )
+        result = config._saveconfig(config.file)
+        assert result == 0
+
+        # Reload and verify
+        from connpy.configfile import configfile
+        reloaded = configfile(conf=config.file, key=config.key)
+        assert &#34;test_node&#34; in reloaded.connections</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_configfile.TestGetAll.test_getallfolders"><code class="name flex">
+<span>def <span class="ident">test_getallfolders</span></span>(<span>self, populated_config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_getallfolders(self, populated_config):
+    folders = populated_config._getallfolders()
+    assert &#34;@office&#34; in folders
+    assert &#34;@datacenter@office&#34; in folders</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestGetAll.test_getallnodes_filter_invalid_type"><code class="name flex">
+<span>def <span class="ident">test_getallnodes_filter_invalid_type</span></span>(<span>self, populated_config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_getallnodes_filter_invalid_type(self, populated_config):
+    with pytest.raises(ValueError):
+        populated_config._getallnodes(123)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestGetAll.test_getallnodes_list_filter"><code class="name flex">
+<span>def <span class="ident">test_getallnodes_list_filter</span></span>(<span>self, populated_config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_getallnodes_list_filter(self, populated_config):
+    nodes = populated_config._getallnodes([&#34;router.*&#34;, &#34;db.*&#34;])
+    assert &#34;router1&#34; in nodes
+    assert &#34;db1@datacenter@office&#34; in nodes
+    assert &#34;server1@office&#34; not in nodes</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestGetAll.test_getallnodes_no_filter"><code class="name flex">
+<span>def <span class="ident">test_getallnodes_no_filter</span></span>(<span>self, populated_config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_getallnodes_no_filter(self, populated_config):
+    nodes = populated_config._getallnodes()
+    assert &#34;router1&#34; in nodes
+    assert &#34;server1@office&#34; in nodes
+    assert &#34;db1@datacenter@office&#34; in nodes</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestGetAll.test_getallnodes_string_filter"><code class="name flex">
+<span>def <span class="ident">test_getallnodes_string_filter</span></span>(<span>self, populated_config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_getallnodes_string_filter(self, populated_config):
+    nodes = populated_config._getallnodes(&#34;router.*&#34;)
+    assert &#34;router1&#34; in nodes
+    assert &#34;server1@office&#34; not in nodes</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestGetAll.test_getallnodesfull"><code class="name flex">
+<span>def <span class="ident">test_getallnodesfull</span></span>(<span>self, populated_config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_getallnodesfull(self, populated_config):
+    nodes = populated_config._getallnodesfull()
+    assert &#34;router1&#34; in nodes
+    assert nodes[&#34;router1&#34;][&#34;host&#34;] == &#34;10.0.0.1&#34;</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestGetAll.test_getallnodesfull_with_filter"><code class="name flex">
+<span>def <span class="ident">test_getallnodesfull_with_filter</span></span>(<span>self, populated_config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_getallnodesfull_with_filter(self, populated_config):
+    nodes = populated_config._getallnodesfull(&#34;router.*&#34;)
+    assert &#34;router1&#34; in nodes
+    assert &#34;server1@office&#34; not in nodes</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestGetAll.test_profileused"><code class="name flex">
+<span>def <span class="ident">test_profileused</span></span>(<span>self, tmp_config_dir)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_profileused(self, tmp_config_dir):
+    &#34;&#34;&#34;Detects nodes using a specific profile.&#34;&#34;&#34;
+    config_file = tmp_config_dir / &#34;config.json&#34;
+    data = {
+        &#34;config&#34;: {&#34;case&#34;: False, &#34;idletime&#34;: 30, &#34;fzf&#34;: False},
+        &#34;connections&#34;: {
+            &#34;router1&#34;: {
+                &#34;host&#34;: &#34;10.0.0.1&#34;, &#34;protocol&#34;: &#34;ssh&#34;, &#34;port&#34;: &#34;&#34;,
+                &#34;user&#34;: &#34;@myprofile&#34;, &#34;password&#34;: &#34;pass&#34;,
+                &#34;options&#34;: &#34;&#34;, &#34;logs&#34;: &#34;&#34;, &#34;tags&#34;: &#34;&#34;, &#34;jumphost&#34;: &#34;&#34;,
+                &#34;type&#34;: &#34;connection&#34;
+            },
+            &#34;router2&#34;: {
+                &#34;host&#34;: &#34;10.0.0.2&#34;, &#34;protocol&#34;: &#34;ssh&#34;, &#34;port&#34;: &#34;&#34;,
+                &#34;user&#34;: &#34;admin&#34;, &#34;password&#34;: &#34;pass&#34;,
+                &#34;options&#34;: &#34;&#34;, &#34;logs&#34;: &#34;&#34;, &#34;tags&#34;: &#34;&#34;, &#34;jumphost&#34;: &#34;&#34;,
+                &#34;type&#34;: &#34;connection&#34;
+            }
+        },
+        &#34;profiles&#34;: {
+            &#34;default&#34;: {&#34;host&#34;: &#34;&#34;, &#34;protocol&#34;: &#34;ssh&#34;, &#34;port&#34;: &#34;&#34;,
+                       &#34;user&#34;: &#34;&#34;, &#34;password&#34;: &#34;&#34;, &#34;options&#34;: &#34;&#34;,
+                       &#34;logs&#34;: &#34;&#34;, &#34;tags&#34;: &#34;&#34;, &#34;jumphost&#34;: &#34;&#34;},
+            &#34;myprofile&#34;: {&#34;host&#34;: &#34;&#34;, &#34;protocol&#34;: &#34;ssh&#34;, &#34;port&#34;: &#34;&#34;,
+                         &#34;user&#34;: &#34;profuser&#34;, &#34;password&#34;: &#34;profpass&#34;,
+                         &#34;options&#34;: &#34;&#34;, &#34;logs&#34;: &#34;&#34;, &#34;tags&#34;: &#34;&#34;, &#34;jumphost&#34;: &#34;&#34;}
+        }
+    }
+    config_file.write_text(json.dumps(data, indent=4))
+    from connpy.configfile import configfile
+    conf = configfile(conf=str(config_file), key=str(tmp_config_dir / &#34;.osk&#34;))
+
+    used = conf._profileused(&#34;myprofile&#34;)
+    assert &#34;router1&#34; in used
+    assert &#34;router2&#34; not in used</code></pre>
+</details>
+<div class="desc"><p>Detects nodes using a specific profile.</p></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestGetAll.test_saveconfig"><code class="name flex">
+<span>def <span class="ident">test_saveconfig</span></span>(<span>self, config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_saveconfig(self, config):
+    &#34;&#34;&#34;Save and reload correctly.&#34;&#34;&#34;
+    config._connections_add(
+        id=&#34;test_node&#34;, host=&#34;1.2.3.4&#34;, protocol=&#34;ssh&#34;,
+        port=&#34;&#34;, user=&#34;&#34;, password=&#34;&#34;, options=&#34;&#34;,
+        logs=&#34;&#34;, tags=&#34;&#34;, jumphost=&#34;&#34;
+    )
+    result = config._saveconfig(config.file)
+    assert result == 0
+
+    # Reload and verify
+    from connpy.configfile import configfile
+    reloaded = configfile(conf=config.file, key=config.key)
+    assert &#34;test_node&#34; in reloaded.connections</code></pre>
+</details>
+<div class="desc"><p>Save and reload correctly.</p></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.tests.test_configfile.TestGetItem"><code class="flex name class">
+<span>class <span class="ident">TestGetItem</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestGetItem:
+    def test_getitem_node(self, populated_config):
+        node = populated_config.getitem(&#34;router1&#34;)
+        assert node[&#34;host&#34;] == &#34;10.0.0.1&#34;
+        assert &#34;type&#34; not in node  # type is stripped
+
+    def test_getitem_folder(self, populated_config):
+        nodes = populated_config.getitem(&#34;@office&#34;)
+        # Should contain server1@office but NOT datacenter (subfolder)
+        assert &#34;server1@office&#34; in nodes
+        assert all(&#34;type&#34; not in v for v in nodes.values())
+
+    def test_getitem_subfolder(self, populated_config):
+        nodes = populated_config.getitem(&#34;@datacenter@office&#34;)
+        assert &#34;db1@datacenter@office&#34; in nodes
+
+    def test_getitem_node_in_folder(self, populated_config):
+        node = populated_config.getitem(&#34;server1@office&#34;)
+        assert node[&#34;host&#34;] == &#34;10.0.1.1&#34;
+
+    def test_getitem_node_in_subfolder(self, populated_config):
+        node = populated_config.getitem(&#34;db1@datacenter@office&#34;)
+        assert node[&#34;host&#34;] == &#34;10.0.2.1&#34;
+
+    def test_getitem_with_profile_extraction(self, tmp_config_dir):
+        &#34;&#34;&#34;extract=True resolves @profile references.&#34;&#34;&#34;
+        config_file = tmp_config_dir / &#34;config.json&#34;
+        data = {
+            &#34;config&#34;: {&#34;case&#34;: False, &#34;idletime&#34;: 30, &#34;fzf&#34;: False},
+            &#34;connections&#34;: {
+                &#34;router1&#34;: {
+                    &#34;host&#34;: &#34;10.0.0.1&#34;, &#34;protocol&#34;: &#34;ssh&#34;, &#34;port&#34;: &#34;&#34;,
+                    &#34;user&#34;: &#34;@office-user&#34;, &#34;password&#34;: &#34;@office-user&#34;,
+                    &#34;options&#34;: &#34;&#34;, &#34;logs&#34;: &#34;&#34;, &#34;tags&#34;: &#34;&#34;, &#34;jumphost&#34;: &#34;&#34;,
+                    &#34;type&#34;: &#34;connection&#34;
+                }
+            },
+            &#34;profiles&#34;: {
+                &#34;default&#34;: {&#34;host&#34;: &#34;&#34;, &#34;protocol&#34;: &#34;ssh&#34;, &#34;port&#34;: &#34;&#34;,
+                           &#34;user&#34;: &#34;&#34;, &#34;password&#34;: &#34;&#34;, &#34;options&#34;: &#34;&#34;,
+                           &#34;logs&#34;: &#34;&#34;, &#34;tags&#34;: &#34;&#34;, &#34;jumphost&#34;: &#34;&#34;},
+                &#34;office-user&#34;: {&#34;host&#34;: &#34;&#34;, &#34;protocol&#34;: &#34;ssh&#34;, &#34;port&#34;: &#34;&#34;,
+                               &#34;user&#34;: &#34;officeadmin&#34;, &#34;password&#34;: &#34;officepass&#34;,
+                               &#34;options&#34;: &#34;&#34;, &#34;logs&#34;: &#34;&#34;, &#34;tags&#34;: &#34;&#34;, &#34;jumphost&#34;: &#34;&#34;}
+            }
+        }
+        config_file.write_text(json.dumps(data, indent=4))
+
+        from connpy.configfile import configfile
+        conf = configfile(conf=str(config_file), key=str(tmp_config_dir / &#34;.osk&#34;))
+
+        node = conf.getitem(&#34;router1&#34;, extract=True)
+        assert node[&#34;user&#34;] == &#34;officeadmin&#34;
+        assert node[&#34;password&#34;] == &#34;officepass&#34;
+
+    def test_getitems_multiple(self, populated_config):
+        nodes = populated_config.getitems([&#34;router1&#34;, &#34;server1@office&#34;])
+        assert &#34;router1&#34; in nodes
+        assert &#34;server1@office&#34; in nodes
+
+    def test_getitems_folder(self, populated_config):
+        nodes = populated_config.getitems([&#34;@office&#34;])
+        assert &#34;server1@office&#34; in nodes</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_configfile.TestGetItem.test_getitem_folder"><code class="name flex">
+<span>def <span class="ident">test_getitem_folder</span></span>(<span>self, populated_config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_getitem_folder(self, populated_config):
+    nodes = populated_config.getitem(&#34;@office&#34;)
+    # Should contain server1@office but NOT datacenter (subfolder)
+    assert &#34;server1@office&#34; in nodes
+    assert all(&#34;type&#34; not in v for v in nodes.values())</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestGetItem.test_getitem_node"><code class="name flex">
+<span>def <span class="ident">test_getitem_node</span></span>(<span>self, populated_config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_getitem_node(self, populated_config):
+    node = populated_config.getitem(&#34;router1&#34;)
+    assert node[&#34;host&#34;] == &#34;10.0.0.1&#34;
+    assert &#34;type&#34; not in node  # type is stripped</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestGetItem.test_getitem_node_in_folder"><code class="name flex">
+<span>def <span class="ident">test_getitem_node_in_folder</span></span>(<span>self, populated_config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_getitem_node_in_folder(self, populated_config):
+    node = populated_config.getitem(&#34;server1@office&#34;)
+    assert node[&#34;host&#34;] == &#34;10.0.1.1&#34;</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestGetItem.test_getitem_node_in_subfolder"><code class="name flex">
+<span>def <span class="ident">test_getitem_node_in_subfolder</span></span>(<span>self, populated_config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_getitem_node_in_subfolder(self, populated_config):
+    node = populated_config.getitem(&#34;db1@datacenter@office&#34;)
+    assert node[&#34;host&#34;] == &#34;10.0.2.1&#34;</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestGetItem.test_getitem_subfolder"><code class="name flex">
+<span>def <span class="ident">test_getitem_subfolder</span></span>(<span>self, populated_config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_getitem_subfolder(self, populated_config):
+    nodes = populated_config.getitem(&#34;@datacenter@office&#34;)
+    assert &#34;db1@datacenter@office&#34; in nodes</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestGetItem.test_getitem_with_profile_extraction"><code class="name flex">
+<span>def <span class="ident">test_getitem_with_profile_extraction</span></span>(<span>self, tmp_config_dir)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_getitem_with_profile_extraction(self, tmp_config_dir):
+    &#34;&#34;&#34;extract=True resolves @profile references.&#34;&#34;&#34;
+    config_file = tmp_config_dir / &#34;config.json&#34;
+    data = {
+        &#34;config&#34;: {&#34;case&#34;: False, &#34;idletime&#34;: 30, &#34;fzf&#34;: False},
+        &#34;connections&#34;: {
+            &#34;router1&#34;: {
+                &#34;host&#34;: &#34;10.0.0.1&#34;, &#34;protocol&#34;: &#34;ssh&#34;, &#34;port&#34;: &#34;&#34;,
+                &#34;user&#34;: &#34;@office-user&#34;, &#34;password&#34;: &#34;@office-user&#34;,
+                &#34;options&#34;: &#34;&#34;, &#34;logs&#34;: &#34;&#34;, &#34;tags&#34;: &#34;&#34;, &#34;jumphost&#34;: &#34;&#34;,
+                &#34;type&#34;: &#34;connection&#34;
+            }
+        },
+        &#34;profiles&#34;: {
+            &#34;default&#34;: {&#34;host&#34;: &#34;&#34;, &#34;protocol&#34;: &#34;ssh&#34;, &#34;port&#34;: &#34;&#34;,
+                       &#34;user&#34;: &#34;&#34;, &#34;password&#34;: &#34;&#34;, &#34;options&#34;: &#34;&#34;,
+                       &#34;logs&#34;: &#34;&#34;, &#34;tags&#34;: &#34;&#34;, &#34;jumphost&#34;: &#34;&#34;},
+            &#34;office-user&#34;: {&#34;host&#34;: &#34;&#34;, &#34;protocol&#34;: &#34;ssh&#34;, &#34;port&#34;: &#34;&#34;,
+                           &#34;user&#34;: &#34;officeadmin&#34;, &#34;password&#34;: &#34;officepass&#34;,
+                           &#34;options&#34;: &#34;&#34;, &#34;logs&#34;: &#34;&#34;, &#34;tags&#34;: &#34;&#34;, &#34;jumphost&#34;: &#34;&#34;}
+        }
+    }
+    config_file.write_text(json.dumps(data, indent=4))
+
+    from connpy.configfile import configfile
+    conf = configfile(conf=str(config_file), key=str(tmp_config_dir / &#34;.osk&#34;))
+
+    node = conf.getitem(&#34;router1&#34;, extract=True)
+    assert node[&#34;user&#34;] == &#34;officeadmin&#34;
+    assert node[&#34;password&#34;] == &#34;officepass&#34;</code></pre>
+</details>
+<div class="desc"><p>extract=True resolves @profile references.</p></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestGetItem.test_getitems_folder"><code class="name flex">
+<span>def <span class="ident">test_getitems_folder</span></span>(<span>self, populated_config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_getitems_folder(self, populated_config):
+    nodes = populated_config.getitems([&#34;@office&#34;])
+    assert &#34;server1@office&#34; in nodes</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_configfile.TestGetItem.test_getitems_multiple"><code class="name flex">
+<span>def <span class="ident">test_getitems_multiple</span></span>(<span>self, populated_config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_getitems_multiple(self, populated_config):
+    nodes = populated_config.getitems([&#34;router1&#34;, &#34;server1@office&#34;])
+    assert &#34;router1&#34; in nodes
+    assert &#34;server1@office&#34; in nodes</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="connpy.tests" href="index.html">connpy.tests</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="connpy.tests.test_configfile.TestCRUDNodes" href="#connpy.tests.test_configfile.TestCRUDNodes">TestCRUDNodes</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_configfile.TestCRUDNodes.test_add_folder" href="#connpy.tests.test_configfile.TestCRUDNodes.test_add_folder">test_add_folder</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestCRUDNodes.test_add_node_folder" href="#connpy.tests.test_configfile.TestCRUDNodes.test_add_node_folder">test_add_node_folder</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestCRUDNodes.test_add_node_root" href="#connpy.tests.test_configfile.TestCRUDNodes.test_add_node_root">test_add_node_root</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestCRUDNodes.test_add_node_subfolder" href="#connpy.tests.test_configfile.TestCRUDNodes.test_add_node_subfolder">test_add_node_subfolder</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestCRUDNodes.test_add_subfolder" href="#connpy.tests.test_configfile.TestCRUDNodes.test_add_subfolder">test_add_subfolder</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestCRUDNodes.test_del_folder" href="#connpy.tests.test_configfile.TestCRUDNodes.test_del_folder">test_del_folder</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestCRUDNodes.test_del_node_folder" href="#connpy.tests.test_configfile.TestCRUDNodes.test_del_node_folder">test_del_node_folder</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestCRUDNodes.test_del_node_root" href="#connpy.tests.test_configfile.TestCRUDNodes.test_del_node_root">test_del_node_root</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestCRUDNodes.test_del_subfolder" href="#connpy.tests.test_configfile.TestCRUDNodes.test_del_subfolder">test_del_subfolder</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.tests.test_configfile.TestCRUDProfiles" href="#connpy.tests.test_configfile.TestCRUDProfiles">TestCRUDProfiles</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_configfile.TestCRUDProfiles.test_add_profile" href="#connpy.tests.test_configfile.TestCRUDProfiles.test_add_profile">test_add_profile</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestCRUDProfiles.test_default_profile_exists" href="#connpy.tests.test_configfile.TestCRUDProfiles.test_default_profile_exists">test_default_profile_exists</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestCRUDProfiles.test_del_profile" href="#connpy.tests.test_configfile.TestCRUDProfiles.test_del_profile">test_del_profile</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.tests.test_configfile.TestConfigfileInit" href="#connpy.tests.test_configfile.TestConfigfileInit">TestConfigfileInit</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_configfile.TestConfigfileInit.test_config_file_permissions" href="#connpy.tests.test_configfile.TestConfigfileInit.test_config_file_permissions">test_config_file_permissions</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestConfigfileInit.test_creates_default_config" href="#connpy.tests.test_configfile.TestConfigfileInit.test_creates_default_config">test_creates_default_config</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestConfigfileInit.test_creates_rsa_key" href="#connpy.tests.test_configfile.TestConfigfileInit.test_creates_rsa_key">test_creates_rsa_key</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestConfigfileInit.test_custom_paths" href="#connpy.tests.test_configfile.TestConfigfileInit.test_custom_paths">test_custom_paths</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestConfigfileInit.test_loads_existing_config" href="#connpy.tests.test_configfile.TestConfigfileInit.test_loads_existing_config">test_loads_existing_config</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.tests.test_configfile.TestEncryption" href="#connpy.tests.test_configfile.TestEncryption">TestEncryption</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_configfile.TestEncryption.test_encrypt_decrypt_roundtrip" href="#connpy.tests.test_configfile.TestEncryption.test_encrypt_decrypt_roundtrip">test_encrypt_decrypt_roundtrip</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestEncryption.test_encrypt_password" href="#connpy.tests.test_configfile.TestEncryption.test_encrypt_password">test_encrypt_password</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.tests.test_configfile.TestExplodeUnique" href="#connpy.tests.test_configfile.TestExplodeUnique">TestExplodeUnique</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_configfile.TestExplodeUnique.test_empty_folder" href="#connpy.tests.test_configfile.TestExplodeUnique.test_empty_folder">test_empty_folder</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestExplodeUnique.test_empty_subfolder" href="#connpy.tests.test_configfile.TestExplodeUnique.test_empty_subfolder">test_empty_subfolder</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestExplodeUnique.test_folder_only" href="#connpy.tests.test_configfile.TestExplodeUnique.test_folder_only">test_folder_only</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestExplodeUnique.test_node_with_folder" href="#connpy.tests.test_configfile.TestExplodeUnique.test_node_with_folder">test_node_with_folder</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestExplodeUnique.test_node_with_subfolder" href="#connpy.tests.test_configfile.TestExplodeUnique.test_node_with_subfolder">test_node_with_subfolder</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestExplodeUnique.test_simple_node" href="#connpy.tests.test_configfile.TestExplodeUnique.test_simple_node">test_simple_node</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestExplodeUnique.test_subfolder_only" href="#connpy.tests.test_configfile.TestExplodeUnique.test_subfolder_only">test_subfolder_only</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestExplodeUnique.test_too_deep" href="#connpy.tests.test_configfile.TestExplodeUnique.test_too_deep">test_too_deep</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.tests.test_configfile.TestGetAll" href="#connpy.tests.test_configfile.TestGetAll">TestGetAll</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_configfile.TestGetAll.test_getallfolders" href="#connpy.tests.test_configfile.TestGetAll.test_getallfolders">test_getallfolders</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestGetAll.test_getallnodes_filter_invalid_type" href="#connpy.tests.test_configfile.TestGetAll.test_getallnodes_filter_invalid_type">test_getallnodes_filter_invalid_type</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestGetAll.test_getallnodes_list_filter" href="#connpy.tests.test_configfile.TestGetAll.test_getallnodes_list_filter">test_getallnodes_list_filter</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestGetAll.test_getallnodes_no_filter" href="#connpy.tests.test_configfile.TestGetAll.test_getallnodes_no_filter">test_getallnodes_no_filter</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestGetAll.test_getallnodes_string_filter" href="#connpy.tests.test_configfile.TestGetAll.test_getallnodes_string_filter">test_getallnodes_string_filter</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestGetAll.test_getallnodesfull" href="#connpy.tests.test_configfile.TestGetAll.test_getallnodesfull">test_getallnodesfull</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestGetAll.test_getallnodesfull_with_filter" href="#connpy.tests.test_configfile.TestGetAll.test_getallnodesfull_with_filter">test_getallnodesfull_with_filter</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestGetAll.test_profileused" href="#connpy.tests.test_configfile.TestGetAll.test_profileused">test_profileused</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestGetAll.test_saveconfig" href="#connpy.tests.test_configfile.TestGetAll.test_saveconfig">test_saveconfig</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.tests.test_configfile.TestGetItem" href="#connpy.tests.test_configfile.TestGetItem">TestGetItem</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_configfile.TestGetItem.test_getitem_folder" href="#connpy.tests.test_configfile.TestGetItem.test_getitem_folder">test_getitem_folder</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestGetItem.test_getitem_node" href="#connpy.tests.test_configfile.TestGetItem.test_getitem_node">test_getitem_node</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestGetItem.test_getitem_node_in_folder" href="#connpy.tests.test_configfile.TestGetItem.test_getitem_node_in_folder">test_getitem_node_in_folder</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestGetItem.test_getitem_node_in_subfolder" href="#connpy.tests.test_configfile.TestGetItem.test_getitem_node_in_subfolder">test_getitem_node_in_subfolder</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestGetItem.test_getitem_subfolder" href="#connpy.tests.test_configfile.TestGetItem.test_getitem_subfolder">test_getitem_subfolder</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestGetItem.test_getitem_with_profile_extraction" href="#connpy.tests.test_configfile.TestGetItem.test_getitem_with_profile_extraction">test_getitem_with_profile_extraction</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestGetItem.test_getitems_folder" href="#connpy.tests.test_configfile.TestGetItem.test_getitems_folder">test_getitems_folder</a></code></li>
+<li><code><a title="connpy.tests.test_configfile.TestGetItem.test_getitems_multiple" href="#connpy.tests.test_configfile.TestGetItem.test_getitems_multiple">test_getitems_multiple</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+</footer>
+</body>
+</html>

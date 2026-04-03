@@ -1,0 +1,882 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<meta name="generator" content="pdoc3 0.11.6">
+<title>connpy.tests.test_api API documentation</title>
+<meta name="description" content="Tests for connpy.api module — Flask routes.">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:1.5em;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:2em 0 .50em 0}h3{font-size:1.4em;margin:1.6em 0 .7em 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .2s ease-in-out}a:visited{color:#503}a:hover{color:#b62}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900;font-weight:bold}pre code{font-size:.8em;line-height:1.4em;padding:1em;display:block}code{background:#f3f3f3;font-family:"DejaVu Sans Mono",monospace;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source > summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible;min-width:max-content}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em 1em;margin:1em 0}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul ul{padding-left:1em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha512-D9gUyxqja7hBtkWpPWGt9wfbfaMGVt9gnyCvYa+jojwwPHLCzUm5i8rpk7vD7wNee9bA35eYIjobYPaQuKS1MQ==" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => {
+hljs.configure({languages: ['bash', 'css', 'diff', 'graphql', 'ini', 'javascript', 'json', 'plaintext', 'python', 'python-repl', 'rust', 'shell', 'sql', 'typescript', 'xml', 'yaml']});
+hljs.highlightAll();
+/* Collapse source docstrings */
+setTimeout(() => {
+[...document.querySelectorAll('.hljs.language-python > .hljs-string')]
+.filter(el => el.innerHTML.length > 200 && ['"""', "'''"].includes(el.innerHTML.substring(0, 3)))
+.forEach(el => {
+let d = document.createElement('details');
+d.classList.add('hljs-string');
+d.innerHTML = '<summary>"""</summary>' + el.innerHTML.substring(3);
+el.replaceWith(d);
+});
+}, 100);
+})</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>connpy.tests.test_api</code></h1>
+</header>
+<section id="section-intro">
+<p>Tests for connpy.api module — Flask routes.</p>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-functions">Functions</h2>
+<dl>
+<dt id="connpy.tests.test_api.api_client"><code class="name flex">
+<span>def <span class="ident">api_client</span></span>(<span>populated_config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@pytest.fixture
+def api_client(populated_config):
+    &#34;&#34;&#34;Create a Flask test client with a populated config.&#34;&#34;&#34;
+    from connpy.api import app
+    app.custom_config = populated_config
+    app.config[&#34;TESTING&#34;] = True
+    with app.test_client() as client:
+        yield client</code></pre>
+</details>
+<div class="desc"><p>Create a Flask test client with a populated config.</p></div>
+</dd>
+</dl>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="connpy.tests.test_api.TestAskAI"><code class="flex name class">
+<span>class <span class="ident">TestAskAI</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestAskAI:
+    @patch(&#34;connpy.api.myai&#34;)
+    def test_ask_ai(self, mock_ai_cls, api_client):
+        mock_instance = MagicMock()
+        mock_instance.ask.return_value = {&#34;response&#34;: &#34;AI says hello&#34;}
+        mock_ai_cls.return_value = mock_instance
+
+        response = api_client.post(&#34;/ask_ai&#34;, json={
+            &#34;input&#34;: &#34;list my routers&#34;
+        })
+        data = response.get_json()
+        assert data is not None
+
+    @patch(&#34;connpy.api.myai&#34;)
+    def test_ask_ai_with_dryrun(self, mock_ai_cls, api_client):
+        mock_instance = MagicMock()
+        mock_instance.ask.return_value = {&#34;response&#34;: &#34;dry run&#34;}
+        mock_ai_cls.return_value = mock_instance
+
+        response = api_client.post(&#34;/ask_ai&#34;, json={
+            &#34;input&#34;: &#34;test&#34;,
+            &#34;dryrun&#34;: True
+        })
+        assert response.status_code == 200
+
+    @patch(&#34;connpy.api.myai&#34;)
+    def test_ask_ai_with_history(self, mock_ai_cls, api_client):
+        mock_instance = MagicMock()
+        mock_instance.ask.return_value = {&#34;response&#34;: &#34;with history&#34;}
+        mock_ai_cls.return_value = mock_instance
+
+        response = api_client.post(&#34;/ask_ai&#34;, json={
+            &#34;input&#34;: &#34;follow up&#34;,
+            &#34;chat_history&#34;: [
+                {&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;previous&#34;},
+                {&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: &#34;answer&#34;}
+            ]
+        })
+        assert response.status_code == 200</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_api.TestAskAI.test_ask_ai"><code class="name flex">
+<span>def <span class="ident">test_ask_ai</span></span>(<span>self, mock_ai_cls, api_client)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.api.myai&#34;)
+def test_ask_ai(self, mock_ai_cls, api_client):
+    mock_instance = MagicMock()
+    mock_instance.ask.return_value = {&#34;response&#34;: &#34;AI says hello&#34;}
+    mock_ai_cls.return_value = mock_instance
+
+    response = api_client.post(&#34;/ask_ai&#34;, json={
+        &#34;input&#34;: &#34;list my routers&#34;
+    })
+    data = response.get_json()
+    assert data is not None</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_api.TestAskAI.test_ask_ai_with_dryrun"><code class="name flex">
+<span>def <span class="ident">test_ask_ai_with_dryrun</span></span>(<span>self, mock_ai_cls, api_client)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.api.myai&#34;)
+def test_ask_ai_with_dryrun(self, mock_ai_cls, api_client):
+    mock_instance = MagicMock()
+    mock_instance.ask.return_value = {&#34;response&#34;: &#34;dry run&#34;}
+    mock_ai_cls.return_value = mock_instance
+
+    response = api_client.post(&#34;/ask_ai&#34;, json={
+        &#34;input&#34;: &#34;test&#34;,
+        &#34;dryrun&#34;: True
+    })
+    assert response.status_code == 200</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_api.TestAskAI.test_ask_ai_with_history"><code class="name flex">
+<span>def <span class="ident">test_ask_ai_with_history</span></span>(<span>self, mock_ai_cls, api_client)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.api.myai&#34;)
+def test_ask_ai_with_history(self, mock_ai_cls, api_client):
+    mock_instance = MagicMock()
+    mock_instance.ask.return_value = {&#34;response&#34;: &#34;with history&#34;}
+    mock_ai_cls.return_value = mock_instance
+
+    response = api_client.post(&#34;/ask_ai&#34;, json={
+        &#34;input&#34;: &#34;follow up&#34;,
+        &#34;chat_history&#34;: [
+            {&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;previous&#34;},
+            {&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: &#34;answer&#34;}
+        ]
+    })
+    assert response.status_code == 200</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.tests.test_api.TestConfirm"><code class="flex name class">
+<span>class <span class="ident">TestConfirm</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestConfirm:
+    @patch(&#34;connpy.api.myai&#34;)
+    def test_confirm(self, mock_ai_cls, api_client):
+        mock_instance = MagicMock()
+        mock_instance.confirm.return_value = True
+        mock_ai_cls.return_value = mock_instance
+
+        response = api_client.post(&#34;/confirm&#34;, json={
+            &#34;input&#34;: &#34;yes&#34;
+        })
+        assert response.status_code == 200</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_api.TestConfirm.test_confirm"><code class="name flex">
+<span>def <span class="ident">test_confirm</span></span>(<span>self, mock_ai_cls, api_client)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.api.myai&#34;)
+def test_confirm(self, mock_ai_cls, api_client):
+    mock_instance = MagicMock()
+    mock_instance.confirm.return_value = True
+    mock_ai_cls.return_value = mock_instance
+
+    response = api_client.post(&#34;/confirm&#34;, json={
+        &#34;input&#34;: &#34;yes&#34;
+    })
+    assert response.status_code == 200</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.tests.test_api.TestGetNodes"><code class="flex name class">
+<span>class <span class="ident">TestGetNodes</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestGetNodes:
+    def test_get_nodes_no_filter(self, api_client):
+        response = api_client.post(&#34;/get_nodes&#34;, json={})
+        data = response.get_json()
+        assert response.status_code == 200
+        assert isinstance(data, dict)
+        assert &#34;router1&#34; in data
+
+    def test_get_nodes_with_filter(self, api_client):
+        response = api_client.post(&#34;/get_nodes&#34;, json={&#34;filter&#34;: &#34;router.*&#34;})
+        data = response.get_json()
+        assert &#34;router1&#34; in data
+        assert &#34;host&#34; in data[&#34;router1&#34;]
+
+    def test_get_nodes_has_attributes(self, api_client):
+        response = api_client.post(&#34;/get_nodes&#34;, json={&#34;filter&#34;: &#34;router1&#34;})
+        data = response.get_json()
+        if &#34;router1&#34; in data:
+            assert &#34;host&#34; in data[&#34;router1&#34;]
+            assert &#34;protocol&#34; in data[&#34;router1&#34;]</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_api.TestGetNodes.test_get_nodes_has_attributes"><code class="name flex">
+<span>def <span class="ident">test_get_nodes_has_attributes</span></span>(<span>self, api_client)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_get_nodes_has_attributes(self, api_client):
+    response = api_client.post(&#34;/get_nodes&#34;, json={&#34;filter&#34;: &#34;router1&#34;})
+    data = response.get_json()
+    if &#34;router1&#34; in data:
+        assert &#34;host&#34; in data[&#34;router1&#34;]
+        assert &#34;protocol&#34; in data[&#34;router1&#34;]</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_api.TestGetNodes.test_get_nodes_no_filter"><code class="name flex">
+<span>def <span class="ident">test_get_nodes_no_filter</span></span>(<span>self, api_client)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_get_nodes_no_filter(self, api_client):
+    response = api_client.post(&#34;/get_nodes&#34;, json={})
+    data = response.get_json()
+    assert response.status_code == 200
+    assert isinstance(data, dict)
+    assert &#34;router1&#34; in data</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_api.TestGetNodes.test_get_nodes_with_filter"><code class="name flex">
+<span>def <span class="ident">test_get_nodes_with_filter</span></span>(<span>self, api_client)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_get_nodes_with_filter(self, api_client):
+    response = api_client.post(&#34;/get_nodes&#34;, json={&#34;filter&#34;: &#34;router.*&#34;})
+    data = response.get_json()
+    assert &#34;router1&#34; in data
+    assert &#34;host&#34; in data[&#34;router1&#34;]</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.tests.test_api.TestListNodes"><code class="flex name class">
+<span>class <span class="ident">TestListNodes</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestListNodes:
+    def test_list_nodes_no_filter(self, api_client):
+        response = api_client.post(&#34;/list_nodes&#34;, json={})
+        data = response.get_json()
+        assert response.status_code == 200
+        assert isinstance(data, list)
+        assert &#34;router1&#34; in data
+
+    def test_list_nodes_with_filter(self, api_client):
+        response = api_client.post(&#34;/list_nodes&#34;, json={&#34;filter&#34;: &#34;router.*&#34;})
+        data = response.get_json()
+        assert &#34;router1&#34; in data
+        assert all(&#34;router&#34; in n or &#34;Router&#34; in n for n in data)
+
+    def test_list_nodes_case_insensitive(self, api_client):
+        &#34;&#34;&#34;Filter is lowercased when case=false.&#34;&#34;&#34;
+        response = api_client.post(&#34;/list_nodes&#34;, json={&#34;filter&#34;: &#34;ROUTER.*&#34;})
+        data = response.get_json()
+        # Should still match since the filter gets lowercased
+        assert isinstance(data, list)
+
+    def test_list_nodes_no_body(self, api_client):
+        &#34;&#34;&#34;No body returns all nodes.&#34;&#34;&#34;
+        response = api_client.post(&#34;/list_nodes&#34;,
+                                   data=&#34;&#34;,
+                                   content_type=&#34;application/json&#34;)
+        data = response.get_json()
+        assert isinstance(data, list)</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_api.TestListNodes.test_list_nodes_case_insensitive"><code class="name flex">
+<span>def <span class="ident">test_list_nodes_case_insensitive</span></span>(<span>self, api_client)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_list_nodes_case_insensitive(self, api_client):
+    &#34;&#34;&#34;Filter is lowercased when case=false.&#34;&#34;&#34;
+    response = api_client.post(&#34;/list_nodes&#34;, json={&#34;filter&#34;: &#34;ROUTER.*&#34;})
+    data = response.get_json()
+    # Should still match since the filter gets lowercased
+    assert isinstance(data, list)</code></pre>
+</details>
+<div class="desc"><p>Filter is lowercased when case=false.</p></div>
+</dd>
+<dt id="connpy.tests.test_api.TestListNodes.test_list_nodes_no_body"><code class="name flex">
+<span>def <span class="ident">test_list_nodes_no_body</span></span>(<span>self, api_client)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_list_nodes_no_body(self, api_client):
+    &#34;&#34;&#34;No body returns all nodes.&#34;&#34;&#34;
+    response = api_client.post(&#34;/list_nodes&#34;,
+                               data=&#34;&#34;,
+                               content_type=&#34;application/json&#34;)
+    data = response.get_json()
+    assert isinstance(data, list)</code></pre>
+</details>
+<div class="desc"><p>No body returns all nodes.</p></div>
+</dd>
+<dt id="connpy.tests.test_api.TestListNodes.test_list_nodes_no_filter"><code class="name flex">
+<span>def <span class="ident">test_list_nodes_no_filter</span></span>(<span>self, api_client)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_list_nodes_no_filter(self, api_client):
+    response = api_client.post(&#34;/list_nodes&#34;, json={})
+    data = response.get_json()
+    assert response.status_code == 200
+    assert isinstance(data, list)
+    assert &#34;router1&#34; in data</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_api.TestListNodes.test_list_nodes_with_filter"><code class="name flex">
+<span>def <span class="ident">test_list_nodes_with_filter</span></span>(<span>self, api_client)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_list_nodes_with_filter(self, api_client):
+    response = api_client.post(&#34;/list_nodes&#34;, json={&#34;filter&#34;: &#34;router.*&#34;})
+    data = response.get_json()
+    assert &#34;router1&#34; in data
+    assert all(&#34;router&#34; in n or &#34;Router&#34; in n for n in data)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.tests.test_api.TestRootEndpoint"><code class="flex name class">
+<span>class <span class="ident">TestRootEndpoint</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestRootEndpoint:
+    def test_root_returns_welcome(self, api_client):
+        response = api_client.get(&#34;/&#34;)
+        data = response.get_json()
+        assert response.status_code == 200
+        assert &#34;Welcome&#34; in data[&#34;message&#34;]
+        assert &#34;version&#34; in data</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_api.TestRootEndpoint.test_root_returns_welcome"><code class="name flex">
+<span>def <span class="ident">test_root_returns_welcome</span></span>(<span>self, api_client)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_root_returns_welcome(self, api_client):
+    response = api_client.get(&#34;/&#34;)
+    data = response.get_json()
+    assert response.status_code == 200
+    assert &#34;Welcome&#34; in data[&#34;message&#34;]
+    assert &#34;version&#34; in data</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.tests.test_api.TestRunCommands"><code class="flex name class">
+<span>class <span class="ident">TestRunCommands</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestRunCommands:
+    def test_missing_action(self, api_client):
+        response = api_client.post(&#34;/run_commands&#34;, json={
+            &#34;nodes&#34;: &#34;router1&#34;,
+            &#34;commands&#34;: [&#34;show version&#34;]
+        })
+        data = response.get_json()
+        assert &#34;DataError&#34; in data
+        assert &#34;action&#34; in data[&#34;DataError&#34;]
+
+    def test_missing_nodes(self, api_client):
+        response = api_client.post(&#34;/run_commands&#34;, json={
+            &#34;action&#34;: &#34;run&#34;,
+            &#34;commands&#34;: [&#34;show version&#34;]
+        })
+        data = response.get_json()
+        assert &#34;DataError&#34; in data
+        assert &#34;nodes&#34; in data[&#34;DataError&#34;]
+
+    def test_missing_commands(self, api_client):
+        response = api_client.post(&#34;/run_commands&#34;, json={
+            &#34;action&#34;: &#34;run&#34;,
+            &#34;nodes&#34;: &#34;router1&#34;
+        })
+        data = response.get_json()
+        assert &#34;DataError&#34; in data
+        assert &#34;commands&#34; in data[&#34;DataError&#34;]
+
+    def test_wrong_action(self, api_client):
+        response = api_client.post(&#34;/run_commands&#34;, json={
+            &#34;action&#34;: &#34;invalid&#34;,
+            &#34;nodes&#34;: &#34;router1&#34;,
+            &#34;commands&#34;: [&#34;show version&#34;]
+        })
+        data = response.get_json()
+        assert &#34;DataError&#34; in data
+        assert &#34;Wrong action&#34; in data[&#34;DataError&#34;]
+
+    @patch(&#34;connpy.api.nodes&#34;)
+    def test_run_action(self, mock_nodes_cls, api_client):
+        &#34;&#34;&#34;action=run executes and returns output.&#34;&#34;&#34;
+        mock_instance = MagicMock()
+        mock_instance.run.return_value = {&#34;router1&#34;: &#34;Router v1.0&#34;}
+        mock_nodes_cls.return_value = mock_instance
+
+        response = api_client.post(&#34;/run_commands&#34;, json={
+            &#34;action&#34;: &#34;run&#34;,
+            &#34;nodes&#34;: &#34;router1&#34;,
+            &#34;commands&#34;: [&#34;show version&#34;]
+        })
+        data = response.get_json()
+        assert &#34;router1&#34; in data
+
+    @patch(&#34;connpy.api.nodes&#34;)
+    def test_test_action(self, mock_nodes_cls, api_client):
+        &#34;&#34;&#34;action=test returns result + output.&#34;&#34;&#34;
+        mock_instance = MagicMock()
+        mock_instance.test.return_value = {&#34;router1&#34;: {&#34;expected&#34;: True}}
+        mock_instance.output = {&#34;router1&#34;: &#34;output text&#34;}
+        mock_nodes_cls.return_value = mock_instance
+
+        response = api_client.post(&#34;/run_commands&#34;, json={
+            &#34;action&#34;: &#34;test&#34;,
+            &#34;nodes&#34;: &#34;router1&#34;,
+            &#34;commands&#34;: [&#34;show version&#34;],
+            &#34;expected&#34;: &#34;Router&#34;
+        })
+        data = response.get_json()
+        assert &#34;result&#34; in data
+        assert &#34;output&#34; in data
+
+    @patch(&#34;connpy.api.nodes&#34;)
+    def test_run_with_options(self, mock_nodes_cls, api_client):
+        &#34;&#34;&#34;Options get passed through.&#34;&#34;&#34;
+        mock_instance = MagicMock()
+        mock_instance.run.return_value = {&#34;router1&#34;: &#34;ok&#34;}
+        mock_nodes_cls.return_value = mock_instance
+
+        response = api_client.post(&#34;/run_commands&#34;, json={
+            &#34;action&#34;: &#34;run&#34;,
+            &#34;nodes&#34;: &#34;router1&#34;,
+            &#34;commands&#34;: [&#34;show version&#34;],
+            &#34;options&#34;: {&#34;timeout&#34;: 30, &#34;parallel&#34;: 5}
+        })
+        assert response.status_code == 200
+
+    @patch(&#34;connpy.api.nodes&#34;)
+    def test_run_folder_nodes(self, mock_nodes_cls, api_client):
+        &#34;&#34;&#34;Nodes with @ prefix are resolved as folders.&#34;&#34;&#34;
+        mock_instance = MagicMock()
+        mock_instance.run.return_value = {&#34;server1@office&#34;: &#34;ok&#34;}
+        mock_nodes_cls.return_value = mock_instance
+
+        response = api_client.post(&#34;/run_commands&#34;, json={
+            &#34;action&#34;: &#34;run&#34;,
+            &#34;nodes&#34;: &#34;@office&#34;,
+            &#34;commands&#34;: [&#34;ls -la&#34;]
+        })
+        assert response.status_code == 200
+
+    @patch(&#34;connpy.api.nodes&#34;)
+    def test_run_list_nodes(self, mock_nodes_cls, api_client):
+        &#34;&#34;&#34;List of nodes is resolved correctly.&#34;&#34;&#34;
+        mock_instance = MagicMock()
+        mock_instance.run.return_value = {&#34;router1&#34;: &#34;ok&#34;, &#34;server1@office&#34;: &#34;ok&#34;}
+        mock_nodes_cls.return_value = mock_instance
+
+        response = api_client.post(&#34;/run_commands&#34;, json={
+            &#34;action&#34;: &#34;run&#34;,
+            &#34;nodes&#34;: [&#34;router1&#34;, &#34;server1@office&#34;],
+            &#34;commands&#34;: [&#34;show version&#34;]
+        })
+        assert response.status_code == 200</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_api.TestRunCommands.test_missing_action"><code class="name flex">
+<span>def <span class="ident">test_missing_action</span></span>(<span>self, api_client)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_missing_action(self, api_client):
+    response = api_client.post(&#34;/run_commands&#34;, json={
+        &#34;nodes&#34;: &#34;router1&#34;,
+        &#34;commands&#34;: [&#34;show version&#34;]
+    })
+    data = response.get_json()
+    assert &#34;DataError&#34; in data
+    assert &#34;action&#34; in data[&#34;DataError&#34;]</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_api.TestRunCommands.test_missing_commands"><code class="name flex">
+<span>def <span class="ident">test_missing_commands</span></span>(<span>self, api_client)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_missing_commands(self, api_client):
+    response = api_client.post(&#34;/run_commands&#34;, json={
+        &#34;action&#34;: &#34;run&#34;,
+        &#34;nodes&#34;: &#34;router1&#34;
+    })
+    data = response.get_json()
+    assert &#34;DataError&#34; in data
+    assert &#34;commands&#34; in data[&#34;DataError&#34;]</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_api.TestRunCommands.test_missing_nodes"><code class="name flex">
+<span>def <span class="ident">test_missing_nodes</span></span>(<span>self, api_client)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_missing_nodes(self, api_client):
+    response = api_client.post(&#34;/run_commands&#34;, json={
+        &#34;action&#34;: &#34;run&#34;,
+        &#34;commands&#34;: [&#34;show version&#34;]
+    })
+    data = response.get_json()
+    assert &#34;DataError&#34; in data
+    assert &#34;nodes&#34; in data[&#34;DataError&#34;]</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_api.TestRunCommands.test_run_action"><code class="name flex">
+<span>def <span class="ident">test_run_action</span></span>(<span>self, mock_nodes_cls, api_client)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.api.nodes&#34;)
+def test_run_action(self, mock_nodes_cls, api_client):
+    &#34;&#34;&#34;action=run executes and returns output.&#34;&#34;&#34;
+    mock_instance = MagicMock()
+    mock_instance.run.return_value = {&#34;router1&#34;: &#34;Router v1.0&#34;}
+    mock_nodes_cls.return_value = mock_instance
+
+    response = api_client.post(&#34;/run_commands&#34;, json={
+        &#34;action&#34;: &#34;run&#34;,
+        &#34;nodes&#34;: &#34;router1&#34;,
+        &#34;commands&#34;: [&#34;show version&#34;]
+    })
+    data = response.get_json()
+    assert &#34;router1&#34; in data</code></pre>
+</details>
+<div class="desc"><p>action=run executes and returns output.</p></div>
+</dd>
+<dt id="connpy.tests.test_api.TestRunCommands.test_run_folder_nodes"><code class="name flex">
+<span>def <span class="ident">test_run_folder_nodes</span></span>(<span>self, mock_nodes_cls, api_client)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.api.nodes&#34;)
+def test_run_folder_nodes(self, mock_nodes_cls, api_client):
+    &#34;&#34;&#34;Nodes with @ prefix are resolved as folders.&#34;&#34;&#34;
+    mock_instance = MagicMock()
+    mock_instance.run.return_value = {&#34;server1@office&#34;: &#34;ok&#34;}
+    mock_nodes_cls.return_value = mock_instance
+
+    response = api_client.post(&#34;/run_commands&#34;, json={
+        &#34;action&#34;: &#34;run&#34;,
+        &#34;nodes&#34;: &#34;@office&#34;,
+        &#34;commands&#34;: [&#34;ls -la&#34;]
+    })
+    assert response.status_code == 200</code></pre>
+</details>
+<div class="desc"><p>Nodes with @ prefix are resolved as folders.</p></div>
+</dd>
+<dt id="connpy.tests.test_api.TestRunCommands.test_run_list_nodes"><code class="name flex">
+<span>def <span class="ident">test_run_list_nodes</span></span>(<span>self, mock_nodes_cls, api_client)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.api.nodes&#34;)
+def test_run_list_nodes(self, mock_nodes_cls, api_client):
+    &#34;&#34;&#34;List of nodes is resolved correctly.&#34;&#34;&#34;
+    mock_instance = MagicMock()
+    mock_instance.run.return_value = {&#34;router1&#34;: &#34;ok&#34;, &#34;server1@office&#34;: &#34;ok&#34;}
+    mock_nodes_cls.return_value = mock_instance
+
+    response = api_client.post(&#34;/run_commands&#34;, json={
+        &#34;action&#34;: &#34;run&#34;,
+        &#34;nodes&#34;: [&#34;router1&#34;, &#34;server1@office&#34;],
+        &#34;commands&#34;: [&#34;show version&#34;]
+    })
+    assert response.status_code == 200</code></pre>
+</details>
+<div class="desc"><p>List of nodes is resolved correctly.</p></div>
+</dd>
+<dt id="connpy.tests.test_api.TestRunCommands.test_run_with_options"><code class="name flex">
+<span>def <span class="ident">test_run_with_options</span></span>(<span>self, mock_nodes_cls, api_client)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.api.nodes&#34;)
+def test_run_with_options(self, mock_nodes_cls, api_client):
+    &#34;&#34;&#34;Options get passed through.&#34;&#34;&#34;
+    mock_instance = MagicMock()
+    mock_instance.run.return_value = {&#34;router1&#34;: &#34;ok&#34;}
+    mock_nodes_cls.return_value = mock_instance
+
+    response = api_client.post(&#34;/run_commands&#34;, json={
+        &#34;action&#34;: &#34;run&#34;,
+        &#34;nodes&#34;: &#34;router1&#34;,
+        &#34;commands&#34;: [&#34;show version&#34;],
+        &#34;options&#34;: {&#34;timeout&#34;: 30, &#34;parallel&#34;: 5}
+    })
+    assert response.status_code == 200</code></pre>
+</details>
+<div class="desc"><p>Options get passed through.</p></div>
+</dd>
+<dt id="connpy.tests.test_api.TestRunCommands.test_test_action"><code class="name flex">
+<span>def <span class="ident">test_test_action</span></span>(<span>self, mock_nodes_cls, api_client)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.api.nodes&#34;)
+def test_test_action(self, mock_nodes_cls, api_client):
+    &#34;&#34;&#34;action=test returns result + output.&#34;&#34;&#34;
+    mock_instance = MagicMock()
+    mock_instance.test.return_value = {&#34;router1&#34;: {&#34;expected&#34;: True}}
+    mock_instance.output = {&#34;router1&#34;: &#34;output text&#34;}
+    mock_nodes_cls.return_value = mock_instance
+
+    response = api_client.post(&#34;/run_commands&#34;, json={
+        &#34;action&#34;: &#34;test&#34;,
+        &#34;nodes&#34;: &#34;router1&#34;,
+        &#34;commands&#34;: [&#34;show version&#34;],
+        &#34;expected&#34;: &#34;Router&#34;
+    })
+    data = response.get_json()
+    assert &#34;result&#34; in data
+    assert &#34;output&#34; in data</code></pre>
+</details>
+<div class="desc"><p>action=test returns result + output.</p></div>
+</dd>
+<dt id="connpy.tests.test_api.TestRunCommands.test_wrong_action"><code class="name flex">
+<span>def <span class="ident">test_wrong_action</span></span>(<span>self, api_client)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_wrong_action(self, api_client):
+    response = api_client.post(&#34;/run_commands&#34;, json={
+        &#34;action&#34;: &#34;invalid&#34;,
+        &#34;nodes&#34;: &#34;router1&#34;,
+        &#34;commands&#34;: [&#34;show version&#34;]
+    })
+    data = response.get_json()
+    assert &#34;DataError&#34; in data
+    assert &#34;Wrong action&#34; in data[&#34;DataError&#34;]</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="connpy.tests" href="index.html">connpy.tests</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-functions">Functions</a></h3>
+<ul class="">
+<li><code><a title="connpy.tests.test_api.api_client" href="#connpy.tests.test_api.api_client">api_client</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="connpy.tests.test_api.TestAskAI" href="#connpy.tests.test_api.TestAskAI">TestAskAI</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_api.TestAskAI.test_ask_ai" href="#connpy.tests.test_api.TestAskAI.test_ask_ai">test_ask_ai</a></code></li>
+<li><code><a title="connpy.tests.test_api.TestAskAI.test_ask_ai_with_dryrun" href="#connpy.tests.test_api.TestAskAI.test_ask_ai_with_dryrun">test_ask_ai_with_dryrun</a></code></li>
+<li><code><a title="connpy.tests.test_api.TestAskAI.test_ask_ai_with_history" href="#connpy.tests.test_api.TestAskAI.test_ask_ai_with_history">test_ask_ai_with_history</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.tests.test_api.TestConfirm" href="#connpy.tests.test_api.TestConfirm">TestConfirm</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_api.TestConfirm.test_confirm" href="#connpy.tests.test_api.TestConfirm.test_confirm">test_confirm</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.tests.test_api.TestGetNodes" href="#connpy.tests.test_api.TestGetNodes">TestGetNodes</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_api.TestGetNodes.test_get_nodes_has_attributes" href="#connpy.tests.test_api.TestGetNodes.test_get_nodes_has_attributes">test_get_nodes_has_attributes</a></code></li>
+<li><code><a title="connpy.tests.test_api.TestGetNodes.test_get_nodes_no_filter" href="#connpy.tests.test_api.TestGetNodes.test_get_nodes_no_filter">test_get_nodes_no_filter</a></code></li>
+<li><code><a title="connpy.tests.test_api.TestGetNodes.test_get_nodes_with_filter" href="#connpy.tests.test_api.TestGetNodes.test_get_nodes_with_filter">test_get_nodes_with_filter</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.tests.test_api.TestListNodes" href="#connpy.tests.test_api.TestListNodes">TestListNodes</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_api.TestListNodes.test_list_nodes_case_insensitive" href="#connpy.tests.test_api.TestListNodes.test_list_nodes_case_insensitive">test_list_nodes_case_insensitive</a></code></li>
+<li><code><a title="connpy.tests.test_api.TestListNodes.test_list_nodes_no_body" href="#connpy.tests.test_api.TestListNodes.test_list_nodes_no_body">test_list_nodes_no_body</a></code></li>
+<li><code><a title="connpy.tests.test_api.TestListNodes.test_list_nodes_no_filter" href="#connpy.tests.test_api.TestListNodes.test_list_nodes_no_filter">test_list_nodes_no_filter</a></code></li>
+<li><code><a title="connpy.tests.test_api.TestListNodes.test_list_nodes_with_filter" href="#connpy.tests.test_api.TestListNodes.test_list_nodes_with_filter">test_list_nodes_with_filter</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.tests.test_api.TestRootEndpoint" href="#connpy.tests.test_api.TestRootEndpoint">TestRootEndpoint</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_api.TestRootEndpoint.test_root_returns_welcome" href="#connpy.tests.test_api.TestRootEndpoint.test_root_returns_welcome">test_root_returns_welcome</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.tests.test_api.TestRunCommands" href="#connpy.tests.test_api.TestRunCommands">TestRunCommands</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_api.TestRunCommands.test_missing_action" href="#connpy.tests.test_api.TestRunCommands.test_missing_action">test_missing_action</a></code></li>
+<li><code><a title="connpy.tests.test_api.TestRunCommands.test_missing_commands" href="#connpy.tests.test_api.TestRunCommands.test_missing_commands">test_missing_commands</a></code></li>
+<li><code><a title="connpy.tests.test_api.TestRunCommands.test_missing_nodes" href="#connpy.tests.test_api.TestRunCommands.test_missing_nodes">test_missing_nodes</a></code></li>
+<li><code><a title="connpy.tests.test_api.TestRunCommands.test_run_action" href="#connpy.tests.test_api.TestRunCommands.test_run_action">test_run_action</a></code></li>
+<li><code><a title="connpy.tests.test_api.TestRunCommands.test_run_folder_nodes" href="#connpy.tests.test_api.TestRunCommands.test_run_folder_nodes">test_run_folder_nodes</a></code></li>
+<li><code><a title="connpy.tests.test_api.TestRunCommands.test_run_list_nodes" href="#connpy.tests.test_api.TestRunCommands.test_run_list_nodes">test_run_list_nodes</a></code></li>
+<li><code><a title="connpy.tests.test_api.TestRunCommands.test_run_with_options" href="#connpy.tests.test_api.TestRunCommands.test_run_with_options">test_run_with_options</a></code></li>
+<li><code><a title="connpy.tests.test_api.TestRunCommands.test_test_action" href="#connpy.tests.test_api.TestRunCommands.test_test_action">test_test_action</a></code></li>
+<li><code><a title="connpy.tests.test_api.TestRunCommands.test_wrong_action" href="#connpy.tests.test_api.TestRunCommands.test_wrong_action">test_wrong_action</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+</footer>
+</body>
+</html>
