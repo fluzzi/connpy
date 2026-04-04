@@ -1523,40 +1523,43 @@ class connapp:
             commands_help = "Commands:\n"
             commands_help += "\n".join([f"  {cmd:<15} {help_text}" for cmd, help_text in help_dict.items() if help_text != None])
             return commands_help
+        import os
+        completion_script = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'completion.py')
+
         if type == "bashcompletion":
-            return '''
+            return f'''
 #Here starts bash completion for conn
 _conn()
-{
-        mapfile -t strings < <(connpy-completion-helper "bash" "${#COMP_WORDS[@]}" "${COMP_WORDS[@]}")
-        local IFS=$'\t\n'
+{{
+        mapfile -t strings < <(python3 "{completion_script}" "bash" "${{#COMP_WORDS[@]}}" "${{COMP_WORDS[@]}}")
+        local IFS=$'\\t\\n'
         local home_dir=$(eval echo ~)
-        local last_word=${COMP_WORDS[-1]/\\~/$home_dir}
-        COMPREPLY=($(compgen -W "$(printf '%s' "${strings[@]}")" -- "$last_word"))
-        if [ "$last_word" != "${COMP_WORDS[-1]}" ]; then
-            COMPREPLY=(${COMPREPLY[@]/$home_dir/\\~})
+        local last_word=${{COMP_WORDS[-1]/\\~/$home_dir}}
+        COMPREPLY=($(compgen -W "$(printf '%s' "${{strings[@]}}")" -- "$last_word"))
+        if [ "$last_word" != "${{COMP_WORDS[-1]}}" ]; then
+            COMPREPLY=(${{COMPREPLY[@]/$home_dir/\\~}})
         fi
-}
+}}
 
 complete -o nospace -o nosort -F _conn conn
 complete -o nospace -o nosort -F _conn connpy
 #Here ends bash completion for conn
         '''
         if type == "zshcompletion":
-            return '''
+            return f'''
 #Here starts zsh completion for conn
 autoload -U compinit && compinit
 _conn()
-{
+{{
     local home_dir=$(eval echo ~)
-    last_word=${words[-1]/\\~/$home_dir}
-    strings=($(connpy-completion-helper "zsh" ${#words} $words[1,-2] $last_word))
-    for string in "${strings[@]}"; do
+    last_word=${{words[-1]/\\~/$home_dir}}
+    strings=($(python3 "{completion_script}" "zsh" ${{#words}} $words[1,-2] $last_word))
+    for string in "${{strings[@]}}"; do
         #Replace the expanded home directory with ~
         if [ "$last_word" != "$words[-1]" ]; then
-            string=${string/$home_dir/\\~}
+            string=${{string/$home_dir/\\~}}
         fi
-        if [[ "${string}" =~ .*/$ ]]; then
+        if [[ "${{string}}" =~ .*/$ ]]; then
             # If the string ends with a '/', do not append a space
             compadd -Q -S '' -- "$string"
         else
@@ -1564,7 +1567,7 @@ _conn()
             compadd -Q -S ' ' -- "$string"
         fi
     done
-}
+}}
 compdef _conn conn
 compdef _conn connpy
 #Here ends zsh completion for conn

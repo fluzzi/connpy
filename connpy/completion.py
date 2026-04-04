@@ -1,35 +1,15 @@
 import sys
 import os
-import json
-import glob
-import importlib.util
 
-def _getallnodes(config):
-    #get all nodes on configfile
-    nodes = []
-    layer1 = [k for k,v in config["connections"].items() if isinstance(v, dict) and v["type"] == "connection"]
-    folders = [k for k,v in config["connections"].items() if isinstance(v, dict) and v["type"] == "folder"]
-    nodes.extend(layer1)
-    for f in folders:
-        layer2 = [k + "@" + f for k,v in config["connections"][f].items() if isinstance(v, dict) and v["type"] == "connection"]
-        nodes.extend(layer2)
-        subfolders = [k for k,v in config["connections"][f].items() if isinstance(v, dict) and v["type"] == "subfolder"]
-        for s in subfolders:
-            layer3 = [k + "@" + s + "@" + f for k,v in config["connections"][f][s].items() if isinstance(v, dict) and v["type"] == "connection"]
-            nodes.extend(layer3)
-    return nodes
-
-def _getallfolders(config):
-    #get all folders on configfile
-    folders = ["@" + k for k,v in config["connections"].items() if isinstance(v, dict) and v["type"] == "folder"]
-    subfolders = []
-    for f in folders:
-        s = ["@" + k + f for k,v in config["connections"][f[1:]].items() if isinstance(v, dict) and v["type"] == "subfolder"]
-        subfolders.extend(s)
-    folders.extend(subfolders)
-    return folders
+def load_txt_cache(filepath):
+    try:
+        with open(filepath, "r") as f:
+            return f.read().splitlines()
+    except FileNotFoundError:
+        return []
 
 def _getcwd(words, option, folderonly=False):
+    import glob
     # Expand tilde to home directory if present
     if words[-1].startswith("~"):
         words[-1] = os.path.expanduser(words[-1])
@@ -98,26 +78,14 @@ def main():
     except (FileNotFoundError, IOError):
         configdir = defaultdir
     cachefile = configdir + '/.config.cache.json'
-    try:
-        with open(cachefile, "r") as jsonconf:
-            config = json.load(jsonconf)
-    except FileNotFoundError:
-        try:
-            import yaml
-            with open(configdir + '/config.yaml', "r") as yamlconf:
-                config = yaml.safe_load(yamlconf)
-        except Exception:
-            try:
-                with open(configdir + '/config.json', "r") as jsonconf:
-                    config = json.load(jsonconf)
-            except Exception:
-                exit()
-    nodes = _getallnodes(config)
-    folders = _getallfolders(config)
-    profiles = list(config["profiles"].keys())
+    
+    nodes = load_txt_cache(configdir + '/.fzf_nodes_cache.txt')
+    folders = load_txt_cache(configdir + '/.folders_cache.txt')
+    profiles = load_txt_cache(configdir + '/.profiles_cache.txt')
     plugins = _get_plugins("all", defaultdir)
+    
     info = {}
-    info["config"] = config
+    info["config"] = None
     info["nodes"] = nodes
     info["folders"] = folders
     info["profiles"] = profiles
@@ -137,6 +105,19 @@ def main():
         strings.extend(folders)
 
     elif wordsnumber >=3 and words[0] in plugins.keys():
+        import json
+        import importlib.util
+        try:
+            with open(cachefile, "r") as jsonconf:
+                info["config"] = json.load(jsonconf)
+        except Exception:
+            try:
+                import yaml
+                with open(configdir + '/config.yaml', "r") as yamlconf:
+                    info["config"] = yaml.safe_load(yamlconf)
+            except Exception:
+                info["config"] = {}
+                
         try:
             spec = importlib.util.spec_from_file_location("module.name", plugins[words[0]])
             module = importlib.util.module_from_spec(spec)

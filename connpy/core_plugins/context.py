@@ -9,9 +9,21 @@ class context_manager:
     def __init__(self, connapp):
         self.connapp = connapp
         self.config = connapp.config
-        self.contexts = self.config.config["contexts"]
-        self.current_context = self.config.config["current_context"]
-        self.regex = [re.compile(regex) for regex in self.contexts[self.current_context]]
+
+    @property
+    def contexts(self):
+        return self.config.config.get("contexts", {})
+
+    @property
+    def current_context(self):
+        return self.config.config.get("current_context", "all")
+
+    @property
+    def regex(self):
+        try:
+            return [re.compile(regex) for regex in self.contexts[self.current_context]]
+        except KeyError:
+            return [re.compile(".*")]
 
     def add_context(self, context, regex):
         if not context.isalnum():
@@ -21,8 +33,9 @@ class context_manager:
             printer.error(f"Context {context} already exists.")
             exit(2)
         else:
-            self.contexts[context] = regex
-            self.connapp._change_settings("contexts", self.contexts)
+            contexts = self.contexts
+            contexts[context] = regex
+            self.connapp._change_settings("contexts", contexts)
 
     def modify_context(self, context, regex):
         if context == "all":
@@ -32,8 +45,9 @@ class context_manager:
             printer.error(f"Context {context} doesn't exist.")
             exit(4)
         else:
-            self.contexts[context] = regex
-            self.connapp._change_settings("contexts", self.contexts)
+            contexts = self.contexts
+            contexts[context] = regex
+            self.connapp._change_settings("contexts", contexts)
 
     def delete_context(self, context):
         if context == "all":
@@ -46,8 +60,9 @@ class context_manager:
             printer.error(f"Can't delete current context: {self.current_context}")
             exit(5)
         else:
-            self.contexts.pop(context)
-            self.connapp._change_settings("contexts", self.contexts)
+            contexts = self.contexts
+            contexts.pop(context)
+            self.connapp._change_settings("contexts", contexts)
 
     def list_contexts(self):
         for key in self.contexts.keys():

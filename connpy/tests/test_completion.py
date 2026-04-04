@@ -2,86 +2,26 @@
 import os
 import json
 import pytest
-from connpy.completion import _getallnodes, _getallfolders, _getcwd, _get_plugins
+from connpy.completion import load_txt_cache, _getcwd, _get_plugins
 
 
 # =========================================================================
-# _getallnodes tests
+# load_txt_cache tests
 # =========================================================================
 
-class TestGetAllNodes:
-    def test_flat_nodes(self):
-        """Nodes without folders."""
-        config = {
-            "connections": {
-                "router1": {"type": "connection"},
-                "router2": {"type": "connection"}
-            }
-        }
-        nodes = _getallnodes(config)
-        assert "router1" in nodes
-        assert "router2" in nodes
+class TestLoadTxtCache:
+    def test_load_existing_cache(self, tmp_path):
+        """Loads lines from a file correctly."""
+        cache_file = tmp_path / "cache.txt"
+        cache_file.write_text("node1\nnode2\nnode3@folder")
+        
+        result = load_txt_cache(str(cache_file))
+        assert result == ["node1", "node2", "node3@folder"]
 
-    def test_nested_nodes(self):
-        """Nodes in folders and subfolders have correct format."""
-        config = {
-            "connections": {
-                "router1": {"type": "connection"},
-                "office": {
-                    "type": "folder",
-                    "server1": {"type": "connection"},
-                    "datacenter": {
-                        "type": "subfolder",
-                        "db1": {"type": "connection"}
-                    }
-                }
-            }
-        }
-        nodes = _getallnodes(config)
-        assert "router1" in nodes
-        assert "server1@office" in nodes
-        assert "db1@datacenter@office" in nodes
-
-    def test_empty_connections(self):
-        config = {"connections": {}}
-        nodes = _getallnodes(config)
-        assert nodes == []
-
-
-# =========================================================================
-# _getallfolders tests
-# =========================================================================
-
-class TestGetAllFolders:
-    def test_basic_folders(self):
-        config = {
-            "connections": {
-                "office": {"type": "folder"},
-                "home": {"type": "folder"}
-            }
-        }
-        folders = _getallfolders(config)
-        assert "@office" in folders
-        assert "@home" in folders
-
-    def test_with_subfolders(self):
-        config = {
-            "connections": {
-                "office": {
-                    "type": "folder",
-                    "datacenter": {"type": "subfolder"},
-                    "server1": {"type": "connection"}
-                }
-            }
-        }
-        folders = _getallfolders(config)
-        assert "@office" in folders
-        assert "@datacenter@office" in folders
-
-    def test_empty(self):
-        config = {"connections": {}}
-        folders = _getallfolders(config)
-        assert folders == []
+    def test_load_nonexistent_cache(self, tmp_path):
+        """Returns empty list if file is missing."""
+        result = load_txt_cache(str(tmp_path / "missing.txt"))
+        assert result == []
 
 
 # =========================================================================

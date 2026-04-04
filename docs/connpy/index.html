@@ -2262,6 +2262,8 @@ class configfile:
         defaultfile = configdir + &#39;/config.yaml&#39;
         self.cachefile = configdir + &#39;/.config.cache.json&#39;
         self.fzf_cachefile = configdir + &#39;/.fzf_nodes_cache.txt&#39;
+        self.folders_cachefile = configdir + &#39;/.folders_cache.txt&#39;
+        self.profiles_cachefile = configdir + &#39;/.profiles_cache.txt&#39;
         defaultkey = configdir + &#39;/.osk&#39;
         if conf == None:
             self.file = defaultfile
@@ -2306,6 +2308,10 @@ class configfile:
             self.privatekey = RSA.import_key(f.read())
             f.close()
         self.publickey = self.privatekey.publickey()
+
+        # Self-heal text caches if they are missing
+        if not os.path.exists(self.fzf_cachefile) or not os.path.exists(self.folders_cachefile) or not os.path.exists(self.profiles_cachefile):
+            self._generate_nodes_cache()
 
 
     def _loadconfig(self, conf):
@@ -2364,8 +2370,15 @@ class configfile:
     def _generate_nodes_cache(self):
         try:
             nodes = self._getallnodes()
+            folders = self._getallfolders()
+            profiles = list(self.profiles.keys())
+            
             with open(self.fzf_cachefile, &#34;w&#34;) as f:
                 f.write(&#34;\n&#34;.join(nodes))
+            with open(self.folders_cachefile, &#34;w&#34;) as f:
+                f.write(&#34;\n&#34;.join(folders))
+            with open(self.profiles_cachefile, &#34;w&#34;) as f:
+                f.write(&#34;\n&#34;.join(profiles))
         except Exception:
             pass
 
