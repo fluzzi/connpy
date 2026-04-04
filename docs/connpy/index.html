@@ -2240,7 +2240,7 @@ class configfile:
         ### Optional Parameters:  
 
             - conf (str): Path/file to config file. If left empty default
-                          path is ~/.config/conn/config.json
+                          path is ~/.config/conn/config.yaml
 
             - key  (str): Path/file to RSA key file. If left empty default
                           path is ~/.config/conn/.osk
@@ -2279,13 +2279,29 @@ class configfile:
                 try:
                     with open(legacy_file, &#39;r&#39;) as f:
                         old_data = json.load(f)
-                    with open(self.file, &#39;w&#39;) as f:
-                        yaml.dump(old_data, f, default_flow_style=False, sort_keys=False)
-                    with open(self.cachefile, &#39;w&#39;) as f:
-                        json.dump(old_data, f)
-                    shutil.move(legacy_file, legacy_file + &#34;.backup&#34;)
-                    printer.success(f&#34;Migrated legacy config ({len(old_data.get(&#39;connections&#39;,{}))} folders/nodes) into YAML and Cache successfully!&#34;)
+                    if not self._validate_config(old_data):
+                        printer.warning(f&#34;Legacy config {legacy_file} has invalid structure, skipping migration.&#34;)
+                    else:
+                        with open(self.file, &#39;w&#39;) as f:
+                            yaml.dump(old_data, f, default_flow_style=False, sort_keys=False)
+                        # Verify the written YAML can be read back correctly
+                        with open(self.file, &#39;r&#39;) as f:
+                            verify = yaml.safe_load(f)
+                        if not self._validate_config(verify):
+                            os.remove(self.file)
+                            printer.warning(&#34;YAML verification failed after migration, keeping legacy config.&#34;)
+                        else:
+                            with open(self.cachefile, &#39;w&#39;) as f:
+                                json.dump(old_data, f)
+                            shutil.move(legacy_file, legacy_file + &#34;.backup&#34;)
+                            printer.success(f&#34;Migrated legacy config ({len(old_data.get(&#39;connections&#39;,{}))} folders/nodes) into YAML and Cache successfully!&#34;)
                 except Exception as e:
+                    # Clean up partial YAML if it was created
+                    if os.path.exists(self.file):
+                        try:
+                            os.remove(self.file)
+                        except OSError:
+                            pass
                     printer.warning(f&#34;Failed to migrate legacy config: {e}&#34;)
         else:
             self.file = conf
@@ -2314,6 +2330,13 @@ class configfile:
             self._generate_nodes_cache()
 
 
+    def _validate_config(self, data):
+        &#34;&#34;&#34;Verify config data has the required structure.&#34;&#34;&#34;
+        if not isinstance(data, dict):
+            return False
+        required = {&#34;config&#34;, &#34;connections&#34;, &#34;profiles&#34;}
+        return required.issubset(data.keys())
+
     def _loadconfig(self, conf):
         #Loads config file using dual cache
         cache_exists = os.path.exists(self.cachefile)
@@ -2323,6 +2346,20 @@ class configfile:
         if not cache_exists or yaml_time &gt; cache_time:
             with open(conf, &#39;r&#39;) as f:
                 data = yaml.safe_load(f)
+            if not self._validate_config(data):
+                # YAML is broken, try to recover from cache
+                if cache_exists:
+                    printer.warning(&#34;Config file appears corrupt, recovering from cache...&#34;)
+                    with open(self.cachefile, &#39;r&#39;) as f:
+                        data = json.load(f)
+                    if self._validate_config(data):
+                        # Re-write the YAML from good cache
+                        with open(conf, &#39;w&#39;) as f:
+                            yaml.dump(data, f, default_flow_style=False, sort_keys=False)
+                        return data
+                # Both broken or no cache - create fresh
+                printer.error(&#34;Config file is corrupt and no valid cache exists. Creating default config.&#34;)
+                return self._createconfig(conf)
             try:
                 with open(self.cachefile, &#39;w&#39;) as f:
                     json.dump(data, f)
@@ -2331,39 +2368,55 @@ class configfile:
             return data
         else:
             with open(self.cachefile, &#39;r&#39;) as f:
-                return json.load(f)
+                data = json.load(f)
+            if not self._validate_config(data):
+                # Cache broken, try yaml
+                with open(conf, &#39;r&#39;) as f:
+                    data = yaml.safe_load(f)
+                if self._validate_config(data):
+                    return data
+                # Both broken
+                printer.error(&#34;Both config and cache are corrupt. Creating default config.&#34;)
+                return self._createconfig(conf)
+            return data
 
     def _createconfig(self, conf):
-        #Create config file
+        #Create config file (always writes defaults, safe for recovery)
         defaultconfig = {&#39;config&#39;: {&#39;case&#39;: False, &#39;idletime&#39;: 30, &#39;fzf&#39;: False}, &#39;connections&#39;: {}, &#39;profiles&#39;: { &#34;default&#34;: { &#34;host&#34;:&#34;&#34;, &#34;protocol&#34;:&#34;ssh&#34;, &#34;port&#34;:&#34;&#34;, &#34;user&#34;:&#34;&#34;, &#34;password&#34;:&#34;&#34;, &#34;options&#34;:&#34;&#34;, &#34;logs&#34;:&#34;&#34;, &#34;tags&#34;: &#34;&#34;, &#34;jumphost&#34;:&#34;&#34;}}}
-        if not os.path.exists(conf):
-            with open(conf, &#34;w&#34;) as f:
-                yaml.dump(defaultconfig, f, default_flow_style=False, sort_keys=False)
-                os.chmod(conf, 0o600)
-            try:
-                with open(self.cachefile, &#39;w&#39;) as f:
-                    json.dump(defaultconfig, f)
-            except Exception:
-                pass
-        with open(conf, &#39;r&#39;) as f:
-            jsondata = yaml.safe_load(f)
-        return jsondata
+        with open(conf, &#34;w&#34;) as f:
+            yaml.dump(defaultconfig, f, default_flow_style=False, sort_keys=False)
+        os.chmod(conf, 0o600)
+        try:
+            with open(self.cachefile, &#39;w&#39;) as f:
+                json.dump(defaultconfig, f)
+        except Exception:
+            pass
+        return defaultconfig
 
     @MethodHook
     def _saveconfig(self, conf):
-        #Save config file
+        #Save config file atomically to prevent corruption
         newconfig = {&#34;config&#34;:{}, &#34;connections&#34;: {}, &#34;profiles&#34;: {}}
         newconfig[&#34;config&#34;] = self.config
         newconfig[&#34;connections&#34;] = self.connections
         newconfig[&#34;profiles&#34;] = self.profiles
+        tmpfile = conf + &#39;.tmp&#39;
         try:
-            with open(conf, &#34;w&#34;) as f:
+            with open(tmpfile, &#34;w&#34;) as f:
                 yaml.dump(newconfig, f, default_flow_style=False, sort_keys=False)
+            # Atomic replace: only overwrite original if write succeeded
+            shutil.move(tmpfile, conf)
             with open(self.cachefile, &#34;w&#34;) as f:
                 json.dump(newconfig, f)
             self._generate_nodes_cache()
         except (IOError, OSError) as e:
             printer.error(f&#34;Failed to save config: {e}&#34;)
+            # Clean up temp file if it exists
+            if os.path.exists(tmpfile):
+                try:
+                    os.remove(tmpfile)
+                except OSError:
+                    pass
             return 1
         return 0
 
@@ -2738,7 +2791,7 @@ class configfile:
 </code></pre>
 <h3 id="optional-parameters">Optional Parameters:</h3>
 <pre><code>- conf (str): Path/file to config file. If left empty default
-              path is ~/.config/conn/config.json
+              path is ~/.config/conn/config.yaml
 
 - key  (str): Path/file to RSA key file. If left empty default
               path is ~/.config/conn/.osk

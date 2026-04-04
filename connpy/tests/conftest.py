@@ -5,6 +5,7 @@ No test touches ~/.config/conn/
 """
 import pytest
 import json
+import yaml
 import os
 from unittest.mock import patch, MagicMock
 from Crypto.PublicKey import RSA
@@ -72,9 +73,9 @@ def tmp_config_dir(tmp_path):
     plugins_dir = config_dir / "plugins"
     plugins_dir.mkdir()
 
-    # Write config.json
-    config_file = config_dir / "config.json"
-    config_file.write_text(json.dumps(DEFAULT_CONFIG, indent=4))
+    # Write config.yaml
+    config_file = config_dir / "config.yaml"
+    config_file.write_text(yaml.dump(DEFAULT_CONFIG, default_flow_style=False, sort_keys=False))
     os.chmod(str(config_file), 0o600)
 
     # Write .folder (points to itself)
@@ -94,7 +95,7 @@ def tmp_config_dir(tmp_path):
 def config(tmp_config_dir):
     """Create a configfile instance pointing to tmp directory."""
     from connpy.configfile import configfile
-    conf_path = str(tmp_config_dir / "config.json")
+    conf_path = str(tmp_config_dir / "config.yaml")
     key_path = str(tmp_config_dir / ".osk")
     return configfile(conf=conf_path, key=key_path)
 
@@ -102,13 +103,13 @@ def config(tmp_config_dir):
 @pytest.fixture
 def populated_config(tmp_config_dir):
     """Create a configfile with sample nodes/profiles pre-loaded."""
-    config_file = tmp_config_dir / "config.json"
+    config_file = tmp_config_dir / "config.yaml"
     data = {
         "config": {"case": False, "idletime": 30, "fzf": False},
         "connections": SAMPLE_CONNECTIONS,
         "profiles": SAMPLE_PROFILES
     }
-    config_file.write_text(json.dumps(data, indent=4))
+    config_file.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False))
     from connpy.configfile import configfile
     return configfile(conf=str(config_file), key=str(tmp_config_dir / ".osk"))
 
@@ -173,7 +174,7 @@ def mock_litellm():
 @pytest.fixture
 def ai_config(tmp_config_dir):
     """Create a configfile with AI keys configured for AI tests."""
-    config_file = tmp_config_dir / "config.json"
+    config_file = tmp_config_dir / "config.yaml"
     data = {
         "config": {
             "case": False, "idletime": 30, "fzf": False,
@@ -187,6 +188,6 @@ def ai_config(tmp_config_dir):
         "connections": SAMPLE_CONNECTIONS,
         "profiles": SAMPLE_PROFILES
     }
-    config_file.write_text(json.dumps(data, indent=4))
+    config_file.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False))
     from connpy.configfile import configfile
     return configfile(conf=str(config_file), key=str(tmp_config_dir / ".osk"))

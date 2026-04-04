@@ -58,7 +58,7 @@ No test touches ~/.config/conn/</p>
 <pre><code class="python">@pytest.fixture
 def ai_config(tmp_config_dir):
     &#34;&#34;&#34;Create a configfile with AI keys configured for AI tests.&#34;&#34;&#34;
-    config_file = tmp_config_dir / &#34;config.json&#34;
+    config_file = tmp_config_dir / &#34;config.yaml&#34;
     data = {
         &#34;config&#34;: {
             &#34;case&#34;: False, &#34;idletime&#34;: 30, &#34;fzf&#34;: False,
@@ -72,7 +72,7 @@ def ai_config(tmp_config_dir):
         &#34;connections&#34;: SAMPLE_CONNECTIONS,
         &#34;profiles&#34;: SAMPLE_PROFILES
     }
-    config_file.write_text(json.dumps(data, indent=4))
+    config_file.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False))
     from connpy.configfile import configfile
     return configfile(conf=str(config_file), key=str(tmp_config_dir / &#34;.osk&#34;))</code></pre>
 </details>
@@ -90,7 +90,7 @@ def ai_config(tmp_config_dir):
 def config(tmp_config_dir):
     &#34;&#34;&#34;Create a configfile instance pointing to tmp directory.&#34;&#34;&#34;
     from connpy.configfile import configfile
-    conf_path = str(tmp_config_dir / &#34;config.json&#34;)
+    conf_path = str(tmp_config_dir / &#34;config.yaml&#34;)
     key_path = str(tmp_config_dir / &#34;.osk&#34;)
     return configfile(conf=conf_path, key=key_path)</code></pre>
 </details>
@@ -182,13 +182,13 @@ def mock_pexpect():
 <pre><code class="python">@pytest.fixture
 def populated_config(tmp_config_dir):
     &#34;&#34;&#34;Create a configfile with sample nodes/profiles pre-loaded.&#34;&#34;&#34;
-    config_file = tmp_config_dir / &#34;config.json&#34;
+    config_file = tmp_config_dir / &#34;config.yaml&#34;
     data = {
         &#34;config&#34;: {&#34;case&#34;: False, &#34;idletime&#34;: 30, &#34;fzf&#34;: False},
         &#34;connections&#34;: SAMPLE_CONNECTIONS,
         &#34;profiles&#34;: SAMPLE_PROFILES
     }
-    config_file.write_text(json.dumps(data, indent=4))
+    config_file.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False))
     from connpy.configfile import configfile
     return configfile(conf=str(config_file), key=str(tmp_config_dir / &#34;.osk&#34;))</code></pre>
 </details>
@@ -210,9 +210,9 @@ def tmp_config_dir(tmp_path):
     plugins_dir = config_dir / &#34;plugins&#34;
     plugins_dir.mkdir()
 
-    # Write config.json
-    config_file = config_dir / &#34;config.json&#34;
-    config_file.write_text(json.dumps(DEFAULT_CONFIG, indent=4))
+    # Write config.yaml
+    config_file = config_dir / &#34;config.yaml&#34;
+    config_file.write_text(yaml.dump(DEFAULT_CONFIG, default_flow_style=False, sort_keys=False))
     os.chmod(str(config_file), 0o600)
 
     # Write .folder (points to itself)

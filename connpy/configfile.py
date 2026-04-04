@@ -48,7 +48,7 @@ class configfile:
         ### Optional Parameters:  
 
             - conf (str): Path/file to config file. If left empty default
-                          path is ~/.config/conn/config.json
+                          path is ~/.config/conn/config.yaml
 
             - key  (str): Path/file to RSA key file. If left empty default
                           path is ~/.config/conn/.osk
@@ -87,13 +87,29 @@ class configfile:
                 try:
                     with open(legacy_file, 'r') as f:
                         old_data = json.load(f)
-                    with open(self.file, 'w') as f:
-                        yaml.dump(old_data, f, default_flow_style=False, sort_keys=False)
-                    with open(self.cachefile, 'w') as f:
-                        json.dump(old_data, f)
-                    shutil.move(legacy_file, legacy_file + ".backup")
-                    printer.success(f"Migrated legacy config ({len(old_data.get('connections',{}))} folders/nodes) into YAML and Cache successfully!")
+                    if not self._validate_config(old_data):
+                        printer.warning(f"Legacy config {legacy_file} has invalid structure, skipping migration.")
+                    else:
+                        with open(self.file, 'w') as f:
+                            yaml.dump(old_data, f, default_flow_style=False, sort_keys=False)
+                        # Verify the written YAML can be read back correctly
+                        with open(self.file, 'r') as f:
+                            verify = yaml.safe_load(f)
+                        if not self._validate_config(verify):
+                            os.remove(self.file)
+                            printer.warning("YAML verification failed after migration, keeping legacy config.")
+                        else:
+                            with open(self.cachefile, 'w') as f:
+                                json.dump(old_data, f)
+                            shutil.move(legacy_file, legacy_file + ".backup")
+                            printer.success(f"Migrated legacy config ({len(old_data.get('connections',{}))} folders/nodes) into YAML and Cache successfully!")
                 except Exception as e:
+                    # Clean up partial YAML if it was created
+                    if os.path.exists(self.file):
+                        try:
+                            os.remove(self.file)
+                        except OSError:
+                            pass
                     printer.warning(f"Failed to migrate legacy config: {e}")
         else:
             self.file = conf
@@ -122,6 +138,13 @@ class configfile:
             self._generate_nodes_cache()
 
 
+    def _validate_config(self, data):
+        """Verify config data has the required structure."""
+        if not isinstance(data, dict):
+            return False
+        required = {"config", "connections", "profiles"}
+        return required.issubset(data.keys())
+
     def _loadconfig(self, conf):
         #Loads config file using dual cache
         cache_exists = os.path.exists(self.cachefile)
@@ -131,6 +154,20 @@ class configfile:
         if not cache_exists or yaml_time > cache_time:
             with open(conf, 'r') as f:
                 data = yaml.safe_load(f)
+            if not self._validate_config(data):
+                # YAML is broken, try to recover from cache
+                if cache_exists:
+                    printer.warning("Config file appears corrupt, recovering from cache...")
+                    with open(self.cachefile, 'r') as f:
+                        data = json.load(f)
+                    if self._validate_config(data):
+                        # Re-write the YAML from good cache
+                        with open(conf, 'w') as f:
+                            yaml.dump(data, f, default_flow_style=False, sort_keys=False)
+                        return data
+                # Both broken or no cache - create fresh
+                printer.error("Config file is corrupt and no valid cache exists. Creating default config.")
+                return self._createconfig(conf)
             try:
                 with open(self.cachefile, 'w') as f:
                     json.dump(data, f)
@@ -139,39 +176,55 @@ class configfile:
             return data
         else:
             with open(self.cachefile, 'r') as f:
-                return json.load(f)
+                data = json.load(f)
+            if not self._validate_config(data):
+                # Cache broken, try yaml
+                with open(conf, 'r') as f:
+                    data = yaml.safe_load(f)
+                if self._validate_config(data):
+                    return data
+                # Both broken
+                printer.error("Both config and cache are corrupt. Creating default config.")
+                return self._createconfig(conf)
+            return data
 
     def _createconfig(self, conf):
-        #Create config file
+        #Create config file (always writes defaults, safe for recovery)
         defaultconfig = {'config': {'case': False, 'idletime': 30, 'fzf': False}, 'connections': {}, 'profiles': { "default": { "host":"", "protocol":"ssh", "port":"", "user":"", "password":"", "options":"", "logs":"", "tags": "", "jumphost":""}}}
-        if not os.path.exists(conf):
-            with open(conf, "w") as f:
-                yaml.dump(defaultconfig, f, default_flow_style=False, sort_keys=False)
-                os.chmod(conf, 0o600)
-            try:
-                with open(self.cachefile, 'w') as f:
-                    json.dump(defaultconfig, f)
-            except Exception:
-                pass
-        with open(conf, 'r') as f:
-            jsondata = yaml.safe_load(f)
-        return jsondata
+        with open(conf, "w") as f:
+            yaml.dump(defaultconfig, f, default_flow_style=False, sort_keys=False)
+        os.chmod(conf, 0o600)
+        try:
+            with open(self.cachefile, 'w') as f:
+                json.dump(defaultconfig, f)
+        except Exception:
+            pass
+        return defaultconfig
 
     @MethodHook
     def _saveconfig(self, conf):
-        #Save config file
+        #Save config file atomically to prevent corruption
         newconfig = {"config":{}, "connections": {}, "profiles": {}}
         newconfig["config"] = self.config
         newconfig["connections"] = self.connections
         newconfig["profiles"] = self.profiles
+        tmpfile = conf + '.tmp'
         try:
-            with open(conf, "w") as f:
+            with open(tmpfile, "w") as f:
                 yaml.dump(newconfig, f, default_flow_style=False, sort_keys=False)
+            # Atomic replace: only overwrite original if write succeeded
+            shutil.move(tmpfile, conf)
             with open(self.cachefile, "w") as f:
                 json.dump(newconfig, f)
             self._generate_nodes_cache()
         except (IOError, OSError) as e:
             printer.error(f"Failed to save config: {e}")
+            # Clean up temp file if it exists
+            if os.path.exists(tmpfile):
+                try:
+                    os.remove(tmpfile)
+                except OSError:
+                    pass
             return 1
         return 0
 
