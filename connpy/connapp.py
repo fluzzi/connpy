@@ -18,14 +18,15 @@ class NoAliasDumper(yaml.SafeDumper):
     def ignore_aliases(self, data):
         return True
 from rich.markdown import Markdown
-from rich.console import Console, Group
+from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.text import Text
 from rich.rule import Rule
 from rich.style import Style
 from rich.prompt import Prompt
-mdprint = Console().print
-console = Console()
+mdprint = printer.console.print
+console = printer.console
+
 try:
     from pyfzf.pyfzf import FzfPrompt
 except ImportError:
@@ -135,6 +136,10 @@ class connapp:
         aiparser.add_argument("--architect-model", nargs=1, help="Override architect model")
         aiparser.add_argument("--architect-api-key", nargs=1, help="Override architect api key")
         aiparser.add_argument("--debug", action="store_true", help="Show AI reasoning and tool calls")
+        aiparser.add_argument("--list", "--list-sessions", dest="list_sessions", action="store_true", help="List saved AI sessions")
+        aiparser.add_argument("--session", nargs=1, help="Resume a specific AI session by ID")
+        aiparser.add_argument("--resume", action="store_true", help="Resume the most recent AI session")
+        aiparser.add_argument("--delete", "--delete-session", dest="delete_session", nargs=1, help="Delete an AI session by ID")
         aiparser.set_defaults(func=self._func_ai)
         #RUNPARSER
         runparser = subparsers.add_parser("run", description="Run scripts or commands on nodes", formatter_class=argparse.RawTextHelpFormatter) 
@@ -188,8 +193,10 @@ class connapp:
         for preload in self.plugins.preloads.values():
             preload.Preload(self)
             
-        if not os.path.exists(self.config.fzf_cachefile):
-            self.config._generate_nodes_cache()
+        # Update internal state and force cache generation after all preloads
+        self.nodes_list = self.config._getallnodes()
+        self.folders = self.config._getallfolders()
+        self.config._generate_nodes_cache()
             
         #Generate helps
         nodeparser.usage = self._help("usage", subparsers)
@@ -656,7 +663,7 @@ class connapp:
         if not os.path.isdir(args.data[0]):
             raise argparse.ArgumentTypeError(f"readable_dir:{args.data[0]} is not a valid path")
         else:
-            pathfile = self.config.defaultdir + "/.folder"
+            pathfile = self.config.anchor_path + "/.folder"
             folder = os.path.abspath(args.data[0]).rstrip('/')
             with open(pathfile, "w") as f:
                 f.write(str(folder))
@@ -803,13 +810,15 @@ class connapp:
             plugins = {}
         
             # Iterate over all files in the specified folder
-            for file in os.listdir(self.config.defaultdir + "/plugins"):
-                # Check if the file is a Python file
-                if file.endswith('.py'):
-                    enabled_files.append(os.path.splitext(file)[0])
-                # Check if the file is a Python backup file
-                elif file.endswith('.py.bkp'):
-                    disabled_files.append(os.path.splitext(os.path.splitext(file)[0])[0])
+            plugins_dir = self.config.defaultdir + "/plugins"
+            if os.path.exists(plugins_dir):
+                for file in os.listdir(plugins_dir):
+                    # Check if the file is a Python file
+                    if file.endswith('.py'):
+                        enabled_files.append(os.path.splitext(file)[0])
+                    # Check if the file is a Python backup file
+                    elif file.endswith('.py.bkp'):
+                        disabled_files.append(os.path.splitext(os.path.splitext(file)[0])[0])
             if enabled_files:
                 plugins["Enabled"] = enabled_files
             if disabled_files:
@@ -899,17 +908,35 @@ class connapp:
         
         self.myai = self.ai(self.config, **arguments)
         
+        # 1. Gestionar comandos de sesión (Listar/Borrar)
+        if args.list_sessions:
+            self.myai.list_sessions()
+            return
+            
+        if args.delete_session:
+            self.myai.delete_session(args.delete_session[0])
+            return
+            
+        # 2. Determinar session_id para retomar
+        session_id = None
+        if args.resume:
+            session_id = self.myai.get_last_session_id()
+            if not session_id:
+                printer.warning("No previous session found to resume.")
+        elif args.session:
+            session_id = args.session[0]
+
         if args.ask:
             # Single question mode
             query = " ".join(args.ask)
             with console.status("[bold green]Agent is thinking and analyzing...") as status:
-                result = self.myai.ask(query, status=status, debug=args.debug)
+                result = self.myai.ask(query, status=status, debug=args.debug, session_id=session_id)
             
             # Determine title and color based on responder
             responder = result.get("responder", "engineer")
             if responder == "architect":
-                title = "[bold purple]Network Architect[/bold purple]"
-                border_style = "purple"
+                title = "[bold medium_purple]Network Architect[/bold medium_purple]"
+                border_style = "medium_purple"
             else:
                 title = "[bold blue]Network Engineer[/bold blue]"
                 border_style = "blue"
@@ -927,9 +954,20 @@ class connapp:
         else:
             # Interactive chat mode
             history = None
-            mdprint(Rule(style="bold blue"))
-            mdprint(Markdown("**Networking Expert Agent**: Hi! I'm your assistant. I can help you diagnose issues, run commands, and manage your nodes.\nType 'exit' to quit.\n"))
-            mdprint(Rule(style="bold blue"))
+            if session_id:
+                session_data = self.myai.load_session_data(session_id)
+                if session_data:
+                    history = session_data.get("history", [])
+                    mdprint(Rule(title=f"[bold cyan] Resuming Session: {session_data.get('title')} [/bold cyan]", style="cyan"))
+                else:
+                    printer.error(f"Could not load session {session_id}. Starting clean.")
+
+            if not history:
+                mdprint(Rule(style="bold blue"))
+                mdprint(Markdown("**Networking Expert Agent**: Hi! I'm your assistant. I can help you diagnose issues, run commands, and manage your nodes.\nType 'exit' to quit.\n"))
+                mdprint(Rule(style="bold blue"))
+            else:
+                mdprint(f"[dim]Analyzing {len(history)} previous messages...[/dim]\n")
             
             while True:
                 try:
@@ -984,18 +1022,18 @@ class connapp:
         return True
 
     def _func_api(self, args):
-        if args.command == "stop" or args.command == "restart":
+        if args.command == "stop" or args.command == "restart" or args.command == "stop":
             args.data = self.stop_api()
         if args.command == "start" or args.command == "restart":
             if args.data:
-                self.start_api(args.data)
+                self.start_api(args.data, config=self.config)
             else:
-                self.start_api()
+                self.start_api(config=self.config)
         if args.command == "debug":
             if args.data:
-                self.debug_api(args.data)
+                self.debug_api(args.data, config=self.config)
             else:
-                self.debug_api()
+                self.debug_api(config=self.config)
         return
 
     def _node_run(self, args):
@@ -1577,8 +1615,9 @@ compdef _conn connpy
 connpy() {
     if [ $# -eq 0 ]; then
         local selected
-        if [ -f ~/.config/conn/.fzf_nodes_cache.txt ]; then
-            selected=$(cat ~/.config/conn/.fzf_nodes_cache.txt | fzf-tmux -d 25% --reverse)
+        local configdir=$(cat ~/.config/conn/.folder 2>/dev/null || echo ~/.config/conn)
+        if [ -s "$configdir/.fzf_nodes_cache.txt" ]; then
+            selected=$(cat "$configdir/.fzf_nodes_cache.txt" | fzf-tmux -i -d 25%)
         else
             command connpy
             return
@@ -1598,8 +1637,9 @@ alias c="connpy"
 connpy() {
     if [ $# -eq 0 ]; then
         local selected
-        if [ -f ~/.config/conn/.fzf_nodes_cache.txt ]; then
-            selected=$(cat ~/.config/conn/.fzf_nodes_cache.txt | fzf-tmux -d 25% --reverse)
+        local configdir=$(cat ~/.config/conn/.folder 2>/dev/null || echo ~/.config/conn)
+        if [ -s "$configdir/.fzf_nodes_cache.txt" ]; then
+            selected=$(cat "$configdir/.fzf_nodes_cache.txt" | fzf-tmux -i -d 25%)
         else
             command connpy
             return

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.6">
+<meta name="generator" content="pdoc3 0.11.5">
 <title>connpy.tests.test_ai API documentation</title>
 <meta name="description" content="Tests for connpy.ai module.">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
@@ -88,7 +88,7 @@ el.replaceWith(d);
 
     def test_init_loads_memory(self, ai_config, tmp_path, mock_litellm):
         &#34;&#34;&#34;Loads long-term memory from file if it exists.&#34;&#34;&#34;
-        memory_path = os.path.expanduser(&#34;~/.config/conn/ai_memory.md&#34;)
+        memory_path = os.path.join(ai_config.defaultdir, &#34;ai_memory.md&#34;)
         from connpy.ai import ai
 
         with patch(&#34;os.path.exists&#34;, side_effect=lambda p: True if p == memory_path else os.path.exists(p)):
@@ -132,7 +132,7 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def test_init_loads_memory(self, ai_config, tmp_path, mock_litellm):
     &#34;&#34;&#34;Loads long-term memory from file if it exists.&#34;&#34;&#34;
-    memory_path = os.path.expanduser(&#34;~/.config/conn/ai_memory.md&#34;)
+    memory_path = os.path.join(ai_config.defaultdir, &#34;ai_memory.md&#34;)
     from connpy.ai import ai
 
     with patch(&#34;os.path.exists&#34;, side_effect=lambda p: True if p == memory_path else os.path.exists(p)):
@@ -198,6 +198,224 @@ el.replaceWith(d);
     assert myai.architect_model == &#34;test/test-architect&#34;</code></pre>
 </details>
 <div class="desc"><p>Initializes correctly when keys are configured.</p></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.tests.test_ai.TestAISessions"><code class="flex name class">
+<span>class <span class="ident">TestAISessions</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestAISessions:
+    @pytest.fixture
+    def myai(self, ai_config, mock_litellm, tmp_path):
+        from connpy.ai import ai
+        ai_config.defaultdir = str(tmp_path)
+        return ai(ai_config)
+
+    def test_sessions_dir_initialization(self, myai, tmp_path):
+        assert os.path.exists(os.path.join(tmp_path, &#34;ai_sessions&#34;))
+        assert myai.sessions_dir == str(tmp_path / &#34;ai_sessions&#34;)
+
+    def test_generate_session_id(self, myai):
+        session_id = myai._generate_session_id(&#34;Any query&#34;)
+        # Format: YYYYMMDD-HHMMSS
+        assert len(session_id) == 15
+        assert &#34;-&#34; in session_id
+        parts = session_id.split(&#34;-&#34;)
+        assert len(parts[0]) == 8 # YYYYMMDD
+        assert len(parts[1]) == 6 # HHMMSS
+
+    def test_save_and_load_session(self, myai):
+        history = [
+            {&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;Hello&#34;},
+            {&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: &#34;Hi&#34;}
+        ]
+        myai.save_session(history, title=&#34;Test Session&#34;)
+        session_id = myai.session_id
+        
+        # Load it back
+        loaded = myai.load_session_data(session_id)
+        assert loaded[&#34;title&#34;] == &#34;Test Session&#34;
+        assert loaded[&#34;history&#34;] == history
+        assert loaded[&#34;model&#34;] == myai.engineer_model
+
+    def test_list_sessions(self, myai, capsys):
+        history = [{&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;Query 1&#34;}]
+        myai.save_session(history, title=&#34;Session 1&#34;)
+        
+        # Use a second instance to list
+        myai.list_sessions()
+        captured = capsys.readouterr()
+        assert &#34;Session 1&#34; in captured.out
+        assert &#34;AI Persisted Sessions&#34; in captured.out
+
+    def test_get_last_session_id(self, myai):
+        # Save two sessions
+        myai.session_id = None # Force new
+        myai.save_session([{&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;First&#34;}])
+        first_id = myai.session_id
+        import time
+        time.sleep(1.1) # Ensure different timestamp
+        
+        myai.session_id = None # Force new
+        myai.save_session([{&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;Second&#34;}])
+        second_id = myai.session_id
+        
+        last_id = myai.get_last_session_id()
+        assert last_id == second_id
+        assert last_id != first_id
+
+    def test_delete_session(self, myai):
+        myai.save_session([{&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;To be deleted&#34;}])
+        session_id = myai.session_id
+        assert os.path.exists(myai.session_path)
+        
+        myai.delete_session(session_id)
+        assert not os.path.exists(myai.session_path)</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_ai.TestAISessions.myai"><code class="name flex">
+<span>def <span class="ident">myai</span></span>(<span>self, ai_config, mock_litellm, tmp_path)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@pytest.fixture
+def myai(self, ai_config, mock_litellm, tmp_path):
+    from connpy.ai import ai
+    ai_config.defaultdir = str(tmp_path)
+    return ai(ai_config)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestAISessions.test_delete_session"><code class="name flex">
+<span>def <span class="ident">test_delete_session</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_delete_session(self, myai):
+    myai.save_session([{&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;To be deleted&#34;}])
+    session_id = myai.session_id
+    assert os.path.exists(myai.session_path)
+    
+    myai.delete_session(session_id)
+    assert not os.path.exists(myai.session_path)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestAISessions.test_generate_session_id"><code class="name flex">
+<span>def <span class="ident">test_generate_session_id</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_generate_session_id(self, myai):
+    session_id = myai._generate_session_id(&#34;Any query&#34;)
+    # Format: YYYYMMDD-HHMMSS
+    assert len(session_id) == 15
+    assert &#34;-&#34; in session_id
+    parts = session_id.split(&#34;-&#34;)
+    assert len(parts[0]) == 8 # YYYYMMDD
+    assert len(parts[1]) == 6 # HHMMSS</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestAISessions.test_get_last_session_id"><code class="name flex">
+<span>def <span class="ident">test_get_last_session_id</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_get_last_session_id(self, myai):
+    # Save two sessions
+    myai.session_id = None # Force new
+    myai.save_session([{&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;First&#34;}])
+    first_id = myai.session_id
+    import time
+    time.sleep(1.1) # Ensure different timestamp
+    
+    myai.session_id = None # Force new
+    myai.save_session([{&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;Second&#34;}])
+    second_id = myai.session_id
+    
+    last_id = myai.get_last_session_id()
+    assert last_id == second_id
+    assert last_id != first_id</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestAISessions.test_list_sessions"><code class="name flex">
+<span>def <span class="ident">test_list_sessions</span></span>(<span>self, myai, capsys)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_list_sessions(self, myai, capsys):
+    history = [{&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;Query 1&#34;}]
+    myai.save_session(history, title=&#34;Session 1&#34;)
+    
+    # Use a second instance to list
+    myai.list_sessions()
+    captured = capsys.readouterr()
+    assert &#34;Session 1&#34; in captured.out
+    assert &#34;AI Persisted Sessions&#34; in captured.out</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestAISessions.test_save_and_load_session"><code class="name flex">
+<span>def <span class="ident">test_save_and_load_session</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_save_and_load_session(self, myai):
+    history = [
+        {&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;Hello&#34;},
+        {&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: &#34;Hi&#34;}
+    ]
+    myai.save_session(history, title=&#34;Test Session&#34;)
+    session_id = myai.session_id
+    
+    # Load it back
+    loaded = myai.load_session_data(session_id)
+    assert loaded[&#34;title&#34;] == &#34;Test Session&#34;
+    assert loaded[&#34;history&#34;] == history
+    assert loaded[&#34;model&#34;] == myai.engineer_model</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestAISessions.test_sessions_dir_initialization"><code class="name flex">
+<span>def <span class="ident">test_sessions_dir_initialization</span></span>(<span>self, myai, tmp_path)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_sessions_dir_initialization(self, myai, tmp_path):
+    assert os.path.exists(os.path.join(tmp_path, &#34;ai_sessions&#34;))
+    assert myai.sessions_dir == str(tmp_path / &#34;ai_sessions&#34;)</code></pre>
+</details>
+<div class="desc"></div>
 </dd>
 </dl>
 </dd>
@@ -807,7 +1025,18 @@ def myai(self, ai_config, mock_litellm):
             {&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: &#34;Found r1&#34;}
         ]
         result = myai._sanitize_messages(messages)
-        assert len(result) == 4</code></pre>
+        assert len(result) == 4
+
+    def test_sanitize_strips_cache_control(self, myai):
+        &#34;&#34;&#34;_sanitize_messages should convert list-based content (with cache_control) back to strings.&#34;&#34;&#34;
+        messages = [
+            {&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: [{&#34;type&#34;: &#34;text&#34;, &#34;text&#34;: &#34;system prompt&#34;, &#34;cache_control&#34;: {&#34;type&#34;: &#34;ephemeral&#34;}}]},
+            {&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;hello&#34;}
+        ]
+        result = myai._sanitize_messages(messages)
+        assert result[0][&#34;role&#34;] == &#34;system&#34;
+        assert isinstance(result[0][&#34;content&#34;], str)
+        assert result[0][&#34;content&#34;] == &#34;system prompt&#34;</code></pre>
 </details>
 <div class="desc"></div>
 <h3>Methods</h3>
@@ -924,6 +1153,27 @@ def myai(self, ai_config, mock_litellm):
     assert result[0][&#34;role&#34;] == &#34;user&#34;</code></pre>
 </details>
 <div class="desc"><p>Tool responses without preceding tool_calls are removed.</p></div>
+</dd>
+<dt id="connpy.tests.test_ai.TestSanitizeMessages.test_sanitize_strips_cache_control"><code class="name flex">
+<span>def <span class="ident">test_sanitize_strips_cache_control</span></span>(<span>self, myai)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_sanitize_strips_cache_control(self, myai):
+    &#34;&#34;&#34;_sanitize_messages should convert list-based content (with cache_control) back to strings.&#34;&#34;&#34;
+    messages = [
+        {&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: [{&#34;type&#34;: &#34;text&#34;, &#34;text&#34;: &#34;system prompt&#34;, &#34;cache_control&#34;: {&#34;type&#34;: &#34;ephemeral&#34;}}]},
+        {&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;hello&#34;}
+    ]
+    result = myai._sanitize_messages(messages)
+    assert result[0][&#34;role&#34;] == &#34;system&#34;
+    assert isinstance(result[0][&#34;content&#34;], str)
+    assert result[0][&#34;content&#34;] == &#34;system prompt&#34;</code></pre>
+</details>
+<div class="desc"><p>_sanitize_messages should convert list-based content (with cache_control) back to strings.</p></div>
 </dd>
 </dl>
 </dd>
@@ -1373,6 +1623,18 @@ def myai(self, ai_config, mock_litellm):
 </ul>
 </li>
 <li>
+<h4><code><a title="connpy.tests.test_ai.TestAISessions" href="#connpy.tests.test_ai.TestAISessions">TestAISessions</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_ai.TestAISessions.myai" href="#connpy.tests.test_ai.TestAISessions.myai">myai</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestAISessions.test_delete_session" href="#connpy.tests.test_ai.TestAISessions.test_delete_session">test_delete_session</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestAISessions.test_generate_session_id" href="#connpy.tests.test_ai.TestAISessions.test_generate_session_id">test_generate_session_id</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestAISessions.test_get_last_session_id" href="#connpy.tests.test_ai.TestAISessions.test_get_last_session_id">test_get_last_session_id</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestAISessions.test_list_sessions" href="#connpy.tests.test_ai.TestAISessions.test_list_sessions">test_list_sessions</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestAISessions.test_save_and_load_session" href="#connpy.tests.test_ai.TestAISessions.test_save_and_load_session">test_save_and_load_session</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestAISessions.test_sessions_dir_initialization" href="#connpy.tests.test_ai.TestAISessions.test_sessions_dir_initialization">test_sessions_dir_initialization</a></code></li>
+</ul>
+</li>
+<li>
 <h4><code><a title="connpy.tests.test_ai.TestAsk" href="#connpy.tests.test_ai.TestAsk">TestAsk</a></code></h4>
 <ul class="">
 <li><code><a title="connpy.tests.test_ai.TestAsk.myai" href="#connpy.tests.test_ai.TestAsk.myai">myai</a></code></li>
@@ -1423,6 +1685,7 @@ def myai(self, ai_config, mock_litellm):
 <li><code><a title="connpy.tests.test_ai.TestSanitizeMessages.test_sanitize_preserves_valid_tool_pairs" href="#connpy.tests.test_ai.TestSanitizeMessages.test_sanitize_preserves_valid_tool_pairs">test_sanitize_preserves_valid_tool_pairs</a></code></li>
 <li><code><a title="connpy.tests.test_ai.TestSanitizeMessages.test_sanitize_removes_orphan_tool_calls" href="#connpy.tests.test_ai.TestSanitizeMessages.test_sanitize_removes_orphan_tool_calls">test_sanitize_removes_orphan_tool_calls</a></code></li>
 <li><code><a title="connpy.tests.test_ai.TestSanitizeMessages.test_sanitize_removes_orphan_tool_responses" href="#connpy.tests.test_ai.TestSanitizeMessages.test_sanitize_removes_orphan_tool_responses">test_sanitize_removes_orphan_tool_responses</a></code></li>
+<li><code><a title="connpy.tests.test_ai.TestSanitizeMessages.test_sanitize_strips_cache_control" href="#connpy.tests.test_ai.TestSanitizeMessages.test_sanitize_strips_cache_control">test_sanitize_strips_cache_control</a></code></li>
 </ul>
 </li>
 <li>
@@ -1464,7 +1727,7 @@ def myai(self, ai_config, mock_litellm):
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
 </footer>
 </body>
 </html>

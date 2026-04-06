@@ -115,6 +115,8 @@ class Plugins:
         return module
 
     def _import_plugins_to_argparse(self, directory, subparsers):
+        if not os.path.exists(directory):
+            return
         for filename in os.listdir(directory):
             commands = subparsers.choices.keys()
             if filename.endswith(".py"):

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.6">
+<meta name="generator" content="pdoc3 0.11.5">
 <title>connpy API documentation</title>
 <meta name="description" content="Connection manager …">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
@@ -683,6 +683,8 @@ class Preload:
         return module
 
     def _import_plugins_to_argparse(self, directory, subparsers):
+        if not os.path.exists(directory):
+            return
         for filename in os.listdir(directory):
             commands = subparsers.choices.keys()
             if filename.endswith(&#34;.py&#34;):
@@ -890,7 +892,7 @@ class ai:
         self.architect_prompt_extensions = [] # Extra text for architect prompt
 
         # Long-term memory
-        self.memory_path = os.path.expanduser(&#34;~/.config/conn/ai_memory.md&#34;)
+        self.memory_path = os.path.join(self.config.defaultdir, &#34;ai_memory.md&#34;)
         self.long_term_memory = &#34;&#34;
         if os.path.exists(self.memory_path):
             try:
@@ -902,6 +904,12 @@ class ai:
                 console.print(f&#34;[yellow]Warning: Cannot read AI memory file: {e}[/yellow]&#34;)
             except Exception as e:
                 console.print(f&#34;[yellow]Warning: Failed to load AI memory: {e}[/yellow]&#34;)
+
+        # Session Management
+        self.sessions_dir = os.path.join(self.config.defaultdir, &#34;ai_sessions&#34;)
+        os.makedirs(self.sessions_dir, exist_ok=True)
+        self.session_id = None
+        self.session_path = None
 
         # Prompts base agnósticos
         self._engineer_base_prompt = dedent(f&#34;&#34;&#34;
@@ -1018,7 +1026,7 @@ class ai:
         
         # Determine styling based on current brain
         role_label = &#34;Network Architect&#34; if &#34;architect&#34; in label.lower() else &#34;Network Engineer&#34;
-        border = &#34;purple&#34; if &#34;architect&#34; in label.lower() else &#34;blue&#34;
+        border = &#34;medium_purple&#34; if &#34;architect&#34; in label.lower() else &#34;blue&#34;
         title = f&#34;[bold {border}]{role_label}[/bold {border}]&#34;
         
         try:
@@ -1118,14 +1126,34 @@ class ai:
         2. No user/system messages appear between tool_calls and tool responses
         3. Orphaned tool_calls at the end are removed
         4. Orphaned tool responses without a preceding tool_call are removed
+        5. Incompatible metadata like cache_control is stripped for non-Anthropic models
         &#34;&#34;&#34;
         if not messages:
             return messages
         
+        # Pre-process messages to pull text from list contents (Anthropic cache format) 
+        # and remove explicit cache keys.
+        pre_sanitized = []
+        for msg in messages:
+            m = msg.copy() if isinstance(msg, dict) else msg.model_dump(exclude_none=True)
+            
+            # Convert content list to plain string if it&#39;s a system message with caching metadata
+            if m.get(&#39;role&#39;) == &#39;system&#39; and isinstance(m.get(&#39;content&#39;), list):
+                # Extraer texto de [{&#34;type&#34;: &#34;text&#34;, &#34;text&#34;: &#34;...&#34;, &#34;cache_control&#34;: ...}]
+                m[&#39;content&#39;] = m[&#39;content&#39;][0][&#39;text&#39;] if m[&#39;content&#39;] else &#34;&#34;
+
+            # Remove any explicit cache_control key anywhere
+            if &#39;cache_control&#39; in m: del m[&#39;cache_control&#39;]
+            if isinstance(m.get(&#39;content&#39;), list):
+                for item in m[&#39;content&#39;]:
+                    if isinstance(item, dict) and &#39;cache_control&#39; in item: del item[&#39;cache_control&#39;]
+            
+            pre_sanitized.append(m)
+
         sanitized = []
         i = 0
-        while i &lt; len(messages):
-            msg = messages[i]
+        while i &lt; len(pre_sanitized):
+            msg = pre_sanitized[i]
             role = msg.get(&#39;role&#39;, &#39;&#39;)
             
             if role == &#39;assistant&#39; and msg.get(&#39;tool_calls&#39;):
@@ -1139,8 +1167,8 @@ class ai:
                 # Look ahead for matching tool responses
                 tool_responses = []
                 j = i + 1
-                while j &lt; len(messages):
-                    next_msg = messages[j]
+                while j &lt; len(pre_sanitized):
+                    next_msg = pre_sanitized[j]
                     if next_msg.get(&#39;role&#39;) == &#39;tool&#39;:
                         tool_responses.append(next_msg)
                         j += 1
@@ -1298,23 +1326,16 @@ class ai:
 
     def _engineer_loop(self, task, status=None, debug=False, chat_history=None):
         &#34;&#34;&#34;Internal loop where the Engineer executes technical tasks for the Architect.&#34;&#34;&#34;
-        # Optimización de caché para el Ingeniero
-        if &#34;claude&#34; in self.engineer_model.lower():
+        # Optimización de caché para el Ingeniero (Solo para Anthropic directo, Vertex tiene reglas distintas)
+        if &#34;claude&#34; in self.engineer_model.lower() and &#34;vertex&#34; not in self.engineer_model.lower():
             messages = [{&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: [{&#34;type&#34;: &#34;text&#34;, &#34;text&#34;: self.engineer_system_prompt, &#34;cache_control&#34;: {&#34;type&#34;: &#34;ephemeral&#34;}}]}]
         else:
             messages = [{&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: self.engineer_system_prompt}]
             
         if chat_history:
-            # Clean chat history from caching metadata if engineer is not Claude
-            if &#34;claude&#34; not in self.engineer_model.lower():
-                cleaned_history = []
-                for msg in chat_history[-5:]:
-                    m = msg if isinstance(msg, dict) else msg.model_dump(exclude_none=True)
-                    # Remove cache_control from system messages
-                    if m.get(&#39;role&#39;) == &#39;system&#39; and isinstance(m.get(&#39;content&#39;), list):
-                        m[&#39;content&#39;] = m[&#39;content&#39;][0][&#39;text&#39;] if m[&#39;content&#39;] else &#34;&#34;
-                    cleaned_history.append(m)
-                messages.extend(cleaned_history)
+            # Clean chat history from caching metadata if engineer is not a compatible Claude model
+            if &#34;claude&#34; not in self.engineer_model.lower() or &#34;vertex&#34; in self.engineer_model.lower():
+                messages.extend(self._sanitize_messages(chat_history[-5:]))
             else:
                 messages.extend(chat_history[-5:])
         
@@ -1410,9 +1431,125 @@ class ai:
         tools.extend(self.external_architect_tools)
         return tools
 
+    def _get_sessions(self):
+        &#34;&#34;&#34;Returns a list of session metadata sorted by date.&#34;&#34;&#34;
+        sessions = []
+        if not os.path.exists(self.sessions_dir):
+            return []
+        for f in os.listdir(self.sessions_dir):
+            if f.endswith(&#34;.json&#34;):
+                path = os.path.join(self.sessions_dir, f)
+                try:
+                    with open(path, &#34;r&#34;) as fs:
+                        data = json.load(fs)
+                        sessions.append({
+                            &#34;id&#34;: f[:-5],
+                            &#34;title&#34;: data.get(&#34;title&#34;, &#34;Untitled Session&#34;),
+                            &#34;created_at&#34;: data.get(&#34;created_at&#34;, &#34;Unknown&#34;),
+                            &#34;model&#34;: data.get(&#34;model&#34;, &#34;Unknown&#34;),
+                            &#34;path&#34;: path
+                        })
+                except Exception:
+                    continue
+        return sorted(sessions, key=lambda x: x[&#34;created_at&#34;], reverse=True)
+
+    def list_sessions(self):
+        &#34;&#34;&#34;Prints a list of sessions using printer.table.&#34;&#34;&#34;
+        sessions = self._get_sessions()
+        if not sessions:
+            printer.info(&#34;No saved AI sessions found.&#34;)
+            return
+        
+        columns = [&#34;ID&#34;, &#34;Title&#34;, &#34;Created At&#34;, &#34;Model&#34;]
+        rows = [[s[&#34;id&#34;], s[&#34;title&#34;], s[&#34;created_at&#34;], s[&#34;model&#34;]] for s in sessions]
+        printer.table(&#34;AI Persisted Sessions&#34;, columns, rows)
+
+    def load_session_data(self, session_id):
+        &#34;&#34;&#34;Loads a session&#39;s raw data by ID.&#34;&#34;&#34;
+        path = os.path.join(self.sessions_dir, f&#34;{session_id}.json&#34;)
+        if os.path.exists(path):
+            try:
+                with open(path, &#34;r&#34;) as f:
+                    data = json.load(f)
+                    self.session_id = session_id
+                    self.session_path = path
+                    return data
+            except Exception as e:
+                printer.error(f&#34;Failed to load session {session_id}: {e}&#34;)
+        return None
+
+    def delete_session(self, session_id):
+        &#34;&#34;&#34;Deletes a session by ID.&#34;&#34;&#34;
+        path = os.path.join(self.sessions_dir, f&#34;{session_id}.json&#34;)
+        if os.path.exists(path):
+            os.remove(path)
+            printer.success(f&#34;Session {session_id} deleted.&#34;)
+        else:
+            printer.error(f&#34;Session {session_id} not found.&#34;)
+
+    def get_last_session_id(self):
+        &#34;&#34;&#34;Returns the ID of the most recent session.&#34;&#34;&#34;
+        sessions = self._get_sessions()
+        return sessions[0][&#34;id&#34;] if sessions else None
+
+    def _generate_session_id(self, query):
+        &#34;&#34;&#34;Generates a unique session ID based on timestamp.&#34;&#34;&#34;
+        return datetime.datetime.now().strftime(&#34;%Y%m%d-%H%M%S&#34;)
+
+    def save_session(self, history, title=None, model=None):
+        &#34;&#34;&#34;Saves current history to the session file.&#34;&#34;&#34;
+        if not self.session_id:
+            # Generate ID from first user query if available
+            first_user_msg = next((m[&#34;content&#34;] for m in history if m[&#34;role&#34;] == &#34;user&#34;), &#34;new-session&#34;)
+            self.session_id = self._generate_session_id(first_user_msg)
+            self.session_path = os.path.join(self.sessions_dir, f&#34;{self.session_id}.json&#34;)
+
+        # If it&#39;s a new file, we might want to set a better title
+        if not os.path.exists(self.session_path) and not title:
+            raw_title = next((m[&#34;content&#34;] for m in history if m[&#34;role&#34;] == &#34;user&#34;), &#34;New Session&#34;)
+            # Clean title: remove newlines, multiple spaces
+            clean_title = &#34; &#34;.join(raw_title.split())
+            if len(clean_title) &gt; 40:
+                title = clean_title[:37].strip() + &#34;...&#34;
+            else:
+                title = clean_title
+
+        try:
+            # Read existing metadata if it exists
+            metadata = {}
+            if os.path.exists(self.session_path):
+                with open(self.session_path, &#34;r&#34;) as f:
+                    metadata = json.load(f)
+            
+            metadata.update({
+                &#34;id&#34;: self.session_id,
+                &#34;title&#34;: title or metadata.get(&#34;title&#34;, &#34;New Session&#34;),
+                &#34;created_at&#34;: metadata.get(&#34;created_at&#34;, datetime.datetime.now().isoformat()),
+                &#34;updated_at&#34;: datetime.datetime.now().isoformat(),
+                &#34;model&#34;: model or metadata.get(&#34;model&#34;, self.engineer_model),
+                &#34;history&#34;: history
+            })
+
+            with open(self.session_path, &#34;w&#34;) as f:
+                json.dump(metadata, f, indent=4)
+        except Exception as e:
+            printer.error(f&#34;Failed to save session: {e}&#34;)
+
+        except Exception as e:
+            printer.error(f&#34;Failed to save session: {e}&#34;)
+
     @MethodHook
-    def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=False, stream=True):
+    def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=False, stream=True, session_id=None):
         if chat_history is None: chat_history = []
+        
+        # Load session if provided and history is empty
+        if session_id and not chat_history:
+            session_data = self.load_session_data(session_id)
+            if session_data:
+                chat_history = session_data.get(&#34;history&#34;, [])
+                # If we loaded history, the caller might need it back
+                # But typically ask() is called in a loop with an external history object
+
         usage = {&#34;input&#34;: 0, &#34;output&#34;: 0, &#34;total&#34;: 0}
         
         # 1. Selector de Rol inicial (Sticky Brain)
@@ -1446,15 +1583,20 @@ class ai:
         model = self.architect_model if current_brain == &#34;architect&#34; else self.engineer_model
         key = self.architect_key if current_brain == &#34;architect&#34; else self.engineer_key
 
-        # Estructura optimizada para Prompt Caching
-        if &#34;claude&#34; in model.lower():
+        # Estructura optimizada para Prompt Caching (Solo para Anthropic directo, Vertex tiene reglas distintas)
+        if &#34;claude&#34; in model.lower() and &#34;vertex&#34; not in model.lower():
             messages = [{&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: [{&#34;type&#34;: &#34;text&#34;, &#34;text&#34;: system_prompt, &#34;cache_control&#34;: {&#34;type&#34;: &#34;ephemeral&#34;}}]}]
         else:
             messages = [{&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: system_prompt}]
         
         # Interleaving de historial
         last_role = &#34;system&#34;
-        for msg in chat_history[-self.max_history:]:
+        # Sanitize history if the current target model is not compatible with cache_control
+        history_to_process = chat_history[-self.max_history:]
+        if &#34;claude&#34; not in model.lower() or &#34;vertex&#34; in model.lower():
+            history_to_process = self._sanitize_messages(history_to_process)
+
+        for msg in history_to_process:
             m = msg if isinstance(msg, dict) else msg.model_dump(exclude_none=True)
             role = m.get(&#39;role&#39;)
             if role == last_role and role == &#39;user&#39;:
@@ -1482,7 +1624,7 @@ class ai:
                     console.print(f&#34;[yellow]  You can press Ctrl+C to interrupt and get a summary of progress.[/yellow]&#34;)
                     soft_limit_warned = True
                 
-                label = &#34;[bold purple]Architect&#34; if current_brain == &#34;architect&#34; else &#34;[bold blue]Engineer&#34;
+                label = &#34;[bold medium_purple]Architect&#34; if current_brain == &#34;architect&#34; else &#34;[bold blue]Engineer&#34;
                 if status: status.update(f&#34;{label} is thinking... (step {iteration})&#34;)
                 
                 streamed_response = False
@@ -1527,7 +1669,7 @@ class ai:
                 messages.append(msg_dict)
 
                 if debug and resp_msg.content:
-                    console.print(Panel(Markdown(resp_msg.content), title=f&#34;{label} Reasoning&#34;, border_style=&#34;purple&#34; if current_brain == &#34;architect&#34; else &#34;blue&#34;))
+                    console.print(Panel(Markdown(resp_msg.content), title=f&#34;{label} Reasoning&#34;, border_style=&#34;medium_purple&#34; if current_brain == &#34;architect&#34; else &#34;blue&#34;))
 
                 if not resp_msg.tool_calls: break
                 
@@ -1544,8 +1686,8 @@ class ai:
                         continue
                     
                     if status:
-                        if fn == &#34;delegate_to_engineer&#34;: status.update(f&#34;[bold purple]Architect: [DELEGATING MISSION] {args.get(&#39;task&#39;,&#39;&#39;)[:40]}...&#34;)
-                        elif fn == &#34;manage_memory_tool&#34;: status.update(f&#34;[bold purple]Architect: [UPDATING MEMORY]&#34;)
+                        if fn == &#34;delegate_to_engineer&#34;: status.update(f&#34;[bold medium_purple]Architect: [DELEGATING MISSION] {args.get(&#39;task&#39;,&#39;&#39;)[:40]}...&#34;)
+                        elif fn == &#34;manage_memory_tool&#34;: status.update(f&#34;[bold medium_purple]Architect: [UPDATING MEMORY]&#34;)
 
                     if debug: console.print(Panel(Text(json.dumps(args, indent=2)), title=f&#34;{label} Decision: {fn}&#34;, border_style=&#34;white&#34;))
 
@@ -1553,7 +1695,7 @@ class ai:
                         obs, eng_usage = self._engineer_loop(args[&#34;task&#34;], status=status, debug=debug, chat_history=messages[:-1])
                         usage[&#34;input&#34;] += eng_usage[&#34;input&#34;]; usage[&#34;output&#34;] += eng_usage[&#34;output&#34;]; usage[&#34;total&#34;] += eng_usage[&#34;total&#34;]
                     elif fn == &#34;consult_architect&#34;:
-                        if status: status.update(&#34;[bold purple]Engineer consulting Architect...&#34;)
+                        if status: status.update(&#34;[bold medium_purple]Engineer consulting Architect...&#34;)
                         try:
                             # Consultation only - Engineer stays in control
                             claude_resp = completion(
@@ -1566,13 +1708,13 @@ class ai:
                                 num_retries=3
                             )
                             obs = claude_resp.choices[0].message.content
-                            if debug: console.print(Panel(Markdown(obs), title=&#34;[bold purple]Architect Consultation[/bold purple]&#34;, border_style=&#34;purple&#34;))
+                            if debug: console.print(Panel(Markdown(obs), title=&#34;[bold medium_purple]Architect Consultation[/bold medium_purple]&#34;, border_style=&#34;medium_purple&#34;))
                         except Exception as e:
                             if status: status.update(&#34;[bold orange3]Architect unavailable! Engineer continuing alone...&#34;)
                             obs = f&#34;Architect unavailable ({str(e)}). Proceeding with your best technical judgment.&#34;
                     
                     elif fn == &#34;escalate_to_architect&#34;:
-                        if status: status.update(&#34;[bold purple]Transferring control to Architect...&#34;)
+                        if status: status.update(&#34;[bold medium_purple]Transferring control to Architect...&#34;)
                         # Full escalation - Architect takes over
                         current_brain = &#34;architect&#34;
                         model = self.architect_model
@@ -1583,7 +1725,7 @@ class ai:
                         handover_msg = f&#34;HANDOVER FROM EXECUTION ENGINE\n\nReason: {args[&#39;reason&#39;]}\n\nContext: {args[&#39;context&#39;]}\n\nYou are now in control of this conversation.&#34;
                         pending_user_message = handover_msg
                         obs = &#34;Control transferred to Architect. Handover context will be provided.&#34;
-                        if debug: console.print(Panel(Text(handover_msg), title=&#34;[bold purple]Escalation to Architect[/bold purple]&#34;, border_style=&#34;purple&#34;))
+                        if debug: console.print(Panel(Text(handover_msg), title=&#34;[bold medium_purple]Escalation to Architect[/bold medium_purple]&#34;, border_style=&#34;medium_purple&#34;))
                     
                     elif fn == &#34;return_to_engineer&#34;:
                         if status: status.update(&#34;[bold blue]Transferring control back to Engineer...&#34;)
@@ -1641,19 +1783,8 @@ class ai:
                 messages.append(resp_msg.model_dump(exclude_none=True))
             except Exception: pass
         finally:
-            try:
-                log_dir = self.config.defaultdir
-                os.makedirs(log_dir, exist_ok=True)
-                log_path = os.path.join(log_dir, &#34;ai_debug.json&#34;)
-                hist = []
-                if os.path.exists(log_path):
-                    try:
-                        with open(log_path, &#34;r&#34;) as f: hist = json.load(f)
-                    except (IOError, json.JSONDecodeError): hist = []
-                hist.append({&#34;timestamp&#34;: datetime.datetime.now().isoformat(), &#34;roles&#34;: {&#34;strategic_engine&#34;: self.architect_model, &#34;execution_engine&#34;: self.engineer_model}, &#34;session&#34;: messages})
-                with open(log_path, &#34;w&#34;) as f: json.dump(hist[-10:], f, indent=4)
-            except Exception as e:
-                if debug: console.print(f&#34;[dim red]Debug log failed: {e}[/dim red]&#34;)
+            # Auto-save session
+            self.save_session(messages, model=model)
 
         return {
             &#34;response&#34;: messages[-1].get(&#34;content&#34;), 
@@ -1672,7 +1803,7 @@ class ai:
 <dl>
 <dt id="connpy.ai.SAFE_COMMANDS"><code class="name">var <span class="ident">SAFE_COMMANDS</span></code></dt>
 <dd>
-<div class="desc"><p>The type of the None singleton.</p></div>
+<div class="desc"></div>
 </dd>
 </dl>
 <h3>Instance variables</h3>
@@ -1713,7 +1844,7 @@ def engineer_system_prompt(self):
 <h3>Methods</h3>
 <dl>
 <dt id="connpy.ai.ask"><code class="name flex">
-<span>def <span class="ident">ask</span></span>(<span>self,<br>user_input,<br>dryrun=False,<br>chat_history=None,<br>status=None,<br>debug=False,<br>stream=True)</span>
+<span>def <span class="ident">ask</span></span>(<span>self,<br>user_input,<br>dryrun=False,<br>chat_history=None,<br>status=None,<br>debug=False,<br>stream=True,<br>session_id=None)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -1721,8 +1852,17 @@ def engineer_system_prompt(self):
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@MethodHook
-def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=False, stream=True):
+def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=False, stream=True, session_id=None):
     if chat_history is None: chat_history = []
+    
+    # Load session if provided and history is empty
+    if session_id and not chat_history:
+        session_data = self.load_session_data(session_id)
+        if session_data:
+            chat_history = session_data.get(&#34;history&#34;, [])
+            # If we loaded history, the caller might need it back
+            # But typically ask() is called in a loop with an external history object
+
     usage = {&#34;input&#34;: 0, &#34;output&#34;: 0, &#34;total&#34;: 0}
     
     # 1. Selector de Rol inicial (Sticky Brain)
@@ -1756,15 +1896,20 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
     model = self.architect_model if current_brain == &#34;architect&#34; else self.engineer_model
     key = self.architect_key if current_brain == &#34;architect&#34; else self.engineer_key
 
-    # Estructura optimizada para Prompt Caching
-    if &#34;claude&#34; in model.lower():
+    # Estructura optimizada para Prompt Caching (Solo para Anthropic directo, Vertex tiene reglas distintas)
+    if &#34;claude&#34; in model.lower() and &#34;vertex&#34; not in model.lower():
         messages = [{&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: [{&#34;type&#34;: &#34;text&#34;, &#34;text&#34;: system_prompt, &#34;cache_control&#34;: {&#34;type&#34;: &#34;ephemeral&#34;}}]}]
     else:
         messages = [{&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: system_prompt}]
     
     # Interleaving de historial
     last_role = &#34;system&#34;
-    for msg in chat_history[-self.max_history:]:
+    # Sanitize history if the current target model is not compatible with cache_control
+    history_to_process = chat_history[-self.max_history:]
+    if &#34;claude&#34; not in model.lower() or &#34;vertex&#34; in model.lower():
+        history_to_process = self._sanitize_messages(history_to_process)
+
+    for msg in history_to_process:
         m = msg if isinstance(msg, dict) else msg.model_dump(exclude_none=True)
         role = m.get(&#39;role&#39;)
         if role == last_role and role == &#39;user&#39;:
@@ -1792,7 +1937,7 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
                 console.print(f&#34;[yellow]  You can press Ctrl+C to interrupt and get a summary of progress.[/yellow]&#34;)
                 soft_limit_warned = True
             
-            label = &#34;[bold purple]Architect&#34; if current_brain == &#34;architect&#34; else &#34;[bold blue]Engineer&#34;
+            label = &#34;[bold medium_purple]Architect&#34; if current_brain == &#34;architect&#34; else &#34;[bold blue]Engineer&#34;
             if status: status.update(f&#34;{label} is thinking... (step {iteration})&#34;)
             
             streamed_response = False
@@ -1837,7 +1982,7 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
             messages.append(msg_dict)
 
             if debug and resp_msg.content:
-                console.print(Panel(Markdown(resp_msg.content), title=f&#34;{label} Reasoning&#34;, border_style=&#34;purple&#34; if current_brain == &#34;architect&#34; else &#34;blue&#34;))
+                console.print(Panel(Markdown(resp_msg.content), title=f&#34;{label} Reasoning&#34;, border_style=&#34;medium_purple&#34; if current_brain == &#34;architect&#34; else &#34;blue&#34;))
 
             if not resp_msg.tool_calls: break
             
@@ -1854,8 +1999,8 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
                     continue
                 
                 if status:
-                    if fn == &#34;delegate_to_engineer&#34;: status.update(f&#34;[bold purple]Architect: [DELEGATING MISSION] {args.get(&#39;task&#39;,&#39;&#39;)[:40]}...&#34;)
-                    elif fn == &#34;manage_memory_tool&#34;: status.update(f&#34;[bold purple]Architect: [UPDATING MEMORY]&#34;)
+                    if fn == &#34;delegate_to_engineer&#34;: status.update(f&#34;[bold medium_purple]Architect: [DELEGATING MISSION] {args.get(&#39;task&#39;,&#39;&#39;)[:40]}...&#34;)
+                    elif fn == &#34;manage_memory_tool&#34;: status.update(f&#34;[bold medium_purple]Architect: [UPDATING MEMORY]&#34;)
 
                 if debug: console.print(Panel(Text(json.dumps(args, indent=2)), title=f&#34;{label} Decision: {fn}&#34;, border_style=&#34;white&#34;))
 
@@ -1863,7 +2008,7 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
                     obs, eng_usage = self._engineer_loop(args[&#34;task&#34;], status=status, debug=debug, chat_history=messages[:-1])
                     usage[&#34;input&#34;] += eng_usage[&#34;input&#34;]; usage[&#34;output&#34;] += eng_usage[&#34;output&#34;]; usage[&#34;total&#34;] += eng_usage[&#34;total&#34;]
                 elif fn == &#34;consult_architect&#34;:
-                    if status: status.update(&#34;[bold purple]Engineer consulting Architect...&#34;)
+                    if status: status.update(&#34;[bold medium_purple]Engineer consulting Architect...&#34;)
                     try:
                         # Consultation only - Engineer stays in control
                         claude_resp = completion(
@@ -1876,13 +2021,13 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
                             num_retries=3
                         )
                         obs = claude_resp.choices[0].message.content
-                        if debug: console.print(Panel(Markdown(obs), title=&#34;[bold purple]Architect Consultation[/bold purple]&#34;, border_style=&#34;purple&#34;))
+                        if debug: console.print(Panel(Markdown(obs), title=&#34;[bold medium_purple]Architect Consultation[/bold medium_purple]&#34;, border_style=&#34;medium_purple&#34;))
                     except Exception as e:
                         if status: status.update(&#34;[bold orange3]Architect unavailable! Engineer continuing alone...&#34;)
                         obs = f&#34;Architect unavailable ({str(e)}). Proceeding with your best technical judgment.&#34;
                 
                 elif fn == &#34;escalate_to_architect&#34;:
-                    if status: status.update(&#34;[bold purple]Transferring control to Architect...&#34;)
+                    if status: status.update(&#34;[bold medium_purple]Transferring control to Architect...&#34;)
                     # Full escalation - Architect takes over
                     current_brain = &#34;architect&#34;
                     model = self.architect_model
@@ -1893,7 +2038,7 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
                     handover_msg = f&#34;HANDOVER FROM EXECUTION ENGINE\n\nReason: {args[&#39;reason&#39;]}\n\nContext: {args[&#39;context&#39;]}\n\nYou are now in control of this conversation.&#34;
                     pending_user_message = handover_msg
                     obs = &#34;Control transferred to Architect. Handover context will be provided.&#34;
-                    if debug: console.print(Panel(Text(handover_msg), title=&#34;[bold purple]Escalation to Architect[/bold purple]&#34;, border_style=&#34;purple&#34;))
+                    if debug: console.print(Panel(Text(handover_msg), title=&#34;[bold medium_purple]Escalation to Architect[/bold medium_purple]&#34;, border_style=&#34;medium_purple&#34;))
                 
                 elif fn == &#34;return_to_engineer&#34;:
                     if status: status.update(&#34;[bold blue]Transferring control back to Engineer...&#34;)
@@ -1951,19 +2096,8 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
             messages.append(resp_msg.model_dump(exclude_none=True))
         except Exception: pass
     finally:
-        try:
-            log_dir = self.config.defaultdir
-            os.makedirs(log_dir, exist_ok=True)
-            log_path = os.path.join(log_dir, &#34;ai_debug.json&#34;)
-            hist = []
-            if os.path.exists(log_path):
-                try:
-                    with open(log_path, &#34;r&#34;) as f: hist = json.load(f)
-                except (IOError, json.JSONDecodeError): hist = []
-            hist.append({&#34;timestamp&#34;: datetime.datetime.now().isoformat(), &#34;roles&#34;: {&#34;strategic_engine&#34;: self.architect_model, &#34;execution_engine&#34;: self.engineer_model}, &#34;session&#34;: messages})
-            with open(log_path, &#34;w&#34;) as f: json.dump(hist[-10:], f, indent=4)
-        except Exception as e:
-            if debug: console.print(f&#34;[dim red]Debug log failed: {e}[/dim red]&#34;)
+        # Auto-save session
+        self.save_session(messages, model=model)
 
     return {
         &#34;response&#34;: messages[-1].get(&#34;content&#34;), 
@@ -1988,6 +2122,40 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
 def confirm(self, user_input): return True</code></pre>
 </details>
 <div class="desc"></div>
+</dd>
+<dt id="connpy.ai.delete_session"><code class="name flex">
+<span>def <span class="ident">delete_session</span></span>(<span>self, session_id)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def delete_session(self, session_id):
+    &#34;&#34;&#34;Deletes a session by ID.&#34;&#34;&#34;
+    path = os.path.join(self.sessions_dir, f&#34;{session_id}.json&#34;)
+    if os.path.exists(path):
+        os.remove(path)
+        printer.success(f&#34;Session {session_id} deleted.&#34;)
+    else:
+        printer.error(f&#34;Session {session_id} not found.&#34;)</code></pre>
+</details>
+<div class="desc"><p>Deletes a session by ID.</p></div>
+</dd>
+<dt id="connpy.ai.get_last_session_id"><code class="name flex">
+<span>def <span class="ident">get_last_session_id</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_last_session_id(self):
+    &#34;&#34;&#34;Returns the ID of the most recent session.&#34;&#34;&#34;
+    sessions = self._get_sessions()
+    return sessions[0][&#34;id&#34;] if sessions else None</code></pre>
+</details>
+<div class="desc"><p>Returns the ID of the most recent session.</p></div>
 </dd>
 <dt id="connpy.ai.get_node_info_tool"><code class="name flex">
 <span>def <span class="ident">get_node_info_tool</span></span>(<span>self, node_name)</span>
@@ -2036,6 +2204,51 @@ def confirm(self, user_input): return True</code></pre>
         return f&#34;Error listing nodes: {str(e)}&#34;</code></pre>
 </details>
 <div class="desc"><p>List nodes matching the filter pattern. Returns metadata for &lt;=5 nodes, names only for more.</p></div>
+</dd>
+<dt id="connpy.ai.list_sessions"><code class="name flex">
+<span>def <span class="ident">list_sessions</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def list_sessions(self):
+    &#34;&#34;&#34;Prints a list of sessions using printer.table.&#34;&#34;&#34;
+    sessions = self._get_sessions()
+    if not sessions:
+        printer.info(&#34;No saved AI sessions found.&#34;)
+        return
+    
+    columns = [&#34;ID&#34;, &#34;Title&#34;, &#34;Created At&#34;, &#34;Model&#34;]
+    rows = [[s[&#34;id&#34;], s[&#34;title&#34;], s[&#34;created_at&#34;], s[&#34;model&#34;]] for s in sessions]
+    printer.table(&#34;AI Persisted Sessions&#34;, columns, rows)</code></pre>
+</details>
+<div class="desc"><p>Prints a list of sessions using printer.table.</p></div>
+</dd>
+<dt id="connpy.ai.load_session_data"><code class="name flex">
+<span>def <span class="ident">load_session_data</span></span>(<span>self, session_id)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def load_session_data(self, session_id):
+    &#34;&#34;&#34;Loads a session&#39;s raw data by ID.&#34;&#34;&#34;
+    path = os.path.join(self.sessions_dir, f&#34;{session_id}.json&#34;)
+    if os.path.exists(path):
+        try:
+            with open(path, &#34;r&#34;) as f:
+                data = json.load(f)
+                self.session_id = session_id
+                self.session_path = path
+                return data
+        except Exception as e:
+            printer.error(f&#34;Failed to load session {session_id}: {e}&#34;)
+    return None</code></pre>
+</details>
+<div class="desc"><p>Loads a session's raw data by ID.</p></div>
 </dd>
 <dt id="connpy.ai.manage_memory_tool"><code class="name flex">
 <span>def <span class="ident">manage_memory_tool</span></span>(<span>self, content, action='append')</span>
@@ -2197,6 +2410,58 @@ def confirm(self, user_input): return True</code></pre>
 </details>
 <div class="desc"><p>Execute commands on nodes matching the filter. Native interactive confirmation for unsafe commands.</p></div>
 </dd>
+<dt id="connpy.ai.save_session"><code class="name flex">
+<span>def <span class="ident">save_session</span></span>(<span>self, history, title=None, model=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def save_session(self, history, title=None, model=None):
+    &#34;&#34;&#34;Saves current history to the session file.&#34;&#34;&#34;
+    if not self.session_id:
+        # Generate ID from first user query if available
+        first_user_msg = next((m[&#34;content&#34;] for m in history if m[&#34;role&#34;] == &#34;user&#34;), &#34;new-session&#34;)
+        self.session_id = self._generate_session_id(first_user_msg)
+        self.session_path = os.path.join(self.sessions_dir, f&#34;{self.session_id}.json&#34;)
+
+    # If it&#39;s a new file, we might want to set a better title
+    if not os.path.exists(self.session_path) and not title:
+        raw_title = next((m[&#34;content&#34;] for m in history if m[&#34;role&#34;] == &#34;user&#34;), &#34;New Session&#34;)
+        # Clean title: remove newlines, multiple spaces
+        clean_title = &#34; &#34;.join(raw_title.split())
+        if len(clean_title) &gt; 40:
+            title = clean_title[:37].strip() + &#34;...&#34;
+        else:
+            title = clean_title
+
+    try:
+        # Read existing metadata if it exists
+        metadata = {}
+        if os.path.exists(self.session_path):
+            with open(self.session_path, &#34;r&#34;) as f:
+                metadata = json.load(f)
+        
+        metadata.update({
+            &#34;id&#34;: self.session_id,
+            &#34;title&#34;: title or metadata.get(&#34;title&#34;, &#34;New Session&#34;),
+            &#34;created_at&#34;: metadata.get(&#34;created_at&#34;, datetime.datetime.now().isoformat()),
+            &#34;updated_at&#34;: datetime.datetime.now().isoformat(),
+            &#34;model&#34;: model or metadata.get(&#34;model&#34;, self.engineer_model),
+            &#34;history&#34;: history
+        })
+
+        with open(self.session_path, &#34;w&#34;) as f:
+            json.dump(metadata, f, indent=4)
+    except Exception as e:
+        printer.error(f&#34;Failed to save session: {e}&#34;)
+
+    except Exception as e:
+        printer.error(f&#34;Failed to save session: {e}&#34;)</code></pre>
+</details>
+<div class="desc"><p>Saves current history to the session file.</p></div>
+</dd>
 </dl>
 </dd>
 <dt id="connpy.configfile"><code class="flex name class">
@@ -2248,27 +2513,31 @@ class configfile:
         &#39;&#39;&#39;
         home = os.path.expanduser(&#34;~&#34;)
         defaultdir = home + &#39;/.config/conn&#39;
-        self.defaultdir = defaultdir
-        Path(defaultdir).mkdir(parents=True, exist_ok=True)
-        Path(f&#34;{defaultdir}/plugins&#34;).mkdir(parents=True, exist_ok=True)
-        pathfile = defaultdir + &#39;/.folder&#39;
-        try:
-            with open(pathfile, &#34;r&#34;) as f:
-                configdir = f.read().strip()
-        except (FileNotFoundError, IOError):
-            with open(pathfile, &#34;w&#34;) as f:
-                f.write(str(defaultdir))
-            configdir = defaultdir
-        defaultfile = configdir + &#39;/config.yaml&#39;
-        self.cachefile = configdir + &#39;/.config.cache.json&#39;
-        self.fzf_cachefile = configdir + &#39;/.fzf_nodes_cache.txt&#39;
-        self.folders_cachefile = configdir + &#39;/.folders_cache.txt&#39;
-        self.profiles_cachefile = configdir + &#39;/.profiles_cache.txt&#39;
-        defaultkey = configdir + &#39;/.osk&#39;
-        if conf == None:
-            self.file = defaultfile
+        
+        if conf is None:
+            # Standard path: use ~/.config/conn and respect .folder redirection
+            self.anchor_path = defaultdir
+            self.defaultdir = defaultdir
+            Path(defaultdir).mkdir(parents=True, exist_ok=True)
             
-            # Backwards compatibility: Migrate from JSON to YAML
+            pathfile = defaultdir + &#39;/.folder&#39;
+            try:
+                with open(pathfile, &#34;r&#34;) as f:
+                    configdir = f.read().strip()
+            except (FileNotFoundError, IOError):
+                with open(pathfile, &#34;w&#34;) as f:
+                    f.write(str(defaultdir))
+                configdir = defaultdir
+            
+            self.defaultdir = configdir
+            self.file = configdir + &#39;/config.yaml&#39;
+            self.key = key or (configdir + &#39;/.osk&#39;)
+
+            # Ensure redirected directories exist
+            Path(configdir).mkdir(parents=True, exist_ok=True)
+            Path(f&#34;{configdir}/plugins&#34;).mkdir(parents=True, exist_ok=True)
+            
+            # Backwards compatibility: Migrate from JSON to YAML only for default path
             legacy_json = configdir + &#39;/config.json&#39;
             legacy_noext = configdir + &#39;/config&#39;
             legacy_file = None
@@ -2291,38 +2560,44 @@ class configfile:
                             os.remove(self.file)
                             printer.warning(&#34;YAML verification failed after migration, keeping legacy config.&#34;)
                         else:
-                            with open(self.cachefile, &#39;w&#39;) as f:
+                            # Note: cachefile is derived later, we use temp one for migration sync
+                            temp_cache = configdir + &#39;/.config.cache.json&#39;
+                            with open(temp_cache, &#39;w&#39;) as f:
                                 json.dump(old_data, f)
                             shutil.move(legacy_file, legacy_file + &#34;.backup&#34;)
                             printer.success(f&#34;Migrated legacy config ({len(old_data.get(&#39;connections&#39;,{}))} folders/nodes) into YAML and Cache successfully!&#34;)
                 except Exception as e:
-                    # Clean up partial YAML if it was created
                     if os.path.exists(self.file):
-                        try:
-                            os.remove(self.file)
-                        except OSError:
-                            pass
+                        try: os.remove(self.file)
+                        except OSError: pass
                     printer.warning(f&#34;Failed to migrate legacy config: {e}&#34;)
         else:
-            self.file = conf
-            
-        if key == None:
-            self.key = defaultkey
-        else:
-            self.key = key
+            # Custom path (common in tests): isolate everything to the conf parent directory
+            self.file = os.path.abspath(conf)
+            configdir = os.path.dirname(self.file)
+            self.anchor_path = configdir
+            self.defaultdir = configdir
+            self.key = os.path.abspath(key) if key else (configdir + &#39;/.osk&#39;)
+
+        # Sidecar files always live next to the config file (or in the redirected configdir)
+        self.cachefile = configdir + &#39;/.config.cache.json&#39;
+        self.fzf_cachefile = configdir + &#39;/.fzf_nodes_cache.txt&#39;
+        self.folders_cachefile = configdir + &#39;/.folders_cache.txt&#39;
+        self.profiles_cachefile = configdir + &#39;/.profiles_cache.txt&#39;
             
         if os.path.exists(self.file):
             config = self._loadconfig(self.file)
         else:
             config = self._createconfig(self.file)
+            
         self.config = config[&#34;config&#34;]
         self.connections = config[&#34;connections&#34;]
         self.profiles = config[&#34;profiles&#34;]
+        
         if not os.path.exists(self.key):
             self._createkey(self.key)
         with open(self.key) as f:
             self.privatekey = RSA.import_key(f.read())
-            f.close()
         self.publickey = self.privatekey.publickey()
 
         # Self-heal text caches if they are missing
@@ -4724,12 +4999,17 @@ def test(self, commands, expected, vars = None,*, prompt = None, parallel = 10, 
 <li><code><a title="connpy.ai.architect_system_prompt" href="#connpy.ai.architect_system_prompt">architect_system_prompt</a></code></li>
 <li><code><a title="connpy.ai.ask" href="#connpy.ai.ask">ask</a></code></li>
 <li><code><a title="connpy.ai.confirm" href="#connpy.ai.confirm">confirm</a></code></li>
+<li><code><a title="connpy.ai.delete_session" href="#connpy.ai.delete_session">delete_session</a></code></li>
 <li><code><a title="connpy.ai.engineer_system_prompt" href="#connpy.ai.engineer_system_prompt">engineer_system_prompt</a></code></li>
+<li><code><a title="connpy.ai.get_last_session_id" href="#connpy.ai.get_last_session_id">get_last_session_id</a></code></li>
 <li><code><a title="connpy.ai.get_node_info_tool" href="#connpy.ai.get_node_info_tool">get_node_info_tool</a></code></li>
 <li><code><a title="connpy.ai.list_nodes_tool" href="#connpy.ai.list_nodes_tool">list_nodes_tool</a></code></li>
+<li><code><a title="connpy.ai.list_sessions" href="#connpy.ai.list_sessions">list_sessions</a></code></li>
+<li><code><a title="connpy.ai.load_session_data" href="#connpy.ai.load_session_data">load_session_data</a></code></li>
 <li><code><a title="connpy.ai.manage_memory_tool" href="#connpy.ai.manage_memory_tool">manage_memory_tool</a></code></li>
 <li><code><a title="connpy.ai.register_ai_tool" href="#connpy.ai.register_ai_tool">register_ai_tool</a></code></li>
 <li><code><a title="connpy.ai.run_commands_tool" href="#connpy.ai.run_commands_tool">run_commands_tool</a></code></li>
+<li><code><a title="connpy.ai.save_session" href="#connpy.ai.save_session">save_session</a></code></li>
 </ul>
 </li>
 <li>
@@ -4761,7 +5041,7 @@ def test(self, commands, expected, vars = None,*, prompt = None, parallel = 10, 
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
 </footer>
 </body>
 </html>

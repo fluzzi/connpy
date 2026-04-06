@@ -42,7 +42,7 @@ class TestAIInit:
 
     def test_init_loads_memory(self, ai_config, tmp_path, mock_litellm):
         """Loads long-term memory from file if it exists."""
-        memory_path = os.path.expanduser("~/.config/conn/ai_memory.md")
+        memory_path = os.path.join(ai_config.defaultdir, "ai_memory.md")
         from connpy.ai import ai
 
         with patch("os.path.exists", side_effect=lambda p: True if p == memory_path else os.path.exists(p)):
@@ -209,6 +209,17 @@ class TestSanitizeMessages:
         ]
         result = myai._sanitize_messages(messages)
         assert len(result) == 4
+
+    def test_sanitize_strips_cache_control(self, myai):
+        """_sanitize_messages should convert list-based content (with cache_control) back to strings."""
+        messages = [
+            {"role": "system", "content": [{"type": "text", "text": "system prompt", "cache_control": {"type": "ephemeral"}}]},
+            {"role": "user", "content": "hello"}
+        ]
+        result = myai._sanitize_messages(messages)
+        assert result[0]["role"] == "system"
+        assert isinstance(result[0]["content"], str)
+        assert result[0]["content"] == "system prompt"
 
 
 # =========================================================================
@@ -395,3 +406,76 @@ class TestToolDefinitions:
         tools = myai._get_architect_tools()
         names = [t["function"]["name"] for t in tools]
         assert "arch_tool" in names
+
+
+# =========================================================================
+# AI Session Management tests
+# =========================================================================
+
+class TestAISessions:
+    @pytest.fixture
+    def myai(self, ai_config, mock_litellm, tmp_path):
+        from connpy.ai import ai
+        ai_config.defaultdir = str(tmp_path)
+        return ai(ai_config)
+
+    def test_sessions_dir_initialization(self, myai, tmp_path):
+        assert os.path.exists(os.path.join(tmp_path, "ai_sessions"))
+        assert myai.sessions_dir == str(tmp_path / "ai_sessions")
+
+    def test_generate_session_id(self, myai):
+        session_id = myai._generate_session_id("Any query")
+        # Format: YYYYMMDD-HHMMSS
+        assert len(session_id) == 15
+        assert "-" in session_id
+        parts = session_id.split("-")
+        assert len(parts[0]) == 8 # YYYYMMDD
+        assert len(parts[1]) == 6 # HHMMSS
+
+    def test_save_and_load_session(self, myai):
+        history = [
+            {"role": "user", "content": "Hello"},
+            {"role": "assistant", "content": "Hi"}
+        ]
+        myai.save_session(history, title="Test Session")
+        session_id = myai.session_id
+        
+        # Load it back
+        loaded = myai.load_session_data(session_id)
+        assert loaded["title"] == "Test Session"
+        assert loaded["history"] == history
+        assert loaded["model"] == myai.engineer_model
+
+    def test_list_sessions(self, myai, capsys):
+        history = [{"role": "user", "content": "Query 1"}]
+        myai.save_session(history, title="Session 1")
+        
+        # Use a second instance to list
+        myai.list_sessions()
+        captured = capsys.readouterr()
+        assert "Session 1" in captured.out
+        assert "AI Persisted Sessions" in captured.out
+
+    def test_get_last_session_id(self, myai):
+        # Save two sessions
+        myai.session_id = None # Force new
+        myai.save_session([{"role": "user", "content": "First"}])
+        first_id = myai.session_id
+        import time
+        time.sleep(1.1) # Ensure different timestamp
+        
+        myai.session_id = None # Force new
+        myai.save_session([{"role": "user", "content": "Second"}])
+        second_id = myai.session_id
+        
+        last_id = myai.get_last_session_id()
+        assert last_id == second_id
+        assert last_id != first_id
+
+    def test_delete_session(self, myai):
+        myai.save_session([{"role": "user", "content": "To be deleted"}])
+        session_id = myai.session_id
+        assert os.path.exists(myai.session_path)
+        
+        myai.delete_session(session_id)
+        assert not os.path.exists(myai.session_path)

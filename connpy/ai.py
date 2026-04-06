@@ -13,11 +13,11 @@ litellm.set_verbose = False
 from .hooks import ClassHook, MethodHook
 from . import printer
 from rich.markdown import Markdown
-from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 
-console = Console()
+console = printer.console
+
 
 @ClassHook
 class ai:
@@ -62,7 +62,7 @@ class ai:
         self.architect_prompt_extensions = [] # Extra text for architect prompt
 
         # Long-term memory
-        self.memory_path = os.path.expanduser("~/.config/conn/ai_memory.md")
+        self.memory_path = os.path.join(self.config.defaultdir, "ai_memory.md")
         self.long_term_memory = ""
         if os.path.exists(self.memory_path):
             try:
@@ -74,6 +74,12 @@ class ai:
                 console.print(f"[yellow]Warning: Cannot read AI memory file: {e}[/yellow]")
             except Exception as e:
                 console.print(f"[yellow]Warning: Failed to load AI memory: {e}[/yellow]")
+
+        # Session Management
+        self.sessions_dir = os.path.join(self.config.defaultdir, "ai_sessions")
+        os.makedirs(self.sessions_dir, exist_ok=True)
+        self.session_id = None
+        self.session_path = None
 
         # Prompts base agnósticos
         self._engineer_base_prompt = dedent(f"""
@@ -190,7 +196,7 @@ class ai:
         
         # Determine styling based on current brain
         role_label = "Network Architect" if "architect" in label.lower() else "Network Engineer"
-        border = "purple" if "architect" in label.lower() else "blue"
+        border = "medium_purple" if "architect" in label.lower() else "blue"
         title = f"[bold {border}]{role_label}[/bold {border}]"
         
         try:
@@ -290,14 +296,34 @@ class ai:
         2. No user/system messages appear between tool_calls and tool responses
         3. Orphaned tool_calls at the end are removed
         4. Orphaned tool responses without a preceding tool_call are removed
+        5. Incompatible metadata like cache_control is stripped for non-Anthropic models
         """
         if not messages:
             return messages
         
+        # Pre-process messages to pull text from list contents (Anthropic cache format) 
+        # and remove explicit cache keys.
+        pre_sanitized = []
+        for msg in messages:
+            m = msg.copy() if isinstance(msg, dict) else msg.model_dump(exclude_none=True)
+            
+            # Convert content list to plain string if it's a system message with caching metadata
+            if m.get('role') == 'system' and isinstance(m.get('content'), list):
+                # Extraer texto de [{"type": "text", "text": "...", "cache_control": ...}]
+                m['content'] = m['content'][0]['text'] if m['content'] else ""
+
+            # Remove any explicit cache_control key anywhere
+            if 'cache_control' in m: del m['cache_control']
+            if isinstance(m.get('content'), list):
+                for item in m['content']:
+                    if isinstance(item, dict) and 'cache_control' in item: del item['cache_control']
+            
+            pre_sanitized.append(m)
+
         sanitized = []
         i = 0
-        while i < len(messages):
-            msg = messages[i]
+        while i < len(pre_sanitized):
+            msg = pre_sanitized[i]
             role = msg.get('role', '')
             
             if role == 'assistant' and msg.get('tool_calls'):
@@ -311,8 +337,8 @@ class ai:
                 # Look ahead for matching tool responses
                 tool_responses = []
                 j = i + 1
-                while j < len(messages):
-                    next_msg = messages[j]
+                while j < len(pre_sanitized):
+                    next_msg = pre_sanitized[j]
                     if next_msg.get('role') == 'tool':
                         tool_responses.append(next_msg)
                         j += 1
@@ -470,23 +496,16 @@ class ai:
 
     def _engineer_loop(self, task, status=None, debug=False, chat_history=None):
         """Internal loop where the Engineer executes technical tasks for the Architect."""
-        # Optimización de caché para el Ingeniero
-        if "claude" in self.engineer_model.lower():
+        # Optimización de caché para el Ingeniero (Solo para Anthropic directo, Vertex tiene reglas distintas)
+        if "claude" in self.engineer_model.lower() and "vertex" not in self.engineer_model.lower():
             messages = [{"role": "system", "content": [{"type": "text", "text": self.engineer_system_prompt, "cache_control": {"type": "ephemeral"}}]}]
         else:
             messages = [{"role": "system", "content": self.engineer_system_prompt}]
             
         if chat_history:
-            # Clean chat history from caching metadata if engineer is not Claude
-            if "claude" not in self.engineer_model.lower():
-                cleaned_history = []
-                for msg in chat_history[-5:]:
-                    m = msg if isinstance(msg, dict) else msg.model_dump(exclude_none=True)
-                    # Remove cache_control from system messages
-                    if m.get('role') == 'system' and isinstance(m.get('content'), list):
-                        m['content'] = m['content'][0]['text'] if m['content'] else ""
-                    cleaned_history.append(m)
-                messages.extend(cleaned_history)
+            # Clean chat history from caching metadata if engineer is not a compatible Claude model
+            if "claude" not in self.engineer_model.lower() or "vertex" in self.engineer_model.lower():
+                messages.extend(self._sanitize_messages(chat_history[-5:]))
             else:
                 messages.extend(chat_history[-5:])
         
@@ -582,9 +601,125 @@ class ai:
         tools.extend(self.external_architect_tools)
         return tools
 
+    def _get_sessions(self):
+        """Returns a list of session metadata sorted by date."""
+        sessions = []
+        if not os.path.exists(self.sessions_dir):
+            return []
+        for f in os.listdir(self.sessions_dir):
+            if f.endswith(".json"):
+                path = os.path.join(self.sessions_dir, f)
+                try:
+                    with open(path, "r") as fs:
+                        data = json.load(fs)
+                        sessions.append({
+                            "id": f[:-5],
+                            "title": data.get("title", "Untitled Session"),
+                            "created_at": data.get("created_at", "Unknown"),
+                            "model": data.get("model", "Unknown"),
+                            "path": path
+                        })
+                except Exception:
+                    continue
+        return sorted(sessions, key=lambda x: x["created_at"], reverse=True)
+
+    def list_sessions(self):
+        """Prints a list of sessions using printer.table."""
+        sessions = self._get_sessions()
+        if not sessions:
+            printer.info("No saved AI sessions found.")
+            return
+        
+        columns = ["ID", "Title", "Created At", "Model"]
+        rows = [[s["id"], s["title"], s["created_at"], s["model"]] for s in sessions]
+        printer.table("AI Persisted Sessions", columns, rows)
+
+    def load_session_data(self, session_id):
+        """Loads a session's raw data by ID."""
+        path = os.path.join(self.sessions_dir, f"{session_id}.json")
+        if os.path.exists(path):
+            try:
+                with open(path, "r") as f:
+                    data = json.load(f)
+                    self.session_id = session_id
+                    self.session_path = path
+                    return data
+            except Exception as e:
+                printer.error(f"Failed to load session {session_id}: {e}")
+        return None
+
+    def delete_session(self, session_id):
+        """Deletes a session by ID."""
+        path = os.path.join(self.sessions_dir, f"{session_id}.json")
+        if os.path.exists(path):
+            os.remove(path)
+            printer.success(f"Session {session_id} deleted.")
+        else:
+            printer.error(f"Session {session_id} not found.")
+
+    def get_last_session_id(self):
+        """Returns the ID of the most recent session."""
+        sessions = self._get_sessions()
+        return sessions[0]["id"] if sessions else None
+
+    def _generate_session_id(self, query):
+        """Generates a unique session ID based on timestamp."""
+        return datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+
+    def save_session(self, history, title=None, model=None):
+        """Saves current history to the session file."""
+        if not self.session_id:
+            # Generate ID from first user query if available
+            first_user_msg = next((m["content"] for m in history if m["role"] == "user"), "new-session")
+            self.session_id = self._generate_session_id(first_user_msg)
+            self.session_path = os.path.join(self.sessions_dir, f"{self.session_id}.json")
+
+        # If it's a new file, we might want to set a better title
+        if not os.path.exists(self.session_path) and not title:
+            raw_title = next((m["content"] for m in history if m["role"] == "user"), "New Session")
+            # Clean title: remove newlines, multiple spaces
+            clean_title = " ".join(raw_title.split())
+            if len(clean_title) > 40:
+                title = clean_title[:37].strip() + "..."
+            else:
+                title = clean_title
+
+        try:
+            # Read existing metadata if it exists
+            metadata = {}
+            if os.path.exists(self.session_path):
+                with open(self.session_path, "r") as f:
+                    metadata = json.load(f)
+            
+            metadata.update({
+                "id": self.session_id,
+                "title": title or metadata.get("title", "New Session"),
+                "created_at": metadata.get("created_at", datetime.datetime.now().isoformat()),
+                "updated_at": datetime.datetime.now().isoformat(),
+                "model": model or metadata.get("model", self.engineer_model),
+                "history": history
+            })
+
+            with open(self.session_path, "w") as f:
+                json.dump(metadata, f, indent=4)
+        except Exception as e:
+            printer.error(f"Failed to save session: {e}")
+
+        except Exception as e:
+            printer.error(f"Failed to save session: {e}")
+
     @MethodHook
-    def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=False, stream=True):
+    def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=False, stream=True, session_id=None):
         if chat_history is None: chat_history = []
+        
+        # Load session if provided and history is empty
+        if session_id and not chat_history:
+            session_data = self.load_session_data(session_id)
+            if session_data:
+                chat_history = session_data.get("history", [])
+                # If we loaded history, the caller might need it back
+                # But typically ask() is called in a loop with an external history object
+
         usage = {"input": 0, "output": 0, "total": 0}
         
         # 1. Selector de Rol inicial (Sticky Brain)
@@ -618,15 +753,20 @@ class ai:
         model = self.architect_model if current_brain == "architect" else self.engineer_model
         key = self.architect_key if current_brain == "architect" else self.engineer_key
 
-        # Estructura optimizada para Prompt Caching
-        if "claude" in model.lower():
+        # Estructura optimizada para Prompt Caching (Solo para Anthropic directo, Vertex tiene reglas distintas)
+        if "claude" in model.lower() and "vertex" not in model.lower():
             messages = [{"role": "system", "content": [{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}]}]
         else:
             messages = [{"role": "system", "content": system_prompt}]
         
         # Interleaving de historial
         last_role = "system"
-        for msg in chat_history[-self.max_history:]:
+        # Sanitize history if the current target model is not compatible with cache_control
+        history_to_process = chat_history[-self.max_history:]
+        if "claude" not in model.lower() or "vertex" in model.lower():
+            history_to_process = self._sanitize_messages(history_to_process)
+
+        for msg in history_to_process:
             m = msg if isinstance(msg, dict) else msg.model_dump(exclude_none=True)
             role = m.get('role')
             if role == last_role and role == 'user':
@@ -654,7 +794,7 @@ class ai:
                     console.print(f"[yellow]  You can press Ctrl+C to interrupt and get a summary of progress.[/yellow]")
                     soft_limit_warned = True
                 
-                label = "[bold purple]Architect" if current_brain == "architect" else "[bold blue]Engineer"
+                label = "[bold medium_purple]Architect" if current_brain == "architect" else "[bold blue]Engineer"
                 if status: status.update(f"{label} is thinking... (step {iteration})")
                 
                 streamed_response = False
@@ -699,7 +839,7 @@ class ai:
                 messages.append(msg_dict)
 
                 if debug and resp_msg.content:
-                    console.print(Panel(Markdown(resp_msg.content), title=f"{label} Reasoning", border_style="purple" if current_brain == "architect" else "blue"))
+                    console.print(Panel(Markdown(resp_msg.content), title=f"{label} Reasoning", border_style="medium_purple" if current_brain == "architect" else "blue"))
 
                 if not resp_msg.tool_calls: break
                 
@@ -716,8 +856,8 @@ class ai:
                         continue
                     
                     if status:
-                        if fn == "delegate_to_engineer": status.update(f"[bold purple]Architect: [DELEGATING MISSION] {args.get('task','')[:40]}...")
-                        elif fn == "manage_memory_tool": status.update(f"[bold purple]Architect: [UPDATING MEMORY]")
+                        if fn == "delegate_to_engineer": status.update(f"[bold medium_purple]Architect: [DELEGATING MISSION] {args.get('task','')[:40]}...")
+                        elif fn == "manage_memory_tool": status.update(f"[bold medium_purple]Architect: [UPDATING MEMORY]")
 
                     if debug: console.print(Panel(Text(json.dumps(args, indent=2)), title=f"{label} Decision: {fn}", border_style="white"))
 
@@ -725,7 +865,7 @@ class ai:
                         obs, eng_usage = self._engineer_loop(args["task"], status=status, debug=debug, chat_history=messages[:-1])
                         usage["input"] += eng_usage["input"]; usage["output"] += eng_usage["output"]; usage["total"] += eng_usage["total"]
                     elif fn == "consult_architect":
-                        if status: status.update("[bold purple]Engineer consulting Architect...")
+                        if status: status.update("[bold medium_purple]Engineer consulting Architect...")
                         try:
                             # Consultation only - Engineer stays in control
                             claude_resp = completion(
@@ -738,13 +878,13 @@ class ai:
                                 num_retries=3
                             )
                             obs = claude_resp.choices[0].message.content
-                            if debug: console.print(Panel(Markdown(obs), title="[bold purple]Architect Consultation[/bold purple]", border_style="purple"))
+                            if debug: console.print(Panel(Markdown(obs), title="[bold medium_purple]Architect Consultation[/bold medium_purple]", border_style="medium_purple"))
                         except Exception as e:
                             if status: status.update("[bold orange3]Architect unavailable! Engineer continuing alone...")
                             obs = f"Architect unavailable ({str(e)}). Proceeding with your best technical judgment."
                     
                     elif fn == "escalate_to_architect":
-                        if status: status.update("[bold purple]Transferring control to Architect...")
+                        if status: status.update("[bold medium_purple]Transferring control to Architect...")
                         # Full escalation - Architect takes over
                         current_brain = "architect"
                         model = self.architect_model
@@ -755,7 +895,7 @@ class ai:
                         handover_msg = f"HANDOVER FROM EXECUTION ENGINE\n\nReason: {args['reason']}\n\nContext: {args['context']}\n\nYou are now in control of this conversation."
                         pending_user_message = handover_msg
                         obs = "Control transferred to Architect. Handover context will be provided."
-                        if debug: console.print(Panel(Text(handover_msg), title="[bold purple]Escalation to Architect[/bold purple]", border_style="purple"))
+                        if debug: console.print(Panel(Text(handover_msg), title="[bold medium_purple]Escalation to Architect[/bold medium_purple]", border_style="medium_purple"))
                     
                     elif fn == "return_to_engineer":
                         if status: status.update("[bold blue]Transferring control back to Engineer...")
@@ -813,19 +953,8 @@ class ai:
                 messages.append(resp_msg.model_dump(exclude_none=True))
             except Exception: pass
         finally:
-            try:
-                log_dir = self.config.defaultdir
-                os.makedirs(log_dir, exist_ok=True)
-                log_path = os.path.join(log_dir, "ai_debug.json")
-                hist = []
-                if os.path.exists(log_path):
-                    try:
-                        with open(log_path, "r") as f: hist = json.load(f)
-                    except (IOError, json.JSONDecodeError): hist = []
-                hist.append({"timestamp": datetime.datetime.now().isoformat(), "roles": {"strategic_engine": self.architect_model, "execution_engine": self.engineer_model}, "session": messages})
-                with open(log_path, "w") as f: json.dump(hist[-10:], f, indent=4)
-            except Exception as e:
-                if debug: console.print(f"[dim red]Debug log failed: {e}[/dim red]")
+            # Auto-save session
+            self.save_session(messages, model=model)
 
         return {
             "response": messages[-1].get("content"), 

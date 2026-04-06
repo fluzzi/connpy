@@ -56,27 +56,31 @@ class configfile:
         '''
         home = os.path.expanduser("~")
         defaultdir = home + '/.config/conn'
-        self.defaultdir = defaultdir
-        Path(defaultdir).mkdir(parents=True, exist_ok=True)
-        Path(f"{defaultdir}/plugins").mkdir(parents=True, exist_ok=True)
-        pathfile = defaultdir + '/.folder'
-        try:
-            with open(pathfile, "r") as f:
-                configdir = f.read().strip()
-        except (FileNotFoundError, IOError):
-            with open(pathfile, "w") as f:
-                f.write(str(defaultdir))
-            configdir = defaultdir
-        defaultfile = configdir + '/config.yaml'
-        self.cachefile = configdir + '/.config.cache.json'
-        self.fzf_cachefile = configdir + '/.fzf_nodes_cache.txt'
-        self.folders_cachefile = configdir + '/.folders_cache.txt'
-        self.profiles_cachefile = configdir + '/.profiles_cache.txt'
-        defaultkey = configdir + '/.osk'
-        if conf == None:
-            self.file = defaultfile
+        
+        if conf is None:
+            # Standard path: use ~/.config/conn and respect .folder redirection
+            self.anchor_path = defaultdir
+            self.defaultdir = defaultdir
+            Path(defaultdir).mkdir(parents=True, exist_ok=True)
             
-            # Backwards compatibility: Migrate from JSON to YAML
+            pathfile = defaultdir + '/.folder'
+            try:
+                with open(pathfile, "r") as f:
+                    configdir = f.read().strip()
+            except (FileNotFoundError, IOError):
+                with open(pathfile, "w") as f:
+                    f.write(str(defaultdir))
+                configdir = defaultdir
+            
+            self.defaultdir = configdir
+            self.file = configdir + '/config.yaml'
+            self.key = key or (configdir + '/.osk')
+
+            # Ensure redirected directories exist
+            Path(configdir).mkdir(parents=True, exist_ok=True)
+            Path(f"{configdir}/plugins").mkdir(parents=True, exist_ok=True)
+            
+            # Backwards compatibility: Migrate from JSON to YAML only for default path
             legacy_json = configdir + '/config.json'
             legacy_noext = configdir + '/config'
             legacy_file = None
@@ -99,38 +103,44 @@ class configfile:
                             os.remove(self.file)
                             printer.warning("YAML verification failed after migration, keeping legacy config.")
                         else:
-                            with open(self.cachefile, 'w') as f:
+                            # Note: cachefile is derived later, we use temp one for migration sync
+                            temp_cache = configdir + '/.config.cache.json'
+                            with open(temp_cache, 'w') as f:
                                 json.dump(old_data, f)
                             shutil.move(legacy_file, legacy_file + ".backup")
                             printer.success(f"Migrated legacy config ({len(old_data.get('connections',{}))} folders/nodes) into YAML and Cache successfully!")
                 except Exception as e:
-                    # Clean up partial YAML if it was created
                     if os.path.exists(self.file):
-                        try:
-                            os.remove(self.file)
-                        except OSError:
-                            pass
+                        try: os.remove(self.file)
+                        except OSError: pass
                     printer.warning(f"Failed to migrate legacy config: {e}")
         else:
-            self.file = conf
-            
-        if key == None:
-            self.key = defaultkey
-        else:
-            self.key = key
+            # Custom path (common in tests): isolate everything to the conf parent directory
+            self.file = os.path.abspath(conf)
+            configdir = os.path.dirname(self.file)
+            self.anchor_path = configdir
+            self.defaultdir = configdir
+            self.key = os.path.abspath(key) if key else (configdir + '/.osk')
+
+        # Sidecar files always live next to the config file (or in the redirected configdir)
+        self.cachefile = configdir + '/.config.cache.json'
+        self.fzf_cachefile = configdir + '/.fzf_nodes_cache.txt'
+        self.folders_cachefile = configdir + '/.folders_cache.txt'
+        self.profiles_cachefile = configdir + '/.profiles_cache.txt'
             
         if os.path.exists(self.file):
             config = self._loadconfig(self.file)
         else:
             config = self._createconfig(self.file)
+            
         self.config = config["config"]
         self.connections = config["connections"]
         self.profiles = config["profiles"]
+        
         if not os.path.exists(self.key):
             self._createkey(self.key)
         with open(self.key) as f:
             self.privatekey = RSA.import_key(f.read())
-            f.close()
         self.publickey = self.privatekey.publickey()
 
         # Self-heal text caches if they are missing

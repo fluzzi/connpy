@@ -117,15 +117,18 @@ class context_manager:
 
 class Preload:
     def __init__(self, connapp):
-        #define contexts if doesn't exist
-        connapp.config.modify(context_manager.add_default_context)
-        #filter nodes using context
         cm = context_manager(connapp)
-        connapp.nodes_list = [node for node in connapp.nodes_list if cm.match_any_regex(node, cm.regex)]
-        connapp.folders = [node for node in connapp.folders if cm.match_any_regex(node, cm.regex)]
+        # Register hooks first so that any save triggers a filtered cache generation
         connapp.config._getallnodes.register_post_hook(cm.modify_node_list)
         connapp.config._getallfolders.register_post_hook(cm.modify_node_list)
         connapp.config._getallnodesfull.register_post_hook(cm.modify_node_dict)
+        
+        # Define contexts if doesn't exist (triggers save/cache generation)
+        connapp.config.modify(context_manager.add_default_context)
+        
+        # Filter in-memory nodes using current context
+        connapp.nodes_list = [node for node in connapp.nodes_list if cm.match_any_regex(node, cm.regex)]
+        connapp.folders = [node for node in connapp.folders if cm.match_any_regex(node, cm.regex)]
 
 class Parser:
     def __init__(self):

@@ -8,7 +8,7 @@ import signal
 
 app = Flask(__name__)
 CORS(app)
-conf = configfile()
+# conf = configfile()  # REMOVED: Item #1 in Roadmap -> Don't instantiate globally
 
 PID_FILE1 = "/run/connpy.pid"
 PID_FILE2 = "/tmp/connpy.pid"
@@ -156,23 +156,23 @@ def stop_api():
     return port
 
 @hooks.MethodHook
-def debug_api(port=8048):
-    app.custom_config = configfile()
+def debug_api(port=8048, config=None):
+    app.custom_config = config or configfile()
     app.run(debug=True, port=port)
 
 @hooks.MethodHook
-def start_server(port=8048):
-    app.custom_config = configfile()
+def start_server(port=8048, config=None):
+    app.custom_config = config or configfile()
     serve(app, host='0.0.0.0', port=port)
 
 @hooks.MethodHook
-def start_api(port=8048):
+def start_api(port=8048, config=None):
     if os.path.exists(PID_FILE1) or os.path.exists(PID_FILE2):
         printer.warning("Connpy server is already running.")
         return
     pid = os.fork()
     if pid == 0:
-        start_server(port)
+        start_server(port, config=config)
     else:
         try:
             with open(PID_FILE1, "w") as f:
