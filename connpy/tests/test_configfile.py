@@ -307,8 +307,9 @@ class TestGetAll:
         assert "server1@office" not in nodes
 
     def test_getallnodes_filter_invalid_type(self, populated_config):
-        with pytest.raises(ValueError):
+        with pytest.raises(SystemExit) as exc:
             populated_config._getallnodes(123)
+        assert exc.value.code == 1
 
     def test_getallfolders(self, populated_config):
         folders = populated_config._getallfolders()

@@ -13,8 +13,9 @@ import threading
 from pathlib import Path
 from copy import deepcopy
 from .hooks import ClassHook, MethodHook
-from . import printer
 import io
+from . import printer
+
 
 #functions and classes
 @ClassHook
@@ -99,6 +100,8 @@ class node:
                 profile = re.search("^@(.*)", password[i])
                 if profile and config != '':
                     self.password.append(config.profiles[profile.group(1)]["password"])
+                else:
+                    self.password.append(password[i])
         else:
             self.password = [password]
         if self.jumphost != "" and config != '':
@@ -121,6 +124,8 @@ class node:
                     profile = re.search("^@(.*)", self.jumphost["password"][i])
                     if profile:
                         jumphost_password.append(config.profiles[profile.group(1)]["password"])
+                    else:
+                        jumphost_password.append(self.jumphost["password"][i])
                 self.jumphost["password"] = jumphost_password
             else:
                 self.jumphost["password"] = [self.jumphost["password"]]
@@ -159,7 +164,9 @@ class node:
                     decrypted = decryptor.decrypt(ast.literal_eval(passwd)).decode("utf-8")
                     dpass.append(decrypted)
                 except Exception:
-                    raise ValueError("Missing or corrupted key")
+                    printer.error("Decryption failed: Missing or corrupted key.")
+                    printer.info("Verify your RSA key and configuration settings.")
+                    sys.exit(1)
         return dpass
 
     
@@ -242,7 +249,7 @@ class node:
 
 
     @MethodHook
-    def interact(self, debug = False):
+    def interact(self, debug = False, logger = None):
         '''
         Allow user to interact with the node directly, mostly used by connection manager.
 
@@ -250,12 +257,15 @@ class node:
 
             - debug (bool): If True, display all the connecting information 
                             before interact. Default False.  
+            - logger (callable): Optional callback for status reporting.
         '''
-        connect = self._connect(debug = debug)
+        connect = self._connect(debug = debug, logger = logger)
         if connect == True:
             size = re.search('columns=([0-9]+).*lines=([0-9]+)',str(os.get_terminal_size()))
             self.child.setwinsize(int(size.group(2)),int(size.group(1)))
-            printer.success("Connected to " + self.unique + " at " + self.host + (":" if self.port != '' else '') + self.port + " via: " + self.protocol)
+            if logger:
+                logger("success", "Connected to " + self.unique + " at " + self.host + (":" if self.port != '' else '') + self.port + " via: " + self.protocol)
+
             if 'logfile' in dir(self):
                 # Initialize self.mylog
                 if not 'mylog' in dir(self):
@@ -280,13 +290,18 @@ class node:
                     f.write(self._logclean(self.mylog.getvalue().decode(), True))
 
         else:
-            printer.error(connect)
-            exit(1)
+            if logger:
+                logger("error", str(connect))
+            else:
+                printer.error(f"Connection failed: {str(connect)}")
+            sys.exit(1)
+
 
     @MethodHook
-    def run(self, commands, vars = None,*, folder = '', prompt = r'>$|#$|\$$|>.$|#.$|\$.$', stdout = False, timeout = 10):
+    def run(self, commands, vars = None,*, folder = '', prompt = r'>$|#$|\$$|>.$|#.$|\$.$', stdout = False, timeout = 10, logger = None):
         '''
         Run a command or list of commands on the node and return the output.
+
 
         ### Parameters:  
 
@@ -324,9 +339,12 @@ class node:
             str: Output of the commands you ran on the node.
 
         '''
-        connect = self._connect(timeout = timeout)
+        connect = self._connect(timeout = timeout, logger = logger)
         now = datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S')
         if connect == True:
+            if logger:
+                logger("success", "Connected to " + self.unique + " at " + self.host + (":" if self.port != '' else '') + self.port + " via: " + self.protocol)
+
             # Attempt to set the terminal size
             try:
                 self.child.setwinsize(65535, 65535)
@@ -338,6 +356,7 @@ class node:
             if "prompt" in self.tags:
                 prompt = self.tags["prompt"]
             expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
+
             output = ''
             status = ''
             if not isinstance(commands, list):
@@ -357,8 +376,8 @@ class node:
                 result = self.child.expect(expects, timeout = timeout)
             self.child.close()
             output = self._logclean(self.mylog.getvalue().decode(), True)
-            if stdout == True:
-                print(output)
+            if logger:
+                logger("output", output)
             if folder != '':
                 with open(folder + "/" + self.unique + "_" + now + ".txt", "w") as f:
                     f.write(output)
@@ -372,18 +391,20 @@ class node:
         else:
             self.output = connect
             self.status = 1
-            if stdout == True:
-                print(connect)
+            if logger:
+                logger("error", f"Connection failed: {connect}")
             if folder != '':
                 with open(folder + "/" + self.unique + "_" + now + ".txt", "w") as f:
                     f.write(connect)
+
                     f.close()
             return connect
 
     @MethodHook
-    def test(self, commands, expected, vars = None,*, prompt = r'>$|#$|\$$|>.$|#.$|\$.$', timeout = 10):
+    def test(self, commands, expected, vars = None,*, prompt = r'>$|#$|\$$|>.$|#.$|\$.$', timeout = 10, logger = None):
         '''
         Run a command or list of commands on the node, then check if expected value appears on the output after the last command.
+
 
         ### Parameters:  
 
@@ -420,8 +441,11 @@ class node:
                   false if prompt is found before.
 
         '''
-        connect = self._connect(timeout = timeout)
+        connect = self._connect(timeout = timeout, logger = logger)
         if connect == True:
+            if logger:
+                logger("success", "Connected to " + self.unique + " at " + self.host + (":" if self.port != '' else '') + self.port + " via: " + self.protocol)
+
             # Attempt to set the terminal size
             try:
                 self.child.setwinsize(65535, 65535)
@@ -536,12 +560,14 @@ class node:
         elif self.protocol == "docker":
             return self._generate_docker_cmd()
         else:
-            raise ValueError(f"Invalid protocol: {self.protocol}")
+            printer.error(f"Invalid protocol: {self.protocol}")
+            sys.exit(1)
 
     @MethodHook
-    def _connect(self, debug=False, timeout=10, max_attempts=3):
+    def _connect(self, debug=False, timeout=10, max_attempts=3, logger=None):
+
         cmd = self._get_cmd()
-        passwords = self._passtx(self.password) if self.password[0] else []
+        passwords = self._passtx(self.password) if self.password and any(self.password) else []
         if self.logs != '':
             self.logfile = self._logfile()
         default_prompt = r'>$|#$|\$$|>.$|#.$|\$.$'
@@ -586,9 +612,11 @@ class node:
             if isinstance(self.tags, dict) and self.tags.get("console"):
                 child.sendline()
             if debug:
-                printer.debug(f"Command:\n{cmd}")
+                if logger:
+                    logger("debug", f"Command:\n{cmd}")
                 self.mylog = io.BytesIO()
                 child.logfile_read = self.mylog
+
 
             endloop = False
             for i in range(len(passwords) if passwords else 1):
@@ -710,9 +738,10 @@ class nodes:
 
 
     @MethodHook
-    def run(self, commands, vars = None,*, folder = None, prompt = None, stdout = None, parallel = 10, timeout = None, on_complete = None):
+    def run(self, commands, vars = None,*, folder = None, prompt = None, stdout = None, parallel = 10, timeout = None, on_complete = None, logger = None):
         '''
         Run a command or list of commands on all the nodes in nodelist.
+
 
         ### Parameters:  
 
@@ -792,11 +821,17 @@ class nodes:
                     nodesargs[n.unique]["vars"].update(vars["__global__"])
                 if n.unique in vars.keys():
                     nodesargs[n.unique]["vars"].update(vars[n.unique])
+            
+            # Pass the logger to the node
+            nodesargs[n.unique]["logger"] = logger
+
             if on_complete:
                 tasks.append(threading.Thread(target=_run_node, args=(n, nodesargs[n.unique], on_complete)))
             else:
                 tasks.append(threading.Thread(target=n.run, kwargs=nodesargs[n.unique]))
+
         taskslist = list(self._splitlist(tasks, parallel))
+
         for t in taskslist:
             for i in t:
                 i.start()
@@ -810,9 +845,10 @@ class nodes:
         return output
 
     @MethodHook
-    def test(self, commands, expected, vars = None,*, prompt = None, parallel = 10, timeout = None):
+    def test(self, commands, expected, vars = None,*, prompt = None, parallel = 10, timeout = None, on_complete = None, logger = None):
         '''
         Run a command or list of commands on all the nodes in nodelist, then check if expected value appears on the output after the last command.
+
 
         ### Parameters:  
 
@@ -848,6 +884,11 @@ class nodes:
             - timeout  (int): Time in seconds for expect to wait for prompt/EOF.
                               default 10.
 
+            - on_complete (callable): Optional callback called when each node 
+                                      finishes. Receives (unique, output, status).
+                                      Called from the node's thread so it must
+                                      be thread-safe.
+
         ### Returns:  
 
             dict: Dictionary formed by nodes unique as keys, value is True if 
@@ -867,6 +908,13 @@ class nodes:
         result = {}
         status = {}
         tasks = []
+
+        def _test_node(node_obj, node_args, callback):
+            """Wrapper that runs a node test and fires the callback on completion."""
+            node_obj.test(**node_args)
+            if callback:
+                callback(node_obj.unique, node_obj.output, node_obj.status, node_obj.result)
+
         for n in self.nodelist:
             nodesargs[n.unique] = deepcopy(args)
             if vars != None:
@@ -875,7 +923,13 @@ class nodes:
                     nodesargs[n.unique]["vars"].update(vars["__global__"])
                 if n.unique in vars.keys():
                     nodesargs[n.unique]["vars"].update(vars[n.unique])
-            tasks.append(threading.Thread(target=n.test, kwargs=nodesargs[n.unique]))
+            nodesargs[n.unique]["logger"] = logger
+            
+            if on_complete:
+                tasks.append(threading.Thread(target=_test_node, args=(n, nodesargs[n.unique], on_complete)))
+            else:
+                tasks.append(threading.Thread(target=n.test, kwargs=nodesargs[n.unique]))
+
         taskslist = list(self._splitlist(tasks, parallel))
         for t in taskslist:
             for i in t:

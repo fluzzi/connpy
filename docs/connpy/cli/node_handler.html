@@ -1,0 +1,604 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<meta name="generator" content="pdoc3 0.11.5">
+<title>connpy.cli.node_handler API documentation</title>
+<meta name="description" content="">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:1.5em;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:2em 0 .50em 0}h3{font-size:1.4em;margin:1.6em 0 .7em 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .2s ease-in-out}a:visited{color:#503}a:hover{color:#b62}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900;font-weight:bold}pre code{font-size:.8em;line-height:1.4em;padding:1em;display:block}code{background:#f3f3f3;font-family:"DejaVu Sans Mono",monospace;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source > summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible;min-width:max-content}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em 1em;margin:1em 0}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul ul{padding-left:1em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha512-D9gUyxqja7hBtkWpPWGt9wfbfaMGVt9gnyCvYa+jojwwPHLCzUm5i8rpk7vD7wNee9bA35eYIjobYPaQuKS1MQ==" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => {
+hljs.configure({languages: ['bash', 'css', 'diff', 'graphql', 'ini', 'javascript', 'json', 'plaintext', 'python', 'python-repl', 'rust', 'shell', 'sql', 'typescript', 'xml', 'yaml']});
+hljs.highlightAll();
+/* Collapse source docstrings */
+setTimeout(() => {
+[...document.querySelectorAll('.hljs.language-python > .hljs-string')]
+.filter(el => el.innerHTML.length > 200 && ['"""', "'''"].includes(el.innerHTML.substring(0, 3)))
+.forEach(el => {
+let d = document.createElement('details');
+d.classList.add('hljs-string');
+d.innerHTML = '<summary>"""</summary>' + el.innerHTML.substring(3);
+el.replaceWith(d);
+});
+}, 100);
+})</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>connpy.cli.node_handler</code></h1>
+</header>
+<section id="section-intro">
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="connpy.cli.node_handler.NodeHandler"><code class="flex name class">
+<span>class <span class="ident">NodeHandler</span></span>
+<span>(</span><span>app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class NodeHandler:
+    def __init__(self, app):
+        self.app = app
+        self.forms = Forms(app)
+
+    def dispatch(self, args):
+        if not self.app.case and args.data != None:
+            args.data = args.data.lower()
+        actions = {&#34;version&#34;: self.version, &#34;connect&#34;: self.connect, &#34;add&#34;: self.add, &#34;del&#34;: self.delete, &#34;mod&#34;: self.modify, &#34;show&#34;: self.show}
+        return actions.get(args.action)(args)
+
+    def version(self, args):
+        from .._version import __version__
+        printer.info(f&#34;Connpy {__version__}&#34;)
+
+    def connect(self, args):
+        if args.data == None:
+            try:
+                matches = self.app.services.nodes.list_nodes()
+            except Exception as e:
+                printer.error(f&#34;Failed to list nodes: {e}&#34;)
+                sys.exit(1)
+                
+            if len(matches) == 0:
+                printer.warning(&#34;There are no nodes created&#34;)
+                printer.info(&#34;try: connpy --help&#34;)
+                sys.exit(9)
+        else:
+            try:
+                matches = self.app.services.nodes.list_nodes(args.data)
+            except Exception:
+                matches = []
+
+        if len(matches) == 0:
+            printer.error(f&#34;{args.data} not found&#34;)
+            sys.exit(2)
+        elif len(matches) &gt; 1:
+            matches[0] = choose(self.app, matches, &#34;node&#34;, &#34;connect&#34;)
+            
+        if matches[0] == None:
+            sys.exit(7)
+            
+        try:
+            self.app.services.nodes.connect_node(
+                matches[0], 
+                sftp=args.sftp, 
+                debug=args.debug, 
+                logger=self.app._service_logger
+            )
+        except ConnpyError as e:
+            printer.error(str(e))
+            sys.exit(1)
+
+    def delete(self, args):
+        if args.data == None:
+            printer.error(&#34;Missing argument node&#34;)
+            sys.exit(3)
+        
+        is_folder = args.data.startswith(&#34;@&#34;)
+        try:
+            if is_folder:
+                matches = self.app.services.nodes.list_folders(args.data)
+            else:
+                matches = self.app.services.nodes.list_nodes(args.data)
+        except Exception:
+            matches = []
+
+        if len(matches) == 0:
+            printer.error(f&#34;{args.data} not found&#34;)
+            sys.exit(2)
+
+        printer.info(f&#34;Removing: {matches}&#34;)
+        question = [inquirer.Confirm(&#34;delete&#34;, message=&#34;Are you sure you want to continue?&#34;)]
+        confirm = inquirer.prompt(question)
+        if confirm == None or not confirm[&#34;delete&#34;]:
+            sys.exit(7)
+
+        try:
+            for item in matches:
+                self.app.services.nodes.delete_node(item, is_folder=is_folder)
+            
+            if len(matches) == 1:
+                printer.success(f&#34;{matches[0]} deleted successfully&#34;)
+            else:
+                printer.success(f&#34;{len(matches)} items deleted successfully&#34;)
+        except ConnpyError as e:
+            printer.error(str(e))
+            sys.exit(1)
+
+    def add(self, args):
+        try:
+            args.data = self.app._type_node(args.data)
+        except ValueError as e:
+            printer.error(str(e))
+            sys.exit(3)
+            
+        if args.data == None:
+            printer.error(&#34;Missing argument node&#34;)
+            sys.exit(3)
+            
+        is_folder = args.data.startswith(&#34;@&#34;)
+        try:
+            if is_folder:
+                uniques = self.app.services.nodes.explode_unique(args.data)
+                if not uniques:
+                    raise InvalidConfigurationError(f&#34;Invalid folder {args.data}&#34;)
+                self.app.services.nodes.add_node(args.data, {}, is_folder=True)
+                printer.success(f&#34;{args.data} added successfully&#34;)
+            else:
+                if args.data in self.app.nodes_list:
+                    printer.error(f&#34;Node &#39;{args.data}&#39; already exists.&#34;)
+                    sys.exit(1)
+                uniques = self.app.services.nodes.explode_unique(args.data)
+                printer.console.print(Markdown(get_instructions()))
+
+                new_node_data = self.forms.questions_nodes(args.data, uniques)
+                if not new_node_data:
+                    sys.exit(7)
+                self.app.services.nodes.add_node(args.data, new_node_data)
+                printer.success(f&#34;{args.data} added successfully&#34;)
+        except ConnpyError as e:
+            printer.error(str(e))
+            sys.exit(1)
+
+    def show(self, args):
+        if args.data == None:
+            printer.error(&#34;Missing argument node&#34;)
+            sys.exit(3)
+            
+        try:
+            matches = self.app.services.nodes.list_nodes(args.data)
+        except Exception:
+            matches = []
+
+        if len(matches) == 0:
+            printer.error(f&#34;{args.data} not found&#34;)
+            sys.exit(2)
+        elif len(matches) &gt; 1:
+            matches[0] = choose(self.app, matches, &#34;node&#34;, &#34;show&#34;)
+            
+        if matches[0] == None:
+            sys.exit(7)
+            
+        try:
+            node = self.app.services.nodes.get_node_details(matches[0])
+            yaml_output = yaml.dump(node, sort_keys=False, default_flow_style=False)
+            printer.data(matches[0], yaml_output)
+        except ConnpyError as e:
+            printer.error(str(e))
+            sys.exit(1)
+
+    def modify(self, args):
+        if args.data == None:
+            printer.error(&#34;Missing argument node&#34;)
+            sys.exit(3)
+            
+        try:
+            matches = self.app.services.nodes.list_nodes(args.data)
+        except Exception:
+            matches = []
+            
+        if len(matches) == 0:
+            printer.error(f&#34;No connection found with filter: {args.data}&#34;)
+            sys.exit(2)
+            
+        unique = matches[0] if len(matches) == 1 else None
+        uniques = self.app.services.nodes.explode_unique(unique) if unique else {&#34;id&#34;: None, &#34;folder&#34;: None}
+        
+        printer.info(f&#34;Editing: {matches}&#34;)
+        node_details = {}
+        for i in matches:
+            node_details[i] = self.app.services.nodes.get_node_details(i)
+            
+        edits = self.forms.questions_edit()
+        if edits == None:
+            sys.exit(7)
+            
+        # Use first match as base for defaults if multiple matches exist
+        base_unique = matches[0]
+        base_uniques = self.app.services.nodes.explode_unique(base_unique)
+        updatenode = self.forms.questions_nodes(base_unique, base_uniques, edit=edits)
+        if not updatenode:
+            sys.exit(7)
+            
+        try:
+            if len(matches) == 1:
+                # Comparison for &#34;Nothing to do&#34;
+                current = node_details[matches[0]].copy()
+                current.update(uniques)
+                current[&#34;type&#34;] = &#34;connection&#34;
+                if sorted(updatenode.items()) == sorted(current.items()):
+                    printer.info(&#34;Nothing to do here&#34;)
+                    return
+                self.app.services.nodes.update_node(matches[0], updatenode)
+                printer.success(f&#34;{args.data} edited successfully&#34;)
+            else:
+                editcount = 0
+                for k in matches:
+                    updated_item = self.app.services.nodes.explode_unique(k)
+                    updated_item[&#34;type&#34;] = &#34;connection&#34;
+                    updated_item.update(node_details[k])
+                    
+                    this_item_changed = False
+                    for key, should_edit in edits.items():
+                        if should_edit:
+                            this_item_changed = True
+                            updated_item[key] = updatenode[key]
+                    
+                    if this_item_changed:
+                        editcount += 1
+                        self.app.services.nodes.update_node(k, updated_item)
+                
+                if editcount == 0:
+                    printer.info(&#34;Nothing to do here&#34;)
+                else:
+                    printer.success(f&#34;{matches} edited successfully&#34;)
+        except ConnpyError as e:
+            printer.error(str(e))
+            sys.exit(1)</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.cli.node_handler.NodeHandler.add"><code class="name flex">
+<span>def <span class="ident">add</span></span>(<span>self, args)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def add(self, args):
+    try:
+        args.data = self.app._type_node(args.data)
+    except ValueError as e:
+        printer.error(str(e))
+        sys.exit(3)
+        
+    if args.data == None:
+        printer.error(&#34;Missing argument node&#34;)
+        sys.exit(3)
+        
+    is_folder = args.data.startswith(&#34;@&#34;)
+    try:
+        if is_folder:
+            uniques = self.app.services.nodes.explode_unique(args.data)
+            if not uniques:
+                raise InvalidConfigurationError(f&#34;Invalid folder {args.data}&#34;)
+            self.app.services.nodes.add_node(args.data, {}, is_folder=True)
+            printer.success(f&#34;{args.data} added successfully&#34;)
+        else:
+            if args.data in self.app.nodes_list:
+                printer.error(f&#34;Node &#39;{args.data}&#39; already exists.&#34;)
+                sys.exit(1)
+            uniques = self.app.services.nodes.explode_unique(args.data)
+            printer.console.print(Markdown(get_instructions()))
+
+            new_node_data = self.forms.questions_nodes(args.data, uniques)
+            if not new_node_data:
+                sys.exit(7)
+            self.app.services.nodes.add_node(args.data, new_node_data)
+            printer.success(f&#34;{args.data} added successfully&#34;)
+    except ConnpyError as e:
+        printer.error(str(e))
+        sys.exit(1)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.cli.node_handler.NodeHandler.connect"><code class="name flex">
+<span>def <span class="ident">connect</span></span>(<span>self, args)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def connect(self, args):
+    if args.data == None:
+        try:
+            matches = self.app.services.nodes.list_nodes()
+        except Exception as e:
+            printer.error(f&#34;Failed to list nodes: {e}&#34;)
+            sys.exit(1)
+            
+        if len(matches) == 0:
+            printer.warning(&#34;There are no nodes created&#34;)
+            printer.info(&#34;try: connpy --help&#34;)
+            sys.exit(9)
+    else:
+        try:
+            matches = self.app.services.nodes.list_nodes(args.data)
+        except Exception:
+            matches = []
+
+    if len(matches) == 0:
+        printer.error(f&#34;{args.data} not found&#34;)
+        sys.exit(2)
+    elif len(matches) &gt; 1:
+        matches[0] = choose(self.app, matches, &#34;node&#34;, &#34;connect&#34;)
+        
+    if matches[0] == None:
+        sys.exit(7)
+        
+    try:
+        self.app.services.nodes.connect_node(
+            matches[0], 
+            sftp=args.sftp, 
+            debug=args.debug, 
+            logger=self.app._service_logger
+        )
+    except ConnpyError as e:
+        printer.error(str(e))
+        sys.exit(1)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.cli.node_handler.NodeHandler.delete"><code class="name flex">
+<span>def <span class="ident">delete</span></span>(<span>self, args)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def delete(self, args):
+    if args.data == None:
+        printer.error(&#34;Missing argument node&#34;)
+        sys.exit(3)
+    
+    is_folder = args.data.startswith(&#34;@&#34;)
+    try:
+        if is_folder:
+            matches = self.app.services.nodes.list_folders(args.data)
+        else:
+            matches = self.app.services.nodes.list_nodes(args.data)
+    except Exception:
+        matches = []
+
+    if len(matches) == 0:
+        printer.error(f&#34;{args.data} not found&#34;)
+        sys.exit(2)
+
+    printer.info(f&#34;Removing: {matches}&#34;)
+    question = [inquirer.Confirm(&#34;delete&#34;, message=&#34;Are you sure you want to continue?&#34;)]
+    confirm = inquirer.prompt(question)
+    if confirm == None or not confirm[&#34;delete&#34;]:
+        sys.exit(7)
+
+    try:
+        for item in matches:
+            self.app.services.nodes.delete_node(item, is_folder=is_folder)
+        
+        if len(matches) == 1:
+            printer.success(f&#34;{matches[0]} deleted successfully&#34;)
+        else:
+            printer.success(f&#34;{len(matches)} items deleted successfully&#34;)
+    except ConnpyError as e:
+        printer.error(str(e))
+        sys.exit(1)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.cli.node_handler.NodeHandler.dispatch"><code class="name flex">
+<span>def <span class="ident">dispatch</span></span>(<span>self, args)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def dispatch(self, args):
+    if not self.app.case and args.data != None:
+        args.data = args.data.lower()
+    actions = {&#34;version&#34;: self.version, &#34;connect&#34;: self.connect, &#34;add&#34;: self.add, &#34;del&#34;: self.delete, &#34;mod&#34;: self.modify, &#34;show&#34;: self.show}
+    return actions.get(args.action)(args)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.cli.node_handler.NodeHandler.modify"><code class="name flex">
+<span>def <span class="ident">modify</span></span>(<span>self, args)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def modify(self, args):
+    if args.data == None:
+        printer.error(&#34;Missing argument node&#34;)
+        sys.exit(3)
+        
+    try:
+        matches = self.app.services.nodes.list_nodes(args.data)
+    except Exception:
+        matches = []
+        
+    if len(matches) == 0:
+        printer.error(f&#34;No connection found with filter: {args.data}&#34;)
+        sys.exit(2)
+        
+    unique = matches[0] if len(matches) == 1 else None
+    uniques = self.app.services.nodes.explode_unique(unique) if unique else {&#34;id&#34;: None, &#34;folder&#34;: None}
+    
+    printer.info(f&#34;Editing: {matches}&#34;)
+    node_details = {}
+    for i in matches:
+        node_details[i] = self.app.services.nodes.get_node_details(i)
+        
+    edits = self.forms.questions_edit()
+    if edits == None:
+        sys.exit(7)
+        
+    # Use first match as base for defaults if multiple matches exist
+    base_unique = matches[0]
+    base_uniques = self.app.services.nodes.explode_unique(base_unique)
+    updatenode = self.forms.questions_nodes(base_unique, base_uniques, edit=edits)
+    if not updatenode:
+        sys.exit(7)
+        
+    try:
+        if len(matches) == 1:
+            # Comparison for &#34;Nothing to do&#34;
+            current = node_details[matches[0]].copy()
+            current.update(uniques)
+            current[&#34;type&#34;] = &#34;connection&#34;
+            if sorted(updatenode.items()) == sorted(current.items()):
+                printer.info(&#34;Nothing to do here&#34;)
+                return
+            self.app.services.nodes.update_node(matches[0], updatenode)
+            printer.success(f&#34;{args.data} edited successfully&#34;)
+        else:
+            editcount = 0
+            for k in matches:
+                updated_item = self.app.services.nodes.explode_unique(k)
+                updated_item[&#34;type&#34;] = &#34;connection&#34;
+                updated_item.update(node_details[k])
+                
+                this_item_changed = False
+                for key, should_edit in edits.items():
+                    if should_edit:
+                        this_item_changed = True
+                        updated_item[key] = updatenode[key]
+                
+                if this_item_changed:
+                    editcount += 1
+                    self.app.services.nodes.update_node(k, updated_item)
+            
+            if editcount == 0:
+                printer.info(&#34;Nothing to do here&#34;)
+            else:
+                printer.success(f&#34;{matches} edited successfully&#34;)
+    except ConnpyError as e:
+        printer.error(str(e))
+        sys.exit(1)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.cli.node_handler.NodeHandler.show"><code class="name flex">
+<span>def <span class="ident">show</span></span>(<span>self, args)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def show(self, args):
+    if args.data == None:
+        printer.error(&#34;Missing argument node&#34;)
+        sys.exit(3)
+        
+    try:
+        matches = self.app.services.nodes.list_nodes(args.data)
+    except Exception:
+        matches = []
+
+    if len(matches) == 0:
+        printer.error(f&#34;{args.data} not found&#34;)
+        sys.exit(2)
+    elif len(matches) &gt; 1:
+        matches[0] = choose(self.app, matches, &#34;node&#34;, &#34;show&#34;)
+        
+    if matches[0] == None:
+        sys.exit(7)
+        
+    try:
+        node = self.app.services.nodes.get_node_details(matches[0])
+        yaml_output = yaml.dump(node, sort_keys=False, default_flow_style=False)
+        printer.data(matches[0], yaml_output)
+    except ConnpyError as e:
+        printer.error(str(e))
+        sys.exit(1)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.cli.node_handler.NodeHandler.version"><code class="name flex">
+<span>def <span class="ident">version</span></span>(<span>self, args)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def version(self, args):
+    from .._version import __version__
+    printer.info(f&#34;Connpy {__version__}&#34;)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="connpy.cli" href="index.html">connpy.cli</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="connpy.cli.node_handler.NodeHandler" href="#connpy.cli.node_handler.NodeHandler">NodeHandler</a></code></h4>
+<ul class="two-column">
+<li><code><a title="connpy.cli.node_handler.NodeHandler.add" href="#connpy.cli.node_handler.NodeHandler.add">add</a></code></li>
+<li><code><a title="connpy.cli.node_handler.NodeHandler.connect" href="#connpy.cli.node_handler.NodeHandler.connect">connect</a></code></li>
+<li><code><a title="connpy.cli.node_handler.NodeHandler.delete" href="#connpy.cli.node_handler.NodeHandler.delete">delete</a></code></li>
+<li><code><a title="connpy.cli.node_handler.NodeHandler.dispatch" href="#connpy.cli.node_handler.NodeHandler.dispatch">dispatch</a></code></li>
+<li><code><a title="connpy.cli.node_handler.NodeHandler.modify" href="#connpy.cli.node_handler.NodeHandler.modify">modify</a></code></li>
+<li><code><a title="connpy.cli.node_handler.NodeHandler.show" href="#connpy.cli.node_handler.NodeHandler.show">show</a></code></li>
+<li><code><a title="connpy.cli.node_handler.NodeHandler.version" href="#connpy.cli.node_handler.NodeHandler.version">version</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
+</footer>
+</body>
+</html>

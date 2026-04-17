@@ -64,7 +64,7 @@ el.replaceWith(d);
         subdir = tmp_path / &#34;subdir&#34;
         subdir.mkdir()
 
-        result = _getcwd([&#34;run&#34;, &#34;run&#34;], &#34;run&#34;)
+        result = get_cwd([&#34;run&#34;, &#34;run&#34;])
         # Should list files
         assert any(&#34;file1.txt&#34; in r for r in result)
         assert any(&#34;subdir/&#34; in r for r in result)
@@ -75,7 +75,7 @@ el.replaceWith(d);
         (tmp_path / &#34;script.yaml&#34;).touch()
         (tmp_path / &#34;script2.yaml&#34;).touch()
 
-        result = _getcwd([&#34;run&#34;, &#34;script&#34;], &#34;run&#34;)
+        result = get_cwd([&#34;run&#34;, &#34;script&#34;])
         assert any(&#34;script&#34; in r for r in result)
 
     def test_folder_only(self, tmp_path, monkeypatch):
@@ -85,7 +85,7 @@ el.replaceWith(d);
         subdir = tmp_path / &#34;mydir&#34;
         subdir.mkdir()
 
-        result = _getcwd([&#34;export&#34;, &#34;export&#34;], &#34;export&#34;, folderonly=True)
+        result = get_cwd([&#34;export&#34;, &#34;export&#34;], folderonly=True)
         files_in_result = [r for r in result if &#34;file.txt&#34; in r]
         assert len(files_in_result) == 0
         dirs_in_result = [r for r in result if &#34;mydir&#34; in r]
@@ -110,7 +110,7 @@ el.replaceWith(d);
     subdir = tmp_path / &#34;subdir&#34;
     subdir.mkdir()
 
-    result = _getcwd([&#34;run&#34;, &#34;run&#34;], &#34;run&#34;)
+    result = get_cwd([&#34;run&#34;, &#34;run&#34;])
     # Should list files
     assert any(&#34;file1.txt&#34; in r for r in result)
     assert any(&#34;subdir/&#34; in r for r in result)</code></pre>
@@ -132,7 +132,7 @@ el.replaceWith(d);
     subdir = tmp_path / &#34;mydir&#34;
     subdir.mkdir()
 
-    result = _getcwd([&#34;export&#34;, &#34;export&#34;], &#34;export&#34;, folderonly=True)
+    result = get_cwd([&#34;export&#34;, &#34;export&#34;], folderonly=True)
     files_in_result = [r for r in result if &#34;file.txt&#34; in r]
     assert len(files_in_result) == 0
     dirs_in_result = [r for r in result if &#34;mydir&#34; in r]
@@ -154,176 +154,10 @@ el.replaceWith(d);
     (tmp_path / &#34;script.yaml&#34;).touch()
     (tmp_path / &#34;script2.yaml&#34;).touch()
 
-    result = _getcwd([&#34;run&#34;, &#34;script&#34;], &#34;run&#34;)
+    result = get_cwd([&#34;run&#34;, &#34;script&#34;])
     assert any(&#34;script&#34; in r for r in result)</code></pre>
 </details>
 <div class="desc"><p>Lists files matching a partial path.</p></div>
-</dd>
-</dl>
-</dd>
-<dt id="connpy.tests.test_completion.TestGetPlugins"><code class="flex name class">
-<span>class <span class="ident">TestGetPlugins</span></span>
-</code></dt>
-<dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">class TestGetPlugins:
-    def test_get_plugins_disable(self, tmp_path):
-        &#34;&#34;&#34;--disable returns enabled plugins.&#34;&#34;&#34;
-        plugin_dir = tmp_path / &#34;plugins&#34;
-        plugin_dir.mkdir()
-        (plugin_dir / &#34;active.py&#34;).touch()
-        (plugin_dir / &#34;disabled.py.bkp&#34;).touch()
-
-        result = _get_plugins(&#34;--disable&#34;, str(tmp_path))
-        assert &#34;active&#34; in result
-        assert &#34;disabled&#34; not in result
-
-    def test_get_plugins_enable(self, tmp_path):
-        &#34;&#34;&#34;--enable returns disabled plugins.&#34;&#34;&#34;
-        plugin_dir = tmp_path / &#34;plugins&#34;
-        plugin_dir.mkdir()
-        (plugin_dir / &#34;active.py&#34;).touch()
-        (plugin_dir / &#34;disabled.py.bkp&#34;).touch()
-
-        result = _get_plugins(&#34;--enable&#34;, str(tmp_path))
-        assert &#34;disabled&#34; in result
-        assert &#34;active&#34; not in result
-
-    def test_get_plugins_del(self, tmp_path):
-        &#34;&#34;&#34;--del returns all plugins.&#34;&#34;&#34;
-        plugin_dir = tmp_path / &#34;plugins&#34;
-        plugin_dir.mkdir()
-        (plugin_dir / &#34;active.py&#34;).touch()
-        (plugin_dir / &#34;disabled.py.bkp&#34;).touch()
-
-        result = _get_plugins(&#34;--del&#34;, str(tmp_path))
-        assert &#34;active&#34; in result
-        assert &#34;disabled&#34; in result
-
-    def test_get_plugins_all(self, tmp_path):
-        &#34;&#34;&#34;&#39;all&#39; returns dict with paths.&#34;&#34;&#34;
-        plugin_dir = tmp_path / &#34;plugins&#34;
-        plugin_dir.mkdir()
-        (plugin_dir / &#34;myplugin.py&#34;).touch()
-
-        result = _get_plugins(&#34;all&#34;, str(tmp_path))
-        assert isinstance(result, dict)
-        assert &#34;myplugin&#34; in result
-
-    def test_get_plugins_empty_dir(self, tmp_path):
-        &#34;&#34;&#34;Empty plugins directory returns empty list.&#34;&#34;&#34;
-        plugin_dir = tmp_path / &#34;plugins&#34;
-        plugin_dir.mkdir()
-
-        result = _get_plugins(&#34;--disable&#34;, str(tmp_path))
-        assert result == []</code></pre>
-</details>
-<div class="desc"></div>
-<h3>Methods</h3>
-<dl>
-<dt id="connpy.tests.test_completion.TestGetPlugins.test_get_plugins_all"><code class="name flex">
-<span>def <span class="ident">test_get_plugins_all</span></span>(<span>self, tmp_path)</span>
-</code></dt>
-<dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def test_get_plugins_all(self, tmp_path):
-    &#34;&#34;&#34;&#39;all&#39; returns dict with paths.&#34;&#34;&#34;
-    plugin_dir = tmp_path / &#34;plugins&#34;
-    plugin_dir.mkdir()
-    (plugin_dir / &#34;myplugin.py&#34;).touch()
-
-    result = _get_plugins(&#34;all&#34;, str(tmp_path))
-    assert isinstance(result, dict)
-    assert &#34;myplugin&#34; in result</code></pre>
-</details>
-<div class="desc"><p>'all' returns dict with paths.</p></div>
-</dd>
-<dt id="connpy.tests.test_completion.TestGetPlugins.test_get_plugins_del"><code class="name flex">
-<span>def <span class="ident">test_get_plugins_del</span></span>(<span>self, tmp_path)</span>
-</code></dt>
-<dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def test_get_plugins_del(self, tmp_path):
-    &#34;&#34;&#34;--del returns all plugins.&#34;&#34;&#34;
-    plugin_dir = tmp_path / &#34;plugins&#34;
-    plugin_dir.mkdir()
-    (plugin_dir / &#34;active.py&#34;).touch()
-    (plugin_dir / &#34;disabled.py.bkp&#34;).touch()
-
-    result = _get_plugins(&#34;--del&#34;, str(tmp_path))
-    assert &#34;active&#34; in result
-    assert &#34;disabled&#34; in result</code></pre>
-</details>
-<div class="desc"><p>&ndash;del returns all plugins.</p></div>
-</dd>
-<dt id="connpy.tests.test_completion.TestGetPlugins.test_get_plugins_disable"><code class="name flex">
-<span>def <span class="ident">test_get_plugins_disable</span></span>(<span>self, tmp_path)</span>
-</code></dt>
-<dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def test_get_plugins_disable(self, tmp_path):
-    &#34;&#34;&#34;--disable returns enabled plugins.&#34;&#34;&#34;
-    plugin_dir = tmp_path / &#34;plugins&#34;
-    plugin_dir.mkdir()
-    (plugin_dir / &#34;active.py&#34;).touch()
-    (plugin_dir / &#34;disabled.py.bkp&#34;).touch()
-
-    result = _get_plugins(&#34;--disable&#34;, str(tmp_path))
-    assert &#34;active&#34; in result
-    assert &#34;disabled&#34; not in result</code></pre>
-</details>
-<div class="desc"><p>&ndash;disable returns enabled plugins.</p></div>
-</dd>
-<dt id="connpy.tests.test_completion.TestGetPlugins.test_get_plugins_empty_dir"><code class="name flex">
-<span>def <span class="ident">test_get_plugins_empty_dir</span></span>(<span>self, tmp_path)</span>
-</code></dt>
-<dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def test_get_plugins_empty_dir(self, tmp_path):
-    &#34;&#34;&#34;Empty plugins directory returns empty list.&#34;&#34;&#34;
-    plugin_dir = tmp_path / &#34;plugins&#34;
-    plugin_dir.mkdir()
-
-    result = _get_plugins(&#34;--disable&#34;, str(tmp_path))
-    assert result == []</code></pre>
-</details>
-<div class="desc"><p>Empty plugins directory returns empty list.</p></div>
-</dd>
-<dt id="connpy.tests.test_completion.TestGetPlugins.test_get_plugins_enable"><code class="name flex">
-<span>def <span class="ident">test_get_plugins_enable</span></span>(<span>self, tmp_path)</span>
-</code></dt>
-<dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def test_get_plugins_enable(self, tmp_path):
-    &#34;&#34;&#34;--enable returns disabled plugins.&#34;&#34;&#34;
-    plugin_dir = tmp_path / &#34;plugins&#34;
-    plugin_dir.mkdir()
-    (plugin_dir / &#34;active.py&#34;).touch()
-    (plugin_dir / &#34;disabled.py.bkp&#34;).touch()
-
-    result = _get_plugins(&#34;--enable&#34;, str(tmp_path))
-    assert &#34;disabled&#34; in result
-    assert &#34;active&#34; not in result</code></pre>
-</details>
-<div class="desc"><p>&ndash;enable returns disabled plugins.</p></div>
 </dd>
 </dl>
 </dd>
@@ -408,16 +242,6 @@ el.replaceWith(d);
 <li><code><a title="connpy.tests.test_completion.TestGetCwd.test_current_dir" href="#connpy.tests.test_completion.TestGetCwd.test_current_dir">test_current_dir</a></code></li>
 <li><code><a title="connpy.tests.test_completion.TestGetCwd.test_folder_only" href="#connpy.tests.test_completion.TestGetCwd.test_folder_only">test_folder_only</a></code></li>
 <li><code><a title="connpy.tests.test_completion.TestGetCwd.test_specific_path" href="#connpy.tests.test_completion.TestGetCwd.test_specific_path">test_specific_path</a></code></li>
-</ul>
-</li>
-<li>
-<h4><code><a title="connpy.tests.test_completion.TestGetPlugins" href="#connpy.tests.test_completion.TestGetPlugins">TestGetPlugins</a></code></h4>
-<ul class="">
-<li><code><a title="connpy.tests.test_completion.TestGetPlugins.test_get_plugins_all" href="#connpy.tests.test_completion.TestGetPlugins.test_get_plugins_all">test_get_plugins_all</a></code></li>
-<li><code><a title="connpy.tests.test_completion.TestGetPlugins.test_get_plugins_del" href="#connpy.tests.test_completion.TestGetPlugins.test_get_plugins_del">test_get_plugins_del</a></code></li>
-<li><code><a title="connpy.tests.test_completion.TestGetPlugins.test_get_plugins_disable" href="#connpy.tests.test_completion.TestGetPlugins.test_get_plugins_disable">test_get_plugins_disable</a></code></li>
-<li><code><a title="connpy.tests.test_completion.TestGetPlugins.test_get_plugins_empty_dir" href="#connpy.tests.test_completion.TestGetPlugins.test_get_plugins_empty_dir">test_get_plugins_empty_dir</a></code></li>
-<li><code><a title="connpy.tests.test_completion.TestGetPlugins.test_get_plugins_enable" href="#connpy.tests.test_completion.TestGetPlugins.test_get_plugins_enable">test_get_plugins_enable</a></code></li>
 </ul>
 </li>
 <li>

@@ -45,6 +45,20 @@ el.replaceWith(d);
 <section>
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
+<dt id="connpy.tests.test_capture.RemoteCapture"><code class="name flex">
+<span>def <span class="ident">RemoteCapture</span></span>(<span>)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@pytest.fixture
+def RemoteCapture():
+    return Entrypoint.get_remote_capture_class()</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
 <dt id="connpy.tests.test_capture.mock_connapp"><code class="name flex">
 <span>def <span class="ident">mock_connapp</span></span>(<span>)</span>
 </code></dt>
@@ -56,13 +70,14 @@ el.replaceWith(d);
 <pre><code class="python">@pytest.fixture
 def mock_connapp():
     app = MagicMock()
-    app.nodes_list = [&#34;test_node&#34;]
-    app.config.getitem.return_value = {&#34;host&#34;: &#34;127.0.0.1&#34;, &#34;protocol&#34;: &#34;ssh&#34;}
+    app.services.nodes.list_nodes.return_value = [&#34;test_node&#34;]
+    app.services.nodes.get_node_details.return_value = {&#34;host&#34;: &#34;127.0.0.1&#34;, &#34;protocol&#34;: &#34;ssh&#34;}
+    app.services.config_svc.get_settings().get.return_value = &#34;/fake/ws&#34;
+    
     mock_node = MagicMock()
     mock_node.protocol = &#34;ssh&#34;
     mock_node.unique = &#34;test_node&#34;
     app.node.return_value = mock_node
-    app.config.config = {&#34;wireshark_path&#34;: &#34;/fake/ws&#34;}
     return app</code></pre>
 </details>
 <div class="desc"></div>
@@ -81,34 +96,54 @@ def mock_connapp():
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class TestRemoteCapture:
-    def test_init_node_not_found(self, mock_connapp):
-        # Attempt to capture a node not in nodes_list
-        mock_connapp.nodes_list = [&#34;other_node&#34;]
+    def test_init_node_not_found(self, mock_connapp, RemoteCapture):
+        # Attempt to capture a node not in inventory
+        mock_connapp.services.nodes.list_nodes.return_value = []
         with pytest.raises(SystemExit) as exc:
             RemoteCapture(mock_connapp, &#34;test_node&#34;, &#34;eth0&#34;)
         assert exc.value.code == 2
 
-    def test_init_success(self, mock_connapp):
+    def test_init_success(self, mock_connapp, RemoteCapture):
         rc = RemoteCapture(mock_connapp, &#34;test_node&#34;, &#34;eth0&#34;)
         assert rc.node_name == &#34;test_node&#34;
         assert rc.interface == &#34;eth0&#34;
         assert rc.wireshark_path == &#34;/fake/ws&#34;
 
-    @patch(&#34;connpy.core_plugins.capture.socket&#34;)
-    def test_is_port_in_use(self, mock_socket, mock_connapp):
+    def test_is_port_in_use(self, mock_connapp, RemoteCapture):
         rc = RemoteCapture(mock_connapp, &#34;test_node&#34;, &#34;eth0&#34;)
-        mock_sock_instance = MagicMock()
-        mock_socket.socket.return_value.__enter__.return_value = mock_sock_instance
-        
-        mock_sock_instance.connect_ex.return_value = 0
-        assert rc._is_port_in_use(8080) is True
-        
-        mock_sock_instance.connect_ex.return_value = 1
-        assert rc._is_port_in_use(8080) is False
+        with patch(&#34;socket.socket&#34;) as mock_socket:
+            mock_sock_instance = MagicMock()
+            mock_socket.return_value.__enter__.return_value = mock_sock_instance
+            
+            mock_sock_instance.connect_ex.return_value = 0
+            assert rc._is_port_in_use(8080) is True
+            
+            mock_sock_instance.connect_ex.return_value = 1
+            assert rc._is_port_in_use(8080) is False
 
-    @patch.object(RemoteCapture, &#34;_is_port_in_use&#34;)
-    def test_find_free_port(self, mock_is_in_use, mock_connapp):
+    def test_find_free_port(self, mock_connapp, RemoteCapture):
         rc = RemoteCapture(mock_connapp, &#34;test_node&#34;, &#34;eth0&#34;)
+        with patch.object(RemoteCapture, &#34;_is_port_in_use&#34;) as mock_is_in_use:
+            # First 2 ports in use, 3rd is free
+            mock_is_in_use.side_effect = [True, True, False]
+            port = rc._find_free_port(20000, 30000)
+            assert 20000 &lt;= port &lt;= 30000
+            assert mock_is_in_use.call_count == 3</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_capture.TestRemoteCapture.test_find_free_port"><code class="name flex">
+<span>def <span class="ident">test_find_free_port</span></span>(<span>self, mock_connapp, RemoteCapture)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_find_free_port(self, mock_connapp, RemoteCapture):
+    rc = RemoteCapture(mock_connapp, &#34;test_node&#34;, &#34;eth0&#34;)
+    with patch.object(RemoteCapture, &#34;_is_port_in_use&#34;) as mock_is_in_use:
         # First 2 ports in use, 3rd is free
         mock_is_in_use.side_effect = [True, True, False]
         port = rc._find_free_port(20000, 30000)
@@ -116,38 +151,18 @@ def mock_connapp():
         assert mock_is_in_use.call_count == 3</code></pre>
 </details>
 <div class="desc"></div>
-<h3>Methods</h3>
-<dl>
-<dt id="connpy.tests.test_capture.TestRemoteCapture.test_find_free_port"><code class="name flex">
-<span>def <span class="ident">test_find_free_port</span></span>(<span>self, mock_is_in_use, mock_connapp)</span>
-</code></dt>
-<dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">@patch.object(RemoteCapture, &#34;_is_port_in_use&#34;)
-def test_find_free_port(self, mock_is_in_use, mock_connapp):
-    rc = RemoteCapture(mock_connapp, &#34;test_node&#34;, &#34;eth0&#34;)
-    # First 2 ports in use, 3rd is free
-    mock_is_in_use.side_effect = [True, True, False]
-    port = rc._find_free_port(20000, 30000)
-    assert 20000 &lt;= port &lt;= 30000
-    assert mock_is_in_use.call_count == 3</code></pre>
-</details>
-<div class="desc"></div>
 </dd>
 <dt id="connpy.tests.test_capture.TestRemoteCapture.test_init_node_not_found"><code class="name flex">
-<span>def <span class="ident">test_init_node_not_found</span></span>(<span>self, mock_connapp)</span>
+<span>def <span class="ident">test_init_node_not_found</span></span>(<span>self, mock_connapp, RemoteCapture)</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def test_init_node_not_found(self, mock_connapp):
-    # Attempt to capture a node not in nodes_list
-    mock_connapp.nodes_list = [&#34;other_node&#34;]
+<pre><code class="python">def test_init_node_not_found(self, mock_connapp, RemoteCapture):
+    # Attempt to capture a node not in inventory
+    mock_connapp.services.nodes.list_nodes.return_value = []
     with pytest.raises(SystemExit) as exc:
         RemoteCapture(mock_connapp, &#34;test_node&#34;, &#34;eth0&#34;)
     assert exc.value.code == 2</code></pre>
@@ -155,14 +170,14 @@ def test_find_free_port(self, mock_is_in_use, mock_connapp):
 <div class="desc"></div>
 </dd>
 <dt id="connpy.tests.test_capture.TestRemoteCapture.test_init_success"><code class="name flex">
-<span>def <span class="ident">test_init_success</span></span>(<span>self, mock_connapp)</span>
+<span>def <span class="ident">test_init_success</span></span>(<span>self, mock_connapp, RemoteCapture)</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def test_init_success(self, mock_connapp):
+<pre><code class="python">def test_init_success(self, mock_connapp, RemoteCapture):
     rc = RemoteCapture(mock_connapp, &#34;test_node&#34;, &#34;eth0&#34;)
     assert rc.node_name == &#34;test_node&#34;
     assert rc.interface == &#34;eth0&#34;
@@ -171,24 +186,24 @@ def test_find_free_port(self, mock_is_in_use, mock_connapp):
 <div class="desc"></div>
 </dd>
 <dt id="connpy.tests.test_capture.TestRemoteCapture.test_is_port_in_use"><code class="name flex">
-<span>def <span class="ident">test_is_port_in_use</span></span>(<span>self, mock_socket, mock_connapp)</span>
+<span>def <span class="ident">test_is_port_in_use</span></span>(<span>self, mock_connapp, RemoteCapture)</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@patch(&#34;connpy.core_plugins.capture.socket&#34;)
-def test_is_port_in_use(self, mock_socket, mock_connapp):
+<pre><code class="python">def test_is_port_in_use(self, mock_connapp, RemoteCapture):
     rc = RemoteCapture(mock_connapp, &#34;test_node&#34;, &#34;eth0&#34;)
-    mock_sock_instance = MagicMock()
-    mock_socket.socket.return_value.__enter__.return_value = mock_sock_instance
-    
-    mock_sock_instance.connect_ex.return_value = 0
-    assert rc._is_port_in_use(8080) is True
-    
-    mock_sock_instance.connect_ex.return_value = 1
-    assert rc._is_port_in_use(8080) is False</code></pre>
+    with patch(&#34;socket.socket&#34;) as mock_socket:
+        mock_sock_instance = MagicMock()
+        mock_socket.return_value.__enter__.return_value = mock_sock_instance
+        
+        mock_sock_instance.connect_ex.return_value = 0
+        assert rc._is_port_in_use(8080) is True
+        
+        mock_sock_instance.connect_ex.return_value = 1
+        assert rc._is_port_in_use(8080) is False</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -209,6 +224,7 @@ def test_is_port_in_use(self, mock_socket, mock_connapp):
 </li>
 <li><h3><a href="#header-functions">Functions</a></h3>
 <ul class="">
+<li><code><a title="connpy.tests.test_capture.RemoteCapture" href="#connpy.tests.test_capture.RemoteCapture">RemoteCapture</a></code></li>
 <li><code><a title="connpy.tests.test_capture.mock_connapp" href="#connpy.tests.test_capture.mock_connapp">mock_connapp</a></code></li>
 </ul>
 </li>

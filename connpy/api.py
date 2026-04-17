@@ -1,150 +1,42 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-from connpy import configfile, node, nodes, hooks, printer
-from connpy.ai import ai as myai
-from waitress import serve
 import os
 import signal
+import time
 
-app = Flask(__name__)
-CORS(app)
-# conf = configfile()  # REMOVED: Item #1 in Roadmap -> Don't instantiate globally
+# Suppress harmless but noisy gRPC fork() warnings from pexpect child processes
+os.environ["GRPC_VERBOSITY"] = "NONE"
+os.environ["GRPC_ENABLE_FORK_SUPPORT"] = "0"
+
+from connpy import hooks, printer
+from connpy.configfile import configfile
 
 PID_FILE1 = "/run/connpy.pid"
 PID_FILE2 = "/tmp/connpy.pid"
 
-
-@app.route("/")
-def root():
-    return jsonify({
-        'message': 'Welcome to Connpy api',
-        'version': '1.0',
-        'documentation': 'https://fluzzi.github.io/connpy/'
-    })
-
-@app.route("/list_nodes", methods=["POST"])
-def list_nodes():
-    conf = app.custom_config
-    case = conf.config["case"]
+def _wait_for_termination():
     try:
-        data = request.get_json()
-        filter = data["filter"]
-        if not case:
-            if isinstance(filter, list):
-                filter = [item.lower() for item in filter]
-            else:
-                filter = filter.lower()
-        output = conf._getallnodes(filter)
-    except Exception:
-        output = conf._getallnodes()
-    return jsonify(output)
-
-@app.route("/get_nodes", methods=["POST"])
-def get_nodes():
-    conf = app.custom_config
-    case = conf.config["case"]
-    try:
-        data = request.get_json()
-        filter = data["filter"]
-        if not case:
-            if isinstance(filter, list):
-                filter = [item.lower() for item in filter]
-            else:
-                filter = filter.lower()
-        output = conf._getallnodesfull(filter)
-    except Exception:
-        output = conf._getallnodesfull()
-    return jsonify(output)
-
-@app.route("/ask_ai", methods=["POST"])
-def ask_ai():
-    conf = app.custom_config
-    data = request.get_json()
-    input = data["input"]
-    if "dryrun" in data:
-        dryrun = data["dryrun"] 
-    else:
-        dryrun = False
-    if "chat_history" in data:
-        chat_history = data["chat_history"]
-    else:
-        chat_history = None
-    ai = myai(conf)
-    return ai.ask(input, dryrun, chat_history)
-
-@app.route("/confirm", methods=["POST"])
-def confirm():
-    conf = app.custom_config
-    data = request.get_json()
-    input = data["input"]
-    ai = myai(conf)
-    return str(ai.confirm(input))
-
-@app.route("/run_commands", methods=["POST"])
-def run_commands():
-    conf = app.custom_config
-    data = request.get_json()
-    case = conf.config["case"]
-    mynodes = {}
-    args = {}
-    try:
-        action = data["action"]
-        nodelist = data["nodes"]
-        args["commands"] = data["commands"]
-        if action == "test":
-            args["expected"] = data["expected"]
-    except KeyError as e:
-        error = "'{}' is mandatory".format(e.args[0])
-        return({"DataError": error})
-    if isinstance(nodelist, list):
-        mynodes = conf.getitems(nodelist)
-    else:
-        if not case:
-            nodelist = nodelist.lower()
-        if nodelist.startswith("@"):
-            mynodes = conf.getitem(nodelist)
-        else:
-            mynodes[nodelist] = conf.getitem(nodelist)
-
-    mynodes = nodes(mynodes, config=conf)
-    try:
-        args["vars"] = data["vars"]
-    except Exception:
+        while True:
+            time.sleep(86400)
+    except KeyboardInterrupt:
         pass
-    try:
-        options = data["options"]
-        thisoptions = {k: v for k, v in options.items() if k in ["prompt", "parallel", "timeout"]}
-        args.update(thisoptions)
-    except Exception:
-        options = None
-    if action == "run":
-        output = mynodes.run(**args)
-    elif action == "test":
-        output = {}
-        output["result"] = mynodes.test(**args)
-        output["output"] = mynodes.output
-    else:
-        error = "Wrong action '{}'".format(action)
-        return({"DataError": error})
-    return output
 
-@hooks.MethodHook
 def stop_api():
     # Read the process ID (pid) from the file
     try:
         with open(PID_FILE1, "r") as f:
             pid = int(f.readline().strip())
-            port = int(f.readline().strip())
-        PID_FILE=PID_FILE1
+            port_line = f.readline().strip()
+            port = int(port_line) if port_line else None
+        PID_FILE = PID_FILE1
     except (FileNotFoundError, ValueError, OSError):
         try:
             with open(PID_FILE2, "r") as f:
                 pid = int(f.readline().strip())
-                port = int(f.readline().strip())
-            PID_FILE=PID_FILE2
+                port_line = f.readline().strip()
+                port = int(port_line) if port_line else None
+            PID_FILE = PID_FILE2
         except (FileNotFoundError, ValueError, OSError):
             printer.warning("Connpy API server is not running.")
-            return 
+            return None
     # Send a SIGTERM signal to the process
     try:
         os.kill(pid, signal.SIGTERM)
@@ -155,21 +47,34 @@ def stop_api():
     printer.info(f"Server with process ID {pid} stopped.")
     return port
 
-@hooks.MethodHook
 def debug_api(port=8048, config=None):
-    app.custom_config = config or configfile()
-    app.run(debug=True, port=port)
+    from .grpc.server import serve
+    conf = config or configfile()
+    server = serve(conf, port=port, debug=True)
+    printer.info(f"gRPC Server running in debug mode on port {port}...")
+    _wait_for_termination()
+    server.stop(0)
 
-@hooks.MethodHook
 def start_server(port=8048, config=None):
-    app.custom_config = config or configfile()
-    serve(app, host='0.0.0.0', port=port)
+    from .grpc.server import serve
+    conf = config or configfile()
+    server = serve(conf, port=port, debug=False)
+    _wait_for_termination()
 
-@hooks.MethodHook
 def start_api(port=8048, config=None):
-    if os.path.exists(PID_FILE1) or os.path.exists(PID_FILE2):
-        printer.warning("Connpy server is already running.")
-        return
+    # Check if already running via PID file verification
+    for pid_file in [PID_FILE1, PID_FILE2]:
+        if os.path.exists(pid_file):
+            try:
+                with open(pid_file, "r") as f:
+                    pid = int(f.readline().strip())
+                os.kill(pid, 0)
+                # If we get here, process exists
+                return
+            except (ValueError, OSError, ProcessLookupError):
+                # Stale PID file, ignore here, start_api will overwrite
+                pass
+
     pid = os.fork()
     if pid == 0:
         start_server(port, config=config)
@@ -184,5 +89,4 @@ def start_api(port=8048, config=None):
             except OSError:
                 printer.error("Couldn't create PID file.")
                 exit(1)
-        printer.start(f"Server is running with process ID {pid} on port {port}")
-
+        printer.start(f"gRPC Server is running with process ID {pid} on port {port}")

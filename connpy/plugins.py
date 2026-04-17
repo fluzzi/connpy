@@ -11,6 +11,27 @@ class Plugins:
         self.plugins = {}
         self.plugin_parsers = {}
         self.preloads = {}
+        self.remote_plugins = {}
+        self.preferences = {}
+
+    def _load_preferences(self, config_dir):
+        import json
+        path = os.path.join(config_dir, "plugin_preferences.json")
+        try:
+            with open(path) as f:
+                self.preferences = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            self.preferences = {}
+
+    def _save_preferences(self, config_dir):
+        import json
+        path = os.path.join(config_dir, "plugin_preferences.json")
+        try:
+            with open(path, "w") as f:
+                json.dump(self.preferences, f, indent=4)
+        except OSError as e:
+            printer.error(f"Failed to save plugin preferences: {e}")
+
 
     def verify_script(self, file_path):
         """
@@ -114,7 +135,7 @@ class Plugins:
         spec.loader.exec_module(module)
         return module
 
-    def _import_plugins_to_argparse(self, directory, subparsers):
+    def _import_plugins_to_argparse(self, directory, subparsers, remote_enabled=False):
         if not os.path.exists(directory):
             return
         for filename in os.listdir(directory):
@@ -123,6 +144,11 @@ class Plugins:
                 root_filename = os.path.splitext(filename)[0]
                 if root_filename in commands:
                     continue
+                
+                # Check preferences: if remote is preferred AND remote is enabled, skip local loading
+                if remote_enabled and self.preferences.get(root_filename) == "remote":
+                    continue
+
                 # Construct the full path
                 filepath = os.path.join(directory, filename)
                 check_file = self.verify_script(filepath)
@@ -134,7 +160,98 @@ class Plugins:
                     if hasattr(self.plugins[root_filename], "Parser"):
                         self.plugin_parsers[root_filename] = self.plugins[root_filename].Parser()
                         plugin = self.plugin_parsers[root_filename]
-                        subparsers.add_parser(root_filename, parents=[self.plugin_parsers[root_filename].parser], add_help=False, usage=plugin.parser.usage, description=plugin.parser.description, epilog=plugin.parser.epilog, formatter_class=plugin.parser.formatter_class)
+                        # Default to RichHelpFormatter if plugin doesn't set one
+                        try:
+                            from rich_argparse import RichHelpFormatter as _RHF
+                            fmt = plugin.parser.formatter_class
+                            if fmt is argparse.HelpFormatter or fmt is argparse.RawTextHelpFormatter or fmt is argparse.RawDescriptionHelpFormatter:
+                                fmt = _RHF
+                        except ImportError:
+                            fmt = plugin.parser.formatter_class
+                        subparsers.add_parser(root_filename, parents=[self.plugin_parsers[root_filename].parser], add_help=False, help=plugin.parser.description, usage=plugin.parser.usage, description=plugin.parser.description, epilog=plugin.parser.epilog, formatter_class=fmt)
                     if hasattr(self.plugins[root_filename], "Preload"):
                         self.preloads[root_filename] = self.plugins[root_filename]
 
+    def _import_remote_plugins_to_argparse(self, plugin_stub, subparsers, cache_dir, force_sync=False):
+        import hashlib
+        os.makedirs(cache_dir, exist_ok=True)
+        
+        try:
+            remote_plugins_info = plugin_stub.list_plugins()
+        except Exception:
+            return
+
+        # Pruning: Remove local cached files that are no longer on the server
+        for local_file in os.listdir(cache_dir):
+            if local_file.endswith(".py"):
+                name = local_file[:-3]
+                if name not in remote_plugins_info:
+                    try:
+                        os.remove(os.path.join(cache_dir, local_file))
+                    except Exception:
+                        pass
+
+        for name, info in remote_plugins_info.items():
+            if not info.get("enabled", True):
+                continue
+                
+            pref = self.preferences.get(name, "local")
+            if pref != "remote" and name in self.plugins:
+                continue
+            if not force_sync and name in subparsers.choices:
+                continue
+
+            cache_path = os.path.join(cache_dir, f"{name}.py")
+            
+            # Hash comparison
+            remote_hash = info.get("hash", "")
+            local_hash = ""
+            if os.path.exists(cache_path):
+                try:
+                    with open(cache_path, "rb") as f:
+                        local_hash = hashlib.md5(f.read()).hexdigest()
+                except Exception:
+                    pass
+
+            # Update only if hash differs or force_sync is True
+            if force_sync or remote_hash != local_hash or not os.path.exists(cache_path):
+                try:
+                    source = plugin_stub.get_plugin_source(name)
+                    with open(cache_path, "w") as f:
+                        f.write(source)
+                except Exception as e:
+                    printer.warning(f"Failed to sync remote plugin {name}: {e}")
+                    continue
+
+            # Verify and load
+            check_file = self.verify_script(cache_path)
+            if check_file:
+                printer.warning(f"Remote plugin {name} failed verification: {check_file}")
+                continue
+
+            module = self._import_from_path(cache_path)
+            if hasattr(module, "Parser"):
+                self.plugin_parsers[name] = module.Parser()
+                self.remote_plugins[name] = True
+                plugin = self.plugin_parsers[name]
+                try:
+                    from rich_argparse import RichHelpFormatter as _RHF
+                    fmt = plugin.parser.formatter_class
+                    if fmt is argparse.HelpFormatter or fmt is argparse.RawTextHelpFormatter or fmt is argparse.RawDescriptionHelpFormatter:
+                        fmt = _RHF
+                except ImportError:
+                    fmt = plugin.parser.formatter_class
+                
+                # If force_sync, we might be re-registering, but argparse subparsers.add_parser 
+                # might fail if it exists. We check if it's already there.
+                if name not in subparsers.choices:
+                    subparsers.add_parser(
+                        name, 
+                        parents=[plugin.parser], 
+                        add_help=False, 
+                        help=f"[remote] {plugin.parser.description}", 
+                        usage=plugin.parser.usage, 
+                        description=plugin.parser.description, 
+                        epilog=plugin.parser.epilog, 
+                        formatter_class=fmt
+                    )

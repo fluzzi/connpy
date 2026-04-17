@@ -1,0 +1,25 @@
+syntax = "proto3";
+package connpy_remote;
+
+message IdRequest {
+    string id = 1;
+}
+
+message StringResponse {
+    string value = 1;
+}
+
+message PluginInvokeRequest {
+    string name = 1;
+    string args_json = 2;
+}
+
+message OutputChunk {
+    string text = 1;
+    bool is_error = 2;
+}
+
+service RemotePluginService {
+    rpc get_plugin_source(IdRequest) returns (StringResponse);
+    rpc invoke_plugin(PluginInvokeRequest) returns (stream OutputChunk);
+}

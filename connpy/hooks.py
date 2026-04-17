@@ -22,16 +22,17 @@ class MethodHook:
             except Exception as e:
                 printer.error(f"{self.func.__name__} Pre-hook {hook.__name__} raised an exception: {e}")
 
-        try:
-            result = self.func(*args, **kwargs)
+        result = self.func(*args, **kwargs)
 
-        finally:
-            # Execute post-hooks after the original function
-            for hook in self.post_hooks:
-                try:
-                    result = hook(*args, **kwargs, result=result)  # Pass result to hooks
-                except Exception as e:
-                    printer.error(f"{self.func.__name__} Post-hook {hook.__name__} raised an exception: {e}")
+        # Execute post-hooks after the original function
+        if self.post_hooks:
+            #printer.info(f"Executing {len(self.post_hooks)} post-hooks for {self.func.__name__}...")
+            pass
+        for hook in self.post_hooks:
+            try:
+                result = hook(*args, **kwargs, result=result)  # Pass result to hooks
+            except Exception as e:
+                printer.error(f"{self.func.__name__} Post-hook {hook.__name__} raised an exception: {e}")
 
         return result
 

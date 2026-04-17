@@ -1,0 +1,970 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<meta name="generator" content="pdoc3 0.11.5">
+<title>connpy.services.sync_service API documentation</title>
+<meta name="description" content="">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:1.5em;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:2em 0 .50em 0}h3{font-size:1.4em;margin:1.6em 0 .7em 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .2s ease-in-out}a:visited{color:#503}a:hover{color:#b62}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900;font-weight:bold}pre code{font-size:.8em;line-height:1.4em;padding:1em;display:block}code{background:#f3f3f3;font-family:"DejaVu Sans Mono",monospace;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source > summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible;min-width:max-content}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em 1em;margin:1em 0}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul ul{padding-left:1em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha512-D9gUyxqja7hBtkWpPWGt9wfbfaMGVt9gnyCvYa+jojwwPHLCzUm5i8rpk7vD7wNee9bA35eYIjobYPaQuKS1MQ==" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => {
+hljs.configure({languages: ['bash', 'css', 'diff', 'graphql', 'ini', 'javascript', 'json', 'plaintext', 'python', 'python-repl', 'rust', 'shell', 'sql', 'typescript', 'xml', 'yaml']});
+hljs.highlightAll();
+/* Collapse source docstrings */
+setTimeout(() => {
+[...document.querySelectorAll('.hljs.language-python > .hljs-string')]
+.filter(el => el.innerHTML.length > 200 && ['"""', "'''"].includes(el.innerHTML.substring(0, 3)))
+.forEach(el => {
+let d = document.createElement('details');
+d.classList.add('hljs-string');
+d.innerHTML = '<summary>"""</summary>' + el.innerHTML.substring(3);
+el.replaceWith(d);
+});
+}, 100);
+})</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>connpy.services.sync_service</code></h1>
+</header>
+<section id="section-intro">
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="connpy.services.sync_service.SyncService"><code class="flex name class">
+<span>class <span class="ident">SyncService</span></span>
+<span>(</span><span>config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class SyncService(BaseService):
+    &#34;&#34;&#34;Business logic for Google Drive synchronization.&#34;&#34;&#34;
+
+    def __init__(self, config):
+        super().__init__(config)
+        self.scopes = [&#39;https://www.googleapis.com/auth/drive.appdata&#39;]
+        self.token_file = os.path.join(self.config.defaultdir, &#34;gtoken.json&#34;)
+        
+        # Embedded OAuth config
+        self.client_config = {
+            &#34;installed&#34;: {
+                &#34;client_id&#34;: &#34;559598250648-cr189kfrga2il1a6d6nkaspq0a9pn5vv.&#34; + &#34;apps.googleusercontent.com&#34;,
+                &#34;project_id&#34;: &#34;celtic-surface-420323&#34;,
+                &#34;auth_uri&#34;: &#34;https://accounts.google.com/o/oauth2/auth&#34;,
+                &#34;token_uri&#34;: &#34;https://oauth2.googleapis.com/token&#34;,
+                &#34;auth_provider_x509_cert_url&#34;: &#34;https://www.googleapis.com/oauth2/v1/certs&#34;,
+                &#34;client_secret&#34;: &#34;GOCSPX-&#34; + &#34;VVfOSrJLPU90Pl0g7aAXM9GK2xPE&#34;,
+                &#34;redirect_uris&#34;: [&#34;http://localhost&#34;]
+            }
+        }
+        
+        # Sync status from config
+        self.sync_enabled = self.config.config.get(&#34;sync&#34;, False)
+        self.sync_remote = self.config.config.get(&#34;sync_remote&#34;, False)
+
+    def login(self):
+        &#34;&#34;&#34;Authenticate with Google Drive.&#34;&#34;&#34;
+        creds = None
+        if os.path.exists(self.token_file):
+            creds = Credentials.from_authorized_user_file(self.token_file, self.scopes)
+
+        try:
+            if not creds or not creds.valid:
+                if creds and creds.expired and creds.refresh_token:
+                    creds.refresh(Request())
+                else:
+                    flow = InstalledAppFlow.from_client_config(self.client_config, self.scopes)
+                    creds = flow.run_local_server(port=0, access_type=&#39;offline&#39;)
+
+                with open(self.token_file, &#39;w&#39;) as token:
+                    token.write(creds.to_json())
+
+            printer.success(&#34;Logged in successfully.&#34;)
+            return True
+
+        except RefreshError:
+            if os.path.exists(self.token_file):
+                os.remove(self.token_file)
+            printer.warning(&#34;Existing token was invalid and has been removed. Please log in again.&#34;)
+            return False
+        except Exception as e:
+            printer.error(f&#34;Login failed: {e}&#34;)
+            return False
+
+    def logout(self):
+        &#34;&#34;&#34;Remove Google Drive credentials.&#34;&#34;&#34;
+        if os.path.exists(self.token_file):
+            os.remove(self.token_file)
+            printer.success(&#34;Logged out successfully.&#34;)
+        else:
+            printer.info(&#34;No credentials file found. Already logged out.&#34;)
+
+    def get_credentials(self):
+        &#34;&#34;&#34;Get valid credentials, refreshing if necessary.&#34;&#34;&#34;
+        if os.path.exists(self.token_file):
+            creds = Credentials.from_authorized_user_file(self.token_file, self.scopes)
+        else:
+            return None
+        
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                try:
+                    creds.refresh(Request())
+                except RefreshError:
+                    return None
+            else:
+                return None
+        return creds
+
+    def check_login_status(self):
+        &#34;&#34;&#34;Check if logged in to Google Drive.&#34;&#34;&#34;
+        if os.path.exists(self.token_file):
+            creds = Credentials.from_authorized_user_file(self.token_file)
+            if creds and creds.expired and creds.refresh_token:
+                try:
+                    creds.refresh(Request())
+                except RefreshError:
+                    pass
+            return True if creds.valid else &#34;Invalid&#34;
+        return False
+
+    def list_backups(self):
+        &#34;&#34;&#34;List files in Google Drive appDataFolder.&#34;&#34;&#34;
+        creds = self.get_credentials()
+        if not creds:
+            printer.error(&#34;Not logged in to Google Drive.&#34;)
+            return []
+
+        try:
+            service = build(&#34;drive&#34;, &#34;v3&#34;, credentials=creds)
+            response = service.files().list(
+                spaces=&#34;appDataFolder&#34;,
+                fields=&#34;files(id, name, appProperties)&#34;,
+                pageSize=10,
+            ).execute()
+
+            files_info = []
+            for file in response.get(&#34;files&#34;, []):
+                files_info.append({
+                    &#34;name&#34;: file.get(&#34;name&#34;),
+                    &#34;id&#34;: file.get(&#34;id&#34;),
+                    &#34;date&#34;: file.get(&#34;appProperties&#34;, {}).get(&#34;date&#34;),
+                    &#34;timestamp&#34;: file.get(&#34;appProperties&#34;, {}).get(&#34;timestamp&#34;)
+                })
+            return files_info
+        except HttpError as error:
+            printer.error(f&#34;Google Drive API error: {error}&#34;)
+            return []
+
+    def compress_and_upload(self, remote_data=None):
+        &#34;&#34;&#34;Compress config and upload to Drive.&#34;&#34;&#34;
+        timestamp = int(time.time() * 1000)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            zip_path = os.path.join(tmp_dir, f&#34;connpy-backup-{timestamp}.zip&#34;)
+            
+            with zipfile.ZipFile(zip_path, &#39;w&#39;, zipfile.ZIP_DEFLATED) as zipf:
+                # If we have remote data, we create a virtual config file
+                if remote_data:
+                    config_tmp = os.path.join(tmp_dir, &#34;config.yaml&#34;)
+                    with open(config_tmp, &#39;w&#39;) as f:
+                        yaml.dump(remote_data, f, default_flow_style=False)
+                    zipf.write(config_tmp, &#34;config.yaml&#34;)
+                else:
+                    # Legacy behavior: use local file
+                    zipf.write(self.config.file, os.path.basename(self.config.file))
+                
+                # Always include the key if it exists
+                if os.path.exists(self.config.key):
+                    zipf.write(self.config.key, &#34;.osk&#34;)
+
+            # Manage retention (max 10 backups)
+            backups = self.list_backups()
+            if len(backups) &gt;= 10:
+                oldest = min(backups, key=lambda x: x[&#39;timestamp&#39;] or &#39;0&#39;)
+                self.delete_backup(oldest[&#39;id&#39;])
+
+            # Upload
+            return self.upload_file(zip_path, timestamp)
+
+    def upload_file(self, file_path, timestamp):
+        &#34;&#34;&#34;Internal method to upload to Drive.&#34;&#34;&#34;
+        creds = self.get_credentials()
+        if not creds: return False
+        
+        service = build(&#39;drive&#39;, &#39;v3&#39;, credentials=creds)
+        date_str = datetime.fromtimestamp(timestamp/1000).strftime(&#39;%Y-%m-%d %H:%M:%S&#39;)
+        
+        file_metadata = {
+            &#39;name&#39;: os.path.basename(file_path),
+            &#39;parents&#39;: [&#34;appDataFolder&#34;],
+            &#39;appProperties&#39;: {
+                &#39;timestamp&#39;: str(timestamp),
+                &#39;date&#39;: date_str
+            }
+        }
+        media = MediaFileUpload(file_path)
+        try:
+            service.files().create(body=file_metadata, media_body=media, fields=&#39;id&#39;).execute()
+            printer.success(&#34;Backup uploaded to Google Drive.&#34;)
+            return True
+        except Exception as e:
+            printer.error(f&#34;Upload failed: {e}&#34;)
+            return False
+
+    def delete_backup(self, file_id):
+        &#34;&#34;&#34;Delete a backup from Drive.&#34;&#34;&#34;
+        creds = self.get_credentials()
+        if not creds: return False
+        try:
+            service = build(&#34;drive&#34;, &#34;v3&#34;, credentials=creds)
+            service.files().delete(fileId=file_id).execute()
+            return True
+        except Exception as e:
+            printer.error(f&#34;Delete failed: {e}&#34;)
+            return False
+
+    def restore_backup(self, file_id=None, restore_config=True, restore_nodes=True, app_instance=None):
+        &#34;&#34;&#34;Download and analyze a backup for restoration.&#34;&#34;&#34;
+        backups = self.list_backups()
+        if not backups:
+            printer.error(&#34;No backups found.&#34;)
+            return None
+
+        if file_id:
+            selected = next((f for f in backups if f[&#39;id&#39;] == file_id), None)
+            if not selected:
+                printer.error(f&#34;Backup {file_id} not found.&#34;)
+                return None
+        else:
+            selected = max(backups, key=lambda x: x[&#39;timestamp&#39;] or &#39;0&#39;)
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            zip_path = os.path.join(tmp_dir, &#39;restore.zip&#39;)
+            if self.download_file(selected[&#39;id&#39;], zip_path):
+                return self.perform_restore(zip_path, restore_config, restore_nodes, app_instance)
+        return False
+
+    def download_file(self, file_id, dest):
+        &#34;&#34;&#34;Internal method to download from Drive.&#34;&#34;&#34;
+        creds = self.get_credentials()
+        if not creds: return False
+        try:
+            service = build(&#39;drive&#39;, &#39;v3&#39;, credentials=creds)
+            request = service.files().get_media(fileId=file_id)
+            with io.FileIO(dest, mode=&#39;wb&#39;) as fh:
+                downloader = MediaIoBaseDownload(fh, request)
+                done = False
+                while not done:
+                    _, done = downloader.next_chunk()
+            return True
+        except Exception as e:
+            printer.error(f&#34;Download failed: {e}&#34;)
+            return False
+
+    def perform_restore(self, zip_path, restore_config=True, restore_nodes=True, app_instance=None):
+        &#34;&#34;&#34;Execute the actual restoration of files or remote nodes.&#34;&#34;&#34;
+        try:
+            with zipfile.ZipFile(zip_path, &#39;r&#39;) as zipf:
+                names = zipf.namelist()
+                dest_dir = os.path.dirname(self.config.file)
+                
+                # We need to read the config content from zip to decide what to do
+                backup_data = {}
+                config_filename = &#34;config.yaml&#34; if &#34;config.yaml&#34; in names else (&#34;config.json&#34; if &#34;config.json&#34; in names else None)
+                
+                if config_filename:
+                    with zipf.open(config_filename) as f:
+                        backup_data = yaml.safe_load(f)
+
+                # 1. Restore Key (.osk) - Part of config identity
+                if restore_config and &#34;.osk&#34; in names:
+                    zipf.extract(&#34;.osk&#34;, os.path.dirname(self.config.key))
+
+                # 2. Restore Config (Local Settings)
+                if restore_config and backup_data:
+                    local_config = self.config.config.copy()
+                    
+                    # Capture current connectivity settings to preserve them
+                    current_mode = local_config.get(&#34;service_mode&#34;, &#34;local&#34;)
+                    current_remote = local_config.get(&#34;remote_host&#34;)
+                    
+                    if &#34;config&#34; in backup_data:
+                        local_config.update(backup_data[&#34;config&#34;])
+                    
+                    # Restore connectivity settings - we don&#39;t want a restore to 
+                    # accidentally switch us between local and remote and break connectivity
+                    local_config[&#34;service_mode&#34;] = current_mode
+                    if current_remote:
+                        local_config[&#34;remote_host&#34;] = current_remote
+                        
+                    self.config.config = local_config
+                    self.config._saveconfig(self.config.file)
+
+                # 3. Restore Nodes and Profiles
+                if restore_nodes and backup_data:
+                    connections = backup_data.get(&#34;connections&#34;, {})
+                    profiles = backup_data.get(&#34;profiles&#34;, {})
+                    
+                    if app_instance and app_instance.services.mode == &#34;remote&#34;:
+                        # Push to Remote via gRPC
+                        app_instance.services.nodes.full_replace(connections, profiles)
+                    else:
+                        # Restore to Local config file
+                        self.config.connections = connections
+                        self.config.profiles = profiles
+                        self.config._saveconfig(self.config.file)
+
+            # Clear caches
+            for f in [self.config.cachefile, self.config.fzf_cachefile]:
+                if os.path.exists(f): os.remove(f)
+                
+            return True
+        except Exception as e:
+            printer.error(f&#34;Restoration failed: {e}&#34;)
+            return False
+
+    def analyze_backup_content(self, file_id=None):
+        &#34;&#34;&#34;Analyze a backup without restoring to provide info for confirmation.&#34;&#34;&#34;
+        backups = self.list_backups()
+        if not backups: return None
+        selected = next((f for f in backups if f[&#39;id&#39;] == file_id), None) if file_id else max(backups, key=lambda x: x[&#39;timestamp&#39;] or &#39;0&#39;)
+        
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            zip_path = os.path.join(tmp_dir, &#39;analyze.zip&#39;)
+            if self.download_file(selected[&#39;id&#39;], zip_path):
+                with zipfile.ZipFile(zip_path, &#39;r&#39;) as zipf:
+                    names = zipf.namelist()
+                    config_filename = &#34;config.yaml&#34; if &#34;config.yaml&#34; in names else (&#34;config.json&#34; if &#34;config.json&#34; in names else None)
+                    if config_filename:
+                        with zipf.open(config_filename) as f:
+                            data = yaml.safe_load(f)
+                            connections = data.get(&#34;connections&#34;, {})
+                            
+                            # Accurate recursive count
+                            nodes_count = 0
+                            folders_count = 0
+                            
+                            # Layer 1
+                            for k, v in connections.items():
+                                if isinstance(v, dict):
+                                    if v.get(&#34;type&#34;) == &#34;connection&#34;:
+                                        nodes_count += 1
+                                    elif v.get(&#34;type&#34;) == &#34;folder&#34;:
+                                        folders_count += 1
+                                        # Layer 2
+                                        for k2, v2 in v.items():
+                                            if isinstance(v2, dict):
+                                                if v2.get(&#34;type&#34;) == &#34;connection&#34;:
+                                                    nodes_count += 1
+                                                elif v2.get(&#34;type&#34;) == &#34;subfolder&#34;:
+                                                    folders_count += 1
+                                                    # Layer 3
+                                                    for k3, v3 in v2.items():
+                                                        if isinstance(v3, dict) and v3.get(&#34;type&#34;) == &#34;connection&#34;:
+                                                            nodes_count += 1
+
+                            return {
+                                &#34;nodes&#34;: nodes_count,
+                                &#34;folders&#34;: folders_count,
+                                &#34;profiles&#34;: len(data.get(&#34;profiles&#34;, {})),
+                                &#34;has_config&#34;: &#34;config&#34; in data,
+                                &#34;has_key&#34;: &#34;.osk&#34; in names
+                            }
+        return None
+
+    def perform_sync(self, app_instance):
+        &#34;&#34;&#34;Background sync logic.&#34;&#34;&#34;
+        # Always check current config state
+        sync_enabled = self.config.config.get(&#34;sync&#34;, False)
+        sync_remote = self.config.config.get(&#34;sync_remote&#34;, False)
+        
+        if not sync_enabled: return
+
+        printer.info(&#34;Triggering auto-sync...&#34;)
+        if self.check_login_status() != True: 
+            printer.warning(&#34;Auto-sync: Not logged in to Google Drive.&#34;)
+            return
+
+        remote_data = None
+        if sync_remote and app_instance.services.mode == &#34;remote&#34;:
+            try:
+                inventory = app_instance.services.nodes.get_inventory()
+                # Merge with local settings
+                local_settings = app_instance.services.config_svc.get_settings()
+                local_settings.pop(&#34;configfolder&#34;, None)
+
+                # Maintain proper config structure: {config: {}, connections: {}, profiles: {}}
+                remote_data = {
+                    &#34;config&#34;: local_settings,
+                    &#34;connections&#34;: inventory.get(&#34;connections&#34;, {}),
+                    &#34;profiles&#34;: inventory.get(&#34;profiles&#34;, {})
+                }
+            except Exception as e:
+                printer.warning(f&#34;Could not fetch remote inventory for sync: {e}&#34;)
+
+        # Run in thread to not block CLI
+        threading.Thread(
+            target=self.compress_and_upload, 
+            args=(remote_data,)
+        ).start()</code></pre>
+</details>
+<div class="desc"><p>Business logic for Google Drive synchronization.</p>
+<p>Initialize the service.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>config</code></strong></dt>
+<dd>An instance of configfile (or None to instantiate a new one/use global context).</dd>
+</dl></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="connpy.services.base.BaseService" href="base.html#connpy.services.base.BaseService">BaseService</a></li>
+</ul>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.services.sync_service.SyncService.analyze_backup_content"><code class="name flex">
+<span>def <span class="ident">analyze_backup_content</span></span>(<span>self, file_id=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def analyze_backup_content(self, file_id=None):
+    &#34;&#34;&#34;Analyze a backup without restoring to provide info for confirmation.&#34;&#34;&#34;
+    backups = self.list_backups()
+    if not backups: return None
+    selected = next((f for f in backups if f[&#39;id&#39;] == file_id), None) if file_id else max(backups, key=lambda x: x[&#39;timestamp&#39;] or &#39;0&#39;)
+    
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        zip_path = os.path.join(tmp_dir, &#39;analyze.zip&#39;)
+        if self.download_file(selected[&#39;id&#39;], zip_path):
+            with zipfile.ZipFile(zip_path, &#39;r&#39;) as zipf:
+                names = zipf.namelist()
+                config_filename = &#34;config.yaml&#34; if &#34;config.yaml&#34; in names else (&#34;config.json&#34; if &#34;config.json&#34; in names else None)
+                if config_filename:
+                    with zipf.open(config_filename) as f:
+                        data = yaml.safe_load(f)
+                        connections = data.get(&#34;connections&#34;, {})
+                        
+                        # Accurate recursive count
+                        nodes_count = 0
+                        folders_count = 0
+                        
+                        # Layer 1
+                        for k, v in connections.items():
+                            if isinstance(v, dict):
+                                if v.get(&#34;type&#34;) == &#34;connection&#34;:
+                                    nodes_count += 1
+                                elif v.get(&#34;type&#34;) == &#34;folder&#34;:
+                                    folders_count += 1
+                                    # Layer 2
+                                    for k2, v2 in v.items():
+                                        if isinstance(v2, dict):
+                                            if v2.get(&#34;type&#34;) == &#34;connection&#34;:
+                                                nodes_count += 1
+                                            elif v2.get(&#34;type&#34;) == &#34;subfolder&#34;:
+                                                folders_count += 1
+                                                # Layer 3
+                                                for k3, v3 in v2.items():
+                                                    if isinstance(v3, dict) and v3.get(&#34;type&#34;) == &#34;connection&#34;:
+                                                        nodes_count += 1
+
+                        return {
+                            &#34;nodes&#34;: nodes_count,
+                            &#34;folders&#34;: folders_count,
+                            &#34;profiles&#34;: len(data.get(&#34;profiles&#34;, {})),
+                            &#34;has_config&#34;: &#34;config&#34; in data,
+                            &#34;has_key&#34;: &#34;.osk&#34; in names
+                        }
+    return None</code></pre>
+</details>
+<div class="desc"><p>Analyze a backup without restoring to provide info for confirmation.</p></div>
+</dd>
+<dt id="connpy.services.sync_service.SyncService.check_login_status"><code class="name flex">
+<span>def <span class="ident">check_login_status</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def check_login_status(self):
+    &#34;&#34;&#34;Check if logged in to Google Drive.&#34;&#34;&#34;
+    if os.path.exists(self.token_file):
+        creds = Credentials.from_authorized_user_file(self.token_file)
+        if creds and creds.expired and creds.refresh_token:
+            try:
+                creds.refresh(Request())
+            except RefreshError:
+                pass
+        return True if creds.valid else &#34;Invalid&#34;
+    return False</code></pre>
+</details>
+<div class="desc"><p>Check if logged in to Google Drive.</p></div>
+</dd>
+<dt id="connpy.services.sync_service.SyncService.compress_and_upload"><code class="name flex">
+<span>def <span class="ident">compress_and_upload</span></span>(<span>self, remote_data=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def compress_and_upload(self, remote_data=None):
+    &#34;&#34;&#34;Compress config and upload to Drive.&#34;&#34;&#34;
+    timestamp = int(time.time() * 1000)
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        zip_path = os.path.join(tmp_dir, f&#34;connpy-backup-{timestamp}.zip&#34;)
+        
+        with zipfile.ZipFile(zip_path, &#39;w&#39;, zipfile.ZIP_DEFLATED) as zipf:
+            # If we have remote data, we create a virtual config file
+            if remote_data:
+                config_tmp = os.path.join(tmp_dir, &#34;config.yaml&#34;)
+                with open(config_tmp, &#39;w&#39;) as f:
+                    yaml.dump(remote_data, f, default_flow_style=False)
+                zipf.write(config_tmp, &#34;config.yaml&#34;)
+            else:
+                # Legacy behavior: use local file
+                zipf.write(self.config.file, os.path.basename(self.config.file))
+            
+            # Always include the key if it exists
+            if os.path.exists(self.config.key):
+                zipf.write(self.config.key, &#34;.osk&#34;)
+
+        # Manage retention (max 10 backups)
+        backups = self.list_backups()
+        if len(backups) &gt;= 10:
+            oldest = min(backups, key=lambda x: x[&#39;timestamp&#39;] or &#39;0&#39;)
+            self.delete_backup(oldest[&#39;id&#39;])
+
+        # Upload
+        return self.upload_file(zip_path, timestamp)</code></pre>
+</details>
+<div class="desc"><p>Compress config and upload to Drive.</p></div>
+</dd>
+<dt id="connpy.services.sync_service.SyncService.delete_backup"><code class="name flex">
+<span>def <span class="ident">delete_backup</span></span>(<span>self, file_id)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def delete_backup(self, file_id):
+    &#34;&#34;&#34;Delete a backup from Drive.&#34;&#34;&#34;
+    creds = self.get_credentials()
+    if not creds: return False
+    try:
+        service = build(&#34;drive&#34;, &#34;v3&#34;, credentials=creds)
+        service.files().delete(fileId=file_id).execute()
+        return True
+    except Exception as e:
+        printer.error(f&#34;Delete failed: {e}&#34;)
+        return False</code></pre>
+</details>
+<div class="desc"><p>Delete a backup from Drive.</p></div>
+</dd>
+<dt id="connpy.services.sync_service.SyncService.download_file"><code class="name flex">
+<span>def <span class="ident">download_file</span></span>(<span>self, file_id, dest)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def download_file(self, file_id, dest):
+    &#34;&#34;&#34;Internal method to download from Drive.&#34;&#34;&#34;
+    creds = self.get_credentials()
+    if not creds: return False
+    try:
+        service = build(&#39;drive&#39;, &#39;v3&#39;, credentials=creds)
+        request = service.files().get_media(fileId=file_id)
+        with io.FileIO(dest, mode=&#39;wb&#39;) as fh:
+            downloader = MediaIoBaseDownload(fh, request)
+            done = False
+            while not done:
+                _, done = downloader.next_chunk()
+        return True
+    except Exception as e:
+        printer.error(f&#34;Download failed: {e}&#34;)
+        return False</code></pre>
+</details>
+<div class="desc"><p>Internal method to download from Drive.</p></div>
+</dd>
+<dt id="connpy.services.sync_service.SyncService.get_credentials"><code class="name flex">
+<span>def <span class="ident">get_credentials</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_credentials(self):
+    &#34;&#34;&#34;Get valid credentials, refreshing if necessary.&#34;&#34;&#34;
+    if os.path.exists(self.token_file):
+        creds = Credentials.from_authorized_user_file(self.token_file, self.scopes)
+    else:
+        return None
+    
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            try:
+                creds.refresh(Request())
+            except RefreshError:
+                return None
+        else:
+            return None
+    return creds</code></pre>
+</details>
+<div class="desc"><p>Get valid credentials, refreshing if necessary.</p></div>
+</dd>
+<dt id="connpy.services.sync_service.SyncService.list_backups"><code class="name flex">
+<span>def <span class="ident">list_backups</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def list_backups(self):
+    &#34;&#34;&#34;List files in Google Drive appDataFolder.&#34;&#34;&#34;
+    creds = self.get_credentials()
+    if not creds:
+        printer.error(&#34;Not logged in to Google Drive.&#34;)
+        return []
+
+    try:
+        service = build(&#34;drive&#34;, &#34;v3&#34;, credentials=creds)
+        response = service.files().list(
+            spaces=&#34;appDataFolder&#34;,
+            fields=&#34;files(id, name, appProperties)&#34;,
+            pageSize=10,
+        ).execute()
+
+        files_info = []
+        for file in response.get(&#34;files&#34;, []):
+            files_info.append({
+                &#34;name&#34;: file.get(&#34;name&#34;),
+                &#34;id&#34;: file.get(&#34;id&#34;),
+                &#34;date&#34;: file.get(&#34;appProperties&#34;, {}).get(&#34;date&#34;),
+                &#34;timestamp&#34;: file.get(&#34;appProperties&#34;, {}).get(&#34;timestamp&#34;)
+            })
+        return files_info
+    except HttpError as error:
+        printer.error(f&#34;Google Drive API error: {error}&#34;)
+        return []</code></pre>
+</details>
+<div class="desc"><p>List files in Google Drive appDataFolder.</p></div>
+</dd>
+<dt id="connpy.services.sync_service.SyncService.login"><code class="name flex">
+<span>def <span class="ident">login</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def login(self):
+    &#34;&#34;&#34;Authenticate with Google Drive.&#34;&#34;&#34;
+    creds = None
+    if os.path.exists(self.token_file):
+        creds = Credentials.from_authorized_user_file(self.token_file, self.scopes)
+
+    try:
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+            else:
+                flow = InstalledAppFlow.from_client_config(self.client_config, self.scopes)
+                creds = flow.run_local_server(port=0, access_type=&#39;offline&#39;)
+
+            with open(self.token_file, &#39;w&#39;) as token:
+                token.write(creds.to_json())
+
+        printer.success(&#34;Logged in successfully.&#34;)
+        return True
+
+    except RefreshError:
+        if os.path.exists(self.token_file):
+            os.remove(self.token_file)
+        printer.warning(&#34;Existing token was invalid and has been removed. Please log in again.&#34;)
+        return False
+    except Exception as e:
+        printer.error(f&#34;Login failed: {e}&#34;)
+        return False</code></pre>
+</details>
+<div class="desc"><p>Authenticate with Google Drive.</p></div>
+</dd>
+<dt id="connpy.services.sync_service.SyncService.logout"><code class="name flex">
+<span>def <span class="ident">logout</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def logout(self):
+    &#34;&#34;&#34;Remove Google Drive credentials.&#34;&#34;&#34;
+    if os.path.exists(self.token_file):
+        os.remove(self.token_file)
+        printer.success(&#34;Logged out successfully.&#34;)
+    else:
+        printer.info(&#34;No credentials file found. Already logged out.&#34;)</code></pre>
+</details>
+<div class="desc"><p>Remove Google Drive credentials.</p></div>
+</dd>
+<dt id="connpy.services.sync_service.SyncService.perform_restore"><code class="name flex">
+<span>def <span class="ident">perform_restore</span></span>(<span>self, zip_path, restore_config=True, restore_nodes=True, app_instance=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def perform_restore(self, zip_path, restore_config=True, restore_nodes=True, app_instance=None):
+    &#34;&#34;&#34;Execute the actual restoration of files or remote nodes.&#34;&#34;&#34;
+    try:
+        with zipfile.ZipFile(zip_path, &#39;r&#39;) as zipf:
+            names = zipf.namelist()
+            dest_dir = os.path.dirname(self.config.file)
+            
+            # We need to read the config content from zip to decide what to do
+            backup_data = {}
+            config_filename = &#34;config.yaml&#34; if &#34;config.yaml&#34; in names else (&#34;config.json&#34; if &#34;config.json&#34; in names else None)
+            
+            if config_filename:
+                with zipf.open(config_filename) as f:
+                    backup_data = yaml.safe_load(f)
+
+            # 1. Restore Key (.osk) - Part of config identity
+            if restore_config and &#34;.osk&#34; in names:
+                zipf.extract(&#34;.osk&#34;, os.path.dirname(self.config.key))
+
+            # 2. Restore Config (Local Settings)
+            if restore_config and backup_data:
+                local_config = self.config.config.copy()
+                
+                # Capture current connectivity settings to preserve them
+                current_mode = local_config.get(&#34;service_mode&#34;, &#34;local&#34;)
+                current_remote = local_config.get(&#34;remote_host&#34;)
+                
+                if &#34;config&#34; in backup_data:
+                    local_config.update(backup_data[&#34;config&#34;])
+                
+                # Restore connectivity settings - we don&#39;t want a restore to 
+                # accidentally switch us between local and remote and break connectivity
+                local_config[&#34;service_mode&#34;] = current_mode
+                if current_remote:
+                    local_config[&#34;remote_host&#34;] = current_remote
+                    
+                self.config.config = local_config
+                self.config._saveconfig(self.config.file)
+
+            # 3. Restore Nodes and Profiles
+            if restore_nodes and backup_data:
+                connections = backup_data.get(&#34;connections&#34;, {})
+                profiles = backup_data.get(&#34;profiles&#34;, {})
+                
+                if app_instance and app_instance.services.mode == &#34;remote&#34;:
+                    # Push to Remote via gRPC
+                    app_instance.services.nodes.full_replace(connections, profiles)
+                else:
+                    # Restore to Local config file
+                    self.config.connections = connections
+                    self.config.profiles = profiles
+                    self.config._saveconfig(self.config.file)
+
+        # Clear caches
+        for f in [self.config.cachefile, self.config.fzf_cachefile]:
+            if os.path.exists(f): os.remove(f)
+            
+        return True
+    except Exception as e:
+        printer.error(f&#34;Restoration failed: {e}&#34;)
+        return False</code></pre>
+</details>
+<div class="desc"><p>Execute the actual restoration of files or remote nodes.</p></div>
+</dd>
+<dt id="connpy.services.sync_service.SyncService.perform_sync"><code class="name flex">
+<span>def <span class="ident">perform_sync</span></span>(<span>self, app_instance)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def perform_sync(self, app_instance):
+    &#34;&#34;&#34;Background sync logic.&#34;&#34;&#34;
+    # Always check current config state
+    sync_enabled = self.config.config.get(&#34;sync&#34;, False)
+    sync_remote = self.config.config.get(&#34;sync_remote&#34;, False)
+    
+    if not sync_enabled: return
+
+    printer.info(&#34;Triggering auto-sync...&#34;)
+    if self.check_login_status() != True: 
+        printer.warning(&#34;Auto-sync: Not logged in to Google Drive.&#34;)
+        return
+
+    remote_data = None
+    if sync_remote and app_instance.services.mode == &#34;remote&#34;:
+        try:
+            inventory = app_instance.services.nodes.get_inventory()
+            # Merge with local settings
+            local_settings = app_instance.services.config_svc.get_settings()
+            local_settings.pop(&#34;configfolder&#34;, None)
+
+            # Maintain proper config structure: {config: {}, connections: {}, profiles: {}}
+            remote_data = {
+                &#34;config&#34;: local_settings,
+                &#34;connections&#34;: inventory.get(&#34;connections&#34;, {}),
+                &#34;profiles&#34;: inventory.get(&#34;profiles&#34;, {})
+            }
+        except Exception as e:
+            printer.warning(f&#34;Could not fetch remote inventory for sync: {e}&#34;)
+
+    # Run in thread to not block CLI
+    threading.Thread(
+        target=self.compress_and_upload, 
+        args=(remote_data,)
+    ).start()</code></pre>
+</details>
+<div class="desc"><p>Background sync logic.</p></div>
+</dd>
+<dt id="connpy.services.sync_service.SyncService.restore_backup"><code class="name flex">
+<span>def <span class="ident">restore_backup</span></span>(<span>self, file_id=None, restore_config=True, restore_nodes=True, app_instance=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def restore_backup(self, file_id=None, restore_config=True, restore_nodes=True, app_instance=None):
+    &#34;&#34;&#34;Download and analyze a backup for restoration.&#34;&#34;&#34;
+    backups = self.list_backups()
+    if not backups:
+        printer.error(&#34;No backups found.&#34;)
+        return None
+
+    if file_id:
+        selected = next((f for f in backups if f[&#39;id&#39;] == file_id), None)
+        if not selected:
+            printer.error(f&#34;Backup {file_id} not found.&#34;)
+            return None
+    else:
+        selected = max(backups, key=lambda x: x[&#39;timestamp&#39;] or &#39;0&#39;)
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        zip_path = os.path.join(tmp_dir, &#39;restore.zip&#39;)
+        if self.download_file(selected[&#39;id&#39;], zip_path):
+            return self.perform_restore(zip_path, restore_config, restore_nodes, app_instance)
+    return False</code></pre>
+</details>
+<div class="desc"><p>Download and analyze a backup for restoration.</p></div>
+</dd>
+<dt id="connpy.services.sync_service.SyncService.upload_file"><code class="name flex">
+<span>def <span class="ident">upload_file</span></span>(<span>self, file_path, timestamp)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def upload_file(self, file_path, timestamp):
+    &#34;&#34;&#34;Internal method to upload to Drive.&#34;&#34;&#34;
+    creds = self.get_credentials()
+    if not creds: return False
+    
+    service = build(&#39;drive&#39;, &#39;v3&#39;, credentials=creds)
+    date_str = datetime.fromtimestamp(timestamp/1000).strftime(&#39;%Y-%m-%d %H:%M:%S&#39;)
+    
+    file_metadata = {
+        &#39;name&#39;: os.path.basename(file_path),
+        &#39;parents&#39;: [&#34;appDataFolder&#34;],
+        &#39;appProperties&#39;: {
+            &#39;timestamp&#39;: str(timestamp),
+            &#39;date&#39;: date_str
+        }
+    }
+    media = MediaFileUpload(file_path)
+    try:
+        service.files().create(body=file_metadata, media_body=media, fields=&#39;id&#39;).execute()
+        printer.success(&#34;Backup uploaded to Google Drive.&#34;)
+        return True
+    except Exception as e:
+        printer.error(f&#34;Upload failed: {e}&#34;)
+        return False</code></pre>
+</details>
+<div class="desc"><p>Internal method to upload to Drive.</p></div>
+</dd>
+</dl>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="connpy.services.base.BaseService" href="base.html#connpy.services.base.BaseService">BaseService</a></b></code>:
+<ul class="hlist">
+<li><code><a title="connpy.services.base.BaseService.set_reserved_names" href="base.html#connpy.services.base.BaseService.set_reserved_names">set_reserved_names</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="connpy.services" href="index.html">connpy.services</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="connpy.services.sync_service.SyncService" href="#connpy.services.sync_service.SyncService">SyncService</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.services.sync_service.SyncService.analyze_backup_content" href="#connpy.services.sync_service.SyncService.analyze_backup_content">analyze_backup_content</a></code></li>
+<li><code><a title="connpy.services.sync_service.SyncService.check_login_status" href="#connpy.services.sync_service.SyncService.check_login_status">check_login_status</a></code></li>
+<li><code><a title="connpy.services.sync_service.SyncService.compress_and_upload" href="#connpy.services.sync_service.SyncService.compress_and_upload">compress_and_upload</a></code></li>
+<li><code><a title="connpy.services.sync_service.SyncService.delete_backup" href="#connpy.services.sync_service.SyncService.delete_backup">delete_backup</a></code></li>
+<li><code><a title="connpy.services.sync_service.SyncService.download_file" href="#connpy.services.sync_service.SyncService.download_file">download_file</a></code></li>
+<li><code><a title="connpy.services.sync_service.SyncService.get_credentials" href="#connpy.services.sync_service.SyncService.get_credentials">get_credentials</a></code></li>
+<li><code><a title="connpy.services.sync_service.SyncService.list_backups" href="#connpy.services.sync_service.SyncService.list_backups">list_backups</a></code></li>
+<li><code><a title="connpy.services.sync_service.SyncService.login" href="#connpy.services.sync_service.SyncService.login">login</a></code></li>
+<li><code><a title="connpy.services.sync_service.SyncService.logout" href="#connpy.services.sync_service.SyncService.logout">logout</a></code></li>
+<li><code><a title="connpy.services.sync_service.SyncService.perform_restore" href="#connpy.services.sync_service.SyncService.perform_restore">perform_restore</a></code></li>
+<li><code><a title="connpy.services.sync_service.SyncService.perform_sync" href="#connpy.services.sync_service.SyncService.perform_sync">perform_sync</a></code></li>
+<li><code><a title="connpy.services.sync_service.SyncService.restore_backup" href="#connpy.services.sync_service.SyncService.restore_backup">restore_backup</a></code></li>
+<li><code><a title="connpy.services.sync_service.SyncService.upload_file" href="#connpy.services.sync_service.SyncService.upload_file">upload_file</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
+</footer>
+</body>
+</html>

@@ -1,0 +1,251 @@
+syntax = "proto3";
+
+package connpy;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/empty.proto";
+
+service NodeService {
+    rpc list_nodes (FilterRequest) returns (ValueResponse) {}
+    rpc list_folders (FilterRequest) returns (ValueResponse) {}
+    rpc get_node_details (IdRequest) returns (StructResponse) {}
+    rpc explode_unique (IdRequest) returns (ValueResponse) {}
+    rpc generate_cache (google.protobuf.Empty) returns (google.protobuf.Empty) {}
+    rpc add_node (NodeRequest) returns (google.protobuf.Empty) {}
+    rpc update_node (NodeRequest) returns (google.protobuf.Empty) {}
+    rpc delete_node (DeleteRequest) returns (google.protobuf.Empty) {}
+    rpc move_node (MoveRequest) returns (google.protobuf.Empty) {}
+    rpc bulk_add (BulkRequest) returns (google.protobuf.Empty) {}
+    rpc set_reserved_names (ListRequest) returns (google.protobuf.Empty) {}
+    rpc interact_node (stream InteractRequest) returns (stream InteractResponse) {}
+    rpc full_replace (FullReplaceRequest) returns (google.protobuf.Empty) {}
+    rpc get_inventory (google.protobuf.Empty) returns (FullReplaceRequest) {}
+}
+
+service ProfileService {
+    rpc list_profiles (FilterRequest) returns (ValueResponse) {}
+    rpc get_profile (ProfileRequest) returns (StructResponse) {}
+    rpc add_profile (NodeRequest) returns (google.protobuf.Empty) {}
+    rpc resolve_node_data (StructRequest) returns (StructResponse) {}
+    rpc delete_profile (IdRequest) returns (google.protobuf.Empty) {}
+    rpc update_profile (NodeRequest) returns (google.protobuf.Empty) {}
+}
+
+service ConfigService {
+    rpc get_settings (google.protobuf.Empty) returns (StructResponse) {}
+    rpc get_default_dir (google.protobuf.Empty) returns (StringResponse) {}
+    rpc set_config_folder (StringRequest) returns (google.protobuf.Empty) {}
+    rpc update_setting (UpdateRequest) returns (google.protobuf.Empty) {}
+    rpc encrypt_password (StringRequest) returns (StringResponse) {}
+    rpc apply_theme_from_file (StringRequest) returns (StructResponse) {}
+}
+
+service PluginService {
+    rpc list_plugins (google.protobuf.Empty) returns (ValueResponse) {}
+    rpc add_plugin (PluginRequest) returns (google.protobuf.Empty) {}
+    rpc delete_plugin (IdRequest) returns (google.protobuf.Empty) {}
+    rpc enable_plugin (IdRequest) returns (google.protobuf.Empty) {}
+    rpc disable_plugin (IdRequest) returns (google.protobuf.Empty) {}
+}
+
+service ExecutionService {
+    rpc run_commands (RunRequest) returns (stream NodeRunResult) {}
+    rpc test_commands (TestRequest) returns (stream NodeRunResult) {}
+    rpc run_cli_script (ScriptRequest) returns (StructResponse) {}
+    rpc run_yaml_playbook (ScriptRequest) returns (StructResponse) {}
+}
+
+service ImportExportService {
+    rpc export_to_file (ExportRequest) returns (google.protobuf.Empty) {}
+    rpc import_from_file (StringRequest) returns (google.protobuf.Empty) {}
+    rpc set_reserved_names (ListRequest) returns (google.protobuf.Empty) {}
+}
+
+service AIService {
+    rpc ask (stream AskRequest) returns (stream AIResponse) {}
+    rpc confirm (StringRequest) returns (BoolResponse) {}
+    rpc list_sessions (google.protobuf.Empty) returns (ValueResponse) {}
+    rpc delete_session (StringRequest) returns (google.protobuf.Empty) {}
+    rpc configure_provider (ProviderRequest) returns (google.protobuf.Empty) {}
+    rpc load_session_data (StringRequest) returns (StructResponse) {}
+}
+
+service SystemService {
+    rpc start_api (IntRequest) returns (google.protobuf.Empty) {}
+    rpc debug_api (IntRequest) returns (google.protobuf.Empty) {}
+    rpc stop_api (google.protobuf.Empty) returns (google.protobuf.Empty) {}
+    rpc restart_api (IntRequest) returns (google.protobuf.Empty) {}
+    rpc get_api_status (google.protobuf.Empty) returns (BoolResponse) {}
+}
+
+// Request and Response Messages
+
+message InteractRequest {
+    string id = 1;
+    bool sftp = 2;
+    bool debug = 3;
+    bytes stdin_data = 4;
+    int32 cols = 5;
+    int32 rows = 6;
+}
+
+message InteractResponse {
+    bytes stdout_data = 1;
+}
+
+message FilterRequest {
+    string filter_str = 1;
+    string format_str = 2;
+}
+
+message ValueResponse {
+    google.protobuf.Value data = 1;
+}
+
+message IdRequest {
+    string id = 1;
+}
+
+message NodeRequest {
+    string id = 1;
+    google.protobuf.Struct data = 2;
+    bool is_folder = 3;
+}
+
+message DeleteRequest {
+    string id = 1;
+    bool is_folder = 2;
+}
+
+message MessageValue {
+    string value = 1;
+}
+
+message MoveRequest {
+    string src_id = 1;
+    string dst_id = 2;
+    bool copy = 3;
+}
+
+message BulkRequest {
+    repeated string ids = 1;
+    repeated string hosts = 2;
+    google.protobuf.Struct common_data = 3;
+}
+
+message StructResponse {
+    google.protobuf.Struct data = 1;
+}
+
+message ProfileRequest {
+    string name = 1;
+    bool resolve = 2;
+}
+
+message StructRequest {
+    google.protobuf.Struct data = 1;
+}
+
+message StringRequest {
+    string value = 1;
+}
+
+message StringResponse {
+    string value = 1;
+}
+
+message UpdateRequest {
+    string key = 1;
+    google.protobuf.Value value = 2;
+}
+
+message PluginRequest {
+    string name = 1;
+    string source_file = 2;
+    bool update = 3;
+}
+
+message RunRequest {
+    repeated string nodes = 1;
+    repeated string commands = 2;
+    string folder = 3;
+    string prompt = 4;
+    int32 parallel = 5;
+    google.protobuf.Struct vars = 6;
+}
+
+message TestRequest {
+    repeated string nodes = 1;
+    repeated string commands = 2;
+    string expected = 3;
+    string folder = 4;
+    string prompt = 5;
+    int32 parallel = 6;
+    google.protobuf.Struct vars = 7;
+}
+
+message ScriptRequest {
+    string param1 = 1; // nodes_filter or playbook_path
+    string param2 = 2; // script_path or ""
+    int32 parallel = 3;
+}
+
+message ExportRequest {
+    string file_path = 1;
+    repeated string folders = 2;
+}
+
+message ListRequest {
+    repeated string items = 1;
+}
+
+message AskRequest {
+    string input_text = 1;
+    bool dryrun = 2;
+    google.protobuf.Value chat_history = 3;
+    string session_id = 4;
+    bool debug = 5;
+    string engineer_model = 6;
+    string engineer_api_key = 7;
+    string architect_model = 8;
+    string architect_api_key = 9;
+    bool trust = 10;
+    string confirmation_answer = 11;
+    bool interrupt = 12;
+}
+
+message AIResponse {
+    string text_chunk = 1;
+    bool is_final = 2;
+    google.protobuf.Struct full_result = 3;
+    string status_update = 4;
+    string debug_message = 5;
+    bool requires_confirmation = 6;
+    string important_message = 7;
+}
+
+message BoolResponse {
+    bool value = 1;
+}
+
+message ProviderRequest {
+    string provider = 1;
+    string model = 2;
+    string api_key = 3;
+}
+
+message IntRequest {
+    int32 value = 1;
+}
+
+message NodeRunResult {
+    string unique_id = 1;
+    string output = 2;
+    int32 status = 3;
+    google.protobuf.Struct test_result = 4;
+}
+
+message FullReplaceRequest {
+    google.protobuf.Struct connections = 1;
+    google.protobuf.Struct profiles = 2;
+}

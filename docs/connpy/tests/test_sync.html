@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
 <meta name="generator" content="pdoc3 0.11.5">
 <title>connpy.tests.test_sync API documentation</title>
-<meta name="description" content="Tests for connpy.core_plugins.sync">
+<meta name="description" content="Tests for connpy.services.sync_service">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
@@ -36,7 +36,7 @@ el.replaceWith(d);
 <h1 class="title">Module <code>connpy.tests.test_sync</code></h1>
 </header>
 <section id="section-intro">
-<p>Tests for connpy.core_plugins.sync</p>
+<p>Tests for connpy.services.sync_service</p>
 </section>
 <section>
 </section>
@@ -45,8 +45,8 @@ el.replaceWith(d);
 <section>
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
-<dt id="connpy.tests.test_sync.mock_connapp"><code class="name flex">
-<span>def <span class="ident">mock_connapp</span></span>(<span>)</span>
+<dt id="connpy.tests.test_sync.mock_config"><code class="name flex">
+<span>def <span class="ident">mock_config</span></span>(<span>)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -54,13 +54,15 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@pytest.fixture
-def mock_connapp():
-    app = MagicMock()
-    app.config.defaultdir = &#34;/fake/dir&#34;
-    app.config.file = &#34;/fake/dir/config.yaml&#34;
-    app.config.key = &#34;/fake/dir/.osk&#34;
-    app.config.config = {&#34;sync&#34;: True}
-    return app</code></pre>
+def mock_config():
+    config = MagicMock()
+    config.defaultdir = &#34;/fake/dir&#34;
+    config.file = &#34;/fake/dir/config.yaml&#34;
+    config.key = &#34;/fake/dir/.osk&#34;
+    config.cachefile = &#34;/fake/dir/.cache&#34;
+    config.fzf_cachefile = &#34;/fake/dir/.fzf_cache&#34;
+    config.config = {&#34;sync&#34;: True, &#34;sync_remote&#34;: False}
+    return config</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -69,79 +71,85 @@ def mock_connapp():
 <section>
 <h2 class="section-title" id="header-classes">Classes</h2>
 <dl>
-<dt id="connpy.tests.test_sync.TestSyncPlugin"><code class="flex name class">
-<span>class <span class="ident">TestSyncPlugin</span></span>
+<dt id="connpy.tests.test_sync.TestSyncService"><code class="flex name class">
+<span>class <span class="ident">TestSyncService</span></span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">class TestSyncPlugin:
-    def test_init(self, mock_connapp):
-        s = sync(mock_connapp)
-        assert s.sync is True
-        assert s.file == &#34;/fake/dir/config.yaml&#34;
-        assert s.token_file == &#34;/fake/dir/gtoken.json&#34;
+<pre><code class="python">class TestSyncService:
+    def test_init(self, mock_config):
+        s = SyncService(mock_config)
+        assert s.sync_enabled is True
+        assert s.token_file == os.path.join(&#34;/fake/dir&#34;, &#34;gtoken.json&#34;)
 
-    @patch(&#34;connpy.core_plugins.sync.os.path.exists&#34;)
-    @patch(&#34;connpy.core_plugins.sync.Credentials&#34;)
-    def test_get_credentials_success(self, MockCreds, mock_exists, mock_connapp):
+    @patch(&#34;connpy.services.sync_service.os.path.exists&#34;)
+    @patch(&#34;connpy.services.sync_service.Credentials&#34;)
+    def test_get_credentials_success(self, MockCreds, mock_exists, mock_config):
         mock_exists.return_value = True
         mock_cred_instance = MagicMock()
         mock_cred_instance.valid = True
         MockCreds.from_authorized_user_file.return_value = mock_cred_instance
         
-        s = sync(mock_connapp)
+        s = SyncService(mock_config)
         creds = s.get_credentials()
         assert creds == mock_cred_instance
 
-    @patch(&#34;connpy.core_plugins.sync.os.path.exists&#34;)
-    def test_get_credentials_not_found(self, mock_exists, mock_connapp):
+    @patch(&#34;connpy.services.sync_service.os.path.exists&#34;)
+    def test_get_credentials_not_found(self, mock_exists, mock_config):
         mock_exists.return_value = False
-        s = sync(mock_connapp)
-        assert s.get_credentials() == 0
+        s = SyncService(mock_config)
+        assert s.get_credentials() is None
 
-    @patch(&#34;connpy.core_plugins.sync.zipfile.ZipFile&#34;)
-    @patch(&#34;connpy.core_plugins.sync.os.path.basename&#34;)
-    def test_compress_specific_files(self, mock_basename, MockZipFile, mock_connapp):
+    @patch(&#34;connpy.services.sync_service.zipfile.ZipFile&#34;)
+    @patch(&#34;connpy.services.sync_service.os.path.exists&#34;)
+    @patch(&#34;connpy.services.sync_service.os.path.basename&#34;)
+    def test_compress_and_upload_local(self, mock_basename, mock_exists, MockZipFile, mock_config):
         mock_basename.return_value = &#34;config.yaml&#34;
-        s = sync(mock_connapp)
+        mock_exists.return_value = True
+        s = SyncService(mock_config)
+        
+        # Mocking list_backups and upload_file to avoid real API calls
+        s.list_backups = MagicMock(return_value=[])
+        s.upload_file = MagicMock(return_value=True)
+        
         zip_mock = MagicMock()
         MockZipFile.return_value.__enter__.return_value = zip_mock
         
-        s.compress_specific_files(&#34;/fake/zip.zip&#34;)
-        zip_mock.write.assert_any_call(s.file, &#34;config.yaml&#34;)
-        zip_mock.write.assert_any_call(s.key, &#34;.osk&#34;)
+        s.compress_and_upload()
+        # Verify zip was created with local config and key
+        zip_mock.write.assert_any_call(s.config.file, &#34;config.yaml&#34;)
+        zip_mock.write.assert_any_call(s.config.key, &#34;.osk&#34;)
 
-    @patch(&#34;connpy.core_plugins.sync.zipfile.ZipFile&#34;)
-    @patch(&#34;connpy.core_plugins.sync.os.path.dirname&#34;)
-    def test_decompress_zip_yaml(self, mock_dirname, MockZipFile, mock_connapp):
+    @patch(&#34;connpy.services.sync_service.zipfile.ZipFile&#34;)
+    @patch(&#34;connpy.services.sync_service.os.path.exists&#34;)
+    @patch(&#34;connpy.services.sync_service.os.path.dirname&#34;)
+    @patch(&#34;connpy.services.sync_service.os.remove&#34;)
+    def test_perform_restore(self, mock_remove, mock_dirname, mock_exists, MockZipFile, mock_config):
         mock_dirname.return_value = &#34;/fake/dir&#34;
-        s = sync(mock_connapp)
+        # Mock exists to return True for key and zip, but False for caches during the cleanup phase
+        def exists_side_effect(path):
+            if &#34;.cache&#34; in path or &#34;.fzf_cache&#34; in path:
+                return False
+            return True
+        mock_exists.side_effect = exists_side_effect
+        
+        s = SyncService(mock_config)
         zip_mock = MagicMock()
         zip_mock.namelist.return_value = [&#34;config.yaml&#34;, &#34;.osk&#34;]
         MockZipFile.return_value.__enter__.return_value = zip_mock
         
-        assert s.decompress_zip(&#34;/fake/zip.zip&#34;) == 0
-        zip_mock.extract.assert_any_call(&#34;config.yaml&#34;, &#34;/fake/dir&#34;)
+        with patch(&#34;connpy.services.sync_service.yaml.safe_load&#34;) as mock_load:
+            mock_load.return_value = {&#34;connections&#34;: {}, &#34;profiles&#34;: {}, &#34;config&#34;: {}}
+            assert s.perform_restore(&#34;/fake/zip.zip&#34;) is True
+            
         zip_mock.extract.assert_any_call(&#34;.osk&#34;, &#34;/fake/dir&#34;)
 
-    @patch(&#34;connpy.core_plugins.sync.zipfile.ZipFile&#34;)
-    @patch(&#34;connpy.core_plugins.sync.os.path.dirname&#34;)
-    def test_decompress_zip_json_fallback(self, mock_dirname, MockZipFile, mock_connapp):
-        mock_dirname.return_value = &#34;/fake/dir&#34;
-        s = sync(mock_connapp)
-        zip_mock = MagicMock()
-        zip_mock.namelist.return_value = [&#34;config.json&#34;, &#34;.osk&#34;]
-        MockZipFile.return_value.__enter__.return_value = zip_mock
-        
-        assert s.decompress_zip(&#34;/fake/old_zip.zip&#34;) == 0
-        zip_mock.extract.assert_any_call(&#34;config.json&#34;, &#34;/fake/dir&#34;)
-
-    @patch.object(sync, &#34;get_credentials&#34;)
-    @patch(&#34;connpy.core_plugins.sync.build&#34;)
-    def test_get_appdata_files(self, mock_build, mock_get_credentials, mock_connapp):
+    @patch.object(SyncService, &#34;get_credentials&#34;)
+    @patch(&#34;connpy.services.sync_service.build&#34;)
+    def test_list_backups(self, mock_build, mock_get_credentials, mock_config):
         mock_get_credentials.return_value = MagicMock()
         mock_service = MagicMock()
         mock_build.return_value = mock_service
@@ -152,131 +160,109 @@ def mock_connapp():
             ]
         }
         
-        s = sync(mock_connapp)
-        files = s.get_appdata_files()
+        s = SyncService(mock_config)
+        files = s.list_backups()
         assert len(files) == 1
         assert files[0][&#34;id&#34;] == &#34;1&#34;
-        assert files[0][&#34;timestamp&#34;] == &#34;1000&#34;
-
-    @patch.object(sync, &#34;get_credentials&#34;)
-    @patch(&#34;connpy.core_plugins.sync.build&#34;)
-    @patch(&#34;connpy.core_plugins.sync.MediaFileUpload&#34;)
-    @patch(&#34;connpy.core_plugins.sync.os.path.basename&#34;)
-    def test_backup_file_to_drive(self, mock_basename, mock_media, mock_build, mock_get_credentials, mock_connapp):
-        mock_get_credentials.return_value = MagicMock()
-        mock_basename.return_value = &#34;backup.zip&#34;
-        mock_service = MagicMock()
-        mock_build.return_value = mock_service
-        
-        s = sync(mock_connapp)
-        assert s.backup_file_to_drive(&#34;/fake/backup.zip&#34;, 1234567890000) == 0
-        mock_service.files().create.assert_called_once()</code></pre>
+        assert files[0][&#34;timestamp&#34;] == &#34;1000&#34;</code></pre>
 </details>
 <div class="desc"></div>
 <h3>Methods</h3>
 <dl>
-<dt id="connpy.tests.test_sync.TestSyncPlugin.test_backup_file_to_drive"><code class="name flex">
-<span>def <span class="ident">test_backup_file_to_drive</span></span>(<span>self, mock_basename, mock_media, mock_build, mock_get_credentials, mock_connapp)</span>
+<dt id="connpy.tests.test_sync.TestSyncService.test_compress_and_upload_local"><code class="name flex">
+<span>def <span class="ident">test_compress_and_upload_local</span></span>(<span>self, mock_basename, mock_exists, MockZipFile, mock_config)</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@patch.object(sync, &#34;get_credentials&#34;)
-@patch(&#34;connpy.core_plugins.sync.build&#34;)
-@patch(&#34;connpy.core_plugins.sync.MediaFileUpload&#34;)
-@patch(&#34;connpy.core_plugins.sync.os.path.basename&#34;)
-def test_backup_file_to_drive(self, mock_basename, mock_media, mock_build, mock_get_credentials, mock_connapp):
-    mock_get_credentials.return_value = MagicMock()
-    mock_basename.return_value = &#34;backup.zip&#34;
-    mock_service = MagicMock()
-    mock_build.return_value = mock_service
-    
-    s = sync(mock_connapp)
-    assert s.backup_file_to_drive(&#34;/fake/backup.zip&#34;, 1234567890000) == 0
-    mock_service.files().create.assert_called_once()</code></pre>
-</details>
-<div class="desc"></div>
-</dd>
-<dt id="connpy.tests.test_sync.TestSyncPlugin.test_compress_specific_files"><code class="name flex">
-<span>def <span class="ident">test_compress_specific_files</span></span>(<span>self, mock_basename, MockZipFile, mock_connapp)</span>
-</code></dt>
-<dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">@patch(&#34;connpy.core_plugins.sync.zipfile.ZipFile&#34;)
-@patch(&#34;connpy.core_plugins.sync.os.path.basename&#34;)
-def test_compress_specific_files(self, mock_basename, MockZipFile, mock_connapp):
+<pre><code class="python">@patch(&#34;connpy.services.sync_service.zipfile.ZipFile&#34;)
+@patch(&#34;connpy.services.sync_service.os.path.exists&#34;)
+@patch(&#34;connpy.services.sync_service.os.path.basename&#34;)
+def test_compress_and_upload_local(self, mock_basename, mock_exists, MockZipFile, mock_config):
     mock_basename.return_value = &#34;config.yaml&#34;
-    s = sync(mock_connapp)
+    mock_exists.return_value = True
+    s = SyncService(mock_config)
+    
+    # Mocking list_backups and upload_file to avoid real API calls
+    s.list_backups = MagicMock(return_value=[])
+    s.upload_file = MagicMock(return_value=True)
+    
     zip_mock = MagicMock()
     MockZipFile.return_value.__enter__.return_value = zip_mock
     
-    s.compress_specific_files(&#34;/fake/zip.zip&#34;)
-    zip_mock.write.assert_any_call(s.file, &#34;config.yaml&#34;)
-    zip_mock.write.assert_any_call(s.key, &#34;.osk&#34;)</code></pre>
+    s.compress_and_upload()
+    # Verify zip was created with local config and key
+    zip_mock.write.assert_any_call(s.config.file, &#34;config.yaml&#34;)
+    zip_mock.write.assert_any_call(s.config.key, &#34;.osk&#34;)</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
-<dt id="connpy.tests.test_sync.TestSyncPlugin.test_decompress_zip_json_fallback"><code class="name flex">
-<span>def <span class="ident">test_decompress_zip_json_fallback</span></span>(<span>self, mock_dirname, MockZipFile, mock_connapp)</span>
+<dt id="connpy.tests.test_sync.TestSyncService.test_get_credentials_not_found"><code class="name flex">
+<span>def <span class="ident">test_get_credentials_not_found</span></span>(<span>self, mock_exists, mock_config)</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@patch(&#34;connpy.core_plugins.sync.zipfile.ZipFile&#34;)
-@patch(&#34;connpy.core_plugins.sync.os.path.dirname&#34;)
-def test_decompress_zip_json_fallback(self, mock_dirname, MockZipFile, mock_connapp):
-    mock_dirname.return_value = &#34;/fake/dir&#34;
-    s = sync(mock_connapp)
-    zip_mock = MagicMock()
-    zip_mock.namelist.return_value = [&#34;config.json&#34;, &#34;.osk&#34;]
-    MockZipFile.return_value.__enter__.return_value = zip_mock
-    
-    assert s.decompress_zip(&#34;/fake/old_zip.zip&#34;) == 0
-    zip_mock.extract.assert_any_call(&#34;config.json&#34;, &#34;/fake/dir&#34;)</code></pre>
+<pre><code class="python">@patch(&#34;connpy.services.sync_service.os.path.exists&#34;)
+def test_get_credentials_not_found(self, mock_exists, mock_config):
+    mock_exists.return_value = False
+    s = SyncService(mock_config)
+    assert s.get_credentials() is None</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
-<dt id="connpy.tests.test_sync.TestSyncPlugin.test_decompress_zip_yaml"><code class="name flex">
-<span>def <span class="ident">test_decompress_zip_yaml</span></span>(<span>self, mock_dirname, MockZipFile, mock_connapp)</span>
+<dt id="connpy.tests.test_sync.TestSyncService.test_get_credentials_success"><code class="name flex">
+<span>def <span class="ident">test_get_credentials_success</span></span>(<span>self, MockCreds, mock_exists, mock_config)</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@patch(&#34;connpy.core_plugins.sync.zipfile.ZipFile&#34;)
-@patch(&#34;connpy.core_plugins.sync.os.path.dirname&#34;)
-def test_decompress_zip_yaml(self, mock_dirname, MockZipFile, mock_connapp):
-    mock_dirname.return_value = &#34;/fake/dir&#34;
-    s = sync(mock_connapp)
-    zip_mock = MagicMock()
-    zip_mock.namelist.return_value = [&#34;config.yaml&#34;, &#34;.osk&#34;]
-    MockZipFile.return_value.__enter__.return_value = zip_mock
+<pre><code class="python">@patch(&#34;connpy.services.sync_service.os.path.exists&#34;)
+@patch(&#34;connpy.services.sync_service.Credentials&#34;)
+def test_get_credentials_success(self, MockCreds, mock_exists, mock_config):
+    mock_exists.return_value = True
+    mock_cred_instance = MagicMock()
+    mock_cred_instance.valid = True
+    MockCreds.from_authorized_user_file.return_value = mock_cred_instance
     
-    assert s.decompress_zip(&#34;/fake/zip.zip&#34;) == 0
-    zip_mock.extract.assert_any_call(&#34;config.yaml&#34;, &#34;/fake/dir&#34;)
-    zip_mock.extract.assert_any_call(&#34;.osk&#34;, &#34;/fake/dir&#34;)</code></pre>
+    s = SyncService(mock_config)
+    creds = s.get_credentials()
+    assert creds == mock_cred_instance</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
-<dt id="connpy.tests.test_sync.TestSyncPlugin.test_get_appdata_files"><code class="name flex">
-<span>def <span class="ident">test_get_appdata_files</span></span>(<span>self, mock_build, mock_get_credentials, mock_connapp)</span>
+<dt id="connpy.tests.test_sync.TestSyncService.test_init"><code class="name flex">
+<span>def <span class="ident">test_init</span></span>(<span>self, mock_config)</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@patch.object(sync, &#34;get_credentials&#34;)
-@patch(&#34;connpy.core_plugins.sync.build&#34;)
-def test_get_appdata_files(self, mock_build, mock_get_credentials, mock_connapp):
+<pre><code class="python">def test_init(self, mock_config):
+    s = SyncService(mock_config)
+    assert s.sync_enabled is True
+    assert s.token_file == os.path.join(&#34;/fake/dir&#34;, &#34;gtoken.json&#34;)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_sync.TestSyncService.test_list_backups"><code class="name flex">
+<span>def <span class="ident">test_list_backups</span></span>(<span>self, mock_build, mock_get_credentials, mock_config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch.object(SyncService, &#34;get_credentials&#34;)
+@patch(&#34;connpy.services.sync_service.build&#34;)
+def test_list_backups(self, mock_build, mock_get_credentials, mock_config):
     mock_get_credentials.return_value = MagicMock()
     mock_service = MagicMock()
     mock_build.return_value = mock_service
@@ -287,65 +273,45 @@ def test_get_appdata_files(self, mock_build, mock_get_credentials, mock_connapp)
         ]
     }
     
-    s = sync(mock_connapp)
-    files = s.get_appdata_files()
+    s = SyncService(mock_config)
+    files = s.list_backups()
     assert len(files) == 1
     assert files[0][&#34;id&#34;] == &#34;1&#34;
     assert files[0][&#34;timestamp&#34;] == &#34;1000&#34;</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
-<dt id="connpy.tests.test_sync.TestSyncPlugin.test_get_credentials_not_found"><code class="name flex">
-<span>def <span class="ident">test_get_credentials_not_found</span></span>(<span>self, mock_exists, mock_connapp)</span>
+<dt id="connpy.tests.test_sync.TestSyncService.test_perform_restore"><code class="name flex">
+<span>def <span class="ident">test_perform_restore</span></span>(<span>self, mock_remove, mock_dirname, mock_exists, MockZipFile, mock_config)</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@patch(&#34;connpy.core_plugins.sync.os.path.exists&#34;)
-def test_get_credentials_not_found(self, mock_exists, mock_connapp):
-    mock_exists.return_value = False
-    s = sync(mock_connapp)
-    assert s.get_credentials() == 0</code></pre>
-</details>
-<div class="desc"></div>
-</dd>
-<dt id="connpy.tests.test_sync.TestSyncPlugin.test_get_credentials_success"><code class="name flex">
-<span>def <span class="ident">test_get_credentials_success</span></span>(<span>self, MockCreds, mock_exists, mock_connapp)</span>
-</code></dt>
-<dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">@patch(&#34;connpy.core_plugins.sync.os.path.exists&#34;)
-@patch(&#34;connpy.core_plugins.sync.Credentials&#34;)
-def test_get_credentials_success(self, MockCreds, mock_exists, mock_connapp):
-    mock_exists.return_value = True
-    mock_cred_instance = MagicMock()
-    mock_cred_instance.valid = True
-    MockCreds.from_authorized_user_file.return_value = mock_cred_instance
+<pre><code class="python">@patch(&#34;connpy.services.sync_service.zipfile.ZipFile&#34;)
+@patch(&#34;connpy.services.sync_service.os.path.exists&#34;)
+@patch(&#34;connpy.services.sync_service.os.path.dirname&#34;)
+@patch(&#34;connpy.services.sync_service.os.remove&#34;)
+def test_perform_restore(self, mock_remove, mock_dirname, mock_exists, MockZipFile, mock_config):
+    mock_dirname.return_value = &#34;/fake/dir&#34;
+    # Mock exists to return True for key and zip, but False for caches during the cleanup phase
+    def exists_side_effect(path):
+        if &#34;.cache&#34; in path or &#34;.fzf_cache&#34; in path:
+            return False
+        return True
+    mock_exists.side_effect = exists_side_effect
     
-    s = sync(mock_connapp)
-    creds = s.get_credentials()
-    assert creds == mock_cred_instance</code></pre>
-</details>
-<div class="desc"></div>
-</dd>
-<dt id="connpy.tests.test_sync.TestSyncPlugin.test_init"><code class="name flex">
-<span>def <span class="ident">test_init</span></span>(<span>self, mock_connapp)</span>
-</code></dt>
-<dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def test_init(self, mock_connapp):
-    s = sync(mock_connapp)
-    assert s.sync is True
-    assert s.file == &#34;/fake/dir/config.yaml&#34;
-    assert s.token_file == &#34;/fake/dir/gtoken.json&#34;</code></pre>
+    s = SyncService(mock_config)
+    zip_mock = MagicMock()
+    zip_mock.namelist.return_value = [&#34;config.yaml&#34;, &#34;.osk&#34;]
+    MockZipFile.return_value.__enter__.return_value = zip_mock
+    
+    with patch(&#34;connpy.services.sync_service.yaml.safe_load&#34;) as mock_load:
+        mock_load.return_value = {&#34;connections&#34;: {}, &#34;profiles&#34;: {}, &#34;config&#34;: {}}
+        assert s.perform_restore(&#34;/fake/zip.zip&#34;) is True
+        
+    zip_mock.extract.assert_any_call(&#34;.osk&#34;, &#34;/fake/dir&#34;)</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -366,22 +332,20 @@ def test_get_credentials_success(self, MockCreds, mock_exists, mock_connapp):
 </li>
 <li><h3><a href="#header-functions">Functions</a></h3>
 <ul class="">
-<li><code><a title="connpy.tests.test_sync.mock_connapp" href="#connpy.tests.test_sync.mock_connapp">mock_connapp</a></code></li>
+<li><code><a title="connpy.tests.test_sync.mock_config" href="#connpy.tests.test_sync.mock_config">mock_config</a></code></li>
 </ul>
 </li>
 <li><h3><a href="#header-classes">Classes</a></h3>
 <ul>
 <li>
-<h4><code><a title="connpy.tests.test_sync.TestSyncPlugin" href="#connpy.tests.test_sync.TestSyncPlugin">TestSyncPlugin</a></code></h4>
+<h4><code><a title="connpy.tests.test_sync.TestSyncService" href="#connpy.tests.test_sync.TestSyncService">TestSyncService</a></code></h4>
 <ul class="">
-<li><code><a title="connpy.tests.test_sync.TestSyncPlugin.test_backup_file_to_drive" href="#connpy.tests.test_sync.TestSyncPlugin.test_backup_file_to_drive">test_backup_file_to_drive</a></code></li>
-<li><code><a title="connpy.tests.test_sync.TestSyncPlugin.test_compress_specific_files" href="#connpy.tests.test_sync.TestSyncPlugin.test_compress_specific_files">test_compress_specific_files</a></code></li>
-<li><code><a title="connpy.tests.test_sync.TestSyncPlugin.test_decompress_zip_json_fallback" href="#connpy.tests.test_sync.TestSyncPlugin.test_decompress_zip_json_fallback">test_decompress_zip_json_fallback</a></code></li>
-<li><code><a title="connpy.tests.test_sync.TestSyncPlugin.test_decompress_zip_yaml" href="#connpy.tests.test_sync.TestSyncPlugin.test_decompress_zip_yaml">test_decompress_zip_yaml</a></code></li>
-<li><code><a title="connpy.tests.test_sync.TestSyncPlugin.test_get_appdata_files" href="#connpy.tests.test_sync.TestSyncPlugin.test_get_appdata_files">test_get_appdata_files</a></code></li>
-<li><code><a title="connpy.tests.test_sync.TestSyncPlugin.test_get_credentials_not_found" href="#connpy.tests.test_sync.TestSyncPlugin.test_get_credentials_not_found">test_get_credentials_not_found</a></code></li>
-<li><code><a title="connpy.tests.test_sync.TestSyncPlugin.test_get_credentials_success" href="#connpy.tests.test_sync.TestSyncPlugin.test_get_credentials_success">test_get_credentials_success</a></code></li>
-<li><code><a title="connpy.tests.test_sync.TestSyncPlugin.test_init" href="#connpy.tests.test_sync.TestSyncPlugin.test_init">test_init</a></code></li>
+<li><code><a title="connpy.tests.test_sync.TestSyncService.test_compress_and_upload_local" href="#connpy.tests.test_sync.TestSyncService.test_compress_and_upload_local">test_compress_and_upload_local</a></code></li>
+<li><code><a title="connpy.tests.test_sync.TestSyncService.test_get_credentials_not_found" href="#connpy.tests.test_sync.TestSyncService.test_get_credentials_not_found">test_get_credentials_not_found</a></code></li>
+<li><code><a title="connpy.tests.test_sync.TestSyncService.test_get_credentials_success" href="#connpy.tests.test_sync.TestSyncService.test_get_credentials_success">test_get_credentials_success</a></code></li>
+<li><code><a title="connpy.tests.test_sync.TestSyncService.test_init" href="#connpy.tests.test_sync.TestSyncService.test_init">test_init</a></code></li>
+<li><code><a title="connpy.tests.test_sync.TestSyncService.test_list_backups" href="#connpy.tests.test_sync.TestSyncService.test_list_backups">test_list_backups</a></code></li>
+<li><code><a title="connpy.tests.test_sync.TestSyncService.test_perform_restore" href="#connpy.tests.test_sync.TestSyncService.test_perform_restore">test_perform_restore</a></code></li>
 </ul>
 </li>
 </ul>

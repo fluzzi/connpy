@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<meta name="generator" content="pdoc3 0.11.5">
+<title>connpy.tests.test_node_service API documentation</title>
+<meta name="description" content="">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:1.5em;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:2em 0 .50em 0}h3{font-size:1.4em;margin:1.6em 0 .7em 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .2s ease-in-out}a:visited{color:#503}a:hover{color:#b62}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900;font-weight:bold}pre code{font-size:.8em;line-height:1.4em;padding:1em;display:block}code{background:#f3f3f3;font-family:"DejaVu Sans Mono",monospace;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source > summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible;min-width:max-content}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em 1em;margin:1em 0}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul ul{padding-left:1em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha512-D9gUyxqja7hBtkWpPWGt9wfbfaMGVt9gnyCvYa+jojwwPHLCzUm5i8rpk7vD7wNee9bA35eYIjobYPaQuKS1MQ==" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => {
+hljs.configure({languages: ['bash', 'css', 'diff', 'graphql', 'ini', 'javascript', 'json', 'plaintext', 'python', 'python-repl', 'rust', 'shell', 'sql', 'typescript', 'xml', 'yaml']});
+hljs.highlightAll();
+/* Collapse source docstrings */
+setTimeout(() => {
+[...document.querySelectorAll('.hljs.language-python > .hljs-string')]
+.filter(el => el.innerHTML.length > 200 && ['"""', "'''"].includes(el.innerHTML.substring(0, 3)))
+.forEach(el => {
+let d = document.createElement('details');
+d.classList.add('hljs-string');
+d.innerHTML = '<summary>"""</summary>' + el.innerHTML.substring(3);
+el.replaceWith(d);
+});
+}, 100);
+})</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>connpy.tests.test_node_service</code></h1>
+</header>
+<section id="section-intro">
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-functions">Functions</h2>
+<dl>
+<dt id="connpy.tests.test_node_service.test_list_nodes_case_sensitivity"><code class="name flex">
+<span>def <span class="ident">test_list_nodes_case_sensitivity</span></span>(<span>populated_config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_list_nodes_case_sensitivity(populated_config):
+    &#34;&#34;&#34;Test that filtering respects the case setting in config.&#34;&#34;&#34;
+    service = NodeService(populated_config)
+    
+    # Default case is False (case-insensitive)
+    nodes = service.list_nodes(filter_str=&#34;ROUTER&#34;)
+    assert &#34;router1&#34; in nodes</code></pre>
+</details>
+<div class="desc"><p>Test that filtering respects the case setting in config.</p></div>
+</dd>
+<dt id="connpy.tests.test_node_service.test_list_nodes_dynamic_formatting"><code class="name flex">
+<span>def <span class="ident">test_list_nodes_dynamic_formatting</span></span>(<span>populated_config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_list_nodes_dynamic_formatting(populated_config):
+    &#34;&#34;&#34;
+    Test that list_nodes supports dynamic formatting for any node attribute.
+    Regression: NodeService currently has hardcoded support for name, location, host.
+    &#34;&#34;&#34;
+    service = NodeService(populated_config)
+    
+    # Try to format using &#39;user&#39; and &#39;protocol&#39; which are NOT in the hardcoded list
+    # (name, location, host)
+    format_str = &#34;{name} -&gt; {user}@{host} ({protocol})&#34;
+    
+    # router1: host=10.0.0.1, user=admin, protocol=ssh
+    # Expected: &#34;router1 -&gt; admin@10.0.0.1 (ssh)&#34;
+    
+    formatted = service.list_nodes(filter_str=&#34;router1&#34;, format_str=format_str)
+    
+    assert len(formatted) == 1
+    # This will FAIL if it only supports {name}, {location}, {host}
+    assert formatted[0] == &#34;router1 -&gt; admin@10.0.0.1 (ssh)&#34;</code></pre>
+</details>
+<div class="desc"><p>Test that list_nodes supports dynamic formatting for any node attribute.
+Regression: NodeService currently has hardcoded support for name, location, host.</p></div>
+</dd>
+<dt id="connpy.tests.test_node_service.test_list_nodes_filtering_parity"><code class="name flex">
+<span>def <span class="ident">test_list_nodes_filtering_parity</span></span>(<span>populated_config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_list_nodes_filtering_parity(populated_config):
+    &#34;&#34;&#34;
+    Test that list_nodes uses literal &#39;in&#39; logic instead of re.search.
+    Regression: NodeService currently uses re.search in some versions, 
+    but we want to ensure it uses literal &#39;in&#39; for parity.
+    &#34;&#34;&#34;
+    service = NodeService(populated_config)
+    
+    # If it uses &#39;in&#39; logic, &#39;1&#39; should match all nodes containing &#39;1&#39;
+    # router1, server1@office, db1@datacenter@office
+    nodes = service.list_nodes(filter_str=&#34;1&#34;)
+    assert len(nodes) == 3
+    assert &#34;router1&#34; in nodes
+    assert &#34;server1@office&#34; in nodes
+    assert &#34;db1@datacenter@office&#34; in nodes
+
+    # Test regex-specific characters. 
+    # NodeService should use re.search, so &#39;^router&#39; will match &#39;router1&#39;.
+    nodes_regex = service.list_nodes(filter_str=&#34;^router&#34;)
+    
+    assert &#34;router1&#34; in nodes_regex</code></pre>
+</details>
+<div class="desc"><p>Test that list_nodes uses literal 'in' logic instead of re.search.
+Regression: NodeService currently uses re.search in some versions,
+but we want to ensure it uses literal 'in' for parity.</p></div>
+</dd>
+<dt id="connpy.tests.test_node_service.test_node_editing_parity"><code class="name flex">
+<span>def <span class="ident">test_node_editing_parity</span></span>(<span>populated_config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_node_editing_parity(populated_config):
+    &#34;&#34;&#34;
+    Test that add_node improperly raises NodeAlreadyExistsError when used for editing.
+    Regression: connapp._mod calls add_node instead of update_node.
+    &#34;&#34;&#34;
+    service = NodeService(populated_config)
+    
+    # router1 already exists in populated_config
+    # We confirm that calling add_node with an existing ID raises NodeAlreadyExistsError
+    # which is why connapp._mod (which calls add_node) is currently broken for editing.
+    with pytest.raises(NodeAlreadyExistsError):
+        service.add_node(&#34;router1&#34;, {&#34;host&#34;: &#34;1.1.1.1&#34;})</code></pre>
+</details>
+<div class="desc"><p>Test that add_node improperly raises NodeAlreadyExistsError when used for editing.
+Regression: connapp._mod calls add_node instead of update_node.</p></div>
+</dd>
+</dl>
+</section>
+<section>
+</section>
+</article>
+<nav id="sidebar">
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="connpy.tests" href="index.html">connpy.tests</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-functions">Functions</a></h3>
+<ul class="">
+<li><code><a title="connpy.tests.test_node_service.test_list_nodes_case_sensitivity" href="#connpy.tests.test_node_service.test_list_nodes_case_sensitivity">test_list_nodes_case_sensitivity</a></code></li>
+<li><code><a title="connpy.tests.test_node_service.test_list_nodes_dynamic_formatting" href="#connpy.tests.test_node_service.test_list_nodes_dynamic_formatting">test_list_nodes_dynamic_formatting</a></code></li>
+<li><code><a title="connpy.tests.test_node_service.test_list_nodes_filtering_parity" href="#connpy.tests.test_node_service.test_list_nodes_filtering_parity">test_list_nodes_filtering_parity</a></code></li>
+<li><code><a title="connpy.tests.test_node_service.test_node_editing_parity" href="#connpy.tests.test_node_service.test_node_editing_parity">test_node_editing_parity</a></code></li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
+</footer>
+</body>
+</html>

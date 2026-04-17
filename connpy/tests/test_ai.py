@@ -17,11 +17,13 @@ class TestAIInit:
         assert myai.engineer_model == "test/test-model"
         assert myai.architect_model == "test/test-architect"
 
-    def test_init_missing_engineer_key(self, config):
-        """Raises ValueError if engineer key is missing."""
+    def test_ask_missing_engineer_key(self, config):
+        """Raises ValueError if engineer key is missing when asking."""
         from connpy.ai import ai
-        with pytest.raises(ValueError, match="Engineer API key"):
-            ai(config)
+        myai = ai(config)
+        with pytest.raises(ValueError) as exc:
+            myai.ask("hello")
+        assert "Engineer API key not configured" in str(exc.value)
 
     def test_init_missing_architect_key_warns(self, ai_config, capsys, mock_litellm):
         """Warns if architect key is missing but doesn't crash."""

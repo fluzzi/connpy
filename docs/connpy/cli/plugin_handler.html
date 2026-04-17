@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<meta name="generator" content="pdoc3 0.11.5">
+<title>connpy.cli.plugin_handler API documentation</title>
+<meta name="description" content="">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:1.5em;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:2em 0 .50em 0}h3{font-size:1.4em;margin:1.6em 0 .7em 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .2s ease-in-out}a:visited{color:#503}a:hover{color:#b62}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900;font-weight:bold}pre code{font-size:.8em;line-height:1.4em;padding:1em;display:block}code{background:#f3f3f3;font-family:"DejaVu Sans Mono",monospace;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source > summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible;min-width:max-content}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em 1em;margin:1em 0}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul ul{padding-left:1em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha512-D9gUyxqja7hBtkWpPWGt9wfbfaMGVt9gnyCvYa+jojwwPHLCzUm5i8rpk7vD7wNee9bA35eYIjobYPaQuKS1MQ==" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => {
+hljs.configure({languages: ['bash', 'css', 'diff', 'graphql', 'ini', 'javascript', 'json', 'plaintext', 'python', 'python-repl', 'rust', 'shell', 'sql', 'typescript', 'xml', 'yaml']});
+hljs.highlightAll();
+/* Collapse source docstrings */
+setTimeout(() => {
+[...document.querySelectorAll('.hljs.language-python > .hljs-string')]
+.filter(el => el.innerHTML.length > 200 && ['"""', "'''"].includes(el.innerHTML.substring(0, 3)))
+.forEach(el => {
+let d = document.createElement('details');
+d.classList.add('hljs-string');
+d.innerHTML = '<summary>"""</summary>' + el.innerHTML.substring(3);
+el.replaceWith(d);
+});
+}, 100);
+})</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>connpy.cli.plugin_handler</code></h1>
+</header>
+<section id="section-intro">
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="connpy.cli.plugin_handler.PluginHandler"><code class="flex name class">
+<span>class <span class="ident">PluginHandler</span></span>
+<span>(</span><span>app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class PluginHandler:
+    def __init__(self, app):
+        self.app = app
+
+    def dispatch(self, args):
+        try:
+            # We determine the target PluginService/PluginStub based on standard &#39;mode&#39;
+            # But wait, local plugins should go to app.services._init_local version
+            # Or we can just use the provided app.services.plugins and pass the appropriate grpc calls if needed.
+            
+            is_remote = getattr(args, &#34;remote&#34;, False)
+            if is_remote and self.app.services.mode != &#34;remote&#34;:
+                printer.error(&#34;Cannot use --remote flag when not running in remote mode.&#34;)
+                return
+
+            if args.add:
+                self.app.services.plugins.add_plugin(args.add[0], args.add[1])
+                printer.success(f&#34;Plugin {args.add[0]} added successfully{&#39; remotely&#39; if is_remote else &#39;&#39;}.&#34;)
+            elif args.update:
+                self.app.services.plugins.add_plugin(args.update[0], args.update[1], update=True)
+                printer.success(f&#34;Plugin {args.update[0]} updated successfully{&#39; remotely&#39; if is_remote else &#39;&#39;}.&#34;)
+            elif args.delete:
+                self.app.services.plugins.delete_plugin(args.delete[0])
+                printer.success(f&#34;Plugin {args.delete[0]} deleted successfully{&#39; remotely&#39; if is_remote else &#39;&#39;}.&#34;)
+            elif args.enable:
+                name = args.enable[0]
+                if is_remote:
+                    self.app.plugins.preferences[name] = &#34;remote&#34;
+                else:
+                    if name in self.app.plugins.preferences:
+                        del self.app.plugins.preferences[name]
+                
+                self.app.plugins._save_preferences(self.app.services.config_svc.get_default_dir())
+                
+                # Always try to enable it locally (remove .bkp) if it exists
+                # regardless of mode, to keep files consistent with &#34;enabled&#34; state
+                try:
+                    # We use a local service instance to ensure we touch local files
+                    from ..services.plugin_service import PluginService
+                    local_svc = PluginService(self.app.services.config)
+                    local_svc.enable_plugin(name)
+                except Exception:
+                    pass # Ignore if not found locally or already enabled
+
+                if is_remote and self.app.services.mode == &#34;remote&#34;:
+                    self.app.services.plugins.enable_plugin(name)
+                        
+                printer.success(f&#34;Plugin {name} enabled successfully{&#39; remotely&#39; if is_remote else &#39; locally&#39;}.&#34;)
+            elif args.disable:
+                name = args.disable[0]
+                success = False
+                if is_remote:
+                    if self.app.services.mode == &#34;remote&#34;:
+                        self.app.services.plugins.disable_plugin(name)
+                        success = True
+                else:
+                    # Disable locally
+                    from ..services.plugin_service import PluginService
+                    local_svc = PluginService(self.app.services.config)
+                    try:
+                        if local_svc.disable_plugin(name):
+                            success = True
+                    except Exception as e:
+                        printer.warning(f&#34;Could not disable local plugin: {e}&#34;)
+                
+                if success:
+                    printer.success(f&#34;Plugin {name} disabled successfully{&#39; remotely&#39; if is_remote else &#39; locally&#39;}.&#34;)
+            
+            # If any remote operation was performed, trigger a sync to update local cache immediately
+            if is_remote and self.app.services.mode == &#34;remote&#34;:
+                try:
+                    import os
+                    cache_dir = os.path.join(self.app.services.config_svc.get_default_dir(), &#34;remote_plugins&#34;)
+                    # We use a dummy subparser choice check bypass by passing force_sync=True
+                    # or just letting the hasher handle it.
+                    self.app.plugins._import_remote_plugins_to_argparse(
+                        self.app.services.plugins,
+                        self.app.subparsers, # We&#39;ll need to make sure this is available
+                        cache_dir,
+                        force_sync=True
+                    )
+                except Exception:
+                    pass
+
+            elif getattr(args, &#34;sync&#34;, False):
+                # The actual sync logic is performed in connapp.py during init
+                # if the --sync flag is detected in sys.argv
+                printer.success(&#34;Remote plugins synchronized successfully.&#34;)
+            elif args.list:
+                # We need to fetch both local and remote if in remote mode
+                local_plugins = {}
+                remote_plugins = {}
+                
+                # Fetch depending on mode
+                if self.app.services.mode == &#34;remote&#34;:
+                    # For local we need to instantiate a local plugin service bypassing stub
+                    from ..services.plugin_service import PluginService
+                    local_svc = PluginService(self.app.services.config)
+                    local_plugins = local_svc.list_plugins()
+                    remote_plugins = self.app.services.plugins.list_plugins()
+                else:
+                    local_plugins = self.app.services.plugins.list_plugins()
+
+                from rich.table import Table
+                
+                table = Table(title=&#34;Available Plugins&#34;, show_header=True, header_style=&#34;bold cyan&#34;)
+                table.add_column(&#34;Plugin&#34;, style=&#34;cyan&#34;)
+                table.add_column(&#34;State&#34;, style=&#34;bold&#34;)
+                table.add_column(&#34;Origin&#34;, style=&#34;magenta&#34;)
+
+                # Populate local plugins
+                for name, details in local_plugins.items():
+                    state = &#34;Disabled&#34; if not details.get(&#34;enabled&#34;, True) else &#34;Active&#34;
+                    color = &#34;red&#34; if state == &#34;Disabled&#34; else &#34;green&#34;
+                    
+                    if self.app.services.mode == &#34;remote&#34; and state == &#34;Active&#34;:
+                        if self.app.plugins.preferences.get(name) == &#34;remote&#34;:
+                            state = &#34;Shadowed (Override by Remote)&#34;
+                            color = &#34;yellow&#34;
+                    
+                    table.add_row(name, f&#34;[{color}]{state}[/{color}]&#34;, &#34;Local&#34;)
+
+                # Populate remote plugins
+                if self.app.services.mode == &#34;remote&#34;:
+                    for name, details in remote_plugins.items():
+                        state = &#34;Disabled&#34; if not details.get(&#34;enabled&#34;, True) else &#34;Active&#34;
+                        color = &#34;red&#34; if state == &#34;Disabled&#34; else &#34;green&#34;
+                        
+                        if state == &#34;Active&#34;:
+                            pref = self.app.plugins.preferences.get(name, &#34;local&#34;)
+                            # If preference isn&#39;t remote and the plugin exists locally, local takes priority
+                            if pref != &#34;remote&#34; and name in local_plugins:
+                                state = &#34;Shadowed (Override by Local)&#34;
+                                color = &#34;yellow&#34;
+                                
+                        table.add_row(name, f&#34;[{color}]{state}[/{color}]&#34;, &#34;Remote&#34;)
+
+                if not local_plugins and not remote_plugins:
+                    printer.console.print(&#34;  No plugins found.&#34;)
+                else:
+                    printer.console.print(table)
+
+        except ConnpyError as e:
+            printer.error(str(e))
+            sys.exit(1)</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.cli.plugin_handler.PluginHandler.dispatch"><code class="name flex">
+<span>def <span class="ident">dispatch</span></span>(<span>self, args)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def dispatch(self, args):
+    try:
+        # We determine the target PluginService/PluginStub based on standard &#39;mode&#39;
+        # But wait, local plugins should go to app.services._init_local version
+        # Or we can just use the provided app.services.plugins and pass the appropriate grpc calls if needed.
+        
+        is_remote = getattr(args, &#34;remote&#34;, False)
+        if is_remote and self.app.services.mode != &#34;remote&#34;:
+            printer.error(&#34;Cannot use --remote flag when not running in remote mode.&#34;)
+            return
+
+        if args.add:
+            self.app.services.plugins.add_plugin(args.add[0], args.add[1])
+            printer.success(f&#34;Plugin {args.add[0]} added successfully{&#39; remotely&#39; if is_remote else &#39;&#39;}.&#34;)
+        elif args.update:
+            self.app.services.plugins.add_plugin(args.update[0], args.update[1], update=True)
+            printer.success(f&#34;Plugin {args.update[0]} updated successfully{&#39; remotely&#39; if is_remote else &#39;&#39;}.&#34;)
+        elif args.delete:
+            self.app.services.plugins.delete_plugin(args.delete[0])
+            printer.success(f&#34;Plugin {args.delete[0]} deleted successfully{&#39; remotely&#39; if is_remote else &#39;&#39;}.&#34;)
+        elif args.enable:
+            name = args.enable[0]
+            if is_remote:
+                self.app.plugins.preferences[name] = &#34;remote&#34;
+            else:
+                if name in self.app.plugins.preferences:
+                    del self.app.plugins.preferences[name]
+            
+            self.app.plugins._save_preferences(self.app.services.config_svc.get_default_dir())
+            
+            # Always try to enable it locally (remove .bkp) if it exists
+            # regardless of mode, to keep files consistent with &#34;enabled&#34; state
+            try:
+                # We use a local service instance to ensure we touch local files
+                from ..services.plugin_service import PluginService
+                local_svc = PluginService(self.app.services.config)
+                local_svc.enable_plugin(name)
+            except Exception:
+                pass # Ignore if not found locally or already enabled
+
+            if is_remote and self.app.services.mode == &#34;remote&#34;:
+                self.app.services.plugins.enable_plugin(name)
+                    
+            printer.success(f&#34;Plugin {name} enabled successfully{&#39; remotely&#39; if is_remote else &#39; locally&#39;}.&#34;)
+        elif args.disable:
+            name = args.disable[0]
+            success = False
+            if is_remote:
+                if self.app.services.mode == &#34;remote&#34;:
+                    self.app.services.plugins.disable_plugin(name)
+                    success = True
+            else:
+                # Disable locally
+                from ..services.plugin_service import PluginService
+                local_svc = PluginService(self.app.services.config)
+                try:
+                    if local_svc.disable_plugin(name):
+                        success = True
+                except Exception as e:
+                    printer.warning(f&#34;Could not disable local plugin: {e}&#34;)
+            
+            if success:
+                printer.success(f&#34;Plugin {name} disabled successfully{&#39; remotely&#39; if is_remote else &#39; locally&#39;}.&#34;)
+        
+        # If any remote operation was performed, trigger a sync to update local cache immediately
+        if is_remote and self.app.services.mode == &#34;remote&#34;:
+            try:
+                import os
+                cache_dir = os.path.join(self.app.services.config_svc.get_default_dir(), &#34;remote_plugins&#34;)
+                # We use a dummy subparser choice check bypass by passing force_sync=True
+                # or just letting the hasher handle it.
+                self.app.plugins._import_remote_plugins_to_argparse(
+                    self.app.services.plugins,
+                    self.app.subparsers, # We&#39;ll need to make sure this is available
+                    cache_dir,
+                    force_sync=True
+                )
+            except Exception:
+                pass
+
+        elif getattr(args, &#34;sync&#34;, False):
+            # The actual sync logic is performed in connapp.py during init
+            # if the --sync flag is detected in sys.argv
+            printer.success(&#34;Remote plugins synchronized successfully.&#34;)
+        elif args.list:
+            # We need to fetch both local and remote if in remote mode
+            local_plugins = {}
+            remote_plugins = {}
+            
+            # Fetch depending on mode
+            if self.app.services.mode == &#34;remote&#34;:
+                # For local we need to instantiate a local plugin service bypassing stub
+                from ..services.plugin_service import PluginService
+                local_svc = PluginService(self.app.services.config)
+                local_plugins = local_svc.list_plugins()
+                remote_plugins = self.app.services.plugins.list_plugins()
+            else:
+                local_plugins = self.app.services.plugins.list_plugins()
+
+            from rich.table import Table
+            
+            table = Table(title=&#34;Available Plugins&#34;, show_header=True, header_style=&#34;bold cyan&#34;)
+            table.add_column(&#34;Plugin&#34;, style=&#34;cyan&#34;)
+            table.add_column(&#34;State&#34;, style=&#34;bold&#34;)
+            table.add_column(&#34;Origin&#34;, style=&#34;magenta&#34;)
+
+            # Populate local plugins
+            for name, details in local_plugins.items():
+                state = &#34;Disabled&#34; if not details.get(&#34;enabled&#34;, True) else &#34;Active&#34;
+                color = &#34;red&#34; if state == &#34;Disabled&#34; else &#34;green&#34;
+                
+                if self.app.services.mode == &#34;remote&#34; and state == &#34;Active&#34;:
+                    if self.app.plugins.preferences.get(name) == &#34;remote&#34;:
+                        state = &#34;Shadowed (Override by Remote)&#34;
+                        color = &#34;yellow&#34;
+                
+                table.add_row(name, f&#34;[{color}]{state}[/{color}]&#34;, &#34;Local&#34;)
+
+            # Populate remote plugins
+            if self.app.services.mode == &#34;remote&#34;:
+                for name, details in remote_plugins.items():
+                    state = &#34;Disabled&#34; if not details.get(&#34;enabled&#34;, True) else &#34;Active&#34;
+                    color = &#34;red&#34; if state == &#34;Disabled&#34; else &#34;green&#34;
+                    
+                    if state == &#34;Active&#34;:
+                        pref = self.app.plugins.preferences.get(name, &#34;local&#34;)
+                        # If preference isn&#39;t remote and the plugin exists locally, local takes priority
+                        if pref != &#34;remote&#34; and name in local_plugins:
+                            state = &#34;Shadowed (Override by Local)&#34;
+                            color = &#34;yellow&#34;
+                            
+                    table.add_row(name, f&#34;[{color}]{state}[/{color}]&#34;, &#34;Remote&#34;)
+
+            if not local_plugins and not remote_plugins:
+                printer.console.print(&#34;  No plugins found.&#34;)
+            else:
+                printer.console.print(table)
+
+    except ConnpyError as e:
+        printer.error(str(e))
+        sys.exit(1)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="connpy.cli" href="index.html">connpy.cli</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="connpy.cli.plugin_handler.PluginHandler" href="#connpy.cli.plugin_handler.PluginHandler">PluginHandler</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.cli.plugin_handler.PluginHandler.dispatch" href="#connpy.cli.plugin_handler.PluginHandler.dispatch">dispatch</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
+</footer>
+</body>
+</html>

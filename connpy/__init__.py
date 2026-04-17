@@ -17,7 +17,9 @@ Connpy is a SSH, SFTP, Telnet, kubectl, and Docker pod connection manager and au
     - Run automation scripts on network devices.
     - Use AI with a multi-agent system (Engineer/Architect) to help you manage your devices.
       Supports any LLM provider via litellm (OpenAI, Anthropic, Google, etc.).
-    - Add plugins with your own scripts.
+    - Add plugins with your own scripts, and execute them remotely.
+    - Fully decoupled gRPC Client/Server architecture.
+    - Unified UI with syntax highlighting and theming.
     - Much more!
 
 ### Usage
@@ -40,6 +42,9 @@ options:
   -s, --show         Show node[@subfolder][@folder]
   -d, --debug        Display all conections steps
   -t, --sftp         Connects using sftp instead of ssh
+  --service-mode     Set the backend service mode (local or remote)
+  --remote           Connect to a remote connpy service via gRPC
+  --theme            UI Output theme (dark, light, or path)
 
 Commands:
   profile         Manage profiles
@@ -98,6 +103,13 @@ options:
    conn run server ls -la
 ``` 
 ## Plugin Requirements for Connpy
+
+### Remote Plugin Execution
+When Connpy operates in remote mode, plugins are executed **transparently on the server**:
+- The client automatically downloads the plugin source code (`Parser` class context) to generate the local `argparse` structure and provide autocompletion.
+- The execution phase (`Entrypoint` class) is redirected via gRPC streams to execute in the server's memory, ensuring the plugin runs securely against the server's inventory without passing sensitive data to the client.
+- You can manage remote plugins using the `--remote` flag (e.g. `connpy plugin --add myplugin script.py --remote`).
+
 ### General Structure
 - The plugin script must be a Python file.
 - Only the following top-level elements are allowed in the plugin script:
@@ -212,46 +224,37 @@ There are 2 methods that allows you to define custom logic to be executed before
 
 ### Command Completion Support
 
-Plugins can provide intelligent **tab completion** by defining a function called `_connpy_completion` in the plugin script. This function will be called by Connpy to assist with command-line completion when the user types partial input.
+Plugins can provide intelligent **tab completion** by defining autocompletion logic. There are two supported methods, with the tree-based approach being the most modern and recommended.
 
-#### Function Signature
+#### 1. Tree-based Completion (Recommended)
 
-```
-def _connpy_completion(wordsnumber, words, info=None):
-    ...
-```
+Define a function called `_connpy_tree` that returns a declarative navigation tree. This method is highly efficient, supports complex state loops, and is very simple to implement for most use cases.
 
-#### Parameters
-
-| Parameter      | Description |
-|----------------|-------------|
-| `wordsnumber`  | Integer indicating the number of words (space-separated tokens) currently on the command line. For plugins, this typically starts at 3 (e.g., `connpy <plugin> ...`). |
-| `words`        | A list of tokens (words) already typed. `words[0]` is always the name of the plugin, followed by any subcommands or arguments. |
-| `info`         | A dictionary of structured context data provided by Connpy to help with suggestions. |
-
-#### Contents of `info`
-
-The `info` dictionary contains helpful context to generate completions:
-
-```
-info = {
-    "config": config_dict,     # The full loaded configuration
-    "nodes": node_list,        # List of all known node names
-    "folders": folder_list,    # List of all defined folder names
-    "profiles": profile_list,  # List of all profile names
-    "plugins": plugin_list     # List of all plugin names
-}
+```python
+def _connpy_tree(info=None):
+    nodes = info.get("nodes", [])
+    return {
+        "__exclude_used__": True,  # Filter out words already typed
+        "__extra__": nodes,        # Suggest nodes at this level
+        "--format": ["json", "yaml", "table"], # Fixed suggestions
+        "*": {                     # Wildcard matches any positional word
+            "interface1": None,
+            "interface2": None,
+            "--verbose": None
+        }
+    }
 ```
 
-You can use this data to generate suggestions based on the current input.
+- **Keys**: Literal completions (exact matches).
+- **`*` Key**: A wildcard that matches any positional word typed by the user.
+- **`__extra__`**: A list or a callable `(words) -> list` that adds dynamic suggestions.
+- **`__exclude_used__`**: (Boolean) If True, automatically filters out words already present in the command line.
 
-#### Return Value
+#### 2. Legacy Function-based Completion
 
-The function must return a list of suggestion strings to be presented to the user.
+For backward compatibility or highly custom logic, you can define `_connpy_completion`.
 
-#### Example
-
-```
+```python
 def _connpy_completion(wordsnumber, words, info=None):
     if wordsnumber == 3:
         return ["--help", "--verbose", "start", "stop"]
@@ -261,6 +264,12 @@ def _connpy_completion(wordsnumber, words, info=None):
 
     return []
 ```
+
+| Parameter      | Description |
+|----------------|-------------|
+| `wordsnumber`  | Integer indicating the total number of words on the command line. For plugins, this typically starts at 3. |
+| `words`        | A list of tokens (words) already typed. `words[0]` is always the name of the plugin. |
+| `info`         | A dictionary of structured context data (`nodes`, `folders`, `profiles`, `config`). |
 
 > In this example, if the user types `connpy myplugin start ` and presses Tab, it will suggest node names.
 
@@ -313,112 +322,33 @@ For a practical example of how to write a compatible plugin script, please refer
 
 This script demonstrates the required structure and implementation details according to the plugin system's standards.
 
-## http API
-With the Connpy API you can run commands on devices using http requests
+## gRPC Service Architecture
+Connpy features a completely decoupled gRPC Client/Server architecture. You can run Connpy as a standalone background service and connect to it remotely via the CLI or other clients.
 
-### 1. List Nodes
+### 1. Start the Server
+Start the gRPC service by running:
+```bash
+connpy api -s 50051
+```
+The server will handle all configurations, connections, AI sessions, and plugin execution locally on the machine it runs on.
 
-**Endpoint**: `/list_nodes`
+### 2. Connect the Client
+Configure your local CLI client to connect to the remote server:
+```bash
+connpy config --service-mode remote
+connpy config --remote-host localhost:50051
+```
+Once configured, all commands (`connpy node`, `connpy list`, `connpy ai`, etc.) will execute transparently on the remote server via thin-client proxies. You can revert back to standalone execution at any time by running `connpy config --service-mode local`.
 
-**Method**: `POST`
+### Programmatic Access (gRPC & SOA)
+Developers can build their own applications using the Connpy backend by utilizing the `ServiceProvider`:
 
-**Description**: This route returns a list of nodes. It can also filter the list based on a given keyword.
-
-#### Request Body:
-
-```json
-{
-  "filter": "<keyword>"
-}
+```python
+from connpy.services.provider import ServiceProvider
+services = ServiceProvider(config, mode="remote", remote_host="localhost:50051")
+nodes = services.nodes.list_nodes()
 ```
 
-* `filter` (optional): A keyword to filter the list of nodes. It returns only the nodes that contain the keyword. If not provided, the route will return the entire list of nodes.
-
-#### Response:
-
-- A JSON array containing the filtered list of nodes.
-
----
-
-### 2. Get Nodes
-
-**Endpoint**: `/get_nodes`
-
-**Method**: `POST`
-
-**Description**: This route returns a dictionary of nodes with all their attributes. It can also filter the nodes based on a given keyword.
-
-#### Request Body:
-
-```json
-{
-  "filter": "<keyword>"
-}
-```
-
-* `filter` (optional): A keyword to filter the nodes. It returns only the nodes that contain the keyword. If not provided, the route will return the entire list of nodes.
-
-#### Response:
-
-- A JSON array containing the filtered nodes.
-
----
-
-### 3. Run Commands
-
-**Endpoint**: `/run_commands`
-
-**Method**: `POST`
-
-**Description**: This route runs commands on selected nodes based on the provided action, nodes, and commands. It also supports executing tests by providing expected results.
-
-#### Request Body:
-
-```json
-{
-  "action": "<action>",
-  "nodes": "<nodes>",
-  "commands": "<commands>",
-  "expected": "<expected>",
-  "options": "<options>"
-}
-```
-
-* `action` (required): The action to be performed. Possible values: `run` or `test`.
-* `nodes` (required): A list of nodes or a single node on which the commands will be executed. The nodes can be specified as individual node names or a node group with the `@` prefix. Node groups can also be specified as arrays with a list of nodes inside the group.
-* `commands` (required): A list of commands to be executed on the specified nodes.
-* `expected` (optional, only used when the action is `test`): A single expected result for the test.
-* `options` (optional): Array to pass options to the run command, options are: `prompt`, `parallel`, `timeout`  
-
-#### Response:
-
-- A JSON object with the results of the executed commands on the nodes.
-
----
-
-### 4. Ask AI
-
-**Endpoint**: `/ask_ai`
-
-**Method**: `POST`
-
-**Description**: This route sends to chatgpt IA a request that will parse it into an understandable output for the application and then run the request.
-
-#### Request Body:
-
-```json
-{
-  "input": "<user input request>",
-  "dryrun": true or false
-}
-```
-
-* `input` (required): The user input requesting the AI to perform an action on some devices or get the devices list.
-* `dryrun` (optional): If set to true, it will return the parameters to run the request but it won't run it. default is false.
-
-#### Response:
-
-- A JSON array containing the action to run and the parameters and the result of the action.
 
 ## Automation module
 The automation module
@@ -534,6 +464,13 @@ class Preload:
     def __init__(self, connapp):
         connapp.ai.modify(_register_my_tools)
 ```
+
+## Developer Notes (SOA Architecture)
+As of version 2.0, Connpy has migrated to a **Service-Oriented Architecture (SOA)**:
+- **`connpy/cli/`**: Contains all CLI handlers. These are responsible for argument parsing, user interaction (via `inquirer`), and visual output (via `printer`).
+- **`connpy/services/`**: Contains pure logic services (Node, Profile, Execution, etc.).
+- **Zero-Print Policy**: Services must never use `print()`. All output must be returned as data structures or generators to the caller (CLI handlers).
+- **ServiceProvider**: Access services via `connapp.services`. This allows transparent switching between local and remote (gRPC) backends without modifying CLI logic.
 '''
 from .core import node,nodes
 from .configfile import configfile

@@ -1140,8 +1140,9 @@ el.replaceWith(d);
         assert &#34;server1@office&#34; not in nodes
 
     def test_getallnodes_filter_invalid_type(self, populated_config):
-        with pytest.raises(ValueError):
+        with pytest.raises(SystemExit) as exc:
             populated_config._getallnodes(123)
+        assert exc.value.code == 1
 
     def test_getallfolders(self, populated_config):
         folders = populated_config._getallfolders()
@@ -1236,8 +1237,9 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def test_getallnodes_filter_invalid_type(self, populated_config):
-    with pytest.raises(ValueError):
-        populated_config._getallnodes(123)</code></pre>
+    with pytest.raises(SystemExit) as exc:
+        populated_config._getallnodes(123)
+    assert exc.value.code == 1</code></pre>
 </details>
 <div class="desc"></div>
 </dd>

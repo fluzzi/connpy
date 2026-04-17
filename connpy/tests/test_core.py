@@ -121,8 +121,9 @@ class TestCommandGeneration:
 
     def test_invalid_protocol_raises(self):
         n = self._make_node(protocol="invalid_proto")
-        with pytest.raises(ValueError, match="Invalid protocol"):
+        with pytest.raises(SystemExit) as exc:
             n._get_cmd()
+        assert exc.value.code == 1
 
     def test_ssh_cmd_no_user(self):
         n = self._make_node(user="")

@@ -1,0 +1,705 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<meta name="generator" content="pdoc3 0.11.5">
+<title>connpy.tests.test_connapp API documentation</title>
+<meta name="description" content="">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:1.5em;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:2em 0 .50em 0}h3{font-size:1.4em;margin:1.6em 0 .7em 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .2s ease-in-out}a:visited{color:#503}a:hover{color:#b62}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900;font-weight:bold}pre code{font-size:.8em;line-height:1.4em;padding:1em;display:block}code{background:#f3f3f3;font-family:"DejaVu Sans Mono",monospace;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source > summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible;min-width:max-content}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em 1em;margin:1em 0}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul ul{padding-left:1em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha512-D9gUyxqja7hBtkWpPWGt9wfbfaMGVt9gnyCvYa+jojwwPHLCzUm5i8rpk7vD7wNee9bA35eYIjobYPaQuKS1MQ==" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => {
+hljs.configure({languages: ['bash', 'css', 'diff', 'graphql', 'ini', 'javascript', 'json', 'plaintext', 'python', 'python-repl', 'rust', 'shell', 'sql', 'typescript', 'xml', 'yaml']});
+hljs.highlightAll();
+/* Collapse source docstrings */
+setTimeout(() => {
+[...document.querySelectorAll('.hljs.language-python > .hljs-string')]
+.filter(el => el.innerHTML.length > 200 && ['"""', "'''"].includes(el.innerHTML.substring(0, 3)))
+.forEach(el => {
+let d = document.createElement('details');
+d.classList.add('hljs-string');
+d.innerHTML = '<summary>"""</summary>' + el.innerHTML.substring(3);
+el.replaceWith(d);
+});
+}, 100);
+})</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>connpy.tests.test_connapp</code></h1>
+</header>
+<section id="section-intro">
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-functions">Functions</h2>
+<dl>
+<dt id="connpy.tests.test_connapp.app"><code class="name flex">
+<span>def <span class="ident">app</span></span>(<span>populated_config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@pytest.fixture
+def app(populated_config):
+    &#34;&#34;&#34;Returns an instance of connapp initialized with the mock config.&#34;&#34;&#34;
+    return connapp(populated_config)</code></pre>
+</details>
+<div class="desc"><p>Returns an instance of connapp initialized with the mock config.</p></div>
+</dd>
+<dt id="connpy.tests.test_connapp.test_ai"><code class="name flex">
+<span>def <span class="ident">test_ai</span></span>(<span>mock_status, mock_ask, app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.services.ai_service.AIService.ask&#34;)
+@patch(&#34;connpy.connapp.console.status&#34;)
+def test_ai(mock_status, mock_ask, app):
+    mock_ask.return_value = {&#34;response&#34;: &#34;AI output&#34;, &#34;usage&#34;: {&#34;total&#34;: 10, &#34;input&#34;: 5, &#34;output&#34;: 5}}
+    
+    app.start([&#34;ai&#34;, &#34;--engineer-api-key&#34;, &#34;testkey&#34;, &#34;how are you&#34;])
+    mock_ask.assert_called_once()</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_connapp.test_ai_list"><code class="name flex">
+<span>def <span class="ident">test_ai_list</span></span>(<span>mock_list_sessions, app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.services.ai_service.AIService.list_sessions&#34;)
+def test_ai_list(mock_list_sessions, app):
+    mock_list_sessions.return_value = [{&#34;id&#34;: &#34;1&#34;, &#34;title&#34;: &#34;t&#34;, &#34;created_at&#34;: &#34;now&#34;, &#34;model&#34;: &#34;m&#34;}]
+    app.start([&#34;ai&#34;, &#34;--list&#34;])
+    mock_list_sessions.assert_called_once()</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_connapp.test_api_debug"><code class="name flex">
+<span>def <span class="ident">test_api_debug</span></span>(<span>mock_status, app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.services.system_service.SystemService.get_api_status&#34;)
+def test_api_debug(mock_status, app):
+    mock_status.return_value = {&#34;running&#34;: False}
+    app.services.system.debug_api = MagicMock()
+    app.start([&#34;api&#34;, &#34;-d&#34;, &#34;8080&#34;])
+    app.services.system.debug_api.assert_called_once_with(port=8080)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_connapp.test_api_start"><code class="name flex">
+<span>def <span class="ident">test_api_start</span></span>(<span>mock_status, app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.services.system_service.SystemService.get_api_status&#34;)
+def test_api_start(mock_status, app):
+    mock_status.return_value = {&#34;running&#34;: False}
+    app.services.system.start_api = MagicMock()
+    app.start([&#34;api&#34;, &#34;-s&#34;, &#34;8080&#34;])
+    app.services.system.start_api.assert_called_once_with(port=8080)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_connapp.test_api_stop"><code class="name flex">
+<span>def <span class="ident">test_api_stop</span></span>(<span>mock_status, app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.services.system_service.SystemService.get_api_status&#34;)
+def test_api_stop(mock_status, app):
+    mock_status.return_value = {&#34;running&#34;: True, &#34;pid&#34;: &#34;1234&#34;}
+    app.services.system.stop_api = MagicMock(return_value=True)
+    app.start([&#34;api&#34;, &#34;-x&#34;])
+    app.services.system.stop_api.assert_called_once()</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_connapp.test_bulk"><code class="name flex">
+<span>def <span class="ident">test_bulk</span></span>(<span>mock_bulk_add, mock_q_bulk, app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.cli.forms.Forms.questions_bulk&#34;)
+@patch(&#34;connpy.services.node_service.NodeService.bulk_add&#34;)
+def test_bulk(mock_bulk_add, mock_q_bulk, app):
+    mock_q_bulk.return_value = {&#34;ids&#34;: &#34;node1&#34;, &#34;host&#34;: &#34;host1&#34;, &#34;location&#34;: &#34;&#34;}
+    mock_bulk_add.return_value = 1
+    app.start([&#34;bulk&#34;])
+    mock_bulk_add.assert_called_once()</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_connapp.test_config"><code class="name flex">
+<span>def <span class="ident">test_config</span></span>(<span>mock_update_setting, app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.services.config_service.ConfigService.update_setting&#34;)
+def test_config(mock_update_setting, app):
+    app.start([&#34;config&#34;, &#34;--allow-uppercase&#34;, &#34;true&#34;])
+    mock_update_setting.assert_called_with(&#34;case&#34;, True)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_connapp.test_config_folder"><code class="name flex">
+<span>def <span class="ident">test_config_folder</span></span>(<span>mock_set_config_folder, app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.services.config_service.ConfigService.set_config_folder&#34;)
+def test_config_folder(mock_set_config_folder, app):
+    app.start([&#34;config&#34;, &#34;--configfolder&#34;, &#34;/new/path&#34;])
+    mock_set_config_folder.assert_called_once_with(&#34;/new/path&#34;)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_connapp.test_config_various"><code class="name flex">
+<span>def <span class="ident">test_config_various</span></span>(<span>mock_update_setting, app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.services.config_service.ConfigService.update_setting&#34;)
+def test_config_various(mock_update_setting, app):
+    app.start([&#34;config&#34;, &#34;--fzf&#34;, &#34;true&#34;])
+    mock_update_setting.assert_called_with(&#34;fzf&#34;, True)
+    app.start([&#34;config&#34;, &#34;--keepalive&#34;, &#34;60&#34;])
+    mock_update_setting.assert_called_with(&#34;idletime&#34;, 60)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_connapp.test_connapp_init"><code class="name flex">
+<span>def <span class="ident">test_connapp_init</span></span>(<span>app, populated_config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_connapp_init(app, populated_config):
+    &#34;&#34;&#34;Test that connapp initializes correctly with config.&#34;&#34;&#34;
+    assert app.config == populated_config
+    assert app.case == populated_config.config.get(&#34;case&#34;, False)</code></pre>
+</details>
+<div class="desc"><p>Test that connapp initializes correctly with config.</p></div>
+</dd>
+<dt id="connpy.tests.test_connapp.test_copy"><code class="name flex">
+<span>def <span class="ident">test_copy</span></span>(<span>mock_move_node, app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.services.node_service.NodeService.move_node&#34;)
+def test_copy(mock_move_node, app):
+    app.start([&#34;copy&#34;, &#34;src_node&#34;, &#34;dst_node&#34;])
+    mock_move_node.assert_called_once_with(&#34;src_node&#34;, &#34;dst_node&#34;, copy=True)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_connapp.test_export"><code class="name flex">
+<span>def <span class="ident">test_export</span></span>(<span>mock_export, app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.services.import_export_service.ImportExportService.export_to_file&#34;)
+def test_export(mock_export, app):
+    with pytest.raises(SystemExit):
+        app.start([&#34;export&#34;, &#34;file.yml&#34;, &#34;@folder1&#34;])
+    mock_export.assert_called_once_with(&#34;file.yml&#34;, folders=[&#34;@folder1&#34;])</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_connapp.test_import"><code class="name flex">
+<span>def <span class="ident">test_import</span></span>(<span>mock_import, mock_prompt, mock_exists, app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;os.path.exists&#34;)
+@patch(&#34;inquirer.prompt&#34;)
+@patch(&#34;connpy.services.import_export_service.ImportExportService.import_from_file&#34;)
+def test_import(mock_import, mock_prompt, mock_exists, app):
+    mock_exists.return_value = True
+    mock_prompt.return_value = {&#34;import&#34;: True}
+    app.start([&#34;import&#34;, &#34;file.yml&#34;])
+    mock_import.assert_called_once_with(&#34;file.yml&#34;)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_connapp.test_list_folders"><code class="name flex">
+<span>def <span class="ident">test_list_folders</span></span>(<span>mock_list_folders, app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.services.node_service.NodeService.list_folders&#34;)
+def test_list_folders(mock_list_folders, app):
+    mock_list_folders.return_value = [&#34;folder1&#34;]
+    app.start([&#34;list&#34;, &#34;folders&#34;])
+    # Called during init and during the list command
+    assert mock_list_folders.call_count &gt;= 2</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_connapp.test_move"><code class="name flex">
+<span>def <span class="ident">test_move</span></span>(<span>mock_move_node, app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.services.node_service.NodeService.move_node&#34;)
+def test_move(mock_move_node, app):
+    app.start([&#34;move&#34;, &#34;src_node&#34;, &#34;dst_node&#34;])
+    mock_move_node.assert_called_once_with(&#34;src_node&#34;, &#34;dst_node&#34;, copy=False)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_connapp.test_node_add"><code class="name flex">
+<span>def <span class="ident">test_node_add</span></span>(<span>mock_func_node, app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.cli.node_handler.NodeHandler.dispatch&#34;)
+def test_node_add(mock_func_node, app):
+    &#34;&#34;&#34;Test that &#39;node -a&#39; command correctly parses.&#34;&#34;&#34;
+    app.start([&#34;node&#34;, &#34;-a&#34;, &#34;new_router&#34;])
+    mock_func_node.assert_called_once()
+    args = mock_func_node.call_args[0][0]
+    assert args.data == &#34;new_router&#34;
+    assert args.action == &#34;add&#34;</code></pre>
+</details>
+<div class="desc"><p>Test that 'node -a' command correctly parses.</p></div>
+</dd>
+<dt id="connpy.tests.test_connapp.test_node_default"><code class="name flex">
+<span>def <span class="ident">test_node_default</span></span>(<span>mock_func_node, app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.cli.node_handler.NodeHandler.dispatch&#34;)
+def test_node_default(mock_func_node, app):
+    &#34;&#34;&#34;Test that default &#39;node&#39; command correctly parses and calls _func_node.&#34;&#34;&#34;
+    app.start([&#34;node&#34;, &#34;router1&#34;])
+    mock_func_node.assert_called_once()
+    args = mock_func_node.call_args[0][0]
+    assert args.data == &#34;router1&#34;
+    assert args.action == &#34;connect&#34;</code></pre>
+</details>
+<div class="desc"><p>Test that default 'node' command correctly parses and calls _func_node.</p></div>
+</dd>
+<dt id="connpy.tests.test_connapp.test_node_del"><code class="name flex">
+<span>def <span class="ident">test_node_del</span></span>(<span>mock_prompt, mock_delete_node, mock_list_nodes, app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.services.node_service.NodeService.list_nodes&#34;)
+@patch(&#34;connpy.services.node_service.NodeService.delete_node&#34;)
+@patch(&#34;inquirer.prompt&#34;)
+def test_node_del(mock_prompt, mock_delete_node, mock_list_nodes, app):
+    mock_list_nodes.return_value = [&#34;router1&#34;]
+    mock_prompt.return_value = {&#34;delete&#34;: True}
+    app.start([&#34;node&#34;, &#34;-r&#34;, &#34;router1&#34;])
+    mock_delete_node.assert_called_once_with(&#34;router1&#34;, is_folder=False)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_connapp.test_node_list"><code class="name flex">
+<span>def <span class="ident">test_node_list</span></span>(<span>mock_list_nodes, app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.services.node_service.NodeService.list_nodes&#34;)
+def test_node_list(mock_list_nodes, app):
+    &#34;&#34;&#34;Test &#39;list nodes&#39; invokes node service.&#34;&#34;&#34;
+    mock_list_nodes.return_value = [&#34;router1&#34;, &#34;server1&#34;]
+    app.start([&#34;list&#34;, &#34;nodes&#34;])
+    # Should be called during init and during the list command
+    assert mock_list_nodes.call_count &gt;= 2</code></pre>
+</details>
+<div class="desc"><p>Test 'list nodes' invokes node service.</p></div>
+</dd>
+<dt id="connpy.tests.test_connapp.test_node_mod"><code class="name flex">
+<span>def <span class="ident">test_node_mod</span></span>(<span>mock_q_nodes, mock_q_edit, mock_update_node, mock_get_details, mock_list_nodes, app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.services.node_service.NodeService.list_nodes&#34;)
+@patch(&#34;connpy.services.node_service.NodeService.get_node_details&#34;)
+@patch(&#34;connpy.services.node_service.NodeService.update_node&#34;)
+@patch(&#34;connpy.cli.forms.Forms.questions_edit&#34;)
+@patch(&#34;connpy.cli.forms.Forms.questions_nodes&#34;)
+def test_node_mod(mock_q_nodes, mock_q_edit, mock_update_node, mock_get_details, mock_list_nodes, app):
+    mock_list_nodes.return_value = [&#34;router1&#34;]
+    mock_get_details.return_value = {&#34;host&#34;: &#34;1.1.1.1&#34;, &#34;port&#34;: 22}
+    mock_q_edit.return_value = {&#34;host&#34;: True}
+    mock_q_nodes.return_value = {&#34;host&#34;: &#34;2.2.2.2&#34;, &#34;port&#34;: 22}
+
+    app.start([&#34;node&#34;, &#34;-e&#34;, &#34;router1&#34;])
+    mock_update_node.assert_called_once()</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_connapp.test_node_show"><code class="name flex">
+<span>def <span class="ident">test_node_show</span></span>(<span>mock_data, app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.printer.data&#34;)
+def test_node_show(mock_data, app):
+    app.nodes_list = [&#34;router1&#34;]
+    app.config.getitem = MagicMock(return_value={&#34;host&#34;: &#34;1.1.1.1&#34;})
+    app.start([&#34;node&#34;, &#34;-s&#34;, &#34;router1&#34;])
+    mock_data.assert_called()</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_connapp.test_plugin_add"><code class="name flex">
+<span>def <span class="ident">test_plugin_add</span></span>(<span>mock_verify, mock_copy, mock_exists, app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;os.path.exists&#34;)
+@patch(&#34;shutil.copy2&#34;)
+@patch(&#34;connpy.plugins.Plugins.verify_script&#34;)
+def test_plugin_add(mock_verify, mock_copy, mock_exists, app):
+    def mock_exists_side_effect(path):
+        if &#34;testplug.py&#34; in path: return False
+        if &#34;testplug.py.bkp&#34; in path: return False
+        if &#34;file.py&#34; in path: return True
+        return True
+    mock_exists.side_effect = mock_exists_side_effect
+    mock_verify.return_value = None
+    app.commands = []
+    app.start([&#34;plugin&#34;, &#34;--add&#34;, &#34;testplug&#34;, &#34;file.py&#34;])
+    mock_copy.assert_called()</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_connapp.test_plugin_delete"><code class="name flex">
+<span>def <span class="ident">test_plugin_delete</span></span>(<span>mock_delete, app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.services.plugin_service.PluginService.delete_plugin&#34;)
+def test_plugin_delete(mock_delete, app):
+    app.start([&#34;plugin&#34;, &#34;--del&#34;, &#34;testplug&#34;])
+    mock_delete.assert_called_once_with(&#34;testplug&#34;)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_connapp.test_plugin_disable"><code class="name flex">
+<span>def <span class="ident">test_plugin_disable</span></span>(<span>mock_disable, app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.services.plugin_service.PluginService.disable_plugin&#34;)
+def test_plugin_disable(mock_disable, app):
+    app.start([&#34;plugin&#34;, &#34;--disable&#34;, &#34;testplug&#34;])
+    mock_disable.assert_called_once_with(&#34;testplug&#34;)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_connapp.test_plugin_enable"><code class="name flex">
+<span>def <span class="ident">test_plugin_enable</span></span>(<span>mock_enable, app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.services.plugin_service.PluginService.enable_plugin&#34;)
+def test_plugin_enable(mock_enable, app):
+    app.start([&#34;plugin&#34;, &#34;--enable&#34;, &#34;testplug&#34;])
+    mock_enable.assert_called_once_with(&#34;testplug&#34;)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_connapp.test_plugin_list"><code class="name flex">
+<span>def <span class="ident">test_plugin_list</span></span>(<span>mock_list_plugins, app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.services.plugin_service.PluginService.list_plugins&#34;)
+def test_plugin_list(mock_list_plugins, app):
+    mock_list_plugins.return_value = {&#34;testplug&#34;: {&#34;enabled&#34;: True}}
+    app.start([&#34;plugin&#34;, &#34;--list&#34;])
+    mock_list_plugins.assert_called_once()</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_connapp.test_profile_add"><code class="name flex">
+<span>def <span class="ident">test_profile_add</span></span>(<span>mock_q_profiles, mock_add_profile, mock_list_profiles, app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.services.profile_service.ProfileService.list_profiles&#34;)
+@patch(&#34;connpy.services.profile_service.ProfileService.add_profile&#34;)
+@patch(&#34;connpy.cli.forms.Forms.questions_profiles&#34;)
+def test_profile_add(mock_q_profiles, mock_add_profile, mock_list_profiles, app):
+    mock_list_profiles.return_value = [&#34;default&#34;]
+    mock_q_profiles.return_value = {&#34;host&#34;: &#34;test&#34;}
+    app.start([&#34;profile&#34;, &#34;-a&#34;, &#34;new_profile&#34;])
+    mock_add_profile.assert_called_once_with(&#34;new_profile&#34;, {&#34;host&#34;: &#34;test&#34;})</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_connapp.test_profile_del"><code class="name flex">
+<span>def <span class="ident">test_profile_del</span></span>(<span>mock_prompt, mock_delete_profile, mock_get_profile, app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.services.profile_service.ProfileService.get_profile&#34;)
+@patch(&#34;connpy.services.profile_service.ProfileService.delete_profile&#34;)
+@patch(&#34;inquirer.prompt&#34;)
+def test_profile_del(mock_prompt, mock_delete_profile, mock_get_profile, app):
+    mock_get_profile.return_value = {&#34;host&#34;: &#34;test&#34;}
+    mock_prompt.return_value = {&#34;delete&#34;: True}
+    app.start([&#34;profile&#34;, &#34;-r&#34;, &#34;test_profile&#34;])
+    mock_delete_profile.assert_called_once_with(&#34;test_profile&#34;)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_connapp.test_profile_list"><code class="name flex">
+<span>def <span class="ident">test_profile_list</span></span>(<span>mock_print, mock_list_profiles, app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.services.profile_service.ProfileService.list_profiles&#34;)
+@patch(&#34;connpy.connapp.printer.console.print&#34;)
+def test_profile_list(mock_print, mock_list_profiles, app):
+    &#34;&#34;&#34;Test &#39;profile list&#39; invokes profile service correctly.&#34;&#34;&#34;
+    mock_list_profiles.return_value = [&#34;default&#34;, &#34;office-user&#34;]
+    app.start([&#34;list&#34;, &#34;profiles&#34;])
+    assert mock_list_profiles.call_count &gt;= 2</code></pre>
+</details>
+<div class="desc"><p>Test 'profile list' invokes profile service correctly.</p></div>
+</dd>
+<dt id="connpy.tests.test_connapp.test_profile_mod"><code class="name flex">
+<span>def <span class="ident">test_profile_mod</span></span>(<span>mock_q_profiles, mock_q_edit, mock_update_profile, mock_get_profile, app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.services.profile_service.ProfileService.get_profile&#34;)
+@patch(&#34;connpy.services.profile_service.ProfileService.update_profile&#34;)
+@patch(&#34;connpy.cli.forms.Forms.questions_edit&#34;)
+@patch(&#34;connpy.cli.forms.Forms.questions_profiles&#34;)
+def test_profile_mod(mock_q_profiles, mock_q_edit, mock_update_profile, mock_get_profile, app):
+    mock_get_profile.return_value = {&#34;host&#34;: &#34;test&#34;, &#34;port&#34;: 22}
+    mock_q_edit.return_value = {&#34;host&#34;: True}
+    mock_q_profiles.return_value = {&#34;id&#34;: &#34;test_profile&#34;, &#34;host&#34;: &#34;new_host&#34;, &#34;port&#34;: 22}
+    app.start([&#34;profile&#34;, &#34;-e&#34;, &#34;test_profile&#34;])
+    mock_update_profile.assert_called_once_with(&#34;test_profile&#34;, {&#34;id&#34;: &#34;test_profile&#34;, &#34;host&#34;: &#34;new_host&#34;, &#34;port&#34;: 22})</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_connapp.test_profile_show"><code class="name flex">
+<span>def <span class="ident">test_profile_show</span></span>(<span>mock_data, mock_get_profile, app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.services.profile_service.ProfileService.get_profile&#34;)
+@patch(&#34;connpy.printer.data&#34;)
+def test_profile_show(mock_data, mock_get_profile, app):
+    mock_get_profile.return_value = {&#34;host&#34;: &#34;test&#34;}
+    app.start([&#34;profile&#34;, &#34;-s&#34;, &#34;test_profile&#34;])
+    mock_data.assert_called()</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_connapp.test_run"><code class="name flex">
+<span>def <span class="ident">test_run</span></span>(<span>mock_run_commands, app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.services.execution_service.ExecutionService.run_commands&#34;)
+def test_run(mock_run_commands, app):
+    app.start([&#34;run&#34;, &#34;node1&#34;, &#34;command1&#34;, &#34;command2&#34;])
+    mock_run_commands.assert_called_once()
+    assert mock_run_commands.call_args[1][&#34;nodes_filter&#34;] == &#34;node1&#34;
+    assert mock_run_commands.call_args[1][&#34;commands&#34;] == [&#34;command1 command2&#34;]</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_connapp.test_type_node_reserved_word"><code class="name flex">
+<span>def <span class="ident">test_type_node_reserved_word</span></span>(<span>app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_type_node_reserved_word(app):
+    app.commands = [&#34;bulk&#34;, &#34;ai&#34;, &#34;run&#34;]
+    with patch(&#34;sys.argv&#34;, [&#34;connpy&#34;, &#34;node&#34;, &#34;-a&#34;, &#34;bulk&#34;]):
+        with pytest.raises(SystemExit) as exc:
+            app._type_node(&#34;bulk&#34;)
+        assert exc.value.code == 2
+    
+    # In move/copy it also raises because destination cannot be reserved
+    with patch(&#34;sys.argv&#34;, [&#34;connpy&#34;, &#34;mv&#34;, &#34;test1&#34;, &#34;bulk&#34;]):
+        with pytest.raises(SystemExit) as exc:
+            app._type_node(&#34;bulk&#34;)
+        assert exc.value.code == 2</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</section>
+<section>
+</section>
+</article>
+<nav id="sidebar">
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="connpy.tests" href="index.html">connpy.tests</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-functions">Functions</a></h3>
+<ul class="">
+<li><code><a title="connpy.tests.test_connapp.app" href="#connpy.tests.test_connapp.app">app</a></code></li>
+<li><code><a title="connpy.tests.test_connapp.test_ai" href="#connpy.tests.test_connapp.test_ai">test_ai</a></code></li>
+<li><code><a title="connpy.tests.test_connapp.test_ai_list" href="#connpy.tests.test_connapp.test_ai_list">test_ai_list</a></code></li>
+<li><code><a title="connpy.tests.test_connapp.test_api_debug" href="#connpy.tests.test_connapp.test_api_debug">test_api_debug</a></code></li>
+<li><code><a title="connpy.tests.test_connapp.test_api_start" href="#connpy.tests.test_connapp.test_api_start">test_api_start</a></code></li>
+<li><code><a title="connpy.tests.test_connapp.test_api_stop" href="#connpy.tests.test_connapp.test_api_stop">test_api_stop</a></code></li>
+<li><code><a title="connpy.tests.test_connapp.test_bulk" href="#connpy.tests.test_connapp.test_bulk">test_bulk</a></code></li>
+<li><code><a title="connpy.tests.test_connapp.test_config" href="#connpy.tests.test_connapp.test_config">test_config</a></code></li>
+<li><code><a title="connpy.tests.test_connapp.test_config_folder" href="#connpy.tests.test_connapp.test_config_folder">test_config_folder</a></code></li>
+<li><code><a title="connpy.tests.test_connapp.test_config_various" href="#connpy.tests.test_connapp.test_config_various">test_config_various</a></code></li>
+<li><code><a title="connpy.tests.test_connapp.test_connapp_init" href="#connpy.tests.test_connapp.test_connapp_init">test_connapp_init</a></code></li>
+<li><code><a title="connpy.tests.test_connapp.test_copy" href="#connpy.tests.test_connapp.test_copy">test_copy</a></code></li>
+<li><code><a title="connpy.tests.test_connapp.test_export" href="#connpy.tests.test_connapp.test_export">test_export</a></code></li>
+<li><code><a title="connpy.tests.test_connapp.test_import" href="#connpy.tests.test_connapp.test_import">test_import</a></code></li>
+<li><code><a title="connpy.tests.test_connapp.test_list_folders" href="#connpy.tests.test_connapp.test_list_folders">test_list_folders</a></code></li>
+<li><code><a title="connpy.tests.test_connapp.test_move" href="#connpy.tests.test_connapp.test_move">test_move</a></code></li>
+<li><code><a title="connpy.tests.test_connapp.test_node_add" href="#connpy.tests.test_connapp.test_node_add">test_node_add</a></code></li>
+<li><code><a title="connpy.tests.test_connapp.test_node_default" href="#connpy.tests.test_connapp.test_node_default">test_node_default</a></code></li>
+<li><code><a title="connpy.tests.test_connapp.test_node_del" href="#connpy.tests.test_connapp.test_node_del">test_node_del</a></code></li>
+<li><code><a title="connpy.tests.test_connapp.test_node_list" href="#connpy.tests.test_connapp.test_node_list">test_node_list</a></code></li>
+<li><code><a title="connpy.tests.test_connapp.test_node_mod" href="#connpy.tests.test_connapp.test_node_mod">test_node_mod</a></code></li>
+<li><code><a title="connpy.tests.test_connapp.test_node_show" href="#connpy.tests.test_connapp.test_node_show">test_node_show</a></code></li>
+<li><code><a title="connpy.tests.test_connapp.test_plugin_add" href="#connpy.tests.test_connapp.test_plugin_add">test_plugin_add</a></code></li>
+<li><code><a title="connpy.tests.test_connapp.test_plugin_delete" href="#connpy.tests.test_connapp.test_plugin_delete">test_plugin_delete</a></code></li>
+<li><code><a title="connpy.tests.test_connapp.test_plugin_disable" href="#connpy.tests.test_connapp.test_plugin_disable">test_plugin_disable</a></code></li>
+<li><code><a title="connpy.tests.test_connapp.test_plugin_enable" href="#connpy.tests.test_connapp.test_plugin_enable">test_plugin_enable</a></code></li>
+<li><code><a title="connpy.tests.test_connapp.test_plugin_list" href="#connpy.tests.test_connapp.test_plugin_list">test_plugin_list</a></code></li>
+<li><code><a title="connpy.tests.test_connapp.test_profile_add" href="#connpy.tests.test_connapp.test_profile_add">test_profile_add</a></code></li>
+<li><code><a title="connpy.tests.test_connapp.test_profile_del" href="#connpy.tests.test_connapp.test_profile_del">test_profile_del</a></code></li>
+<li><code><a title="connpy.tests.test_connapp.test_profile_list" href="#connpy.tests.test_connapp.test_profile_list">test_profile_list</a></code></li>
+<li><code><a title="connpy.tests.test_connapp.test_profile_mod" href="#connpy.tests.test_connapp.test_profile_mod">test_profile_mod</a></code></li>
+<li><code><a title="connpy.tests.test_connapp.test_profile_show" href="#connpy.tests.test_connapp.test_profile_show">test_profile_show</a></code></li>
+<li><code><a title="connpy.tests.test_connapp.test_run" href="#connpy.tests.test_connapp.test_run">test_run</a></code></li>
+<li><code><a title="connpy.tests.test_connapp.test_type_node_reserved_word" href="#connpy.tests.test_connapp.test_type_node_reserved_word">test_type_node_reserved_word</a></code></li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
+</footer>
+</body>
+</html>

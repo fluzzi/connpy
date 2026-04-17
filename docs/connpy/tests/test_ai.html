@@ -63,11 +63,13 @@ el.replaceWith(d);
         assert myai.engineer_model == &#34;test/test-model&#34;
         assert myai.architect_model == &#34;test/test-architect&#34;
 
-    def test_init_missing_engineer_key(self, config):
-        &#34;&#34;&#34;Raises ValueError if engineer key is missing.&#34;&#34;&#34;
+    def test_ask_missing_engineer_key(self, config):
+        &#34;&#34;&#34;Raises ValueError if engineer key is missing when asking.&#34;&#34;&#34;
         from connpy.ai import ai
-        with pytest.raises(ValueError, match=&#34;Engineer API key&#34;):
-            ai(config)
+        myai = ai(config)
+        with pytest.raises(ValueError) as exc:
+            myai.ask(&#34;hello&#34;)
+        assert &#34;Engineer API key not configured&#34; in str(exc.value)
 
     def test_init_missing_architect_key_warns(self, ai_config, capsys, mock_litellm):
         &#34;&#34;&#34;Warns if architect key is missing but doesn&#39;t crash.&#34;&#34;&#34;
@@ -104,6 +106,24 @@ el.replaceWith(d);
 <div class="desc"></div>
 <h3>Methods</h3>
 <dl>
+<dt id="connpy.tests.test_ai.TestAIInit.test_ask_missing_engineer_key"><code class="name flex">
+<span>def <span class="ident">test_ask_missing_engineer_key</span></span>(<span>self, config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_ask_missing_engineer_key(self, config):
+    &#34;&#34;&#34;Raises ValueError if engineer key is missing when asking.&#34;&#34;&#34;
+    from connpy.ai import ai
+    myai = ai(config)
+    with pytest.raises(ValueError) as exc:
+        myai.ask(&#34;hello&#34;)
+    assert &#34;Engineer API key not configured&#34; in str(exc.value)</code></pre>
+</details>
+<div class="desc"><p>Raises ValueError if engineer key is missing when asking.</p></div>
+</dd>
 <dt id="connpy.tests.test_ai.TestAIInit.test_default_models"><code class="name flex">
 <span>def <span class="ident">test_default_models</span></span>(<span>self, config)</span>
 </code></dt>
@@ -165,22 +185,6 @@ el.replaceWith(d);
     assert myai.architect_key is None</code></pre>
 </details>
 <div class="desc"><p>Warns if architect key is missing but doesn't crash.</p></div>
-</dd>
-<dt id="connpy.tests.test_ai.TestAIInit.test_init_missing_engineer_key"><code class="name flex">
-<span>def <span class="ident">test_init_missing_engineer_key</span></span>(<span>self, config)</span>
-</code></dt>
-<dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def test_init_missing_engineer_key(self, config):
-    &#34;&#34;&#34;Raises ValueError if engineer key is missing.&#34;&#34;&#34;
-    from connpy.ai import ai
-    with pytest.raises(ValueError, match=&#34;Engineer API key&#34;):
-        ai(config)</code></pre>
-</details>
-<div class="desc"><p>Raises ValueError if engineer key is missing.</p></div>
 </dd>
 <dt id="connpy.tests.test_ai.TestAIInit.test_init_with_keys"><code class="name flex">
 <span>def <span class="ident">test_init_with_keys</span></span>(<span>self, ai_config, mock_litellm)</span>
@@ -1615,10 +1619,10 @@ def myai(self, ai_config, mock_litellm):
 <li>
 <h4><code><a title="connpy.tests.test_ai.TestAIInit" href="#connpy.tests.test_ai.TestAIInit">TestAIInit</a></code></h4>
 <ul class="">
+<li><code><a title="connpy.tests.test_ai.TestAIInit.test_ask_missing_engineer_key" href="#connpy.tests.test_ai.TestAIInit.test_ask_missing_engineer_key">test_ask_missing_engineer_key</a></code></li>
 <li><code><a title="connpy.tests.test_ai.TestAIInit.test_default_models" href="#connpy.tests.test_ai.TestAIInit.test_default_models">test_default_models</a></code></li>
 <li><code><a title="connpy.tests.test_ai.TestAIInit.test_init_loads_memory" href="#connpy.tests.test_ai.TestAIInit.test_init_loads_memory">test_init_loads_memory</a></code></li>
 <li><code><a title="connpy.tests.test_ai.TestAIInit.test_init_missing_architect_key_warns" href="#connpy.tests.test_ai.TestAIInit.test_init_missing_architect_key_warns">test_init_missing_architect_key_warns</a></code></li>
-<li><code><a title="connpy.tests.test_ai.TestAIInit.test_init_missing_engineer_key" href="#connpy.tests.test_ai.TestAIInit.test_init_missing_engineer_key">test_init_missing_engineer_key</a></code></li>
 <li><code><a title="connpy.tests.test_ai.TestAIInit.test_init_with_keys" href="#connpy.tests.test_ai.TestAIInit.test_init_with_keys">test_init_with_keys</a></code></li>
 </ul>
 </li>

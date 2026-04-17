@@ -1,0 +1,3188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<meta name="generator" content="pdoc3 0.11.5">
+<title>connpy.services API documentation</title>
+<meta name="description" content="">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:1.5em;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:2em 0 .50em 0}h3{font-size:1.4em;margin:1.6em 0 .7em 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .2s ease-in-out}a:visited{color:#503}a:hover{color:#b62}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900;font-weight:bold}pre code{font-size:.8em;line-height:1.4em;padding:1em;display:block}code{background:#f3f3f3;font-family:"DejaVu Sans Mono",monospace;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source > summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible;min-width:max-content}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em 1em;margin:1em 0}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul ul{padding-left:1em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha512-D9gUyxqja7hBtkWpPWGt9wfbfaMGVt9gnyCvYa+jojwwPHLCzUm5i8rpk7vD7wNee9bA35eYIjobYPaQuKS1MQ==" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => {
+hljs.configure({languages: ['bash', 'css', 'diff', 'graphql', 'ini', 'javascript', 'json', 'plaintext', 'python', 'python-repl', 'rust', 'shell', 'sql', 'typescript', 'xml', 'yaml']});
+hljs.highlightAll();
+/* Collapse source docstrings */
+setTimeout(() => {
+[...document.querySelectorAll('.hljs.language-python > .hljs-string')]
+.filter(el => el.innerHTML.length > 200 && ['"""', "'''"].includes(el.innerHTML.substring(0, 3)))
+.forEach(el => {
+let d = document.createElement('details');
+d.classList.add('hljs-string');
+d.innerHTML = '<summary>"""</summary>' + el.innerHTML.substring(3);
+el.replaceWith(d);
+});
+}, 100);
+})</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>connpy.services</code></h1>
+</header>
+<section id="section-intro">
+</section>
+<section>
+<h2 class="section-title" id="header-submodules">Sub-modules</h2>
+<dl>
+<dt><code class="name"><a title="connpy.services.ai_service" href="ai_service.html">connpy.services.ai_service</a></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt><code class="name"><a title="connpy.services.base" href="base.html">connpy.services.base</a></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt><code class="name"><a title="connpy.services.config_service" href="config_service.html">connpy.services.config_service</a></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt><code class="name"><a title="connpy.services.context_service" href="context_service.html">connpy.services.context_service</a></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt><code class="name"><a title="connpy.services.exceptions" href="exceptions.html">connpy.services.exceptions</a></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt><code class="name"><a title="connpy.services.execution_service" href="execution_service.html">connpy.services.execution_service</a></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt><code class="name"><a title="connpy.services.import_export_service" href="import_export_service.html">connpy.services.import_export_service</a></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt><code class="name"><a title="connpy.services.node_service" href="node_service.html">connpy.services.node_service</a></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt><code class="name"><a title="connpy.services.plugin_service" href="plugin_service.html">connpy.services.plugin_service</a></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt><code class="name"><a title="connpy.services.profile_service" href="profile_service.html">connpy.services.profile_service</a></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt><code class="name"><a title="connpy.services.provider" href="provider.html">connpy.services.provider</a></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt><code class="name"><a title="connpy.services.sync_service" href="sync_service.html">connpy.services.sync_service</a></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt><code class="name"><a title="connpy.services.system_service" href="system_service.html">connpy.services.system_service</a></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+</dl>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="connpy.services.AIService"><code class="flex name class">
+<span>class <span class="ident">AIService</span></span>
+<span>(</span><span>config=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class AIService(BaseService):
+    &#34;&#34;&#34;Business logic for interacting with AI agents and LLM configurations.&#34;&#34;&#34;
+
+    def ask(self, input_text, dryrun=False, chat_history=None, status=None, debug=False, session_id=None, console=None, chunk_callback=None, confirm_handler=None, trust=False, **overrides):
+        &#34;&#34;&#34;Send a prompt to the AI agent.&#34;&#34;&#34;
+        from connpy.ai import ai
+        agent = ai(self.config, console=console, confirm_handler=confirm_handler, trust=trust, **overrides)
+        return agent.ask(input_text, dryrun, chat_history, status=status, debug=debug, session_id=session_id, chunk_callback=chunk_callback)
+
+
+    def confirm(self, input_text, console=None):
+        &#34;&#34;&#34;Ask for a safe confirmation of an action.&#34;&#34;&#34;
+        from connpy.ai import ai
+        agent = ai(self.config, console=console)
+        return agent.confirm(input_text)
+
+
+    def list_sessions(self):
+        &#34;&#34;&#34;Return a list of all saved AI sessions.&#34;&#34;&#34;
+        from connpy.ai import ai
+        agent = ai(self.config)
+        return agent._get_sessions()
+
+    def delete_session(self, session_id):
+        &#34;&#34;&#34;Delete an AI session by ID.&#34;&#34;&#34;
+        import os
+        sessions_dir = os.path.join(self.config.defaultdir, &#34;ai_sessions&#34;)
+        path = os.path.join(sessions_dir, f&#34;{session_id}.json&#34;)
+        if os.path.exists(path):
+            os.remove(path)
+        else:
+            raise InvalidConfigurationError(f&#34;Session &#39;{session_id}&#39; not found.&#34;)
+
+    def configure_provider(self, provider, model=None, api_key=None):
+        &#34;&#34;&#34;Update AI provider settings in the configuration.&#34;&#34;&#34;
+        settings = self.config.config.get(&#34;ai&#34;, {})
+        if model:
+            settings[f&#34;{provider}_model&#34;] = model
+        if api_key:
+            settings[f&#34;{provider}_api_key&#34;] = api_key
+            
+        self.config.config[&#34;ai&#34;] = settings
+        self.config._saveconfig(self.config.file)
+
+    def load_session_data(self, session_id):
+        &#34;&#34;&#34;Load a session&#39;s raw data by ID.&#34;&#34;&#34;
+        from connpy.ai import ai
+        agent = ai(self.config)
+        return agent.load_session_data(session_id)</code></pre>
+</details>
+<div class="desc"><p>Business logic for interacting with AI agents and LLM configurations.</p>
+<p>Initialize the service.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>config</code></strong></dt>
+<dd>An instance of configfile (or None to instantiate a new one/use global context).</dd>
+</dl></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="connpy.services.base.BaseService" href="base.html#connpy.services.base.BaseService">BaseService</a></li>
+</ul>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.services.AIService.ask"><code class="name flex">
+<span>def <span class="ident">ask</span></span>(<span>self,<br>input_text,<br>dryrun=False,<br>chat_history=None,<br>status=None,<br>debug=False,<br>session_id=None,<br>console=None,<br>chunk_callback=None,<br>confirm_handler=None,<br>trust=False,<br>**overrides)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def ask(self, input_text, dryrun=False, chat_history=None, status=None, debug=False, session_id=None, console=None, chunk_callback=None, confirm_handler=None, trust=False, **overrides):
+    &#34;&#34;&#34;Send a prompt to the AI agent.&#34;&#34;&#34;
+    from connpy.ai import ai
+    agent = ai(self.config, console=console, confirm_handler=confirm_handler, trust=trust, **overrides)
+    return agent.ask(input_text, dryrun, chat_history, status=status, debug=debug, session_id=session_id, chunk_callback=chunk_callback)</code></pre>
+</details>
+<div class="desc"><p>Send a prompt to the AI agent.</p></div>
+</dd>
+<dt id="connpy.services.AIService.configure_provider"><code class="name flex">
+<span>def <span class="ident">configure_provider</span></span>(<span>self, provider, model=None, api_key=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def configure_provider(self, provider, model=None, api_key=None):
+    &#34;&#34;&#34;Update AI provider settings in the configuration.&#34;&#34;&#34;
+    settings = self.config.config.get(&#34;ai&#34;, {})
+    if model:
+        settings[f&#34;{provider}_model&#34;] = model
+    if api_key:
+        settings[f&#34;{provider}_api_key&#34;] = api_key
+        
+    self.config.config[&#34;ai&#34;] = settings
+    self.config._saveconfig(self.config.file)</code></pre>
+</details>
+<div class="desc"><p>Update AI provider settings in the configuration.</p></div>
+</dd>
+<dt id="connpy.services.AIService.confirm"><code class="name flex">
+<span>def <span class="ident">confirm</span></span>(<span>self, input_text, console=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def confirm(self, input_text, console=None):
+    &#34;&#34;&#34;Ask for a safe confirmation of an action.&#34;&#34;&#34;
+    from connpy.ai import ai
+    agent = ai(self.config, console=console)
+    return agent.confirm(input_text)</code></pre>
+</details>
+<div class="desc"><p>Ask for a safe confirmation of an action.</p></div>
+</dd>
+<dt id="connpy.services.AIService.delete_session"><code class="name flex">
+<span>def <span class="ident">delete_session</span></span>(<span>self, session_id)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def delete_session(self, session_id):
+    &#34;&#34;&#34;Delete an AI session by ID.&#34;&#34;&#34;
+    import os
+    sessions_dir = os.path.join(self.config.defaultdir, &#34;ai_sessions&#34;)
+    path = os.path.join(sessions_dir, f&#34;{session_id}.json&#34;)
+    if os.path.exists(path):
+        os.remove(path)
+    else:
+        raise InvalidConfigurationError(f&#34;Session &#39;{session_id}&#39; not found.&#34;)</code></pre>
+</details>
+<div class="desc"><p>Delete an AI session by ID.</p></div>
+</dd>
+<dt id="connpy.services.AIService.list_sessions"><code class="name flex">
+<span>def <span class="ident">list_sessions</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def list_sessions(self):
+    &#34;&#34;&#34;Return a list of all saved AI sessions.&#34;&#34;&#34;
+    from connpy.ai import ai
+    agent = ai(self.config)
+    return agent._get_sessions()</code></pre>
+</details>
+<div class="desc"><p>Return a list of all saved AI sessions.</p></div>
+</dd>
+<dt id="connpy.services.AIService.load_session_data"><code class="name flex">
+<span>def <span class="ident">load_session_data</span></span>(<span>self, session_id)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def load_session_data(self, session_id):
+    &#34;&#34;&#34;Load a session&#39;s raw data by ID.&#34;&#34;&#34;
+    from connpy.ai import ai
+    agent = ai(self.config)
+    return agent.load_session_data(session_id)</code></pre>
+</details>
+<div class="desc"><p>Load a session's raw data by ID.</p></div>
+</dd>
+</dl>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="connpy.services.base.BaseService" href="base.html#connpy.services.base.BaseService">BaseService</a></b></code>:
+<ul class="hlist">
+<li><code><a title="connpy.services.base.BaseService.set_reserved_names" href="base.html#connpy.services.base.BaseService.set_reserved_names">set_reserved_names</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="connpy.services.ConfigService"><code class="flex name class">
+<span>class <span class="ident">ConfigService</span></span>
+<span>(</span><span>config=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class ConfigService(BaseService):
+    &#34;&#34;&#34;Business logic for general application settings and state configuration.&#34;&#34;&#34;
+
+    def get_settings(self) -&gt; Dict[str, Any]:
+        &#34;&#34;&#34;Get the global configuration settings block.&#34;&#34;&#34;
+        settings = self.config.config.copy()
+        settings[&#34;configfolder&#34;] = self.config.defaultdir
+        return settings
+
+    def get_default_dir(self) -&gt; str:
+        &#34;&#34;&#34;Get the default configuration directory.&#34;&#34;&#34;
+        return self.config.defaultdir
+
+    def set_config_folder(self, folder_path: str):
+        &#34;&#34;&#34;Set the default location for config file by writing to ~/.config/conn/.folder&#34;&#34;&#34;
+        if not os.path.isdir(folder_path):
+            raise ConnpyError(f&#34;readable_dir:{folder_path} is not a valid path&#34;)
+            
+        pathfile = os.path.join(self.config.anchor_path, &#34;.folder&#34;)
+        folder = os.path.abspath(folder_path).rstrip(&#39;/&#39;)
+        
+        try:
+            with open(pathfile, &#34;w&#34;) as f:
+                f.write(str(folder))
+        except Exception as e:
+            raise ConnpyError(f&#34;Failed to save config folder: {e}&#34;)
+
+    def update_setting(self, key, value):
+        &#34;&#34;&#34;Update a setting in the configuration file.&#34;&#34;&#34;
+        self.config.config[key] = value
+        self.config._saveconfig(self.config.file)
+
+    def encrypt_password(self, password):
+        &#34;&#34;&#34;Encrypt a password using the application&#39;s configuration encryption key.&#34;&#34;&#34;
+        return self.config.encrypt(password)
+        
+    def apply_theme_from_file(self, theme_input):
+        &#34;&#34;&#34;Apply &#39;dark&#39;, &#39;light&#39; theme or load a YAML theme file and save it to the configuration.&#34;&#34;&#34;
+        import yaml
+        from ..printer import STYLES, LIGHT_THEME
+        
+        if theme_input == &#34;dark&#34;:
+            valid_styles = {}
+            self.update_setting(&#34;theme&#34;, valid_styles)
+            return valid_styles
+        elif theme_input == &#34;light&#34;:
+            valid_styles = LIGHT_THEME.copy()
+            self.update_setting(&#34;theme&#34;, valid_styles)
+            return valid_styles
+            
+        if not os.path.exists(theme_input):
+            raise InvalidConfigurationError(f&#34;Theme file &#39;{theme_input}&#39; not found.&#34;)
+            
+        try:
+            with open(theme_input, &#39;r&#39;) as f:
+                user_styles = yaml.safe_load(f)
+        except Exception as e:
+            raise InvalidConfigurationError(f&#34;Failed to parse theme file: {e}&#34;)
+            
+        if not isinstance(user_styles, dict):
+            raise InvalidConfigurationError(&#34;Theme file must be a YAML dictionary.&#34;)
+            
+        # Filter for valid styles only (prevent junk in config)
+        valid_styles = {k: v for k, v in user_styles.items() if k in STYLES}
+        
+        if not valid_styles:
+            raise InvalidConfigurationError(&#34;No valid style keys found in theme file.&#34;)
+            
+        # Persist and return merged styles
+        self.update_setting(&#34;theme&#34;, valid_styles)
+        return valid_styles</code></pre>
+</details>
+<div class="desc"><p>Business logic for general application settings and state configuration.</p>
+<p>Initialize the service.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>config</code></strong></dt>
+<dd>An instance of configfile (or None to instantiate a new one/use global context).</dd>
+</dl></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="connpy.services.base.BaseService" href="base.html#connpy.services.base.BaseService">BaseService</a></li>
+</ul>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.services.ConfigService.apply_theme_from_file"><code class="name flex">
+<span>def <span class="ident">apply_theme_from_file</span></span>(<span>self, theme_input)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def apply_theme_from_file(self, theme_input):
+    &#34;&#34;&#34;Apply &#39;dark&#39;, &#39;light&#39; theme or load a YAML theme file and save it to the configuration.&#34;&#34;&#34;
+    import yaml
+    from ..printer import STYLES, LIGHT_THEME
+    
+    if theme_input == &#34;dark&#34;:
+        valid_styles = {}
+        self.update_setting(&#34;theme&#34;, valid_styles)
+        return valid_styles
+    elif theme_input == &#34;light&#34;:
+        valid_styles = LIGHT_THEME.copy()
+        self.update_setting(&#34;theme&#34;, valid_styles)
+        return valid_styles
+        
+    if not os.path.exists(theme_input):
+        raise InvalidConfigurationError(f&#34;Theme file &#39;{theme_input}&#39; not found.&#34;)
+        
+    try:
+        with open(theme_input, &#39;r&#39;) as f:
+            user_styles = yaml.safe_load(f)
+    except Exception as e:
+        raise InvalidConfigurationError(f&#34;Failed to parse theme file: {e}&#34;)
+        
+    if not isinstance(user_styles, dict):
+        raise InvalidConfigurationError(&#34;Theme file must be a YAML dictionary.&#34;)
+        
+    # Filter for valid styles only (prevent junk in config)
+    valid_styles = {k: v for k, v in user_styles.items() if k in STYLES}
+    
+    if not valid_styles:
+        raise InvalidConfigurationError(&#34;No valid style keys found in theme file.&#34;)
+        
+    # Persist and return merged styles
+    self.update_setting(&#34;theme&#34;, valid_styles)
+    return valid_styles</code></pre>
+</details>
+<div class="desc"><p>Apply 'dark', 'light' theme or load a YAML theme file and save it to the configuration.</p></div>
+</dd>
+<dt id="connpy.services.ConfigService.encrypt_password"><code class="name flex">
+<span>def <span class="ident">encrypt_password</span></span>(<span>self, password)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def encrypt_password(self, password):
+    &#34;&#34;&#34;Encrypt a password using the application&#39;s configuration encryption key.&#34;&#34;&#34;
+    return self.config.encrypt(password)</code></pre>
+</details>
+<div class="desc"><p>Encrypt a password using the application's configuration encryption key.</p></div>
+</dd>
+<dt id="connpy.services.ConfigService.get_default_dir"><code class="name flex">
+<span>def <span class="ident">get_default_dir</span></span>(<span>self) ‑> str</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_default_dir(self) -&gt; str:
+    &#34;&#34;&#34;Get the default configuration directory.&#34;&#34;&#34;
+    return self.config.defaultdir</code></pre>
+</details>
+<div class="desc"><p>Get the default configuration directory.</p></div>
+</dd>
+<dt id="connpy.services.ConfigService.get_settings"><code class="name flex">
+<span>def <span class="ident">get_settings</span></span>(<span>self) ‑> Dict[str, Any]</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_settings(self) -&gt; Dict[str, Any]:
+    &#34;&#34;&#34;Get the global configuration settings block.&#34;&#34;&#34;
+    settings = self.config.config.copy()
+    settings[&#34;configfolder&#34;] = self.config.defaultdir
+    return settings</code></pre>
+</details>
+<div class="desc"><p>Get the global configuration settings block.</p></div>
+</dd>
+<dt id="connpy.services.ConfigService.set_config_folder"><code class="name flex">
+<span>def <span class="ident">set_config_folder</span></span>(<span>self, folder_path: str)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def set_config_folder(self, folder_path: str):
+    &#34;&#34;&#34;Set the default location for config file by writing to ~/.config/conn/.folder&#34;&#34;&#34;
+    if not os.path.isdir(folder_path):
+        raise ConnpyError(f&#34;readable_dir:{folder_path} is not a valid path&#34;)
+        
+    pathfile = os.path.join(self.config.anchor_path, &#34;.folder&#34;)
+    folder = os.path.abspath(folder_path).rstrip(&#39;/&#39;)
+    
+    try:
+        with open(pathfile, &#34;w&#34;) as f:
+            f.write(str(folder))
+    except Exception as e:
+        raise ConnpyError(f&#34;Failed to save config folder: {e}&#34;)</code></pre>
+</details>
+<div class="desc"><p>Set the default location for config file by writing to ~/.config/conn/.folder</p></div>
+</dd>
+<dt id="connpy.services.ConfigService.update_setting"><code class="name flex">
+<span>def <span class="ident">update_setting</span></span>(<span>self, key, value)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def update_setting(self, key, value):
+    &#34;&#34;&#34;Update a setting in the configuration file.&#34;&#34;&#34;
+    self.config.config[key] = value
+    self.config._saveconfig(self.config.file)</code></pre>
+</details>
+<div class="desc"><p>Update a setting in the configuration file.</p></div>
+</dd>
+</dl>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="connpy.services.base.BaseService" href="base.html#connpy.services.base.BaseService">BaseService</a></b></code>:
+<ul class="hlist">
+<li><code><a title="connpy.services.base.BaseService.set_reserved_names" href="base.html#connpy.services.base.BaseService.set_reserved_names">set_reserved_names</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="connpy.services.ConnpyError"><code class="flex name class">
+<span>class <span class="ident">ConnpyError</span></span>
+<span>(</span><span>*args, **kwargs)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class ConnpyError(Exception):
+    &#34;&#34;&#34;Base exception for all connpy services.&#34;&#34;&#34;
+    pass</code></pre>
+</details>
+<div class="desc"><p>Base exception for all connpy services.</p></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>builtins.Exception</li>
+<li>builtins.BaseException</li>
+</ul>
+<h3>Subclasses</h3>
+<ul class="hlist">
+<li><a title="connpy.services.exceptions.ExecutionError" href="exceptions.html#connpy.services.exceptions.ExecutionError">ExecutionError</a></li>
+<li><a title="connpy.services.exceptions.InvalidConfigurationError" href="exceptions.html#connpy.services.exceptions.InvalidConfigurationError">InvalidConfigurationError</a></li>
+<li><a title="connpy.services.exceptions.NodeAlreadyExistsError" href="exceptions.html#connpy.services.exceptions.NodeAlreadyExistsError">NodeAlreadyExistsError</a></li>
+<li><a title="connpy.services.exceptions.NodeNotFoundError" href="exceptions.html#connpy.services.exceptions.NodeNotFoundError">NodeNotFoundError</a></li>
+<li><a title="connpy.services.exceptions.ProfileAlreadyExistsError" href="exceptions.html#connpy.services.exceptions.ProfileAlreadyExistsError">ProfileAlreadyExistsError</a></li>
+<li><a title="connpy.services.exceptions.ProfileNotFoundError" href="exceptions.html#connpy.services.exceptions.ProfileNotFoundError">ProfileNotFoundError</a></li>
+<li><a title="connpy.services.exceptions.ReservedNameError" href="exceptions.html#connpy.services.exceptions.ReservedNameError">ReservedNameError</a></li>
+</ul>
+</dd>
+<dt id="connpy.services.ExecutionError"><code class="flex name class">
+<span>class <span class="ident">ExecutionError</span></span>
+<span>(</span><span>*args, **kwargs)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class ExecutionError(ConnpyError):
+    &#34;&#34;&#34;Raised when an execution fails or returns error.&#34;&#34;&#34;
+    pass</code></pre>
+</details>
+<div class="desc"><p>Raised when an execution fails or returns error.</p></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="connpy.services.exceptions.ConnpyError" href="exceptions.html#connpy.services.exceptions.ConnpyError">ConnpyError</a></li>
+<li>builtins.Exception</li>
+<li>builtins.BaseException</li>
+</ul>
+</dd>
+<dt id="connpy.services.ExecutionService"><code class="flex name class">
+<span>class <span class="ident">ExecutionService</span></span>
+<span>(</span><span>config=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class ExecutionService(BaseService):
+    &#34;&#34;&#34;Business logic for executing commands on nodes and running automation scripts.&#34;&#34;&#34;
+
+    def run_commands(
+        self, 
+        nodes_filter: str, 
+        commands: List[str], 
+        variables: Optional[Dict[str, Any]] = None,
+        parallel: int = 10,
+        timeout: int = 10,
+        folder: Optional[str] = None,
+        prompt: Optional[str] = None,
+        on_node_complete: Optional[Callable] = None,
+        logger: Optional[Callable] = None
+    ) -&gt; Dict[str, str]:
+
+        &#34;&#34;&#34;Execute commands on a set of nodes.&#34;&#34;&#34;
+        try:
+            matched_names = self.config._getallnodes(nodes_filter)
+            if not matched_names:
+                raise ConnpyError(f&#34;No nodes found matching filter: {nodes_filter}&#34;)
+            
+            node_data = self.config.getitems(matched_names, extract=True)
+            executor = Nodes(node_data, config=self.config)
+            self.last_executor = executor
+            
+            results = executor.run(
+                commands=commands,
+                vars=variables,
+                parallel=parallel,
+                timeout=timeout,
+                folder=folder,
+                prompt=prompt,
+                on_complete=on_node_complete,
+                logger=logger
+            )
+
+            return results
+        except Exception as e:
+            raise ConnpyError(f&#34;Execution failed: {e}&#34;)
+
+    def test_commands(
+        self,
+        nodes_filter: str,
+        commands: List[str],
+        expected: List[str],
+        variables: Optional[Dict[str, Any]] = None,
+        parallel: int = 10,
+        timeout: int = 10,
+        prompt: Optional[str] = None,
+        on_node_complete: Optional[Callable] = None,
+        logger: Optional[Callable] = None
+    ) -&gt; Dict[str, Dict[str, bool]]:
+
+        &#34;&#34;&#34;Run commands and verify expected output on a set of nodes.&#34;&#34;&#34;
+        try:
+            matched_names = self.config._getallnodes(nodes_filter)
+            if not matched_names:
+                raise ConnpyError(f&#34;No nodes found matching filter: {nodes_filter}&#34;)
+            
+            node_data = self.config.getitems(matched_names, extract=True)
+            executor = Nodes(node_data, config=self.config)
+            self.last_executor = executor
+            
+            results = executor.test(
+                commands=commands,
+                expected=expected,
+                vars=variables,
+                parallel=parallel,
+                timeout=timeout,
+                prompt=prompt,
+                on_complete=on_node_complete,
+                logger=logger
+            )
+            return results
+        except Exception as e:
+            raise ConnpyError(f&#34;Testing failed: {e}&#34;)
+
+    def run_cli_script(self, nodes_filter: str, script_path: str, parallel: int = 10) -&gt; Dict[str, str]:
+        &#34;&#34;&#34;Run a plain-text script containing one command per line.&#34;&#34;&#34;
+        if not os.path.exists(script_path):
+            raise ConnpyError(f&#34;Script file not found: {script_path}&#34;)
+            
+        try:
+            with open(script_path, &#34;r&#34;) as f:
+                commands = [line.strip() for line in f if line.strip()]
+        except Exception as e:
+            raise ConnpyError(f&#34;Failed to read script {script_path}: {e}&#34;)
+            
+        return self.run_commands(nodes_filter, commands, parallel=parallel)
+
+    def run_yaml_playbook(self, playbook_path: str, parallel: int = 10) -&gt; Dict[str, Any]:
+        &#34;&#34;&#34;Run a structured Connpy YAML automation playbook.&#34;&#34;&#34;
+        if not os.path.exists(playbook_path):
+            raise ConnpyError(f&#34;Playbook file not found: {playbook_path}&#34;)
+            
+        try:
+            with open(playbook_path, &#34;r&#34;) as f:
+                playbook = yaml.load(f, Loader=yaml.FullLoader)
+        except Exception as e:
+            raise ConnpyError(f&#34;Failed to load playbook {playbook_path}: {e}&#34;)
+            
+        # Basic validation
+        if not isinstance(playbook, dict) or &#34;nodes&#34; not in playbook or &#34;commands&#34; not in playbook:
+            raise ConnpyError(&#34;Invalid playbook format: missing &#39;nodes&#39; or &#39;commands&#39; keys.&#34;)
+            
+        action = playbook.get(&#34;action&#34;, &#34;run&#34;)
+        if action == &#34;run&#34;:
+            return self.run_commands(
+                nodes_filter=playbook[&#34;nodes&#34;],
+                commands=playbook[&#34;commands&#34;],
+                parallel=parallel,
+                timeout=playbook.get(&#34;timeout&#34;, 10)
+            )
+        elif action == &#34;test&#34;:
+            return self.test_commands(
+                nodes_filter=playbook[&#34;nodes&#34;],
+                commands=playbook[&#34;commands&#34;],
+                expected=playbook.get(&#34;expected&#34;, []),
+                parallel=parallel,
+                timeout=playbook.get(&#34;timeout&#34;, 10)
+            )
+        else:
+            raise ConnpyError(f&#34;Unsupported playbook action: {action}&#34;)</code></pre>
+</details>
+<div class="desc"><p>Business logic for executing commands on nodes and running automation scripts.</p>
+<p>Initialize the service.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>config</code></strong></dt>
+<dd>An instance of configfile (or None to instantiate a new one/use global context).</dd>
+</dl></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="connpy.services.base.BaseService" href="base.html#connpy.services.base.BaseService">BaseService</a></li>
+</ul>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.services.ExecutionService.run_cli_script"><code class="name flex">
+<span>def <span class="ident">run_cli_script</span></span>(<span>self, nodes_filter: str, script_path: str, parallel: int = 10) ‑> Dict[str, str]</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def run_cli_script(self, nodes_filter: str, script_path: str, parallel: int = 10) -&gt; Dict[str, str]:
+    &#34;&#34;&#34;Run a plain-text script containing one command per line.&#34;&#34;&#34;
+    if not os.path.exists(script_path):
+        raise ConnpyError(f&#34;Script file not found: {script_path}&#34;)
+        
+    try:
+        with open(script_path, &#34;r&#34;) as f:
+            commands = [line.strip() for line in f if line.strip()]
+    except Exception as e:
+        raise ConnpyError(f&#34;Failed to read script {script_path}: {e}&#34;)
+        
+    return self.run_commands(nodes_filter, commands, parallel=parallel)</code></pre>
+</details>
+<div class="desc"><p>Run a plain-text script containing one command per line.</p></div>
+</dd>
+<dt id="connpy.services.ExecutionService.run_commands"><code class="name flex">
+<span>def <span class="ident">run_commands</span></span>(<span>self,<br>nodes_filter: str,<br>commands: List[str],<br>variables: Dict[str, Any] | None = None,<br>parallel: int = 10,<br>timeout: int = 10,<br>folder: str | None = None,<br>prompt: str | None = None,<br>on_node_complete: Callable | None = None,<br>logger: Callable | None = None) ‑> Dict[str, str]</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def run_commands(
+    self, 
+    nodes_filter: str, 
+    commands: List[str], 
+    variables: Optional[Dict[str, Any]] = None,
+    parallel: int = 10,
+    timeout: int = 10,
+    folder: Optional[str] = None,
+    prompt: Optional[str] = None,
+    on_node_complete: Optional[Callable] = None,
+    logger: Optional[Callable] = None
+) -&gt; Dict[str, str]:
+
+    &#34;&#34;&#34;Execute commands on a set of nodes.&#34;&#34;&#34;
+    try:
+        matched_names = self.config._getallnodes(nodes_filter)
+        if not matched_names:
+            raise ConnpyError(f&#34;No nodes found matching filter: {nodes_filter}&#34;)
+        
+        node_data = self.config.getitems(matched_names, extract=True)
+        executor = Nodes(node_data, config=self.config)
+        self.last_executor = executor
+        
+        results = executor.run(
+            commands=commands,
+            vars=variables,
+            parallel=parallel,
+            timeout=timeout,
+            folder=folder,
+            prompt=prompt,
+            on_complete=on_node_complete,
+            logger=logger
+        )
+
+        return results
+    except Exception as e:
+        raise ConnpyError(f&#34;Execution failed: {e}&#34;)</code></pre>
+</details>
+<div class="desc"><p>Execute commands on a set of nodes.</p></div>
+</dd>
+<dt id="connpy.services.ExecutionService.run_yaml_playbook"><code class="name flex">
+<span>def <span class="ident">run_yaml_playbook</span></span>(<span>self, playbook_path: str, parallel: int = 10) ‑> Dict[str, Any]</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def run_yaml_playbook(self, playbook_path: str, parallel: int = 10) -&gt; Dict[str, Any]:
+    &#34;&#34;&#34;Run a structured Connpy YAML automation playbook.&#34;&#34;&#34;
+    if not os.path.exists(playbook_path):
+        raise ConnpyError(f&#34;Playbook file not found: {playbook_path}&#34;)
+        
+    try:
+        with open(playbook_path, &#34;r&#34;) as f:
+            playbook = yaml.load(f, Loader=yaml.FullLoader)
+    except Exception as e:
+        raise ConnpyError(f&#34;Failed to load playbook {playbook_path}: {e}&#34;)
+        
+    # Basic validation
+    if not isinstance(playbook, dict) or &#34;nodes&#34; not in playbook or &#34;commands&#34; not in playbook:
+        raise ConnpyError(&#34;Invalid playbook format: missing &#39;nodes&#39; or &#39;commands&#39; keys.&#34;)
+        
+    action = playbook.get(&#34;action&#34;, &#34;run&#34;)
+    if action == &#34;run&#34;:
+        return self.run_commands(
+            nodes_filter=playbook[&#34;nodes&#34;],
+            commands=playbook[&#34;commands&#34;],
+            parallel=parallel,
+            timeout=playbook.get(&#34;timeout&#34;, 10)
+        )
+    elif action == &#34;test&#34;:
+        return self.test_commands(
+            nodes_filter=playbook[&#34;nodes&#34;],
+            commands=playbook[&#34;commands&#34;],
+            expected=playbook.get(&#34;expected&#34;, []),
+            parallel=parallel,
+            timeout=playbook.get(&#34;timeout&#34;, 10)
+        )
+    else:
+        raise ConnpyError(f&#34;Unsupported playbook action: {action}&#34;)</code></pre>
+</details>
+<div class="desc"><p>Run a structured Connpy YAML automation playbook.</p></div>
+</dd>
+<dt id="connpy.services.ExecutionService.test_commands"><code class="name flex">
+<span>def <span class="ident">test_commands</span></span>(<span>self,<br>nodes_filter: str,<br>commands: List[str],<br>expected: List[str],<br>variables: Dict[str, Any] | None = None,<br>parallel: int = 10,<br>timeout: int = 10,<br>prompt: str | None = None,<br>on_node_complete: Callable | None = None,<br>logger: Callable | None = None) ‑> Dict[str, Dict[str, bool]]</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_commands(
+    self,
+    nodes_filter: str,
+    commands: List[str],
+    expected: List[str],
+    variables: Optional[Dict[str, Any]] = None,
+    parallel: int = 10,
+    timeout: int = 10,
+    prompt: Optional[str] = None,
+    on_node_complete: Optional[Callable] = None,
+    logger: Optional[Callable] = None
+) -&gt; Dict[str, Dict[str, bool]]:
+
+    &#34;&#34;&#34;Run commands and verify expected output on a set of nodes.&#34;&#34;&#34;
+    try:
+        matched_names = self.config._getallnodes(nodes_filter)
+        if not matched_names:
+            raise ConnpyError(f&#34;No nodes found matching filter: {nodes_filter}&#34;)
+        
+        node_data = self.config.getitems(matched_names, extract=True)
+        executor = Nodes(node_data, config=self.config)
+        self.last_executor = executor
+        
+        results = executor.test(
+            commands=commands,
+            expected=expected,
+            vars=variables,
+            parallel=parallel,
+            timeout=timeout,
+            prompt=prompt,
+            on_complete=on_node_complete,
+            logger=logger
+        )
+        return results
+    except Exception as e:
+        raise ConnpyError(f&#34;Testing failed: {e}&#34;)</code></pre>
+</details>
+<div class="desc"><p>Run commands and verify expected output on a set of nodes.</p></div>
+</dd>
+</dl>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="connpy.services.base.BaseService" href="base.html#connpy.services.base.BaseService">BaseService</a></b></code>:
+<ul class="hlist">
+<li><code><a title="connpy.services.base.BaseService.set_reserved_names" href="base.html#connpy.services.base.BaseService.set_reserved_names">set_reserved_names</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="connpy.services.ImportExportService"><code class="flex name class">
+<span>class <span class="ident">ImportExportService</span></span>
+<span>(</span><span>config=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class ImportExportService(BaseService):
+    &#34;&#34;&#34;Business logic for YAML/JSON inventory import and export.&#34;&#34;&#34;
+
+    def export_to_file(self, file_path, folders=None):
+        &#34;&#34;&#34;Export nodes/folders to a YAML file.&#34;&#34;&#34;
+        if os.path.exists(file_path):
+            raise InvalidConfigurationError(f&#34;File &#39;{file_path}&#39; already exists.&#34;)
+            
+        data = self.export_to_dict(folders)
+        try:
+            with open(file_path, &#34;w&#34;) as f:
+                yaml.dump(data, f, Dumper=NoAliasDumper, default_flow_style=False)
+        except OSError as e:
+            raise InvalidConfigurationError(f&#34;Failed to export to &#39;{file_path}&#39;: {e}&#34;)
+
+    def export_to_dict(self, folders=None):
+        &#34;&#34;&#34;Export nodes/folders to a dictionary.&#34;&#34;&#34;
+        if not folders:
+            return self.config._getallnodesfull(extract=False)
+        else:
+            # Validate folders exist
+            for f in folders:
+                if f != &#34;@&#34; and f not in self.config._getallfolders():
+                    raise NodeNotFoundError(f&#34;Folder &#39;{f}&#39; not found.&#34;)
+            return self.config._getallnodesfull(folders, extract=False)
+
+    def import_from_file(self, file_path):
+        &#34;&#34;&#34;Import nodes/folders from a YAML file.&#34;&#34;&#34;
+        if not os.path.exists(file_path):
+            raise InvalidConfigurationError(f&#34;File &#39;{file_path}&#39; does not exist.&#34;)
+            
+        try:
+            with open(file_path, &#34;r&#34;) as f:
+                data = yaml.load(f, Loader=yaml.FullLoader)
+            self.import_from_dict(data)
+        except Exception as e:
+            raise InvalidConfigurationError(f&#34;Failed to read/parse import file: {e}&#34;)
+
+    def import_from_dict(self, data):
+        &#34;&#34;&#34;Import nodes/folders from a dictionary.&#34;&#34;&#34;
+        if not isinstance(data, dict):
+            raise InvalidConfigurationError(&#34;Invalid import data format: expected a dictionary of nodes.&#34;)
+
+        # Process imports
+        for k, v in data.items():
+            uniques = self.config._explode_unique(k)
+            
+            # Ensure folders exist
+            if &#34;folder&#34; in uniques:
+                folder_name = f&#34;@{uniques[&#39;folder&#39;]}&#34;
+                if folder_name not in self.config._getallfolders():
+                    folder_uniques = self.config._explode_unique(folder_name)
+                    self.config._folder_add(**folder_uniques)
+            
+            if &#34;subfolder&#34; in uniques:
+                sub_name = f&#34;@{uniques[&#39;subfolder&#39;]}@{uniques[&#39;folder&#39;]}&#34;
+                if sub_name not in self.config._getallfolders():
+                    sub_uniques = self.config._explode_unique(sub_name)
+                    self.config._folder_add(**sub_uniques)
+            
+            # Add node/connection
+            v.update(uniques)
+            self._validate_node_name(k)
+            self.config._connections_add(**v)
+            
+        self.config._saveconfig(self.config.file)</code></pre>
+</details>
+<div class="desc"><p>Business logic for YAML/JSON inventory import and export.</p>
+<p>Initialize the service.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>config</code></strong></dt>
+<dd>An instance of configfile (or None to instantiate a new one/use global context).</dd>
+</dl></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="connpy.services.base.BaseService" href="base.html#connpy.services.base.BaseService">BaseService</a></li>
+</ul>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.services.ImportExportService.export_to_dict"><code class="name flex">
+<span>def <span class="ident">export_to_dict</span></span>(<span>self, folders=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def export_to_dict(self, folders=None):
+    &#34;&#34;&#34;Export nodes/folders to a dictionary.&#34;&#34;&#34;
+    if not folders:
+        return self.config._getallnodesfull(extract=False)
+    else:
+        # Validate folders exist
+        for f in folders:
+            if f != &#34;@&#34; and f not in self.config._getallfolders():
+                raise NodeNotFoundError(f&#34;Folder &#39;{f}&#39; not found.&#34;)
+        return self.config._getallnodesfull(folders, extract=False)</code></pre>
+</details>
+<div class="desc"><p>Export nodes/folders to a dictionary.</p></div>
+</dd>
+<dt id="connpy.services.ImportExportService.export_to_file"><code class="name flex">
+<span>def <span class="ident">export_to_file</span></span>(<span>self, file_path, folders=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def export_to_file(self, file_path, folders=None):
+    &#34;&#34;&#34;Export nodes/folders to a YAML file.&#34;&#34;&#34;
+    if os.path.exists(file_path):
+        raise InvalidConfigurationError(f&#34;File &#39;{file_path}&#39; already exists.&#34;)
+        
+    data = self.export_to_dict(folders)
+    try:
+        with open(file_path, &#34;w&#34;) as f:
+            yaml.dump(data, f, Dumper=NoAliasDumper, default_flow_style=False)
+    except OSError as e:
+        raise InvalidConfigurationError(f&#34;Failed to export to &#39;{file_path}&#39;: {e}&#34;)</code></pre>
+</details>
+<div class="desc"><p>Export nodes/folders to a YAML file.</p></div>
+</dd>
+<dt id="connpy.services.ImportExportService.import_from_dict"><code class="name flex">
+<span>def <span class="ident">import_from_dict</span></span>(<span>self, data)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def import_from_dict(self, data):
+    &#34;&#34;&#34;Import nodes/folders from a dictionary.&#34;&#34;&#34;
+    if not isinstance(data, dict):
+        raise InvalidConfigurationError(&#34;Invalid import data format: expected a dictionary of nodes.&#34;)
+
+    # Process imports
+    for k, v in data.items():
+        uniques = self.config._explode_unique(k)
+        
+        # Ensure folders exist
+        if &#34;folder&#34; in uniques:
+            folder_name = f&#34;@{uniques[&#39;folder&#39;]}&#34;
+            if folder_name not in self.config._getallfolders():
+                folder_uniques = self.config._explode_unique(folder_name)
+                self.config._folder_add(**folder_uniques)
+        
+        if &#34;subfolder&#34; in uniques:
+            sub_name = f&#34;@{uniques[&#39;subfolder&#39;]}@{uniques[&#39;folder&#39;]}&#34;
+            if sub_name not in self.config._getallfolders():
+                sub_uniques = self.config._explode_unique(sub_name)
+                self.config._folder_add(**sub_uniques)
+        
+        # Add node/connection
+        v.update(uniques)
+        self._validate_node_name(k)
+        self.config._connections_add(**v)
+        
+    self.config._saveconfig(self.config.file)</code></pre>
+</details>
+<div class="desc"><p>Import nodes/folders from a dictionary.</p></div>
+</dd>
+<dt id="connpy.services.ImportExportService.import_from_file"><code class="name flex">
+<span>def <span class="ident">import_from_file</span></span>(<span>self, file_path)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def import_from_file(self, file_path):
+    &#34;&#34;&#34;Import nodes/folders from a YAML file.&#34;&#34;&#34;
+    if not os.path.exists(file_path):
+        raise InvalidConfigurationError(f&#34;File &#39;{file_path}&#39; does not exist.&#34;)
+        
+    try:
+        with open(file_path, &#34;r&#34;) as f:
+            data = yaml.load(f, Loader=yaml.FullLoader)
+        self.import_from_dict(data)
+    except Exception as e:
+        raise InvalidConfigurationError(f&#34;Failed to read/parse import file: {e}&#34;)</code></pre>
+</details>
+<div class="desc"><p>Import nodes/folders from a YAML file.</p></div>
+</dd>
+</dl>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="connpy.services.base.BaseService" href="base.html#connpy.services.base.BaseService">BaseService</a></b></code>:
+<ul class="hlist">
+<li><code><a title="connpy.services.base.BaseService.set_reserved_names" href="base.html#connpy.services.base.BaseService.set_reserved_names">set_reserved_names</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="connpy.services.InvalidConfigurationError"><code class="flex name class">
+<span>class <span class="ident">InvalidConfigurationError</span></span>
+<span>(</span><span>*args, **kwargs)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class InvalidConfigurationError(ConnpyError):
+    &#34;&#34;&#34;Raised when data or configuration input is invalid.&#34;&#34;&#34;
+    pass</code></pre>
+</details>
+<div class="desc"><p>Raised when data or configuration input is invalid.</p></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="connpy.services.exceptions.ConnpyError" href="exceptions.html#connpy.services.exceptions.ConnpyError">ConnpyError</a></li>
+<li>builtins.Exception</li>
+<li>builtins.BaseException</li>
+</ul>
+</dd>
+<dt id="connpy.services.NodeAlreadyExistsError"><code class="flex name class">
+<span>class <span class="ident">NodeAlreadyExistsError</span></span>
+<span>(</span><span>*args, **kwargs)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class NodeAlreadyExistsError(ConnpyError):
+    &#34;&#34;&#34;Raised when a node or folder already exists.&#34;&#34;&#34;
+    pass</code></pre>
+</details>
+<div class="desc"><p>Raised when a node or folder already exists.</p></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="connpy.services.exceptions.ConnpyError" href="exceptions.html#connpy.services.exceptions.ConnpyError">ConnpyError</a></li>
+<li>builtins.Exception</li>
+<li>builtins.BaseException</li>
+</ul>
+</dd>
+<dt id="connpy.services.NodeNotFoundError"><code class="flex name class">
+<span>class <span class="ident">NodeNotFoundError</span></span>
+<span>(</span><span>*args, **kwargs)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class NodeNotFoundError(ConnpyError):
+    &#34;&#34;&#34;Raised when a connection or folder is not found.&#34;&#34;&#34;
+    pass</code></pre>
+</details>
+<div class="desc"><p>Raised when a connection or folder is not found.</p></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="connpy.services.exceptions.ConnpyError" href="exceptions.html#connpy.services.exceptions.ConnpyError">ConnpyError</a></li>
+<li>builtins.Exception</li>
+<li>builtins.BaseException</li>
+</ul>
+</dd>
+<dt id="connpy.services.NodeService"><code class="flex name class">
+<span>class <span class="ident">NodeService</span></span>
+<span>(</span><span>config=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class NodeService(BaseService):
+    def __init__(self, config=None):
+        super().__init__(config)
+
+
+    def list_nodes(self, filter_str=None, format_str=None):
+        &#34;&#34;&#34;Return a listed filtered by regex match and formatted if needed.&#34;&#34;&#34;
+        nodes = self.config._getallnodes()
+        case_sensitive = self.config.config.get(&#34;case&#34;, False)
+        
+        if filter_str:
+            flags = re.IGNORECASE if not case_sensitive else 0
+            nodes = [n for n in nodes if re.search(filter_str, n, flags)]
+            
+        if not format_str:
+            return nodes
+            
+        from .profile_service import ProfileService
+        profile_service = ProfileService(self.config)
+        
+        formatted_nodes = []
+        for n_id in nodes:
+            # Use ProfileService to resolve profiles for dynamic formatting
+            details = self.config.getitem(n_id, extract=False)
+            if details:
+                details = profile_service.resolve_node_data(details)
+                
+                name = n_id.split(&#34;@&#34;)[0]
+                location = n_id.partition(&#34;@&#34;)[2] or &#34;root&#34;
+                
+                # Prepare context for .format() with all details
+                context = details.copy()
+                context.update({
+                    &#34;name&#34;: name,
+                    &#34;NAME&#34;: name.upper(),
+                    &#34;location&#34;: location,
+                    &#34;LOCATION&#34;: location.upper(),
+                })
+                
+                # Add exploded uniques (id, folder, subfolder)
+                uniques = self.config._explode_unique(n_id)
+                if uniques:
+                    context.update(uniques)
+                
+                # Add uppercase versions of all keys for convenience
+                for k, v in list(context.items()):
+                    if isinstance(v, str):
+                        context[k.upper()] = v.upper()
+                
+                try:
+                    formatted_nodes.append(format_str.format(**context))
+                except (KeyError, IndexError, ValueError):
+                    # Fallback to original string if format fails
+                    formatted_nodes.append(n_id)
+        return formatted_nodes
+
+    def list_folders(self, filter_str=None):
+        &#34;&#34;&#34;Return all unique folders, optionally filtered by regex.&#34;&#34;&#34;
+        folders = self.config._getallfolders()
+        case_sensitive = self.config.config.get(&#34;case&#34;, False)
+        
+        if filter_str:
+            flags = re.IGNORECASE if not case_sensitive else 0
+            folders = [f for f in folders if re.search(filter_str, f, flags)]
+        return folders
+
+    def get_node_details(self, unique_id):
+        &#34;&#34;&#34;Return full configuration dictionary for a specific node.&#34;&#34;&#34;
+        details = self.config.getitem(unique_id)
+        if not details:
+            raise NodeNotFoundError(f&#34;Node &#39;{unique_id}&#39; not found.&#34;)
+        return details
+
+    def explode_unique(self, unique_id):
+        &#34;&#34;&#34;Explode a unique ID into a dictionary of its parts.&#34;&#34;&#34;
+        return self.config._explode_unique(unique_id)
+
+    def generate_cache(self, nodes=None, folders=None, profiles=None):
+        &#34;&#34;&#34;Generate and update the internal nodes cache.&#34;&#34;&#34;
+        self.config._generate_nodes_cache(nodes=nodes, folders=folders, profiles=profiles)
+
+
+    def add_node(self, unique_id, data, is_folder=False):
+        &#34;&#34;&#34;Logic for adding a new node or folder to configuration.&#34;&#34;&#34;
+        if not is_folder:
+            self._validate_node_name(unique_id)
+            
+        all_nodes = self.config._getallnodes()
+        all_folders = self.config._getallfolders()
+        
+        if is_folder:
+            if unique_id in all_folders:
+                raise NodeAlreadyExistsError(f&#34;Folder &#39;{unique_id}&#39; already exists.&#34;)
+            uniques = self.config._explode_unique(unique_id)
+            if not uniques:
+                raise InvalidConfigurationError(f&#34;Invalid folder name &#39;{unique_id}&#39;.&#34;)
+            
+            # Check if parent folder exists when creating a subfolder
+            if &#34;subfolder&#34; in uniques:
+                parent_folder = f&#34;@{uniques[&#39;folder&#39;]}&#34;
+                if parent_folder not in all_folders:
+                    raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
+                    
+            self.config._folder_add(**uniques)
+            self.config._saveconfig(self.config.file)
+        else:
+            if unique_id in all_nodes:
+                raise NodeAlreadyExistsError(f&#34;Node &#39;{unique_id}&#39; already exists.&#34;)
+                
+            # Check if parent folder exists when creating a node in a folder
+            node_folder = unique_id.partition(&#34;@&#34;)[2]
+            if node_folder:
+                parent_folder = f&#34;@{node_folder}&#34;
+                if parent_folder not in all_folders:
+                    raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
+                    
+            # Ensure &#39;id&#39; is in data for config._connections_add
+            if &#34;id&#34; not in data:
+                uniques = self.config._explode_unique(unique_id)
+                if uniques and &#34;id&#34; in uniques:
+                    data[&#34;id&#34;] = uniques[&#34;id&#34;]
+            
+            self.config._connections_add(**data)
+            self.config._saveconfig(self.config.file)
+
+    def update_node(self, unique_id, data):
+        &#34;&#34;&#34;Explicitly update an existing node.&#34;&#34;&#34;
+        all_nodes = self.config._getallnodes()
+        if unique_id not in all_nodes:
+            raise NodeNotFoundError(f&#34;Node &#39;{unique_id}&#39; not found.&#34;)
+            
+        # Ensure &#39;id&#39; is in data for config._connections_add
+        if &#34;id&#34; not in data:
+            uniques = self.config._explode_unique(unique_id)
+            if uniques:
+                data[&#34;id&#34;] = uniques[&#34;id&#34;]
+            
+        # config._connections_add actually handles updates if ID exists correctly
+        self.config._connections_add(**data)
+        self.config._saveconfig(self.config.file)
+
+    def delete_node(self, unique_id, is_folder=False):
+        &#34;&#34;&#34;Logic for deleting a node or folder.&#34;&#34;&#34;
+        if is_folder:
+            uniques = self.config._explode_unique(unique_id)
+            if not uniques:
+                raise NodeNotFoundError(f&#34;Folder &#39;{unique_id}&#39; not found or invalid.&#34;)
+            self.config._folder_del(**uniques)
+        else:
+            uniques = self.config._explode_unique(unique_id)
+            if not uniques:
+                raise NodeNotFoundError(f&#34;Node &#39;{unique_id}&#39; not found or invalid.&#34;)
+            self.config._connections_del(**uniques)
+            
+        self.config._saveconfig(self.config.file)
+
+    def connect_node(self, unique_id, sftp=False, debug=False, logger=None):
+        &#34;&#34;&#34;Interact with a node directly.&#34;&#34;&#34;
+        from connpy.core import node
+        from .profile_service import ProfileService
+        
+        node_data = self.config.getitem(unique_id, extract=False)
+        if not node_data:
+            raise NodeNotFoundError(f&#34;Node &#39;{unique_id}&#39; not found.&#34;)
+            
+        # Resolve profiles
+        profile_service = ProfileService(self.config)
+        resolved_data = profile_service.resolve_node_data(node_data)
+            
+        n = node(unique_id, **resolved_data, config=self.config)
+        if sftp:
+            n.protocol = &#34;sftp&#34;
+            
+        n.interact(debug=debug, logger=logger)
+
+    def move_node(self, src_id, dst_id, copy=False):
+        &#34;&#34;&#34;Move or copy a node.&#34;&#34;&#34;
+        self._validate_node_name(dst_id)
+        
+        node_data = self.config.getitem(src_id)
+        if not node_data:
+            raise NodeNotFoundError(f&#34;Source node &#39;{src_id}&#39; not found.&#34;)
+            
+        if dst_id in self.config._getallnodes():
+            raise NodeAlreadyExistsError(f&#34;Destination node &#39;{dst_id}&#39; already exists.&#34;)
+            
+        new_uniques = self.config._explode_unique(dst_id)
+        if not new_uniques:
+            raise InvalidConfigurationError(f&#34;Invalid destination format &#39;{dst_id}&#39;.&#34;)
+            
+        new_node_data = node_data.copy()
+        new_node_data.update(new_uniques)
+        
+        self.config._connections_add(**new_node_data)
+        
+        if not copy:
+            src_uniques = self.config._explode_unique(src_id)
+            self.config._connections_del(**src_uniques)
+            
+        self.config._saveconfig(self.config.file)
+
+    def bulk_add(self, ids, hosts, common_data):
+        &#34;&#34;&#34;Add multiple nodes with shared common configuration.&#34;&#34;&#34;
+        count = 0
+        all_nodes = self.config._getallnodes()
+        
+        for i, uid in enumerate(ids):
+            if uid in all_nodes:
+                continue
+                
+            try:
+                self._validate_node_name(uid)
+            except ReservedNameError:
+                # For bulk, we might want to just skip or log. 
+                # CLI caller will handle if it wants to be strict.
+                continue
+                
+            host = hosts[i] if i &lt; len(hosts) else hosts[0]
+            uniques = self.config._explode_unique(uid)
+            if not uniques:
+                continue
+                
+            node_data = common_data.copy()
+            node_data.pop(&#34;ids&#34;, None)
+            node_data.pop(&#34;location&#34;, None)
+            node_data.update(uniques)
+            node_data[&#34;host&#34;] = host
+            node_data[&#34;type&#34;] = &#34;connection&#34;
+
+            self.config._connections_add(**node_data)
+            count += 1
+            
+        if count &gt; 0:
+            self.config._saveconfig(self.config.file)
+        return count
+
+    def full_replace(self, connections, profiles):
+        &#34;&#34;&#34;Replace all connections and profiles with new data.&#34;&#34;&#34;
+        self.config.connections = connections
+        self.config.profiles = profiles
+        self.config._saveconfig(self.config.file)
+
+    def get_inventory(self):
+        &#34;&#34;&#34;Return a full snapshot of connections and profiles.&#34;&#34;&#34;
+        return {
+            &#34;connections&#34;: self.config.connections,
+            &#34;profiles&#34;: self.config.profiles
+        }</code></pre>
+</details>
+<div class="desc"><p>Base class for all connpy services, providing common configuration access.</p>
+<p>Initialize the service.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>config</code></strong></dt>
+<dd>An instance of configfile (or None to instantiate a new one/use global context).</dd>
+</dl></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="connpy.services.base.BaseService" href="base.html#connpy.services.base.BaseService">BaseService</a></li>
+</ul>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.services.NodeService.add_node"><code class="name flex">
+<span>def <span class="ident">add_node</span></span>(<span>self, unique_id, data, is_folder=False)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def add_node(self, unique_id, data, is_folder=False):
+    &#34;&#34;&#34;Logic for adding a new node or folder to configuration.&#34;&#34;&#34;
+    if not is_folder:
+        self._validate_node_name(unique_id)
+        
+    all_nodes = self.config._getallnodes()
+    all_folders = self.config._getallfolders()
+    
+    if is_folder:
+        if unique_id in all_folders:
+            raise NodeAlreadyExistsError(f&#34;Folder &#39;{unique_id}&#39; already exists.&#34;)
+        uniques = self.config._explode_unique(unique_id)
+        if not uniques:
+            raise InvalidConfigurationError(f&#34;Invalid folder name &#39;{unique_id}&#39;.&#34;)
+        
+        # Check if parent folder exists when creating a subfolder
+        if &#34;subfolder&#34; in uniques:
+            parent_folder = f&#34;@{uniques[&#39;folder&#39;]}&#34;
+            if parent_folder not in all_folders:
+                raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
+                
+        self.config._folder_add(**uniques)
+        self.config._saveconfig(self.config.file)
+    else:
+        if unique_id in all_nodes:
+            raise NodeAlreadyExistsError(f&#34;Node &#39;{unique_id}&#39; already exists.&#34;)
+            
+        # Check if parent folder exists when creating a node in a folder
+        node_folder = unique_id.partition(&#34;@&#34;)[2]
+        if node_folder:
+            parent_folder = f&#34;@{node_folder}&#34;
+            if parent_folder not in all_folders:
+                raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
+                
+        # Ensure &#39;id&#39; is in data for config._connections_add
+        if &#34;id&#34; not in data:
+            uniques = self.config._explode_unique(unique_id)
+            if uniques and &#34;id&#34; in uniques:
+                data[&#34;id&#34;] = uniques[&#34;id&#34;]
+        
+        self.config._connections_add(**data)
+        self.config._saveconfig(self.config.file)</code></pre>
+</details>
+<div class="desc"><p>Logic for adding a new node or folder to configuration.</p></div>
+</dd>
+<dt id="connpy.services.NodeService.bulk_add"><code class="name flex">
+<span>def <span class="ident">bulk_add</span></span>(<span>self, ids, hosts, common_data)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def bulk_add(self, ids, hosts, common_data):
+    &#34;&#34;&#34;Add multiple nodes with shared common configuration.&#34;&#34;&#34;
+    count = 0
+    all_nodes = self.config._getallnodes()
+    
+    for i, uid in enumerate(ids):
+        if uid in all_nodes:
+            continue
+            
+        try:
+            self._validate_node_name(uid)
+        except ReservedNameError:
+            # For bulk, we might want to just skip or log. 
+            # CLI caller will handle if it wants to be strict.
+            continue
+            
+        host = hosts[i] if i &lt; len(hosts) else hosts[0]
+        uniques = self.config._explode_unique(uid)
+        if not uniques:
+            continue
+            
+        node_data = common_data.copy()
+        node_data.pop(&#34;ids&#34;, None)
+        node_data.pop(&#34;location&#34;, None)
+        node_data.update(uniques)
+        node_data[&#34;host&#34;] = host
+        node_data[&#34;type&#34;] = &#34;connection&#34;
+
+        self.config._connections_add(**node_data)
+        count += 1
+        
+    if count &gt; 0:
+        self.config._saveconfig(self.config.file)
+    return count</code></pre>
+</details>
+<div class="desc"><p>Add multiple nodes with shared common configuration.</p></div>
+</dd>
+<dt id="connpy.services.NodeService.connect_node"><code class="name flex">
+<span>def <span class="ident">connect_node</span></span>(<span>self, unique_id, sftp=False, debug=False, logger=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def connect_node(self, unique_id, sftp=False, debug=False, logger=None):
+    &#34;&#34;&#34;Interact with a node directly.&#34;&#34;&#34;
+    from connpy.core import node
+    from .profile_service import ProfileService
+    
+    node_data = self.config.getitem(unique_id, extract=False)
+    if not node_data:
+        raise NodeNotFoundError(f&#34;Node &#39;{unique_id}&#39; not found.&#34;)
+        
+    # Resolve profiles
+    profile_service = ProfileService(self.config)
+    resolved_data = profile_service.resolve_node_data(node_data)
+        
+    n = node(unique_id, **resolved_data, config=self.config)
+    if sftp:
+        n.protocol = &#34;sftp&#34;
+        
+    n.interact(debug=debug, logger=logger)</code></pre>
+</details>
+<div class="desc"><p>Interact with a node directly.</p></div>
+</dd>
+<dt id="connpy.services.NodeService.delete_node"><code class="name flex">
+<span>def <span class="ident">delete_node</span></span>(<span>self, unique_id, is_folder=False)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def delete_node(self, unique_id, is_folder=False):
+    &#34;&#34;&#34;Logic for deleting a node or folder.&#34;&#34;&#34;
+    if is_folder:
+        uniques = self.config._explode_unique(unique_id)
+        if not uniques:
+            raise NodeNotFoundError(f&#34;Folder &#39;{unique_id}&#39; not found or invalid.&#34;)
+        self.config._folder_del(**uniques)
+    else:
+        uniques = self.config._explode_unique(unique_id)
+        if not uniques:
+            raise NodeNotFoundError(f&#34;Node &#39;{unique_id}&#39; not found or invalid.&#34;)
+        self.config._connections_del(**uniques)
+        
+    self.config._saveconfig(self.config.file)</code></pre>
+</details>
+<div class="desc"><p>Logic for deleting a node or folder.</p></div>
+</dd>
+<dt id="connpy.services.NodeService.explode_unique"><code class="name flex">
+<span>def <span class="ident">explode_unique</span></span>(<span>self, unique_id)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def explode_unique(self, unique_id):
+    &#34;&#34;&#34;Explode a unique ID into a dictionary of its parts.&#34;&#34;&#34;
+    return self.config._explode_unique(unique_id)</code></pre>
+</details>
+<div class="desc"><p>Explode a unique ID into a dictionary of its parts.</p></div>
+</dd>
+<dt id="connpy.services.NodeService.full_replace"><code class="name flex">
+<span>def <span class="ident">full_replace</span></span>(<span>self, connections, profiles)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def full_replace(self, connections, profiles):
+    &#34;&#34;&#34;Replace all connections and profiles with new data.&#34;&#34;&#34;
+    self.config.connections = connections
+    self.config.profiles = profiles
+    self.config._saveconfig(self.config.file)</code></pre>
+</details>
+<div class="desc"><p>Replace all connections and profiles with new data.</p></div>
+</dd>
+<dt id="connpy.services.NodeService.generate_cache"><code class="name flex">
+<span>def <span class="ident">generate_cache</span></span>(<span>self, nodes=None, folders=None, profiles=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def generate_cache(self, nodes=None, folders=None, profiles=None):
+    &#34;&#34;&#34;Generate and update the internal nodes cache.&#34;&#34;&#34;
+    self.config._generate_nodes_cache(nodes=nodes, folders=folders, profiles=profiles)</code></pre>
+</details>
+<div class="desc"><p>Generate and update the internal nodes cache.</p></div>
+</dd>
+<dt id="connpy.services.NodeService.get_inventory"><code class="name flex">
+<span>def <span class="ident">get_inventory</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_inventory(self):
+    &#34;&#34;&#34;Return a full snapshot of connections and profiles.&#34;&#34;&#34;
+    return {
+        &#34;connections&#34;: self.config.connections,
+        &#34;profiles&#34;: self.config.profiles
+    }</code></pre>
+</details>
+<div class="desc"><p>Return a full snapshot of connections and profiles.</p></div>
+</dd>
+<dt id="connpy.services.NodeService.get_node_details"><code class="name flex">
+<span>def <span class="ident">get_node_details</span></span>(<span>self, unique_id)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_node_details(self, unique_id):
+    &#34;&#34;&#34;Return full configuration dictionary for a specific node.&#34;&#34;&#34;
+    details = self.config.getitem(unique_id)
+    if not details:
+        raise NodeNotFoundError(f&#34;Node &#39;{unique_id}&#39; not found.&#34;)
+    return details</code></pre>
+</details>
+<div class="desc"><p>Return full configuration dictionary for a specific node.</p></div>
+</dd>
+<dt id="connpy.services.NodeService.list_folders"><code class="name flex">
+<span>def <span class="ident">list_folders</span></span>(<span>self, filter_str=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def list_folders(self, filter_str=None):
+    &#34;&#34;&#34;Return all unique folders, optionally filtered by regex.&#34;&#34;&#34;
+    folders = self.config._getallfolders()
+    case_sensitive = self.config.config.get(&#34;case&#34;, False)
+    
+    if filter_str:
+        flags = re.IGNORECASE if not case_sensitive else 0
+        folders = [f for f in folders if re.search(filter_str, f, flags)]
+    return folders</code></pre>
+</details>
+<div class="desc"><p>Return all unique folders, optionally filtered by regex.</p></div>
+</dd>
+<dt id="connpy.services.NodeService.list_nodes"><code class="name flex">
+<span>def <span class="ident">list_nodes</span></span>(<span>self, filter_str=None, format_str=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def list_nodes(self, filter_str=None, format_str=None):
+    &#34;&#34;&#34;Return a listed filtered by regex match and formatted if needed.&#34;&#34;&#34;
+    nodes = self.config._getallnodes()
+    case_sensitive = self.config.config.get(&#34;case&#34;, False)
+    
+    if filter_str:
+        flags = re.IGNORECASE if not case_sensitive else 0
+        nodes = [n for n in nodes if re.search(filter_str, n, flags)]
+        
+    if not format_str:
+        return nodes
+        
+    from .profile_service import ProfileService
+    profile_service = ProfileService(self.config)
+    
+    formatted_nodes = []
+    for n_id in nodes:
+        # Use ProfileService to resolve profiles for dynamic formatting
+        details = self.config.getitem(n_id, extract=False)
+        if details:
+            details = profile_service.resolve_node_data(details)
+            
+            name = n_id.split(&#34;@&#34;)[0]
+            location = n_id.partition(&#34;@&#34;)[2] or &#34;root&#34;
+            
+            # Prepare context for .format() with all details
+            context = details.copy()
+            context.update({
+                &#34;name&#34;: name,
+                &#34;NAME&#34;: name.upper(),
+                &#34;location&#34;: location,
+                &#34;LOCATION&#34;: location.upper(),
+            })
+            
+            # Add exploded uniques (id, folder, subfolder)
+            uniques = self.config._explode_unique(n_id)
+            if uniques:
+                context.update(uniques)
+            
+            # Add uppercase versions of all keys for convenience
+            for k, v in list(context.items()):
+                if isinstance(v, str):
+                    context[k.upper()] = v.upper()
+            
+            try:
+                formatted_nodes.append(format_str.format(**context))
+            except (KeyError, IndexError, ValueError):
+                # Fallback to original string if format fails
+                formatted_nodes.append(n_id)
+    return formatted_nodes</code></pre>
+</details>
+<div class="desc"><p>Return a listed filtered by regex match and formatted if needed.</p></div>
+</dd>
+<dt id="connpy.services.NodeService.move_node"><code class="name flex">
+<span>def <span class="ident">move_node</span></span>(<span>self, src_id, dst_id, copy=False)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def move_node(self, src_id, dst_id, copy=False):
+    &#34;&#34;&#34;Move or copy a node.&#34;&#34;&#34;
+    self._validate_node_name(dst_id)
+    
+    node_data = self.config.getitem(src_id)
+    if not node_data:
+        raise NodeNotFoundError(f&#34;Source node &#39;{src_id}&#39; not found.&#34;)
+        
+    if dst_id in self.config._getallnodes():
+        raise NodeAlreadyExistsError(f&#34;Destination node &#39;{dst_id}&#39; already exists.&#34;)
+        
+    new_uniques = self.config._explode_unique(dst_id)
+    if not new_uniques:
+        raise InvalidConfigurationError(f&#34;Invalid destination format &#39;{dst_id}&#39;.&#34;)
+        
+    new_node_data = node_data.copy()
+    new_node_data.update(new_uniques)
+    
+    self.config._connections_add(**new_node_data)
+    
+    if not copy:
+        src_uniques = self.config._explode_unique(src_id)
+        self.config._connections_del(**src_uniques)
+        
+    self.config._saveconfig(self.config.file)</code></pre>
+</details>
+<div class="desc"><p>Move or copy a node.</p></div>
+</dd>
+<dt id="connpy.services.NodeService.update_node"><code class="name flex">
+<span>def <span class="ident">update_node</span></span>(<span>self, unique_id, data)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def update_node(self, unique_id, data):
+    &#34;&#34;&#34;Explicitly update an existing node.&#34;&#34;&#34;
+    all_nodes = self.config._getallnodes()
+    if unique_id not in all_nodes:
+        raise NodeNotFoundError(f&#34;Node &#39;{unique_id}&#39; not found.&#34;)
+        
+    # Ensure &#39;id&#39; is in data for config._connections_add
+    if &#34;id&#34; not in data:
+        uniques = self.config._explode_unique(unique_id)
+        if uniques:
+            data[&#34;id&#34;] = uniques[&#34;id&#34;]
+        
+    # config._connections_add actually handles updates if ID exists correctly
+    self.config._connections_add(**data)
+    self.config._saveconfig(self.config.file)</code></pre>
+</details>
+<div class="desc"><p>Explicitly update an existing node.</p></div>
+</dd>
+</dl>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="connpy.services.base.BaseService" href="base.html#connpy.services.base.BaseService">BaseService</a></b></code>:
+<ul class="hlist">
+<li><code><a title="connpy.services.base.BaseService.set_reserved_names" href="base.html#connpy.services.base.BaseService.set_reserved_names">set_reserved_names</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="connpy.services.PluginService"><code class="flex name class">
+<span>class <span class="ident">PluginService</span></span>
+<span>(</span><span>config=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class PluginService(BaseService):
+    &#34;&#34;&#34;Business logic for enabling, disabling, and listing plugins.&#34;&#34;&#34;
+
+    def list_plugins(self):
+        &#34;&#34;&#34;List all core and user-defined plugins with their status and hash.&#34;&#34;&#34;
+        import os
+        import hashlib
+        
+        # Check for user plugins directory
+        plugin_dir = os.path.join(self.config.defaultdir, &#34;plugins&#34;)
+        # Check for core plugins directory
+        core_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), &#34;..&#34;, &#34;core_plugins&#34;)
+        
+        all_plugin_info = {}
+
+        def get_hash(path):
+            try:
+                with open(path, &#34;rb&#34;) as f:
+                    return hashlib.md5(f.read()).hexdigest()
+            except Exception:
+                return &#34;&#34;
+
+        # User plugins
+        if os.path.exists(plugin_dir):
+            for f in os.listdir(plugin_dir):
+                if f.endswith(&#34;.py&#34;):
+                    name = f[:-3]
+                    path = os.path.join(plugin_dir, f)
+                    all_plugin_info[name] = {&#34;enabled&#34;: True, &#34;hash&#34;: get_hash(path)}
+                elif f.endswith(&#34;.py.bkp&#34;):
+                    name = f[:-7]
+                    all_plugin_info[name] = {&#34;enabled&#34;: False}
+
+        return all_plugin_info
+
+    def add_plugin(self, name, source_file, update=False):
+        &#34;&#34;&#34;Add or update a plugin from a local file.&#34;&#34;&#34;
+        import os
+        import shutil
+        from connpy.plugins import Plugins
+
+        if not name.isalpha() or not name.islower() or len(name) &gt; 15:
+            raise InvalidConfigurationError(&#34;Plugin name should be lowercase letters up to 15 characters.&#34;)
+
+        p_manager = Plugins()
+        # Check for bad script
+        error = p_manager.verify_script(source_file)
+        if error:
+            raise InvalidConfigurationError(f&#34;Invalid plugin script: {error}&#34;)
+
+        self._save_plugin_file(name, source_file, update, is_path=True)
+
+    def add_plugin_from_bytes(self, name, content, update=False):
+        &#34;&#34;&#34;Add or update a plugin from bytes (gRPC).&#34;&#34;&#34;
+        import tempfile
+        import os
+        
+        if not name.isalpha() or not name.islower() or len(name) &gt; 15:
+            raise InvalidConfigurationError(&#34;Plugin name should be lowercase letters up to 15 characters.&#34;)
+
+        # Write to temp file to verify script
+        with tempfile.NamedTemporaryFile(suffix=&#34;.py&#34;, delete=False) as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+
+        try:
+            from connpy.plugins import Plugins
+            p_manager = Plugins()
+            error = p_manager.verify_script(tmp_path)
+            if error:
+                raise InvalidConfigurationError(f&#34;Invalid plugin script: {error}&#34;)
+            
+            self._save_plugin_file(name, tmp_path, update, is_path=True)
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
+    def _save_plugin_file(self, name, source, update=False, is_path=True):
+        import os
+        import shutil
+        
+        plugin_dir = os.path.join(self.config.defaultdir, &#34;plugins&#34;)
+        os.makedirs(plugin_dir, exist_ok=True)
+        
+        target_file = os.path.join(plugin_dir, f&#34;{name}.py&#34;)
+        backup_file = f&#34;{target_file}.bkp&#34;
+
+        if not update and (os.path.exists(target_file) or os.path.exists(backup_file)):
+            raise InvalidConfigurationError(f&#34;Plugin &#39;{name}&#39; already exists.&#34;)
+
+        try:
+            if is_path:
+                shutil.copy2(source, target_file)
+            else:
+                with open(target_file, &#34;wb&#34;) as f:
+                    f.write(source)
+        except OSError as e:
+            raise InvalidConfigurationError(f&#34;Failed to save plugin file: {e}&#34;)
+
+    def delete_plugin(self, name):
+        &#34;&#34;&#34;Remove a plugin file permanently.&#34;&#34;&#34;
+        import os
+        plugin_file = os.path.join(self.config.defaultdir, &#34;plugins&#34;, f&#34;{name}.py&#34;)
+        disabled_file = f&#34;{plugin_file}.bkp&#34;
+
+        deleted = False
+        for f in [plugin_file, disabled_file]:
+            if os.path.exists(f):
+                try:
+                    os.remove(f)
+                    deleted = True
+                except OSError as e:
+                    raise InvalidConfigurationError(f&#34;Failed to delete plugin file &#39;{f}&#39;: {e}&#34;)
+        
+        if not deleted:
+            raise InvalidConfigurationError(f&#34;Plugin &#39;{name}&#39; not found.&#34;)
+
+    def enable_plugin(self, name):
+        &#34;&#34;&#34;Activate a plugin by renaming its backup file.&#34;&#34;&#34;
+        import os
+        plugin_file = os.path.join(self.config.defaultdir, &#34;plugins&#34;, f&#34;{name}.py&#34;)
+        disabled_file = f&#34;{plugin_file}.bkp&#34;
+        
+        if os.path.exists(plugin_file):
+            return False # Already enabled
+            
+        if not os.path.exists(disabled_file):
+            raise InvalidConfigurationError(f&#34;Plugin &#39;{name}&#39; not found.&#34;)
+            
+        try:
+            os.rename(disabled_file, plugin_file)
+            return True
+        except OSError as e:
+            raise InvalidConfigurationError(f&#34;Failed to enable plugin &#39;{name}&#39;: {e}&#34;)
+
+    def disable_plugin(self, name):
+        &#34;&#34;&#34;Deactivate a plugin by renaming it to a backup file.&#34;&#34;&#34;
+        import os
+        plugin_file = os.path.join(self.config.defaultdir, &#34;plugins&#34;, f&#34;{name}.py&#34;)
+        disabled_file = f&#34;{plugin_file}.bkp&#34;
+        
+        if os.path.exists(disabled_file):
+            return False # Already disabled
+            
+        if not os.path.exists(plugin_file):
+            raise InvalidConfigurationError(f&#34;Plugin &#39;{name}&#39; not found or is a core plugin.&#34;)
+            
+        try:
+            os.rename(plugin_file, disabled_file)
+            return True
+        except OSError as e:
+            raise InvalidConfigurationError(f&#34;Failed to disable plugin &#39;{name}&#39;: {e}&#34;)
+
+    def get_plugin_source(self, name):
+        import os
+        from ..services.exceptions import InvalidConfigurationError
+        
+        plugin_file = os.path.join(self.config.defaultdir, &#34;plugins&#34;, f&#34;{name}.py&#34;)
+        core_path = os.path.dirname(os.path.realpath(__file__)) + f&#34;/../core_plugins/{name}.py&#34;
+        
+        if os.path.exists(plugin_file):
+            target = plugin_file
+        elif os.path.exists(core_path):
+            target = core_path
+        else:
+            raise InvalidConfigurationError(f&#34;Plugin &#39;{name}&#39; not found&#34;)
+        
+        with open(target, &#34;r&#34;) as f:
+            return f.read()
+
+    def invoke_plugin(self, name, args_dict):
+        import sys, io
+        from argparse import Namespace
+        from ..services.exceptions import InvalidConfigurationError
+        from connpy.plugins import Plugins
+        class MockApp:
+            def __init__(self, config):
+                from ..core import node, nodes
+                from ..ai import ai
+                from ..services.provider import ServiceProvider
+                
+                self.config = config
+                self.node = node
+                self.nodes = nodes
+                self.ai = ai
+                
+                self.services = ServiceProvider(config, mode=&#34;local&#34;)
+                try:
+                    self.nodes_list = self.services.nodes.list_nodes()
+                    self.folders = self.services.nodes.list_folders()
+                    self.profiles = self.services.profiles.list_profiles()
+                except Exception:
+                    self.nodes_list = {}
+                    self.folders = {}
+                    self.profiles = {}
+        
+        args = Namespace(**args_dict)
+        
+        p_manager = Plugins()
+        import os
+        plugin_file = os.path.join(self.config.defaultdir, &#34;plugins&#34;, f&#34;{name}.py&#34;)
+        core_path = os.path.dirname(os.path.realpath(__file__)) + f&#34;/../core_plugins/{name}.py&#34;
+        
+        if os.path.exists(plugin_file):
+            target = plugin_file
+        elif os.path.exists(core_path):
+            target = core_path
+        else:
+            raise InvalidConfigurationError(f&#34;Plugin &#39;{name}&#39; not found&#34;)
+            
+        module = p_manager._import_from_path(target)
+        parser = module.Parser().parser if hasattr(module, &#34;Parser&#34;) else None
+        
+        if &#34;__func_name__&#34; in args_dict and hasattr(module, args_dict[&#34;__func_name__&#34;]):
+            args.func = getattr(module, args_dict[&#34;__func_name__&#34;])
+        
+        app = MockApp(self.config)
+        
+        from .. import printer
+        from rich.console import Console
+        
+        buf = io.StringIO()
+        old_console = printer.console
+        old_err_console = printer.err_console
+        
+        printer.console = Console(file=buf, theme=printer.connpy_theme, force_terminal=True)
+        printer.err_console = Console(file=buf, theme=printer.connpy_theme, force_terminal=True)
+        
+        old_stdout = sys.stdout
+        sys.stdout = buf
+        
+        try:
+            if hasattr(module, &#34;Entrypoint&#34;):
+                module.Entrypoint(args, parser, app)
+        except Exception as e:
+            import traceback
+            printer.err_console.print(traceback.format_exc())
+        finally:
+            sys.stdout = old_stdout
+            printer.console = old_console
+            printer.err_console = old_err_console
+            
+        for line in buf.getvalue().splitlines(keepends=True):
+            yield line</code></pre>
+</details>
+<div class="desc"><p>Business logic for enabling, disabling, and listing plugins.</p>
+<p>Initialize the service.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>config</code></strong></dt>
+<dd>An instance of configfile (or None to instantiate a new one/use global context).</dd>
+</dl></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="connpy.services.base.BaseService" href="base.html#connpy.services.base.BaseService">BaseService</a></li>
+</ul>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.services.PluginService.add_plugin"><code class="name flex">
+<span>def <span class="ident">add_plugin</span></span>(<span>self, name, source_file, update=False)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def add_plugin(self, name, source_file, update=False):
+    &#34;&#34;&#34;Add or update a plugin from a local file.&#34;&#34;&#34;
+    import os
+    import shutil
+    from connpy.plugins import Plugins
+
+    if not name.isalpha() or not name.islower() or len(name) &gt; 15:
+        raise InvalidConfigurationError(&#34;Plugin name should be lowercase letters up to 15 characters.&#34;)
+
+    p_manager = Plugins()
+    # Check for bad script
+    error = p_manager.verify_script(source_file)
+    if error:
+        raise InvalidConfigurationError(f&#34;Invalid plugin script: {error}&#34;)
+
+    self._save_plugin_file(name, source_file, update, is_path=True)</code></pre>
+</details>
+<div class="desc"><p>Add or update a plugin from a local file.</p></div>
+</dd>
+<dt id="connpy.services.PluginService.add_plugin_from_bytes"><code class="name flex">
+<span>def <span class="ident">add_plugin_from_bytes</span></span>(<span>self, name, content, update=False)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def add_plugin_from_bytes(self, name, content, update=False):
+    &#34;&#34;&#34;Add or update a plugin from bytes (gRPC).&#34;&#34;&#34;
+    import tempfile
+    import os
+    
+    if not name.isalpha() or not name.islower() or len(name) &gt; 15:
+        raise InvalidConfigurationError(&#34;Plugin name should be lowercase letters up to 15 characters.&#34;)
+
+    # Write to temp file to verify script
+    with tempfile.NamedTemporaryFile(suffix=&#34;.py&#34;, delete=False) as tmp:
+        tmp.write(content)
+        tmp_path = tmp.name
+
+    try:
+        from connpy.plugins import Plugins
+        p_manager = Plugins()
+        error = p_manager.verify_script(tmp_path)
+        if error:
+            raise InvalidConfigurationError(f&#34;Invalid plugin script: {error}&#34;)
+        
+        self._save_plugin_file(name, tmp_path, update, is_path=True)
+    finally:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)</code></pre>
+</details>
+<div class="desc"><p>Add or update a plugin from bytes (gRPC).</p></div>
+</dd>
+<dt id="connpy.services.PluginService.delete_plugin"><code class="name flex">
+<span>def <span class="ident">delete_plugin</span></span>(<span>self, name)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def delete_plugin(self, name):
+    &#34;&#34;&#34;Remove a plugin file permanently.&#34;&#34;&#34;
+    import os
+    plugin_file = os.path.join(self.config.defaultdir, &#34;plugins&#34;, f&#34;{name}.py&#34;)
+    disabled_file = f&#34;{plugin_file}.bkp&#34;
+
+    deleted = False
+    for f in [plugin_file, disabled_file]:
+        if os.path.exists(f):
+            try:
+                os.remove(f)
+                deleted = True
+            except OSError as e:
+                raise InvalidConfigurationError(f&#34;Failed to delete plugin file &#39;{f}&#39;: {e}&#34;)
+    
+    if not deleted:
+        raise InvalidConfigurationError(f&#34;Plugin &#39;{name}&#39; not found.&#34;)</code></pre>
+</details>
+<div class="desc"><p>Remove a plugin file permanently.</p></div>
+</dd>
+<dt id="connpy.services.PluginService.disable_plugin"><code class="name flex">
+<span>def <span class="ident">disable_plugin</span></span>(<span>self, name)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def disable_plugin(self, name):
+    &#34;&#34;&#34;Deactivate a plugin by renaming it to a backup file.&#34;&#34;&#34;
+    import os
+    plugin_file = os.path.join(self.config.defaultdir, &#34;plugins&#34;, f&#34;{name}.py&#34;)
+    disabled_file = f&#34;{plugin_file}.bkp&#34;
+    
+    if os.path.exists(disabled_file):
+        return False # Already disabled
+        
+    if not os.path.exists(plugin_file):
+        raise InvalidConfigurationError(f&#34;Plugin &#39;{name}&#39; not found or is a core plugin.&#34;)
+        
+    try:
+        os.rename(plugin_file, disabled_file)
+        return True
+    except OSError as e:
+        raise InvalidConfigurationError(f&#34;Failed to disable plugin &#39;{name}&#39;: {e}&#34;)</code></pre>
+</details>
+<div class="desc"><p>Deactivate a plugin by renaming it to a backup file.</p></div>
+</dd>
+<dt id="connpy.services.PluginService.enable_plugin"><code class="name flex">
+<span>def <span class="ident">enable_plugin</span></span>(<span>self, name)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def enable_plugin(self, name):
+    &#34;&#34;&#34;Activate a plugin by renaming its backup file.&#34;&#34;&#34;
+    import os
+    plugin_file = os.path.join(self.config.defaultdir, &#34;plugins&#34;, f&#34;{name}.py&#34;)
+    disabled_file = f&#34;{plugin_file}.bkp&#34;
+    
+    if os.path.exists(plugin_file):
+        return False # Already enabled
+        
+    if not os.path.exists(disabled_file):
+        raise InvalidConfigurationError(f&#34;Plugin &#39;{name}&#39; not found.&#34;)
+        
+    try:
+        os.rename(disabled_file, plugin_file)
+        return True
+    except OSError as e:
+        raise InvalidConfigurationError(f&#34;Failed to enable plugin &#39;{name}&#39;: {e}&#34;)</code></pre>
+</details>
+<div class="desc"><p>Activate a plugin by renaming its backup file.</p></div>
+</dd>
+<dt id="connpy.services.PluginService.get_plugin_source"><code class="name flex">
+<span>def <span class="ident">get_plugin_source</span></span>(<span>self, name)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_plugin_source(self, name):
+    import os
+    from ..services.exceptions import InvalidConfigurationError
+    
+    plugin_file = os.path.join(self.config.defaultdir, &#34;plugins&#34;, f&#34;{name}.py&#34;)
+    core_path = os.path.dirname(os.path.realpath(__file__)) + f&#34;/../core_plugins/{name}.py&#34;
+    
+    if os.path.exists(plugin_file):
+        target = plugin_file
+    elif os.path.exists(core_path):
+        target = core_path
+    else:
+        raise InvalidConfigurationError(f&#34;Plugin &#39;{name}&#39; not found&#34;)
+    
+    with open(target, &#34;r&#34;) as f:
+        return f.read()</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.services.PluginService.invoke_plugin"><code class="name flex">
+<span>def <span class="ident">invoke_plugin</span></span>(<span>self, name, args_dict)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def invoke_plugin(self, name, args_dict):
+    import sys, io
+    from argparse import Namespace
+    from ..services.exceptions import InvalidConfigurationError
+    from connpy.plugins import Plugins
+    class MockApp:
+        def __init__(self, config):
+            from ..core import node, nodes
+            from ..ai import ai
+            from ..services.provider import ServiceProvider
+            
+            self.config = config
+            self.node = node
+            self.nodes = nodes
+            self.ai = ai
+            
+            self.services = ServiceProvider(config, mode=&#34;local&#34;)
+            try:
+                self.nodes_list = self.services.nodes.list_nodes()
+                self.folders = self.services.nodes.list_folders()
+                self.profiles = self.services.profiles.list_profiles()
+            except Exception:
+                self.nodes_list = {}
+                self.folders = {}
+                self.profiles = {}
+    
+    args = Namespace(**args_dict)
+    
+    p_manager = Plugins()
+    import os
+    plugin_file = os.path.join(self.config.defaultdir, &#34;plugins&#34;, f&#34;{name}.py&#34;)
+    core_path = os.path.dirname(os.path.realpath(__file__)) + f&#34;/../core_plugins/{name}.py&#34;
+    
+    if os.path.exists(plugin_file):
+        target = plugin_file
+    elif os.path.exists(core_path):
+        target = core_path
+    else:
+        raise InvalidConfigurationError(f&#34;Plugin &#39;{name}&#39; not found&#34;)
+        
+    module = p_manager._import_from_path(target)
+    parser = module.Parser().parser if hasattr(module, &#34;Parser&#34;) else None
+    
+    if &#34;__func_name__&#34; in args_dict and hasattr(module, args_dict[&#34;__func_name__&#34;]):
+        args.func = getattr(module, args_dict[&#34;__func_name__&#34;])
+    
+    app = MockApp(self.config)
+    
+    from .. import printer
+    from rich.console import Console
+    
+    buf = io.StringIO()
+    old_console = printer.console
+    old_err_console = printer.err_console
+    
+    printer.console = Console(file=buf, theme=printer.connpy_theme, force_terminal=True)
+    printer.err_console = Console(file=buf, theme=printer.connpy_theme, force_terminal=True)
+    
+    old_stdout = sys.stdout
+    sys.stdout = buf
+    
+    try:
+        if hasattr(module, &#34;Entrypoint&#34;):
+            module.Entrypoint(args, parser, app)
+    except Exception as e:
+        import traceback
+        printer.err_console.print(traceback.format_exc())
+    finally:
+        sys.stdout = old_stdout
+        printer.console = old_console
+        printer.err_console = old_err_console
+        
+    for line in buf.getvalue().splitlines(keepends=True):
+        yield line</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.services.PluginService.list_plugins"><code class="name flex">
+<span>def <span class="ident">list_plugins</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def list_plugins(self):
+    &#34;&#34;&#34;List all core and user-defined plugins with their status and hash.&#34;&#34;&#34;
+    import os
+    import hashlib
+    
+    # Check for user plugins directory
+    plugin_dir = os.path.join(self.config.defaultdir, &#34;plugins&#34;)
+    # Check for core plugins directory
+    core_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), &#34;..&#34;, &#34;core_plugins&#34;)
+    
+    all_plugin_info = {}
+
+    def get_hash(path):
+        try:
+            with open(path, &#34;rb&#34;) as f:
+                return hashlib.md5(f.read()).hexdigest()
+        except Exception:
+            return &#34;&#34;
+
+    # User plugins
+    if os.path.exists(plugin_dir):
+        for f in os.listdir(plugin_dir):
+            if f.endswith(&#34;.py&#34;):
+                name = f[:-3]
+                path = os.path.join(plugin_dir, f)
+                all_plugin_info[name] = {&#34;enabled&#34;: True, &#34;hash&#34;: get_hash(path)}
+            elif f.endswith(&#34;.py.bkp&#34;):
+                name = f[:-7]
+                all_plugin_info[name] = {&#34;enabled&#34;: False}
+
+    return all_plugin_info</code></pre>
+</details>
+<div class="desc"><p>List all core and user-defined plugins with their status and hash.</p></div>
+</dd>
+</dl>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="connpy.services.base.BaseService" href="base.html#connpy.services.base.BaseService">BaseService</a></b></code>:
+<ul class="hlist">
+<li><code><a title="connpy.services.base.BaseService.set_reserved_names" href="base.html#connpy.services.base.BaseService.set_reserved_names">set_reserved_names</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="connpy.services.ProfileAlreadyExistsError"><code class="flex name class">
+<span>class <span class="ident">ProfileAlreadyExistsError</span></span>
+<span>(</span><span>*args, **kwargs)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class ProfileAlreadyExistsError(ConnpyError):
+    &#34;&#34;&#34;Raised when a profile with the same name already exists.&#34;&#34;&#34;
+    pass</code></pre>
+</details>
+<div class="desc"><p>Raised when a profile with the same name already exists.</p></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="connpy.services.exceptions.ConnpyError" href="exceptions.html#connpy.services.exceptions.ConnpyError">ConnpyError</a></li>
+<li>builtins.Exception</li>
+<li>builtins.BaseException</li>
+</ul>
+</dd>
+<dt id="connpy.services.ProfileNotFoundError"><code class="flex name class">
+<span>class <span class="ident">ProfileNotFoundError</span></span>
+<span>(</span><span>*args, **kwargs)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class ProfileNotFoundError(ConnpyError):
+    &#34;&#34;&#34;Raised when a profile is not found.&#34;&#34;&#34;
+    pass</code></pre>
+</details>
+<div class="desc"><p>Raised when a profile is not found.</p></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="connpy.services.exceptions.ConnpyError" href="exceptions.html#connpy.services.exceptions.ConnpyError">ConnpyError</a></li>
+<li>builtins.Exception</li>
+<li>builtins.BaseException</li>
+</ul>
+</dd>
+<dt id="connpy.services.ProfileService"><code class="flex name class">
+<span>class <span class="ident">ProfileService</span></span>
+<span>(</span><span>config=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class ProfileService(BaseService):
+    &#34;&#34;&#34;Business logic for node profiles management.&#34;&#34;&#34;
+
+    def list_profiles(self, filter_str=None):
+        &#34;&#34;&#34;List all profile names, optionally filtered.&#34;&#34;&#34;
+        profiles = list(self.config.profiles.keys())
+        case_sensitive = self.config.config.get(&#34;case&#34;, False)
+        
+        if filter_str:
+            if not case_sensitive:
+                f_str = filter_str.lower()
+                return [p for p in profiles if f_str in p.lower()]
+            else:
+                return [p for p in profiles if filter_str in p]
+        return profiles
+
+    def get_profile(self, name, resolve=True):
+        &#34;&#34;&#34;Get the profile dictionary, optionally resolved.&#34;&#34;&#34;
+        profile = self.config.profiles.get(name)
+        if not profile:
+            raise ProfileNotFoundError(f&#34;Profile &#39;{name}&#39; not found.&#34;)
+        
+        if resolve:
+            return self.resolve_node_data(profile)
+        return profile
+
+    def add_profile(self, name, data):
+        &#34;&#34;&#34;Add a new profile.&#34;&#34;&#34;
+        if name in self.config.profiles:
+            raise ProfileAlreadyExistsError(f&#34;Profile &#39;{name}&#39; already exists.&#34;)
+            
+        # Filter data to match _profiles_add signature and ensure id is passed
+        allowed_keys = {&#34;host&#34;, &#34;options&#34;, &#34;logs&#34;, &#34;password&#34;, &#34;port&#34;, &#34;protocol&#34;, &#34;user&#34;, &#34;tags&#34;, &#34;jumphost&#34;}
+        filtered_data = {k: v for k, v in data.items() if k in allowed_keys}
+        
+        self.config._profiles_add(id=name, **filtered_data)
+        self.config._saveconfig(self.config.file)
+
+    def resolve_node_data(self, node_data):
+        &#34;&#34;&#34;Resolve profile references (@profile) in node data and handle inheritance.&#34;&#34;&#34;
+        resolved = node_data.copy()
+        
+        # 1. Identify all referenced profiles to support inheritance
+        referenced_profiles = []
+        for value in resolved.values():
+            if isinstance(value, str) and value.startswith(&#34;@&#34;):
+                referenced_profiles.append(value[1:])
+            elif isinstance(value, list):
+                for item in value:
+                    if isinstance(item, str) and item.startswith(&#34;@&#34;):
+                        referenced_profiles.append(item[1:])
+        
+        # 2. Resolve explicit references
+        for key, value in resolved.items():
+            if isinstance(value, str) and value.startswith(&#34;@&#34;):
+                profile_name = value[1:]
+                try:
+                    profile = self.get_profile(profile_name, resolve=True)
+                    resolved[key] = profile.get(key, &#34;&#34;)
+                except ProfileNotFoundError:
+                    resolved[key] = &#34;&#34;
+            elif isinstance(value, list):
+                resolved_list = []
+                for item in value:
+                    if isinstance(item, str) and item.startswith(&#34;@&#34;):
+                        profile_name = item[1:]
+                        try:
+                            profile = self.get_profile(profile_name, resolve=True)
+                            if &#34;password&#34; in profile:
+                                resolved_list.append(profile[&#34;password&#34;])
+                        except ProfileNotFoundError:
+                            pass
+                    else:
+                        resolved_list.append(item)
+                resolved[key] = resolved_list
+        
+        # 3. Inheritance: Fill empty keys from the first referenced profile
+        if referenced_profiles:
+            base_profile_name = referenced_profiles[0]
+            try:
+                base_profile = self.get_profile(base_profile_name, resolve=True)
+                for key, value in base_profile.items():
+                    # Fill if key is missing or empty
+                    if key not in resolved or resolved[key] == &#34;&#34; or resolved[key] == [] or resolved[key] is None:
+                        resolved[key] = value
+            except ProfileNotFoundError:
+                pass
+
+        # 4. Handle default protocol
+        if resolved.get(&#34;protocol&#34;) == &#34;&#34; or resolved.get(&#34;protocol&#34;) is None:
+            try:
+                default_profile = self.get_profile(&#34;default&#34;, resolve=True)
+                resolved[&#34;protocol&#34;] = default_profile.get(&#34;protocol&#34;, &#34;ssh&#34;)
+            except ProfileNotFoundError:
+                resolved[&#34;protocol&#34;] = &#34;ssh&#34;
+                
+        return resolved
+
+    def delete_profile(self, name):
+        &#34;&#34;&#34;Delete an existing profile, with safety checks.&#34;&#34;&#34;
+        if name not in self.config.profiles:
+            raise ProfileNotFoundError(f&#34;Profile &#39;{name}&#39; not found.&#34;)
+            
+        if name == &#34;default&#34;:
+            raise InvalidConfigurationError(&#34;Cannot delete the &#39;default&#39; profile.&#34;)
+            
+        used_by = self.config._profileused(name)
+        if used_by:
+            # We return the list of nodes using it so the UI can inform the user
+            raise InvalidConfigurationError(f&#34;Profile &#39;{name}&#39; is used by nodes: {&#39;, &#39;.join(used_by)}&#34;)
+            
+        self.config._profiles_del(id=name)
+        self.config._saveconfig(self.config.file)
+
+    def update_profile(self, name, data):
+        &#34;&#34;&#34;Update an existing profile.&#34;&#34;&#34;
+        if name not in self.config.profiles:
+            raise ProfileNotFoundError(f&#34;Profile &#39;{name}&#39; not found.&#34;)
+            
+        # Merge with existing data
+        existing = self.get_profile(name, resolve=False)
+        updated_data = existing.copy()
+        updated_data.update(data)
+        
+        # Filter data to match _profiles_add signature
+        allowed_keys = {&#34;host&#34;, &#34;options&#34;, &#34;logs&#34;, &#34;password&#34;, &#34;port&#34;, &#34;protocol&#34;, &#34;user&#34;, &#34;tags&#34;, &#34;jumphost&#34;}
+        filtered_data = {k: v for k, v in updated_data.items() if k in allowed_keys}
+        
+        self.config._profiles_add(id=name, **filtered_data)
+        self.config._saveconfig(self.config.file)</code></pre>
+</details>
+<div class="desc"><p>Business logic for node profiles management.</p>
+<p>Initialize the service.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>config</code></strong></dt>
+<dd>An instance of configfile (or None to instantiate a new one/use global context).</dd>
+</dl></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="connpy.services.base.BaseService" href="base.html#connpy.services.base.BaseService">BaseService</a></li>
+</ul>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.services.ProfileService.add_profile"><code class="name flex">
+<span>def <span class="ident">add_profile</span></span>(<span>self, name, data)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def add_profile(self, name, data):
+    &#34;&#34;&#34;Add a new profile.&#34;&#34;&#34;
+    if name in self.config.profiles:
+        raise ProfileAlreadyExistsError(f&#34;Profile &#39;{name}&#39; already exists.&#34;)
+        
+    # Filter data to match _profiles_add signature and ensure id is passed
+    allowed_keys = {&#34;host&#34;, &#34;options&#34;, &#34;logs&#34;, &#34;password&#34;, &#34;port&#34;, &#34;protocol&#34;, &#34;user&#34;, &#34;tags&#34;, &#34;jumphost&#34;}
+    filtered_data = {k: v for k, v in data.items() if k in allowed_keys}
+    
+    self.config._profiles_add(id=name, **filtered_data)
+    self.config._saveconfig(self.config.file)</code></pre>
+</details>
+<div class="desc"><p>Add a new profile.</p></div>
+</dd>
+<dt id="connpy.services.ProfileService.delete_profile"><code class="name flex">
+<span>def <span class="ident">delete_profile</span></span>(<span>self, name)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def delete_profile(self, name):
+    &#34;&#34;&#34;Delete an existing profile, with safety checks.&#34;&#34;&#34;
+    if name not in self.config.profiles:
+        raise ProfileNotFoundError(f&#34;Profile &#39;{name}&#39; not found.&#34;)
+        
+    if name == &#34;default&#34;:
+        raise InvalidConfigurationError(&#34;Cannot delete the &#39;default&#39; profile.&#34;)
+        
+    used_by = self.config._profileused(name)
+    if used_by:
+        # We return the list of nodes using it so the UI can inform the user
+        raise InvalidConfigurationError(f&#34;Profile &#39;{name}&#39; is used by nodes: {&#39;, &#39;.join(used_by)}&#34;)
+        
+    self.config._profiles_del(id=name)
+    self.config._saveconfig(self.config.file)</code></pre>
+</details>
+<div class="desc"><p>Delete an existing profile, with safety checks.</p></div>
+</dd>
+<dt id="connpy.services.ProfileService.get_profile"><code class="name flex">
+<span>def <span class="ident">get_profile</span></span>(<span>self, name, resolve=True)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_profile(self, name, resolve=True):
+    &#34;&#34;&#34;Get the profile dictionary, optionally resolved.&#34;&#34;&#34;
+    profile = self.config.profiles.get(name)
+    if not profile:
+        raise ProfileNotFoundError(f&#34;Profile &#39;{name}&#39; not found.&#34;)
+    
+    if resolve:
+        return self.resolve_node_data(profile)
+    return profile</code></pre>
+</details>
+<div class="desc"><p>Get the profile dictionary, optionally resolved.</p></div>
+</dd>
+<dt id="connpy.services.ProfileService.list_profiles"><code class="name flex">
+<span>def <span class="ident">list_profiles</span></span>(<span>self, filter_str=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def list_profiles(self, filter_str=None):
+    &#34;&#34;&#34;List all profile names, optionally filtered.&#34;&#34;&#34;
+    profiles = list(self.config.profiles.keys())
+    case_sensitive = self.config.config.get(&#34;case&#34;, False)
+    
+    if filter_str:
+        if not case_sensitive:
+            f_str = filter_str.lower()
+            return [p for p in profiles if f_str in p.lower()]
+        else:
+            return [p for p in profiles if filter_str in p]
+    return profiles</code></pre>
+</details>
+<div class="desc"><p>List all profile names, optionally filtered.</p></div>
+</dd>
+<dt id="connpy.services.ProfileService.resolve_node_data"><code class="name flex">
+<span>def <span class="ident">resolve_node_data</span></span>(<span>self, node_data)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def resolve_node_data(self, node_data):
+    &#34;&#34;&#34;Resolve profile references (@profile) in node data and handle inheritance.&#34;&#34;&#34;
+    resolved = node_data.copy()
+    
+    # 1. Identify all referenced profiles to support inheritance
+    referenced_profiles = []
+    for value in resolved.values():
+        if isinstance(value, str) and value.startswith(&#34;@&#34;):
+            referenced_profiles.append(value[1:])
+        elif isinstance(value, list):
+            for item in value:
+                if isinstance(item, str) and item.startswith(&#34;@&#34;):
+                    referenced_profiles.append(item[1:])
+    
+    # 2. Resolve explicit references
+    for key, value in resolved.items():
+        if isinstance(value, str) and value.startswith(&#34;@&#34;):
+            profile_name = value[1:]
+            try:
+                profile = self.get_profile(profile_name, resolve=True)
+                resolved[key] = profile.get(key, &#34;&#34;)
+            except ProfileNotFoundError:
+                resolved[key] = &#34;&#34;
+        elif isinstance(value, list):
+            resolved_list = []
+            for item in value:
+                if isinstance(item, str) and item.startswith(&#34;@&#34;):
+                    profile_name = item[1:]
+                    try:
+                        profile = self.get_profile(profile_name, resolve=True)
+                        if &#34;password&#34; in profile:
+                            resolved_list.append(profile[&#34;password&#34;])
+                    except ProfileNotFoundError:
+                        pass
+                else:
+                    resolved_list.append(item)
+            resolved[key] = resolved_list
+    
+    # 3. Inheritance: Fill empty keys from the first referenced profile
+    if referenced_profiles:
+        base_profile_name = referenced_profiles[0]
+        try:
+            base_profile = self.get_profile(base_profile_name, resolve=True)
+            for key, value in base_profile.items():
+                # Fill if key is missing or empty
+                if key not in resolved or resolved[key] == &#34;&#34; or resolved[key] == [] or resolved[key] is None:
+                    resolved[key] = value
+        except ProfileNotFoundError:
+            pass
+
+    # 4. Handle default protocol
+    if resolved.get(&#34;protocol&#34;) == &#34;&#34; or resolved.get(&#34;protocol&#34;) is None:
+        try:
+            default_profile = self.get_profile(&#34;default&#34;, resolve=True)
+            resolved[&#34;protocol&#34;] = default_profile.get(&#34;protocol&#34;, &#34;ssh&#34;)
+        except ProfileNotFoundError:
+            resolved[&#34;protocol&#34;] = &#34;ssh&#34;
+            
+    return resolved</code></pre>
+</details>
+<div class="desc"><p>Resolve profile references (@profile) in node data and handle inheritance.</p></div>
+</dd>
+<dt id="connpy.services.ProfileService.update_profile"><code class="name flex">
+<span>def <span class="ident">update_profile</span></span>(<span>self, name, data)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def update_profile(self, name, data):
+    &#34;&#34;&#34;Update an existing profile.&#34;&#34;&#34;
+    if name not in self.config.profiles:
+        raise ProfileNotFoundError(f&#34;Profile &#39;{name}&#39; not found.&#34;)
+        
+    # Merge with existing data
+    existing = self.get_profile(name, resolve=False)
+    updated_data = existing.copy()
+    updated_data.update(data)
+    
+    # Filter data to match _profiles_add signature
+    allowed_keys = {&#34;host&#34;, &#34;options&#34;, &#34;logs&#34;, &#34;password&#34;, &#34;port&#34;, &#34;protocol&#34;, &#34;user&#34;, &#34;tags&#34;, &#34;jumphost&#34;}
+    filtered_data = {k: v for k, v in updated_data.items() if k in allowed_keys}
+    
+    self.config._profiles_add(id=name, **filtered_data)
+    self.config._saveconfig(self.config.file)</code></pre>
+</details>
+<div class="desc"><p>Update an existing profile.</p></div>
+</dd>
+</dl>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="connpy.services.base.BaseService" href="base.html#connpy.services.base.BaseService">BaseService</a></b></code>:
+<ul class="hlist">
+<li><code><a title="connpy.services.base.BaseService.set_reserved_names" href="base.html#connpy.services.base.BaseService.set_reserved_names">set_reserved_names</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="connpy.services.SystemService"><code class="flex name class">
+<span>class <span class="ident">SystemService</span></span>
+<span>(</span><span>config=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class SystemService(BaseService):
+    &#34;&#34;&#34;Business logic for application lifecycle (API, processes).&#34;&#34;&#34;
+
+    def start_api(self, port=None):
+        &#34;&#34;&#34;Start the Connpy REST API.&#34;&#34;&#34;
+        print(f&#34;DEBUG SystemService: port type={type(port)} value={port}&#34;)
+        from connpy.api import start_api
+        try:
+            start_api(port, config=self.config)
+        except Exception as e:
+            raise ConnpyError(f&#34;Failed to start API: {e}&#34;)
+
+    def debug_api(self, port=None):
+        &#34;&#34;&#34;Start the Connpy REST API in debug mode.&#34;&#34;&#34;
+        from connpy.api import debug_api
+        try:
+            debug_api(port, config=self.config)
+        except Exception as e:
+            raise ConnpyError(f&#34;Failed to start API in debug mode: {e}&#34;)
+
+
+    def stop_api(self):
+        &#34;&#34;&#34;Stop the Connpy REST API.&#34;&#34;&#34;
+        try:
+            import os
+            import signal
+            
+            pids = [&#34;/run/connpy.pid&#34;, &#34;/tmp/connpy.pid&#34;]
+            stopped = False
+            for pid_file in pids:
+                if os.path.exists(pid_file):
+                    try:
+                        with open(pid_file, &#34;r&#34;) as f:
+                            # Read only the first line (PID)
+                            line = f.readline().strip()
+                            if not line:
+                                continue
+                            pid = int(line)
+                        os.kill(pid, signal.SIGTERM)
+                        # Remove the PID file after successful kill
+                        os.remove(pid_file)
+                        stopped = True
+                    except (ValueError, OSError, ProcessLookupError):
+                        # If process is already dead, just remove the stale PID file
+                        try:
+                            os.remove(pid_file)
+                        except OSError:
+                            pass
+                        continue
+            return stopped
+        except Exception as e:
+            raise ConnpyError(f&#34;Failed to stop API: {e}&#34;)
+
+    def restart_api(self, port=None):
+        &#34;&#34;&#34;Restart the Connpy REST API, maintaining the current port if none provided.&#34;&#34;&#34;
+        if port is None:
+            status = self.get_api_status()
+            if status[&#34;running&#34;] and status.get(&#34;port&#34;):
+                port = status[&#34;port&#34;]
+        
+        self.stop_api()
+        import time
+        time.sleep(1)
+        self.start_api(port)
+
+    def get_api_status(self):
+        &#34;&#34;&#34;Check if the API is currently running.&#34;&#34;&#34;
+        import os
+        pids = [&#34;/run/connpy.pid&#34;, &#34;/tmp/connpy.pid&#34;]
+        for pid_file in pids:
+            if os.path.exists(pid_file):
+                try:
+                    with open(pid_file, &#34;r&#34;) as f:
+                        pid_line = f.readline().strip()
+                        port_line = f.readline().strip()
+                        if not pid_line:
+                            continue
+                        pid = int(pid_line)
+                        port = int(port_line) if port_line else None
+                    # Signal 0 checks for process existence without killing it
+                    os.kill(pid, 0)
+                    return {&#34;running&#34;: True, &#34;pid&#34;: pid, &#34;port&#34;: port, &#34;pid_file&#34;: pid_file}
+                except (ValueError, OSError, ProcessLookupError):
+                    continue
+        return {&#34;running&#34;: False}</code></pre>
+</details>
+<div class="desc"><p>Business logic for application lifecycle (API, processes).</p>
+<p>Initialize the service.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>config</code></strong></dt>
+<dd>An instance of configfile (or None to instantiate a new one/use global context).</dd>
+</dl></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="connpy.services.base.BaseService" href="base.html#connpy.services.base.BaseService">BaseService</a></li>
+</ul>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.services.SystemService.debug_api"><code class="name flex">
+<span>def <span class="ident">debug_api</span></span>(<span>self, port=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def debug_api(self, port=None):
+    &#34;&#34;&#34;Start the Connpy REST API in debug mode.&#34;&#34;&#34;
+    from connpy.api import debug_api
+    try:
+        debug_api(port, config=self.config)
+    except Exception as e:
+        raise ConnpyError(f&#34;Failed to start API in debug mode: {e}&#34;)</code></pre>
+</details>
+<div class="desc"><p>Start the Connpy REST API in debug mode.</p></div>
+</dd>
+<dt id="connpy.services.SystemService.get_api_status"><code class="name flex">
+<span>def <span class="ident">get_api_status</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_api_status(self):
+    &#34;&#34;&#34;Check if the API is currently running.&#34;&#34;&#34;
+    import os
+    pids = [&#34;/run/connpy.pid&#34;, &#34;/tmp/connpy.pid&#34;]
+    for pid_file in pids:
+        if os.path.exists(pid_file):
+            try:
+                with open(pid_file, &#34;r&#34;) as f:
+                    pid_line = f.readline().strip()
+                    port_line = f.readline().strip()
+                    if not pid_line:
+                        continue
+                    pid = int(pid_line)
+                    port = int(port_line) if port_line else None
+                # Signal 0 checks for process existence without killing it
+                os.kill(pid, 0)
+                return {&#34;running&#34;: True, &#34;pid&#34;: pid, &#34;port&#34;: port, &#34;pid_file&#34;: pid_file}
+            except (ValueError, OSError, ProcessLookupError):
+                continue
+    return {&#34;running&#34;: False}</code></pre>
+</details>
+<div class="desc"><p>Check if the API is currently running.</p></div>
+</dd>
+<dt id="connpy.services.SystemService.restart_api"><code class="name flex">
+<span>def <span class="ident">restart_api</span></span>(<span>self, port=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def restart_api(self, port=None):
+    &#34;&#34;&#34;Restart the Connpy REST API, maintaining the current port if none provided.&#34;&#34;&#34;
+    if port is None:
+        status = self.get_api_status()
+        if status[&#34;running&#34;] and status.get(&#34;port&#34;):
+            port = status[&#34;port&#34;]
+    
+    self.stop_api()
+    import time
+    time.sleep(1)
+    self.start_api(port)</code></pre>
+</details>
+<div class="desc"><p>Restart the Connpy REST API, maintaining the current port if none provided.</p></div>
+</dd>
+<dt id="connpy.services.SystemService.start_api"><code class="name flex">
+<span>def <span class="ident">start_api</span></span>(<span>self, port=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def start_api(self, port=None):
+    &#34;&#34;&#34;Start the Connpy REST API.&#34;&#34;&#34;
+    print(f&#34;DEBUG SystemService: port type={type(port)} value={port}&#34;)
+    from connpy.api import start_api
+    try:
+        start_api(port, config=self.config)
+    except Exception as e:
+        raise ConnpyError(f&#34;Failed to start API: {e}&#34;)</code></pre>
+</details>
+<div class="desc"><p>Start the Connpy REST API.</p></div>
+</dd>
+<dt id="connpy.services.SystemService.stop_api"><code class="name flex">
+<span>def <span class="ident">stop_api</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def stop_api(self):
+    &#34;&#34;&#34;Stop the Connpy REST API.&#34;&#34;&#34;
+    try:
+        import os
+        import signal
+        
+        pids = [&#34;/run/connpy.pid&#34;, &#34;/tmp/connpy.pid&#34;]
+        stopped = False
+        for pid_file in pids:
+            if os.path.exists(pid_file):
+                try:
+                    with open(pid_file, &#34;r&#34;) as f:
+                        # Read only the first line (PID)
+                        line = f.readline().strip()
+                        if not line:
+                            continue
+                        pid = int(line)
+                    os.kill(pid, signal.SIGTERM)
+                    # Remove the PID file after successful kill
+                    os.remove(pid_file)
+                    stopped = True
+                except (ValueError, OSError, ProcessLookupError):
+                    # If process is already dead, just remove the stale PID file
+                    try:
+                        os.remove(pid_file)
+                    except OSError:
+                        pass
+                    continue
+        return stopped
+    except Exception as e:
+        raise ConnpyError(f&#34;Failed to stop API: {e}&#34;)</code></pre>
+</details>
+<div class="desc"><p>Stop the Connpy REST API.</p></div>
+</dd>
+</dl>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="connpy.services.base.BaseService" href="base.html#connpy.services.base.BaseService">BaseService</a></b></code>:
+<ul class="hlist">
+<li><code><a title="connpy.services.base.BaseService.set_reserved_names" href="base.html#connpy.services.base.BaseService.set_reserved_names">set_reserved_names</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="connpy" href="../index.html">connpy</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-submodules">Sub-modules</a></h3>
+<ul>
+<li><code><a title="connpy.services.ai_service" href="ai_service.html">connpy.services.ai_service</a></code></li>
+<li><code><a title="connpy.services.base" href="base.html">connpy.services.base</a></code></li>
+<li><code><a title="connpy.services.config_service" href="config_service.html">connpy.services.config_service</a></code></li>
+<li><code><a title="connpy.services.context_service" href="context_service.html">connpy.services.context_service</a></code></li>
+<li><code><a title="connpy.services.exceptions" href="exceptions.html">connpy.services.exceptions</a></code></li>
+<li><code><a title="connpy.services.execution_service" href="execution_service.html">connpy.services.execution_service</a></code></li>
+<li><code><a title="connpy.services.import_export_service" href="import_export_service.html">connpy.services.import_export_service</a></code></li>
+<li><code><a title="connpy.services.node_service" href="node_service.html">connpy.services.node_service</a></code></li>
+<li><code><a title="connpy.services.plugin_service" href="plugin_service.html">connpy.services.plugin_service</a></code></li>
+<li><code><a title="connpy.services.profile_service" href="profile_service.html">connpy.services.profile_service</a></code></li>
+<li><code><a title="connpy.services.provider" href="provider.html">connpy.services.provider</a></code></li>
+<li><code><a title="connpy.services.sync_service" href="sync_service.html">connpy.services.sync_service</a></code></li>
+<li><code><a title="connpy.services.system_service" href="system_service.html">connpy.services.system_service</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="connpy.services.AIService" href="#connpy.services.AIService">AIService</a></code></h4>
+<ul class="two-column">
+<li><code><a title="connpy.services.AIService.ask" href="#connpy.services.AIService.ask">ask</a></code></li>
+<li><code><a title="connpy.services.AIService.configure_provider" href="#connpy.services.AIService.configure_provider">configure_provider</a></code></li>
+<li><code><a title="connpy.services.AIService.confirm" href="#connpy.services.AIService.confirm">confirm</a></code></li>
+<li><code><a title="connpy.services.AIService.delete_session" href="#connpy.services.AIService.delete_session">delete_session</a></code></li>
+<li><code><a title="connpy.services.AIService.list_sessions" href="#connpy.services.AIService.list_sessions">list_sessions</a></code></li>
+<li><code><a title="connpy.services.AIService.load_session_data" href="#connpy.services.AIService.load_session_data">load_session_data</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.services.ConfigService" href="#connpy.services.ConfigService">ConfigService</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.services.ConfigService.apply_theme_from_file" href="#connpy.services.ConfigService.apply_theme_from_file">apply_theme_from_file</a></code></li>
+<li><code><a title="connpy.services.ConfigService.encrypt_password" href="#connpy.services.ConfigService.encrypt_password">encrypt_password</a></code></li>
+<li><code><a title="connpy.services.ConfigService.get_default_dir" href="#connpy.services.ConfigService.get_default_dir">get_default_dir</a></code></li>
+<li><code><a title="connpy.services.ConfigService.get_settings" href="#connpy.services.ConfigService.get_settings">get_settings</a></code></li>
+<li><code><a title="connpy.services.ConfigService.set_config_folder" href="#connpy.services.ConfigService.set_config_folder">set_config_folder</a></code></li>
+<li><code><a title="connpy.services.ConfigService.update_setting" href="#connpy.services.ConfigService.update_setting">update_setting</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.services.ConnpyError" href="#connpy.services.ConnpyError">ConnpyError</a></code></h4>
+</li>
+<li>
+<h4><code><a title="connpy.services.ExecutionError" href="#connpy.services.ExecutionError">ExecutionError</a></code></h4>
+</li>
+<li>
+<h4><code><a title="connpy.services.ExecutionService" href="#connpy.services.ExecutionService">ExecutionService</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.services.ExecutionService.run_cli_script" href="#connpy.services.ExecutionService.run_cli_script">run_cli_script</a></code></li>
+<li><code><a title="connpy.services.ExecutionService.run_commands" href="#connpy.services.ExecutionService.run_commands">run_commands</a></code></li>
+<li><code><a title="connpy.services.ExecutionService.run_yaml_playbook" href="#connpy.services.ExecutionService.run_yaml_playbook">run_yaml_playbook</a></code></li>
+<li><code><a title="connpy.services.ExecutionService.test_commands" href="#connpy.services.ExecutionService.test_commands">test_commands</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.services.ImportExportService" href="#connpy.services.ImportExportService">ImportExportService</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.services.ImportExportService.export_to_dict" href="#connpy.services.ImportExportService.export_to_dict">export_to_dict</a></code></li>
+<li><code><a title="connpy.services.ImportExportService.export_to_file" href="#connpy.services.ImportExportService.export_to_file">export_to_file</a></code></li>
+<li><code><a title="connpy.services.ImportExportService.import_from_dict" href="#connpy.services.ImportExportService.import_from_dict">import_from_dict</a></code></li>
+<li><code><a title="connpy.services.ImportExportService.import_from_file" href="#connpy.services.ImportExportService.import_from_file">import_from_file</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.services.InvalidConfigurationError" href="#connpy.services.InvalidConfigurationError">InvalidConfigurationError</a></code></h4>
+</li>
+<li>
+<h4><code><a title="connpy.services.NodeAlreadyExistsError" href="#connpy.services.NodeAlreadyExistsError">NodeAlreadyExistsError</a></code></h4>
+</li>
+<li>
+<h4><code><a title="connpy.services.NodeNotFoundError" href="#connpy.services.NodeNotFoundError">NodeNotFoundError</a></code></h4>
+</li>
+<li>
+<h4><code><a title="connpy.services.NodeService" href="#connpy.services.NodeService">NodeService</a></code></h4>
+<ul class="two-column">
+<li><code><a title="connpy.services.NodeService.add_node" href="#connpy.services.NodeService.add_node">add_node</a></code></li>
+<li><code><a title="connpy.services.NodeService.bulk_add" href="#connpy.services.NodeService.bulk_add">bulk_add</a></code></li>
+<li><code><a title="connpy.services.NodeService.connect_node" href="#connpy.services.NodeService.connect_node">connect_node</a></code></li>
+<li><code><a title="connpy.services.NodeService.delete_node" href="#connpy.services.NodeService.delete_node">delete_node</a></code></li>
+<li><code><a title="connpy.services.NodeService.explode_unique" href="#connpy.services.NodeService.explode_unique">explode_unique</a></code></li>
+<li><code><a title="connpy.services.NodeService.full_replace" href="#connpy.services.NodeService.full_replace">full_replace</a></code></li>
+<li><code><a title="connpy.services.NodeService.generate_cache" href="#connpy.services.NodeService.generate_cache">generate_cache</a></code></li>
+<li><code><a title="connpy.services.NodeService.get_inventory" href="#connpy.services.NodeService.get_inventory">get_inventory</a></code></li>
+<li><code><a title="connpy.services.NodeService.get_node_details" href="#connpy.services.NodeService.get_node_details">get_node_details</a></code></li>
+<li><code><a title="connpy.services.NodeService.list_folders" href="#connpy.services.NodeService.list_folders">list_folders</a></code></li>
+<li><code><a title="connpy.services.NodeService.list_nodes" href="#connpy.services.NodeService.list_nodes">list_nodes</a></code></li>
+<li><code><a title="connpy.services.NodeService.move_node" href="#connpy.services.NodeService.move_node">move_node</a></code></li>
+<li><code><a title="connpy.services.NodeService.update_node" href="#connpy.services.NodeService.update_node">update_node</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.services.PluginService" href="#connpy.services.PluginService">PluginService</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.services.PluginService.add_plugin" href="#connpy.services.PluginService.add_plugin">add_plugin</a></code></li>
+<li><code><a title="connpy.services.PluginService.add_plugin_from_bytes" href="#connpy.services.PluginService.add_plugin_from_bytes">add_plugin_from_bytes</a></code></li>
+<li><code><a title="connpy.services.PluginService.delete_plugin" href="#connpy.services.PluginService.delete_plugin">delete_plugin</a></code></li>
+<li><code><a title="connpy.services.PluginService.disable_plugin" href="#connpy.services.PluginService.disable_plugin">disable_plugin</a></code></li>
+<li><code><a title="connpy.services.PluginService.enable_plugin" href="#connpy.services.PluginService.enable_plugin">enable_plugin</a></code></li>
+<li><code><a title="connpy.services.PluginService.get_plugin_source" href="#connpy.services.PluginService.get_plugin_source">get_plugin_source</a></code></li>
+<li><code><a title="connpy.services.PluginService.invoke_plugin" href="#connpy.services.PluginService.invoke_plugin">invoke_plugin</a></code></li>
+<li><code><a title="connpy.services.PluginService.list_plugins" href="#connpy.services.PluginService.list_plugins">list_plugins</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.services.ProfileAlreadyExistsError" href="#connpy.services.ProfileAlreadyExistsError">ProfileAlreadyExistsError</a></code></h4>
+</li>
+<li>
+<h4><code><a title="connpy.services.ProfileNotFoundError" href="#connpy.services.ProfileNotFoundError">ProfileNotFoundError</a></code></h4>
+</li>
+<li>
+<h4><code><a title="connpy.services.ProfileService" href="#connpy.services.ProfileService">ProfileService</a></code></h4>
+<ul class="two-column">
+<li><code><a title="connpy.services.ProfileService.add_profile" href="#connpy.services.ProfileService.add_profile">add_profile</a></code></li>
+<li><code><a title="connpy.services.ProfileService.delete_profile" href="#connpy.services.ProfileService.delete_profile">delete_profile</a></code></li>
+<li><code><a title="connpy.services.ProfileService.get_profile" href="#connpy.services.ProfileService.get_profile">get_profile</a></code></li>
+<li><code><a title="connpy.services.ProfileService.list_profiles" href="#connpy.services.ProfileService.list_profiles">list_profiles</a></code></li>
+<li><code><a title="connpy.services.ProfileService.resolve_node_data" href="#connpy.services.ProfileService.resolve_node_data">resolve_node_data</a></code></li>
+<li><code><a title="connpy.services.ProfileService.update_profile" href="#connpy.services.ProfileService.update_profile">update_profile</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.services.SystemService" href="#connpy.services.SystemService">SystemService</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.services.SystemService.debug_api" href="#connpy.services.SystemService.debug_api">debug_api</a></code></li>
+<li><code><a title="connpy.services.SystemService.get_api_status" href="#connpy.services.SystemService.get_api_status">get_api_status</a></code></li>
+<li><code><a title="connpy.services.SystemService.restart_api" href="#connpy.services.SystemService.restart_api">restart_api</a></code></li>
+<li><code><a title="connpy.services.SystemService.start_api" href="#connpy.services.SystemService.start_api">start_api</a></code></li>
+<li><code><a title="connpy.services.SystemService.stop_api" href="#connpy.services.SystemService.stop_api">stop_api</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
+</footer>
+</body>
+</html>

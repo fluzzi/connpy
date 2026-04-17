@@ -51,7 +51,9 @@ el.replaceWith(d);
 - Run automation scripts on network devices.
 - Use AI with a multi-agent system (Engineer/Architect) to help you manage your devices.
   Supports any LLM provider via litellm (OpenAI, Anthropic, Google, etc.).
-- Add plugins with your own scripts.
+- Add plugins with your own scripts, and execute them remotely.
+- Fully decoupled gRPC Client/Server architecture.
+- Unified UI with syntax highlighting and theming.
 - Much more!
 </code></pre>
 <h3 id="usage">Usage</h3>
@@ -73,6 +75,9 @@ options:
   -s, --show         Show node[@subfolder][@folder]
   -d, --debug        Display all conections steps
   -t, --sftp         Connects using sftp instead of ssh
+  --service-mode     Set the backend service mode (local or remote)
+  --remote           Connect to a remote connpy service via gRPC
+  --theme            UI Output theme (dark, light, or path)
 
 Commands:
   profile         Manage profiles
@@ -127,6 +132,11 @@ options:
    conn run server ls -la
 </code></pre>
 <h2 id="plugin-requirements-for-connpy">Plugin Requirements for Connpy</h2>
+<h3 id="remote-plugin-execution">Remote Plugin Execution</h3>
+<p>When Connpy operates in remote mode, plugins are executed <strong>transparently on the server</strong>:
+- The client automatically downloads the plugin source code (<code>Parser</code> class context) to generate the local <code>argparse</code> structure and provide autocompletion.
+- The execution phase (<code>Entrypoint</code> class) is redirected via gRPC streams to execute in the server's memory, ensuring the plugin runs securely against the server's inventory without passing sensitive data to the client.
+- You can manage remote plugins using the <code>--remote</code> flag (e.g. <code>connpy plugin --add myplugin script.py --remote</code>).</p>
 <h3 id="general-structure">General Structure</h3>
 <ul>
 <li>The plugin script must be a Python file.</li>
@@ -271,12 +281,39 @@ connapp.ai.some_method.register_pre_hook(pre_processing_hook)</p>
 <li>This block allows the plugin to be run as a standalone script for testing or independent use.</li>
 </ul>
 <h3 id="command-completion-support">Command Completion Support</h3>
-<p>Plugins can provide intelligent <strong>tab completion</strong> by defining a function called <code>_connpy_completion</code> in the plugin script. This function will be called by Connpy to assist with command-line completion when the user types partial input.</p>
-<h4 id="function-signature">Function Signature</h4>
-<pre><code>def _connpy_completion(wordsnumber, words, info=None):
-    ...
+<p>Plugins can provide intelligent <strong>tab completion</strong> by defining autocompletion logic. There are two supported methods, with the tree-based approach being the most modern and recommended.</p>
+<h4 id="1-tree-based-completion-recommended">1. Tree-based Completion (Recommended)</h4>
+<p>Define a function called <code>_connpy_tree</code> that returns a declarative navigation tree. This method is highly efficient, supports complex state loops, and is very simple to implement for most use cases.</p>
+<pre><code class="language-python">def _connpy_tree(info=None):
+    nodes = info.get(&quot;nodes&quot;, [])
+    return {
+        &quot;__exclude_used__&quot;: True,  # Filter out words already typed
+        &quot;__extra__&quot;: nodes,        # Suggest nodes at this level
+        &quot;--format&quot;: [&quot;json&quot;, &quot;yaml&quot;, &quot;table&quot;], # Fixed suggestions
+        &quot;*&quot;: {                     # Wildcard matches any positional word
+            &quot;interface1&quot;: None,
+            &quot;interface2&quot;: None,
+            &quot;--verbose&quot;: None
+        }
+    }
 </code></pre>
-<h4 id="parameters">Parameters</h4>
+<ul>
+<li><strong>Keys</strong>: Literal completions (exact matches).</li>
+<li><strong><code>*</code> Key</strong>: A wildcard that matches any positional word typed by the user.</li>
+<li><strong><code>__extra__</code></strong>: A list or a callable <code>(words) -&gt; list</code> that adds dynamic suggestions.</li>
+<li><strong><code>__exclude_used__</code></strong>: (Boolean) If True, automatically filters out words already present in the command line.</li>
+</ul>
+<h4 id="2-legacy-function-based-completion">2. Legacy Function-based Completion</h4>
+<p>For backward compatibility or highly custom logic, you can define <code>_connpy_completion</code>.</p>
+<pre><code class="language-python">def _connpy_completion(wordsnumber, words, info=None):
+    if wordsnumber == 3:
+        return [&quot;--help&quot;, &quot;--verbose&quot;, &quot;start&quot;, &quot;stop&quot;]
+
+    elif wordsnumber == 4 and words[2] == &quot;start&quot;:
+        return info[&quot;nodes&quot;]  # Suggest node names
+
+    return []
+</code></pre>
 <table>
 <thead>
 <tr>
@@ -287,41 +324,18 @@ connapp.ai.some_method.register_pre_hook(pre_processing_hook)</p>
 <tbody>
 <tr>
 <td><code>wordsnumber</code></td>
-<td>Integer indicating the number of words (space-separated tokens) currently on the command line. For plugins, this typically starts at 3 (e.g., <code>connpy &lt;plugin&gt; ...</code>).</td>
+<td>Integer indicating the total number of words on the command line. For plugins, this typically starts at 3.</td>
 </tr>
 <tr>
 <td><code>words</code></td>
-<td>A list of tokens (words) already typed. <code>words[0]</code> is always the name of the plugin, followed by any subcommands or arguments.</td>
+<td>A list of tokens (words) already typed. <code>words[0]</code> is always the name of the plugin.</td>
 </tr>
 <tr>
 <td><code>info</code></td>
-<td>A dictionary of structured context data provided by Connpy to help with suggestions.</td>
+<td>A dictionary of structured context data (<code><a title="connpy.nodes" href="#connpy.nodes">nodes</a></code>, <code>folders</code>, <code>profiles</code>, <code>config</code>).</td>
 </tr>
 </tbody>
 </table>
-<h4 id="contents-of-info">Contents of <code>info</code></h4>
-<p>The <code>info</code> dictionary contains helpful context to generate completions:</p>
-<pre><code>info = {
-    &quot;config&quot;: config_dict,     # The full loaded configuration
-    &quot;nodes&quot;: node_list,        # List of all known node names
-    &quot;folders&quot;: folder_list,    # List of all defined folder names
-    &quot;profiles&quot;: profile_list,  # List of all profile names
-    &quot;plugins&quot;: plugin_list     # List of all plugin names
-}
-</code></pre>
-<p>You can use this data to generate suggestions based on the current input.</p>
-<h4 id="return-value">Return Value</h4>
-<p>The function must return a list of suggestion strings to be presented to the user.</p>
-<h4 id="example">Example</h4>
-<pre><code>def _connpy_completion(wordsnumber, words, info=None):
-    if wordsnumber == 3:
-        return [&quot;--help&quot;, &quot;--verbose&quot;, &quot;start&quot;, &quot;stop&quot;]
-
-    elif wordsnumber == 4 and words[2] == &quot;start&quot;:
-        return info[&quot;nodes&quot;]  # Suggest node names
-
-    return []
-</code></pre>
 <blockquote>
 <p>In this example, if the user types <code><a title="connpy" href="#connpy">connpy</a> myplugin start </code> and presses Tab, it will suggest node names.</p>
 </blockquote>
@@ -340,7 +354,7 @@ connapp.ai.some_method.register_pre_hook(pre_processing_hook)</p>
 <li>These unknown arguments will be passed to the plugin as <code>args.unknown_args</code> inside the <code>Entrypoint</code>.</li>
 <li>If the user does not pass any unknown arguments, <code>args.unknown_args</code> will contain the default value (<code>True</code>, unless overridden).</li>
 </ul>
-<h4 id="example_1">Example:</h4>
+<h4 id="example">Example:</h4>
 <p>If a plugin accepts unknown tcpdump flags like this:</p>
 <pre><code>connpy myplugin -nn -s0
 </code></pre>
@@ -363,86 +377,25 @@ connapp.ai.some_method.register_pre_hook(pre_processing_hook)</p>
 <p>For a practical example of how to write a compatible plugin script, please refer to the following example:</p>
 <p><a href="https://github.com/fluzzi/awspy">Example Plugin Script</a></p>
 <p>This script demonstrates the required structure and implementation details according to the plugin system's standards.</p>
-<h2 id="http-api">http API</h2>
-<p>With the Connpy API you can run commands on devices using http requests</p>
-<h3 id="1-list-nodes">1. List Nodes</h3>
-<p><strong>Endpoint</strong>: <code>/list_nodes</code></p>
-<p><strong>Method</strong>: <code>POST</code></p>
-<p><strong>Description</strong>: This route returns a list of nodes. It can also filter the list based on a given keyword.</p>
-<h4 id="request-body">Request Body:</h4>
-<pre><code class="language-json">{
-  &quot;filter&quot;: &quot;&lt;keyword&gt;&quot;
-}
+<h2 id="grpc-service-architecture">gRPC Service Architecture</h2>
+<p>Connpy features a completely decoupled gRPC Client/Server architecture. You can run Connpy as a standalone background service and connect to it remotely via the CLI or other clients.</p>
+<h3 id="1-start-the-server">1. Start the Server</h3>
+<p>Start the gRPC service by running:</p>
+<pre><code class="language-bash">connpy api -s 50051
 </code></pre>
-<ul>
-<li><code>filter</code> (optional): A keyword to filter the list of nodes. It returns only the nodes that contain the keyword. If not provided, the route will return the entire list of nodes.</li>
-</ul>
-<h4 id="response">Response:</h4>
-<ul>
-<li>A JSON array containing the filtered list of nodes.</li>
-</ul>
-<hr>
-<h3 id="2-get-nodes">2. Get Nodes</h3>
-<p><strong>Endpoint</strong>: <code>/get_nodes</code></p>
-<p><strong>Method</strong>: <code>POST</code></p>
-<p><strong>Description</strong>: This route returns a dictionary of nodes with all their attributes. It can also filter the nodes based on a given keyword.</p>
-<h4 id="request-body_1">Request Body:</h4>
-<pre><code class="language-json">{
-  &quot;filter&quot;: &quot;&lt;keyword&gt;&quot;
-}
+<p>The server will handle all configurations, connections, AI sessions, and plugin execution locally on the machine it runs on.</p>
+<h3 id="2-connect-the-client">2. Connect the Client</h3>
+<p>Configure your local CLI client to connect to the remote server:</p>
+<pre><code class="language-bash">connpy config --service-mode remote
+connpy config --remote-host localhost:50051
 </code></pre>
-<ul>
-<li><code>filter</code> (optional): A keyword to filter the nodes. It returns only the nodes that contain the keyword. If not provided, the route will return the entire list of nodes.</li>
-</ul>
-<h4 id="response_1">Response:</h4>
-<ul>
-<li>A JSON array containing the filtered nodes.</li>
-</ul>
-<hr>
-<h3 id="3-run-commands">3. Run Commands</h3>
-<p><strong>Endpoint</strong>: <code>/run_commands</code></p>
-<p><strong>Method</strong>: <code>POST</code></p>
-<p><strong>Description</strong>: This route runs commands on selected nodes based on the provided action, nodes, and commands. It also supports executing tests by providing expected results.</p>
-<h4 id="request-body_2">Request Body:</h4>
-<pre><code class="language-json">{
-  &quot;action&quot;: &quot;&lt;action&gt;&quot;,
-  &quot;nodes&quot;: &quot;&lt;nodes&gt;&quot;,
-  &quot;commands&quot;: &quot;&lt;commands&gt;&quot;,
-  &quot;expected&quot;: &quot;&lt;expected&gt;&quot;,
-  &quot;options&quot;: &quot;&lt;options&gt;&quot;
-}
+<p>Once configured, all commands (<code><a title="connpy" href="#connpy">connpy</a> <a title="connpy.node" href="#connpy.node">node</a></code>, <code><a title="connpy" href="#connpy">connpy</a> list</code>, <code><a title="connpy" href="#connpy">connpy</a> <a title="connpy.ai" href="#connpy.ai">ai</a></code>, etc.) will execute transparently on the remote server via thin-client proxies. You can revert back to standalone execution at any time by running <code>connpy config --service-mode local</code>.</p>
+<h3 id="programmatic-access-grpc-soa">Programmatic Access (gRPC &amp; SOA)</h3>
+<p>Developers can build their own applications using the Connpy backend by utilizing the <code>ServiceProvider</code>:</p>
+<pre><code class="language-python">from connpy.services.provider import ServiceProvider
+services = ServiceProvider(config, mode=&quot;remote&quot;, remote_host=&quot;localhost:50051&quot;)
+nodes = services.nodes.list_nodes()
 </code></pre>
-<ul>
-<li><code>action</code> (required): The action to be performed. Possible values: <code>run</code> or <code>test</code>.</li>
-<li><code><a title="connpy.nodes" href="#connpy.nodes">nodes</a></code> (required): A list of nodes or a single node on which the commands will be executed. The nodes can be specified as individual node names or a node group with the <code>@</code> prefix. Node groups can also be specified as arrays with a list of nodes inside the group.</li>
-<li><code>commands</code> (required): A list of commands to be executed on the specified nodes.</li>
-<li><code>expected</code> (optional, only used when the action is <code>test</code>): A single expected result for the test.</li>
-<li><code>options</code> (optional): Array to pass options to the run command, options are: <code>prompt</code>, <code>parallel</code>, <code>timeout</code>
-</li>
-</ul>
-<h4 id="response_2">Response:</h4>
-<ul>
-<li>A JSON object with the results of the executed commands on the nodes.</li>
-</ul>
-<hr>
-<h3 id="4-ask-ai">4. Ask AI</h3>
-<p><strong>Endpoint</strong>: <code>/ask_ai</code></p>
-<p><strong>Method</strong>: <code>POST</code></p>
-<p><strong>Description</strong>: This route sends to chatgpt IA a request that will parse it into an understandable output for the application and then run the request.</p>
-<h4 id="request-body_3">Request Body:</h4>
-<pre><code class="language-json">{
-  &quot;input&quot;: &quot;&lt;user input request&gt;&quot;,
-  &quot;dryrun&quot;: true or false
-}
-</code></pre>
-<ul>
-<li><code>input</code> (required): The user input requesting the AI to perform an action on some devices or get the devices list.</li>
-<li><code>dryrun</code> (optional): If set to true, it will return the parameters to run the request but it won't run it. default is false.</li>
-</ul>
-<h4 id="response_3">Response:</h4>
-<ul>
-<li>A JSON array containing the action to run and the parameters and the result of the action.</li>
-</ul>
 <h2 id="automation-module">Automation module</h2>
 <p>The automation module</p>
 <h3 id="standalone-module">Standalone module</h3>
@@ -549,10 +502,28 @@ class Preload:
     def __init__(self, connapp):
         connapp.ai.modify(_register_my_tools)
 </code></pre>
+<h2 id="developer-notes-soa-architecture">Developer Notes (SOA Architecture)</h2>
+<p>As of version 2.0, Connpy has migrated to a <strong>Service-Oriented Architecture (SOA)</strong>:
+- <strong><code>connpy/cli/</code></strong>: Contains all CLI handlers. These are responsible for argument parsing, user interaction (via <code>inquirer</code>), and visual output (via <code>printer</code>).
+- <strong><code>connpy/services/</code></strong>: Contains pure logic services (Node, Profile, Execution, etc.).
+- <strong>Zero-Print Policy</strong>: Services must never use <code>print()</code>. All output must be returned as data structures or generators to the caller (CLI handlers).
+- <strong>ServiceProvider</strong>: Access services via <code>connapp.services</code>. This allows transparent switching between local and remote (gRPC) backends without modifying CLI logic.</p>
 </section>
 <section>
 <h2 class="section-title" id="header-submodules">Sub-modules</h2>
 <dl>
+<dt><code class="name"><a title="connpy.cli" href="cli/index.html">connpy.cli</a></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt><code class="name"><a title="connpy.grpc" href="grpc/index.html">connpy.grpc</a></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt><code class="name"><a title="connpy.services" href="services/index.html">connpy.services</a></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
 <dt><code class="name"><a title="connpy.tests" href="tests/index.html">connpy.tests</a></code></dt>
 <dd>
 <div class="desc"></div>
@@ -579,6 +550,27 @@ class Preload:
         self.plugins = {}
         self.plugin_parsers = {}
         self.preloads = {}
+        self.remote_plugins = {}
+        self.preferences = {}
+
+    def _load_preferences(self, config_dir):
+        import json
+        path = os.path.join(config_dir, &#34;plugin_preferences.json&#34;)
+        try:
+            with open(path) as f:
+                self.preferences = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            self.preferences = {}
+
+    def _save_preferences(self, config_dir):
+        import json
+        path = os.path.join(config_dir, &#34;plugin_preferences.json&#34;)
+        try:
+            with open(path, &#34;w&#34;) as f:
+                json.dump(self.preferences, f, indent=4)
+        except OSError as e:
+            printer.error(f&#34;Failed to save plugin preferences: {e}&#34;)
+
 
     def verify_script(self, file_path):
         &#34;&#34;&#34;
@@ -682,7 +674,7 @@ class Preload:
         spec.loader.exec_module(module)
         return module
 
-    def _import_plugins_to_argparse(self, directory, subparsers):
+    def _import_plugins_to_argparse(self, directory, subparsers, remote_enabled=False):
         if not os.path.exists(directory):
             return
         for filename in os.listdir(directory):
@@ -691,6 +683,11 @@ class Preload:
                 root_filename = os.path.splitext(filename)[0]
                 if root_filename in commands:
                     continue
+                
+                # Check preferences: if remote is preferred AND remote is enabled, skip local loading
+                if remote_enabled and self.preferences.get(root_filename) == &#34;remote&#34;:
+                    continue
+
                 # Construct the full path
                 filepath = os.path.join(directory, filename)
                 check_file = self.verify_script(filepath)
@@ -702,9 +699,101 @@ class Preload:
                     if hasattr(self.plugins[root_filename], &#34;Parser&#34;):
                         self.plugin_parsers[root_filename] = self.plugins[root_filename].Parser()
                         plugin = self.plugin_parsers[root_filename]
-                        subparsers.add_parser(root_filename, parents=[self.plugin_parsers[root_filename].parser], add_help=False, usage=plugin.parser.usage, description=plugin.parser.description, epilog=plugin.parser.epilog, formatter_class=plugin.parser.formatter_class)
+                        # Default to RichHelpFormatter if plugin doesn&#39;t set one
+                        try:
+                            from rich_argparse import RichHelpFormatter as _RHF
+                            fmt = plugin.parser.formatter_class
+                            if fmt is argparse.HelpFormatter or fmt is argparse.RawTextHelpFormatter or fmt is argparse.RawDescriptionHelpFormatter:
+                                fmt = _RHF
+                        except ImportError:
+                            fmt = plugin.parser.formatter_class
+                        subparsers.add_parser(root_filename, parents=[self.plugin_parsers[root_filename].parser], add_help=False, help=plugin.parser.description, usage=plugin.parser.usage, description=plugin.parser.description, epilog=plugin.parser.epilog, formatter_class=fmt)
                     if hasattr(self.plugins[root_filename], &#34;Preload&#34;):
-                        self.preloads[root_filename] = self.plugins[root_filename]</code></pre>
+                        self.preloads[root_filename] = self.plugins[root_filename]
+
+    def _import_remote_plugins_to_argparse(self, plugin_stub, subparsers, cache_dir, force_sync=False):
+        import hashlib
+        os.makedirs(cache_dir, exist_ok=True)
+        
+        try:
+            remote_plugins_info = plugin_stub.list_plugins()
+        except Exception:
+            return
+
+        # Pruning: Remove local cached files that are no longer on the server
+        for local_file in os.listdir(cache_dir):
+            if local_file.endswith(&#34;.py&#34;):
+                name = local_file[:-3]
+                if name not in remote_plugins_info:
+                    try:
+                        os.remove(os.path.join(cache_dir, local_file))
+                    except Exception:
+                        pass
+
+        for name, info in remote_plugins_info.items():
+            if not info.get(&#34;enabled&#34;, True):
+                continue
+                
+            pref = self.preferences.get(name, &#34;local&#34;)
+            if pref != &#34;remote&#34; and name in self.plugins:
+                continue
+            if not force_sync and name in subparsers.choices:
+                continue
+
+            cache_path = os.path.join(cache_dir, f&#34;{name}.py&#34;)
+            
+            # Hash comparison
+            remote_hash = info.get(&#34;hash&#34;, &#34;&#34;)
+            local_hash = &#34;&#34;
+            if os.path.exists(cache_path):
+                try:
+                    with open(cache_path, &#34;rb&#34;) as f:
+                        local_hash = hashlib.md5(f.read()).hexdigest()
+                except Exception:
+                    pass
+
+            # Update only if hash differs or force_sync is True
+            if force_sync or remote_hash != local_hash or not os.path.exists(cache_path):
+                try:
+                    source = plugin_stub.get_plugin_source(name)
+                    with open(cache_path, &#34;w&#34;) as f:
+                        f.write(source)
+                except Exception as e:
+                    printer.warning(f&#34;Failed to sync remote plugin {name}: {e}&#34;)
+                    continue
+
+            # Verify and load
+            check_file = self.verify_script(cache_path)
+            if check_file:
+                printer.warning(f&#34;Remote plugin {name} failed verification: {check_file}&#34;)
+                continue
+
+            module = self._import_from_path(cache_path)
+            if hasattr(module, &#34;Parser&#34;):
+                self.plugin_parsers[name] = module.Parser()
+                self.remote_plugins[name] = True
+                plugin = self.plugin_parsers[name]
+                try:
+                    from rich_argparse import RichHelpFormatter as _RHF
+                    fmt = plugin.parser.formatter_class
+                    if fmt is argparse.HelpFormatter or fmt is argparse.RawTextHelpFormatter or fmt is argparse.RawDescriptionHelpFormatter:
+                        fmt = _RHF
+                except ImportError:
+                    fmt = plugin.parser.formatter_class
+                
+                # If force_sync, we might be re-registering, but argparse subparsers.add_parser 
+                # might fail if it exists. We check if it&#39;s already there.
+                if name not in subparsers.choices:
+                    subparsers.add_parser(
+                        name, 
+                        parents=[plugin.parser], 
+                        add_help=False, 
+                        help=f&#34;[remote] {plugin.parser.description}&#34;, 
+                        usage=plugin.parser.usage, 
+                        description=plugin.parser.description, 
+                        epilog=plugin.parser.epilog, 
+                        formatter_class=fmt
+                    )</code></pre>
 </details>
 <div class="desc"></div>
 <h3>Methods</h3>
@@ -842,7 +931,7 @@ indicating successful verification.</p>
 </dd>
 <dt id="connpy.ai"><code class="flex name class">
 <span>class <span class="ident">ai</span></span>
-<span>(</span><span>config,<br>org=None,<br>api_key=None,<br>engineer_model=None,<br>architect_model=None,<br>engineer_api_key=None,<br>architect_api_key=None)</span>
+<span>(</span><span>config,<br>org=None,<br>api_key=None,<br>engineer_model=None,<br>architect_model=None,<br>engineer_api_key=None,<br>architect_api_key=None,<br>console=None,<br>confirm_handler=None,<br>trust=False)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -853,11 +942,20 @@ indicating successful verification.</p>
 class ai:
     &#34;&#34;&#34;Hybrid Multi-Agent System: Selective Escalation with Role Persistence.&#34;&#34;&#34;
 
-    SAFE_COMMANDS = [r&#39;^show\s+&#39;, r&#39;^ls\s*&#39;, r&#39;^cat\s+&#39;, r&#39;^ip\s+route\s+show&#39;, r&#39;^ip\s+addr\s+show&#39;, r&#39;^ip\s+link\s+show&#39;, r&#39;^pwd$&#39;, r&#39;^hostname$&#39;, r&#39;^uname&#39;, r&#39;^df\s*&#39;, r&#39;^free\s*&#39;, r&#39;^ps\s*&#39;, r&#39;^ping\s+&#39;, r&#39;^traceroute\s+&#39;]
+    SAFE_COMMANDS = [
+        r&#39;^show\s+&#39;, r&#39;^ls\s*&#39;, r&#39;^cat\s+&#39;, r&#39;^ip\s+&#39;, r&#39;^pwd$&#39;, r&#39;^hostname$&#39;, r&#39;^uname&#39;, 
+        r&#39;^df\s*&#39;, r&#39;^free\s*&#39;, r&#39;^ps\s*&#39;, r&#39;^ping\s+&#39;, r&#39;^traceroute\s+&#39;, r&#39;^whois\s+&#39;, 
+        r&#39;^kubectl\s+(get|describe|version|logs|top|explain|cluster-info|api-resources|api-versions)\s+&#39;,
+        r&#39;^systemctl\s+status\s+&#39;, r&#39;^journalctl\s+&#39;
+    ]
 
-    def __init__(self, config, org=None, api_key=None, engineer_model=None, architect_model=None, engineer_api_key=None, architect_api_key=None):
+    def __init__(self, config, org=None, api_key=None, engineer_model=None, architect_model=None, engineer_api_key=None, architect_api_key=None, console=None, confirm_handler=None, trust=False):
         self.config = config
-        self.trusted_session = False  # Trust mode for the entire session
+        self.console = console or printer.console
+        self.confirm_handler = confirm_handler or self._local_confirm_handler
+        self.trusted_session = trust  # Trust mode for the entire session
+        self.interrupted = False
+
         
         # 1. Cargar configuración genérica
         aiconfig = self.config.config.get(&#34;ai&#34;, {})
@@ -869,13 +967,12 @@ class ai:
         # API Keys (Prioridad: Argumento -&gt; Config)
         self.engineer_key = engineer_api_key or aiconfig.get(&#34;engineer_api_key&#34;)
         self.architect_key = architect_api_key or aiconfig.get(&#34;architect_api_key&#34;)
-        
-        # Validate configuration
-        if not self.engineer_key:
-            raise ValueError(&#34;Engineer API key not configured. Use &#39;conn config ai engineer_api_key &lt;key&gt;&#39; to set it.&#34;)
-        if not self.architect_key:
-            console.print(&#34;[yellow]Warning: Architect API key not configured. Architect will be unavailable.[/yellow]&#34;)
-            console.print(&#34;[yellow]Use &#39;conn config ai architect_api_key &lt;key&gt;&#39; to enable it.[/yellow]&#34;)
+
+        # Custom Trusted Commands Regexes
+        custom_trusted = aiconfig.get(&#34;trusted_commands&#34;, [])
+        if isinstance(custom_trusted, str):
+            custom_trusted = [c.strip() for c in custom_trusted.split(&#34;,&#34;) if c.strip()]
+        self.safe_commands = list(self.SAFE_COMMANDS) + (custom_trusted if isinstance(custom_trusted, list) else [])
         
         # Límites
         self.max_history = 30
@@ -901,9 +998,9 @@ class ai:
             except FileNotFoundError:
                 self.long_term_memory = &#34;&#34;
             except PermissionError as e:
-                console.print(f&#34;[yellow]Warning: Cannot read AI memory file: {e}[/yellow]&#34;)
+                self.console.print(f&#34;[warning]Warning: Cannot read AI memory file: {e}[/warning]&#34;)
             except Exception as e:
-                console.print(f&#34;[yellow]Warning: Failed to load AI memory: {e}[/yellow]&#34;)
+                self.console.print(f&#34;[warning]Warning: Failed to load AI memory: {e}[/warning]&#34;)
 
         # Session Management
         self.sessions_dir = os.path.join(self.config.defaultdir, &#34;ai_sessions&#34;)
@@ -912,20 +1009,9 @@ class ai:
         self.session_path = None
 
         # Prompts base agnósticos
-        self._engineer_base_prompt = dedent(f&#34;&#34;&#34;
-            Role: TECHNICAL EXECUTION ENGINE.
-            Expertise: Universal Networking (Cisco, Nokia, Juniper, 6wind, etc.).
-            
-            Rules:
-            - BE FAST: Execute tools directly to provide swift technical answers.
-            - AUTONOMY: Proactively use iterative tool calls (list_nodes, run_commands) to find the root cause.
-            - BATCH OPERATIONS: When working on multiple devices, call tools in parallel (multiple tool_calls in same response).
-            - COMPLETE MISSIONS: Execute ALL steps of a mission before reporting back. Don&#39;t stop halfway.
-            - DIAGRAM: Use ASCII art or Unicode box-drawing characters directly in your responses to visualize topologies or paths when helpful.
-            - EVIDENCE: Include &#39;Key Snippets&#39; from tool outputs. Be token-efficient.
-            - NO WANDERING: Do not speculate. If stuck, report attempts.
-            - SAFETY: When you use &#39;run_commands&#39; with configuration commands, the system automatically prompts the user for confirmation. Just execute - don&#39;t ask permission first.
-            
+        architect_instructions = &#34;&#34;
+        if self.architect_key:
+            architect_instructions = &#34;&#34;&#34;
             CRITICAL - CONSULT vs ESCALATE:
             - ALWAYS use &#39;consult_architect&#39; for: Configuration planning, design decisions, complex troubleshooting.
               Examples: &#34;consultalo con el arquitecto&#34;, &#34;preguntale al arquitecto&#34;, &#34;que opina el arquitecto&#34;
@@ -936,8 +1022,33 @@ class ai:
               After escalation, you hand over control completely.
             
             - DEFAULT: When in doubt, use &#39;consult_architect&#39;. Escalation is rare.
+&#34;&#34;&#34;
+        else:
+            architect_instructions = &#34;&#34;&#34;
+            CRITICAL - ARCHITECT UNAVAILABLE:
+            - The Strategic Reasoning Engine (Architect) is currently UNAVAILABLE because its API key is not configured.
+            - DO NOT attempt to consult or escalate to the architect.
+            - If the user asks to consult the architect, inform them that the Architect is offline and offer to help them directly to the best of your abilities.
+&#34;&#34;&#34;
+
+        self._engineer_base_prompt = dedent(f&#34;&#34;&#34;
+            Role: TECHNICAL EXECUTION ENGINE.
+            Expertise: Universal Networking (Cisco, Nokia, Juniper, 6wind, etc.).
             
-            Network Context: {self.long_term_memory if self.long_term_memory else &#34;Empty.&#34;}
+            Rules:
+            - BE FAST AND EXTREMELY CONCISE: Provide direct answers. No filler words, no decorative language, no polite pleasantries. Save output tokens at all costs.
+            - KNOWLEDGE FIRST: For general networking questions (AS numbers, protocol details, standards, generic commands), use your internal knowledge. ONLY use tools when the user&#39;s specific infrastructure data is required.
+            - INVENTORY ONLY: &#39;run_commands&#39;, &#39;list_nodes&#39;, and &#39;get_node_info&#39; are ONLY for interacting with the user&#39;s inventory.
+            - BROADCAST RESTRICTION: Avoid using filter &#39;.*&#39; in &#39;run_commands&#39; unless the user explicitly requests a global action. Try to target specific nodes or groups based on the conversation.
+            - AUTONOMY: Proactively use iterative tool calls to find the root cause of infrastructure issues.
+            - BATCH OPERATIONS: When working on multiple devices, call tools in parallel.
+            - COMPLETE MISSIONS: Execute ALL steps of a mission before reporting back.
+            - DIAGRAM: Use ASCII art or Unicode box-drawing characters directly in your responses to visualize topologies or paths when helpful.
+            - EVIDENCE: Include &#39;Key Snippets&#39; from tool outputs. Be token-efficient.
+            - NO WANDERING: Do not speculate. If stuck, report attempts.
+            - SAFETY: When you use &#39;run_commands&#39; with configuration commands, the system automatically prompts the user for confirmation. Just execute - don&#39;t ask permission first.
+{architect_instructions}
+            Network Context: {{self.long_term_memory if self.long_term_memory else &#34;Empty.&#34;}}
         &#34;&#34;&#34;).strip()
 
         self._architect_base_prompt = dedent(f&#34;&#34;&#34;
@@ -945,6 +1056,7 @@ class ai:
             Expertise: Network Architecture, Complex Troubleshooting, and Design Validation.
             
             Rules:
+            - CONCISENESS IS MANDATORY: Strip out fluff, decorative language, and filler words. Provide direct, tactical instructions and analysis to save output tokens.
             - STRATEGY: Define technical missions for the Engineer. 
             - DIAGRAM: Use ASCII art or Unicode box-drawing characters in your responses to visualize topologies, traffic paths, or logic flows.
             - ENGINEER CAPABILITIES: Your Engineer can:
@@ -966,6 +1078,11 @@ class ai:
             
             Network Context: {self.long_term_memory if self.long_term_memory else &#34;Empty.&#34;}
         &#34;&#34;&#34;).strip()
+
+    def _local_confirm_handler(self, prompt, default=&#34;n&#34;):
+        &#34;&#34;&#34;Default confirmation handler using rich.prompt.&#34;&#34;&#34;
+        from rich.prompt import Prompt
+        return Prompt.ask(prompt, default=default)
 
     @property
     def engineer_system_prompt(self):
@@ -1007,57 +1124,65 @@ class ai:
         if status_formatter:
             self.tool_status_formatters[name] = status_formatter
 
-    def _stream_completion(self, model, messages, tools, api_key, status=None, label=&#34;&#34;, debug=False, **kwargs):
+    def _stream_completion(self, model, messages, tools, api_key, status=None, label=&#34;&#34;, debug=False, chunk_callback=None, **kwargs):
         &#34;&#34;&#34;Stream a completion call, rendering styled Markdown in real-time.
-        
+
         Returns (response, streamed) where:
         - response: reconstructed ModelResponse (same as non-streaming)
         - streamed: True if text was rendered to console during streaming
         &#34;&#34;&#34;
         from rich.live import Live
-        
+
         stream_resp = completion(model=model, messages=messages, tools=tools, api_key=api_key, stream=True, **kwargs)
-        
+
         chunks = []
         full_content = &#34;&#34;
         is_streaming_text = False
         has_tool_calls = False
         live_display = None
-        
+
         # Determine styling based on current brain
         role_label = &#34;Network Architect&#34; if &#34;architect&#34; in label.lower() else &#34;Network Engineer&#34;
-        border = &#34;medium_purple&#34; if &#34;architect&#34; in label.lower() else &#34;blue&#34;
-        title = f&#34;[bold {border}]{role_label}[/bold {border}]&#34;
-        
+        alias = &#34;architect&#34; if &#34;architect&#34; in label.lower() else &#34;engineer&#34;
+        title = f&#34;[bold {alias}]{role_label}[/bold {alias}]&#34;
+        border = alias
+
         try:
             for chunk in stream_resp:
                 chunks.append(chunk)
                 delta = chunk.choices[0].delta
-                
+
                 # Detect tool calls
                 if hasattr(delta, &#39;tool_calls&#39;) and delta.tool_calls:
                     has_tool_calls = True
-                
+
                 # Stream text content with styled rendering
-                if hasattr(delta, &#39;content&#39;) and delta.content and not debug:
+                if hasattr(delta, &#39;content&#39;) and delta.content:
                     full_content += delta.content
-                    
-                    if not is_streaming_text:
-                        # Stop spinner before starting live display
-                        if status:
-                            status.stop()
-                        live_display = Live(
-                            Panel(Markdown(full_content), title=title, border_style=border, expand=False),
-                            console=console,
-                            refresh_per_second=8,
-                            transient=False
-                        )
-                        live_display.start()
-                        is_streaming_text = True
-                    else:
-                        live_display.update(
-                            Panel(Markdown(full_content), title=title, border_style=border, expand=False)
-                        )
+
+                    if chunk and chunk_callback:
+                        # Check for remote interruption during streaming
+                        if hasattr(self, &#34;interrupted&#34;) and self.interrupted:
+                            raise KeyboardInterrupt
+                        chunk_callback(delta.content)
+
+                    if not debug and not chunk_callback:
+                        if not is_streaming_text:
+                            # Stop spinner before starting live display
+                            if status:
+                                status.stop()
+                            live_display = Live(
+                                Panel(Markdown(full_content), title=title, border_style=border, expand=False),
+                                console=self.console,
+                                refresh_per_second=8,
+                                transient=False
+                            )
+                            live_display.start()
+                            is_streaming_text = True
+                        else:
+                            live_display.update(
+                                Panel(Markdown(full_content), title=title, border_style=border, expand=False)
+                            )
         except Exception as e:
             if not chunks:
                 raise
@@ -1127,6 +1252,7 @@ class ai:
         3. Orphaned tool_calls at the end are removed
         4. Orphaned tool responses without a preceding tool_call are removed
         5. Incompatible metadata like cache_control is stripped for non-Anthropic models
+        6. Enforces strict alternating history to prevent BadRequestError on Gemini.
         &#34;&#34;&#34;
         if not messages:
             return messages
@@ -1139,8 +1265,10 @@ class ai:
             
             # Convert content list to plain string if it&#39;s a system message with caching metadata
             if m.get(&#39;role&#39;) == &#39;system&#39; and isinstance(m.get(&#39;content&#39;), list):
-                # Extraer texto de [{&#34;type&#34;: &#34;text&#34;, &#34;text&#34;: &#34;...&#34;, &#34;cache_control&#34;: ...}]
-                m[&#39;content&#39;] = m[&#39;content&#39;][0][&#39;text&#39;] if m[&#39;content&#39;] else &#34;&#34;
+                if m[&#39;content&#39;] and isinstance(m[&#39;content&#39;][0], dict) and m[&#39;content&#39;][0].get(&#39;text&#39;):
+                    m[&#39;content&#39;] = m[&#39;content&#39;][0][&#39;text&#39;]
+                else:
+                    m[&#39;content&#39;] = &#34;&#34;
 
             # Remove any explicit cache_control key anywhere
             if &#39;cache_control&#39; in m: del m[&#39;cache_control&#39;]
@@ -1151,43 +1279,72 @@ class ai:
             pre_sanitized.append(m)
 
         sanitized = []
+        last_role = None
+        
         i = 0
         while i &lt; len(pre_sanitized):
             msg = pre_sanitized[i]
             role = msg.get(&#39;role&#39;, &#39;&#39;)
             
-            if role == &#39;assistant&#39; and msg.get(&#39;tool_calls&#39;):
-                # Collect all expected tool_call_ids
-                expected_ids = set()
-                for tc in msg[&#39;tool_calls&#39;]:
-                    tc_id = tc.get(&#39;id&#39;) if isinstance(tc, dict) else getattr(tc, &#39;id&#39;, None)
-                    if tc_id:
-                        expected_ids.add(tc_id)
+            if role == &#39;system&#39;:
+                sanitized.append(msg)
+                last_role = &#39;system&#39;
+                i += 1
                 
-                # Look ahead for matching tool responses
-                tool_responses = []
-                j = i + 1
-                while j &lt; len(pre_sanitized):
-                    next_msg = pre_sanitized[j]
-                    if next_msg.get(&#39;role&#39;) == &#39;tool&#39;:
-                        tool_responses.append(next_msg)
-                        j += 1
-                    else:
-                        break
-                
-                # Only include this assistant+tools block if we have responses
-                if tool_responses:
-                    sanitized.append(msg)
-                    sanitized.extend(tool_responses)
-                    i = j
+            elif role == &#39;user&#39;:
+                if last_role == &#39;user&#39; and sanitized:
+                    # Combine consecutive user messages
+                    sanitized[-1][&#39;content&#39;] = str(sanitized[-1].get(&#39;content&#39;, &#39;&#39;) or &#39;&#39;) + &#39;\n&#39; + str(msg.get(&#39;content&#39;, &#39;&#39;) or &#39;&#39;)
                 else:
-                    # Orphaned tool_calls with no responses - skip the assistant message
+                    sanitized.append(msg)
+                    last_role = &#39;user&#39;
+                i += 1
+                
+            elif role == &#39;assistant&#39;:
+                has_tools = bool(msg.get(&#39;tool_calls&#39;))
+                
+                # Gemini strict sequence: Assistant MUST be preceded by user or tool.
+                # If preceded by system, assistant, or if it&#39;s the very first message...
+                if last_role not in (&#39;user&#39;, &#39;tool&#39;):
+                    sanitized.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;[System sequence separator: History Truncated/Merged]&#34;})
+                    last_role = &#39;user&#39;
+                
+                if has_tools:
+                    # Look ahead for matching tool responses
+                    tool_responses = []
+                    j = i + 1
+                    while j &lt; len(pre_sanitized):
+                        next_msg = pre_sanitized[j]
+                        if next_msg.get(&#39;role&#39;) == &#39;tool&#39;:
+                            tool_responses.append(next_msg)
+                            j += 1
+                        else:
+                            break
+                    
+                    if tool_responses:
+                        sanitized.append(msg)
+                        sanitized.extend(tool_responses)
+                        last_role = &#39;tool&#39;
+                        i = j
+                    else:
+                        # Orphaned tool_calls with no responses - skip the assistant message
+                        # If we just added a dummy user message for this assistant, remove it too
+                        if sanitized and sanitized[-1].get(&#39;content&#39;) == &#34;[System sequence separator: History Truncated/Merged]&#34;:
+                            sanitized.pop()
+                            last_role = sanitized[-1].get(&#39;role&#39;, &#39;&#39;) if sanitized else None
+                        i += 1
+                else:
+                    sanitized.append(msg)
+                    last_role = &#39;assistant&#39;
                     i += 1
+                    
             elif role == &#39;tool&#39;:
                 # Orphaned tool response (no preceding assistant with tool_calls) - skip
                 i += 1
+                
             else:
                 sanitized.append(msg)
+                last_role = role
                 i += 1
         
         return sanitized
@@ -1244,7 +1401,7 @@ class ai:
 
     def _is_safe_command(self, cmd):
         &#34;&#34;&#34;Check if a command matches safe patterns.&#34;&#34;&#34;
-        return any(re.match(pattern, cmd.strip(), re.IGNORECASE) for pattern in self.SAFE_COMMANDS)
+        return any(re.match(pattern, cmd.strip(), re.IGNORECASE) for pattern in self.safe_commands)
     
     def run_commands_tool(self, nodes_filter, commands, status=None):
         &#34;&#34;&#34;Execute commands on nodes matching the filter. Native interactive confirmation for unsafe commands.&#34;&#34;&#34;
@@ -1275,35 +1432,36 @@ class ai:
                 formatted_cmds = []
                 for cmd in commands:
                     if cmd in unsafe_commands:
-                        formatted_cmds.append(f&#34;  • [yellow]{cmd}[/yellow]&#34;)
+                        formatted_cmds.append(f&#34;  • [warning]{cmd}[/warning]&#34;)
                     else:
                         formatted_cmds.append(f&#34;  • {cmd}&#34;)
                 
                 panel_content = f&#34;Target: {nodes_filter}\nCommands:\n&#34; + &#34;\n&#34;.join(formatted_cmds)
-                console.print(Panel(panel_content, title=&#34;[bold yellow]⚠️ UNSAFE COMMANDS DETECTED[/bold yellow]&#34;, border_style=&#34;yellow&#34;))
+                # Use print_important if available (for remote bridges) fallback to standard print
+                print_fn = getattr(self.console, &#34;print_important&#34;, self.console.print)
+                print_fn(Panel(panel_content, title=&#34;[bold warning]⚠️ UNSAFE COMMANDS DETECTED[/bold warning]&#34;, border_style=&#34;warning&#34;))
                 
                 try:
-                    from rich.prompt import Prompt
-                    user_resp = Prompt.ask(&#34;[bold yellow]Execute? (y: yes / n: no / a: allow all this session / &lt;text&gt;: feedback)[/bold yellow]&#34;, default=&#34;n&#34;)
+                    user_resp = self.confirm_handler(&#34;[bold warning]Execute? (y: yes / n: no / a: allow all this session / &lt;text&gt;: feedback)[/bold warning]&#34;, default=&#34;n&#34;)
                 except KeyboardInterrupt:
-                    if status: status.update(&#34;[bold blue]Engineer: Resuming...&#34;)
-                    console.print(&#34;[bold red]✗ Aborted by user (Ctrl+C).[/bold red]&#34;)
-                    return &#34;Error: User cancelled execution (Ctrl+C).&#34;
+                    if status: status.update(&#34;[ai_status]Engineer: Resuming...&#34;)
+                    self.console.print(&#34;[fail]✗ Aborted by user (Ctrl+C).[/fail]&#34;)
+                    raise
                 
                 # Resume the spinner
-                if status: status.update(&#34;[bold blue]Engineer: Processing user response...&#34;)
+                if status: status.update(&#34;[ai_status]Engineer: Processing user response...&#34;)
                 
                 user_resp_lower = user_resp.strip().lower()
                 if user_resp_lower in [&#39;a&#39;, &#39;allow&#39;]:
                     self.trusted_session = True
-                    console.print(&#34;[bold green]✓ Trust Mode Enabled. All future commands in this session will execute without confirmation.[/bold green]&#34;)
+                    self.console.print(&#34;[pass]✓ Trust Mode Enabled. All future commands in this session will execute without confirmation.[/pass]&#34;)
                 elif user_resp_lower in [&#39;y&#39;, &#39;yes&#39;]:
-                    console.print(&#34;[bold green]✓ Executing...[/bold green]&#34;)
+                    self.console.print(&#34;[pass]✓ Executing...[/pass]&#34;)
                 elif user_resp_lower in [&#39;n&#39;, &#39;no&#39;, &#39;&#39;]:
-                    console.print(&#34;[bold red]✗ Execution rejected by user.[/bold red]&#34;)
+                    self.console.print(&#34;[fail]✗ Execution rejected by user.[/fail]&#34;)
                     return &#34;Error: User rejected execution.&#34;
                 else:
-                    console.print(f&#34;[bold cyan]User feedback: [/bold cyan]{user_resp}&#34;)
+                    self.console.print(f&#34;[user_prompt]User feedback: [/user_prompt]{user_resp}&#34;)
                     return f&#34;User requested changes: {user_resp}. Please adjust the commands based on this feedback and try again.&#34;
         
         try:
@@ -1347,22 +1505,31 @@ class ai:
         soft_limit_warned = False
         
         try:
+            # Set up remote interrupt callback if bridge is provided
+            if status and hasattr(status, &#34;on_interrupt&#34;):
+                status.on_interrupt = lambda: setattr(self, &#34;interrupted&#34;, True)
+
             while iteration &lt; self.hard_limit_iterations:
                 iteration += 1
                 
+                # Check for interruption
+                if self.interrupted:
+                    raise KeyboardInterrupt
+                
                 # Soft limit warning
                 if iteration == self.soft_limit_iterations and not soft_limit_warned:
-                    console.print(f&#34;[yellow]⚠ Engineer has performed {iteration} steps. This is taking longer than expected.[/yellow]&#34;)
-                    console.print(f&#34;[yellow]  You can press Ctrl+C to interrupt and get a summary.[/yellow]&#34;)
+                    self.console.print(f&#34;[warning]⚠ Engineer has performed {iteration} steps. This is taking longer than expected.[/warning]&#34;)
+                    self.console.print(f&#34;[warning]  You can press Ctrl+C to interrupt and get a summary.[/warning]&#34;)
                     soft_limit_warned = True
                 
-                if status: status.update(f&#34;[bold blue]Engineer: Analyzing mission... (step {iteration})&#34;)
+                if status: status.update(f&#34;[ai_status]Engineer: Analyzing mission... (step {iteration})&#34;)
                 
                 try:
                     safe_messages = self._sanitize_messages(messages)
                     response = completion(model=self.engineer_model, messages=safe_messages, tools=tools, api_key=self.engineer_key)
                 except Exception as e:
-                    return f&#34;Engineer failed to connect: {str(e)}&#34;, usage
+                    if status: status.stop()
+                    raise ValueError(f&#34;Engineer failed to connect: {str(e)}&#34;)
                 
                 if hasattr(response, &#34;usage&#34;) and response.usage:
                     usage[&#34;input&#34;] += getattr(response.usage, &#34;prompt_tokens&#34;, 0)
@@ -1380,15 +1547,15 @@ class ai:
                     
                     # Notificación en tiempo real de la tarea técnica
                     if status:
-                        if fn == &#34;list_nodes&#34;: status.update(f&#34;[bold blue]Engineer: [SEARCH] {args.get(&#39;filter_pattern&#39;,&#39;.*&#39;)}&#34;)
+                        if fn == &#34;list_nodes&#34;: status.update(f&#34;[ai_status]Engineer: [SEARCH] {args.get(&#39;filter_pattern&#39;,&#39;.*&#39;)}&#34;)
                         elif fn == &#34;run_commands&#34;: 
                             cmds = args.get(&#39;commands&#39;, [])
                             cmd_str = cmds[0] if cmds else &#34;&#34;
-                            status.update(f&#34;[bold blue]Engineer: [CMD] {cmd_str}&#34;)
-                        elif fn == &#34;get_node_info&#34;: status.update(f&#34;[bold blue]Engineer: [INSPECT] {args.get(&#39;node_name&#39;,&#39;&#39;)}&#34;)
+                            status.update(f&#34;[ai_status]Engineer: [CMD] {cmd_str}&#34;)
+                        elif fn == &#34;get_node_info&#34;: status.update(f&#34;[ai_status]Engineer: [INSPECT] {args.get(&#39;node_name&#39;,&#39;&#39;)}&#34;)
                         elif fn in self.tool_status_formatters: status.update(self.tool_status_formatters[fn](args))
 
-                    if debug: console.print(Panel(Text(json.dumps(args, indent=2)), title=f&#34;[bold blue]Engineer Tool: {fn}[/bold blue]&#34;, border_style=&#34;blue&#34;))
+                    if debug: self.console.print(Panel(Text(json.dumps(args, indent=2)), title=f&#34;[bold engineer]Engineer Tool: {fn}[/bold engineer]&#34;, border_style=&#34;engineer&#34;))
                     
                     if fn == &#34;list_nodes&#34;: obs = self.list_nodes_tool(**args)
                     elif fn == &#34;run_commands&#34;: obs = self.run_commands_tool(**args, status=status)
@@ -1396,14 +1563,14 @@ class ai:
                     elif fn in self.external_tool_handlers: obs = self.external_tool_handlers[fn](self, **args)
                     else: obs = f&#34;Error: Unknown tool &#39;{fn}&#39;.&#34;
                     
-                    if debug: console.print(Panel(Text(str(obs)), title=f&#34;[bold green]Engineer Observation: {fn}[/bold green]&#34;, border_style=&#34;green&#34;))
+                    if debug: self.console.print(Panel(Text(str(obs)), title=f&#34;[bold pass]Engineer Observation: {fn}[/bold pass]&#34;, border_style=&#34;success&#34;))
                     messages.append({&#34;tool_call_id&#34;: tc.id, &#34;role&#34;: &#34;tool&#34;, &#34;name&#34;: fn, &#34;content&#34;: obs})
             
             if iteration &gt;= self.hard_limit_iterations:
-                console.print(f&#34;[red]⛔ Engineer reached hard limit ({self.hard_limit_iterations} steps). Forcing stop.[/red]&#34;)
+                self.console.print(f&#34;[error]⛔ Engineer reached hard limit ({self.hard_limit_iterations} steps). Forcing stop.[/error]&#34;)
             
             if debug and resp_msg.content:
-                console.print(Panel(Text(resp_msg.content), title=&#34;[bold blue]Engineer Final Report to Architect[/bold blue]&#34;, border_style=&#34;blue&#34;))
+                self.console.print(Panel(Text(resp_msg.content), title=&#34;[bold engineer]Engineer Final Report to Architect[/bold engineer]&#34;, border_style=&#34;engineer&#34;))
             
             return resp_msg.content, usage
         except Exception as e:
@@ -1414,10 +1581,15 @@ class ai:
         tools = [
             {&#34;type&#34;: &#34;function&#34;, &#34;function&#34;: {&#34;name&#34;: &#34;list_nodes&#34;, &#34;description&#34;: &#34;Lists available nodes in the inventory.&#34;, &#34;parameters&#34;: {&#34;type&#34;: &#34;object&#34;, &#34;properties&#34;: {&#34;filter_pattern&#34;: {&#34;type&#34;: &#34;string&#34;, &#34;description&#34;: &#34;Regex to filter nodes (e.g. &#39;.*&#39;, &#39;border.*&#39;).&#34;}}}}},
             {&#34;type&#34;: &#34;function&#34;, &#34;function&#34;: {&#34;name&#34;: &#34;run_commands&#34;, &#34;description&#34;: &#34;Runs one or more commands on matched nodes. MANDATORY: You MUST call &#39;list_nodes&#39; first to verify the target list.&#34;, &#34;parameters&#34;: {&#34;type&#34;: &#34;object&#34;, &#34;properties&#34;: {&#34;nodes_filter&#34;: {&#34;type&#34;: &#34;string&#34;, &#34;description&#34;: &#34;Exact node name or verified filter pattern.&#34;}, &#34;commands&#34;: {&#34;type&#34;: &#34;array&#34;, &#34;items&#34;: {&#34;type&#34;: &#34;string&#34;}, &#34;description&#34;: &#34;List of commands (e.g. [&#39;show ip route&#39;, &#39;show int desc&#39;]).&#34;}}, &#34;required&#34;: [&#34;nodes_filter&#34;, &#34;commands&#34;]}}},
-            {&#34;type&#34;: &#34;function&#34;, &#34;function&#34;: {&#34;name&#34;: &#34;get_node_info&#34;, &#34;description&#34;: &#34;Gets full metadata for a specific node.&#34;, &#34;parameters&#34;: {&#34;type&#34;: &#34;object&#34;, &#34;properties&#34;: {&#34;node_name&#34;: {&#34;type&#34;: &#34;string&#34;}}, &#34;required&#34;: [&#34;node_name&#34;]}}},
-            {&#34;type&#34;: &#34;function&#34;, &#34;function&#34;: {&#34;name&#34;: &#34;consult_architect&#34;, &#34;description&#34;: &#34;Ask the Strategic Reasoning Engine for advice on complex design, architecture, or troubleshooting decisions. You remain in control and will present the response to the user. Use this for: configuration planning, design validation, complex troubleshooting.&#34;, &#34;parameters&#34;: {&#34;type&#34;: &#34;object&#34;, &#34;properties&#34;: {&#34;question&#34;: {&#34;type&#34;: &#34;string&#34;, &#34;description&#34;: &#34;Strategic question or decision needed.&#34;}, &#34;technical_summary&#34;: {&#34;type&#34;: &#34;string&#34;, &#34;description&#34;: &#34;Technical findings and context gathered so far.&#34;}}, &#34;required&#34;: [&#34;question&#34;, &#34;technical_summary&#34;]}}},
-            {&#34;type&#34;: &#34;function&#34;, &#34;function&#34;: {&#34;name&#34;: &#34;escalate_to_architect&#34;, &#34;description&#34;: &#34;Transfer full control to the Strategic Reasoning Engine. Use ONLY when the user explicitly requests the Architect or when the problem requires strategic oversight beyond consultation. After escalation, the Architect takes over the conversation.&#34;, &#34;parameters&#34;: {&#34;type&#34;: &#34;object&#34;, &#34;properties&#34;: {&#34;reason&#34;: {&#34;type&#34;: &#34;string&#34;, &#34;description&#34;: &#34;Why you&#39;re escalating (e.g. &#39;User requested Architect&#39;, &#39;Complex multi-site design needed&#39;).&#34;}, &#34;context&#34;: {&#34;type&#34;: &#34;string&#34;, &#34;description&#34;: &#34;Full context and findings to hand over.&#34;}}, &#34;required&#34;: [&#34;reason&#34;, &#34;context&#34;]}}}
+            {&#34;type&#34;: &#34;function&#34;, &#34;function&#34;: {&#34;name&#34;: &#34;get_node_info&#34;, &#34;description&#34;: &#34;Gets full metadata for a specific node.&#34;, &#34;parameters&#34;: {&#34;type&#34;: &#34;object&#34;, &#34;properties&#34;: {&#34;node_name&#34;: {&#34;type&#34;: &#34;string&#34;}}, &#34;required&#34;: [&#34;node_name&#34;]}}}
         ]
+        
+        if self.architect_key:
+            tools.extend([
+                {&#34;type&#34;: &#34;function&#34;, &#34;function&#34;: {&#34;name&#34;: &#34;consult_architect&#34;, &#34;description&#34;: &#34;Ask the Strategic Reasoning Engine for advice on complex design, architecture, or troubleshooting decisions. You remain in control and will present the response to the user. Use this for: configuration planning, design validation, complex troubleshooting.&#34;, &#34;parameters&#34;: {&#34;type&#34;: &#34;object&#34;, &#34;properties&#34;: {&#34;question&#34;: {&#34;type&#34;: &#34;string&#34;, &#34;description&#34;: &#34;Strategic question or decision needed.&#34;}, &#34;technical_summary&#34;: {&#34;type&#34;: &#34;string&#34;, &#34;description&#34;: &#34;Technical findings and context gathered so far.&#34;}}, &#34;required&#34;: [&#34;question&#34;, &#34;technical_summary&#34;]}}},
+                {&#34;type&#34;: &#34;function&#34;, &#34;function&#34;: {&#34;name&#34;: &#34;escalate_to_architect&#34;, &#34;description&#34;: &#34;Transfer full control to the Strategic Reasoning Engine. Use ONLY when the user explicitly requests the Architect or when the problem requires strategic oversight beyond consultation. After escalation, the Architect takes over the conversation.&#34;, &#34;parameters&#34;: {&#34;type&#34;: &#34;object&#34;, &#34;properties&#34;: {&#34;reason&#34;: {&#34;type&#34;: &#34;string&#34;, &#34;description&#34;: &#34;Why you&#39;re escalating (e.g. &#39;User requested Architect&#39;, &#39;Complex multi-site design needed&#39;).&#34;}, &#34;context&#34;: {&#34;type&#34;: &#34;string&#34;, &#34;description&#34;: &#34;Full context and findings to hand over.&#34;}}, &#34;required&#34;: [&#34;reason&#34;, &#34;context&#34;]}}}
+            ])
+            
         tools.extend(self.external_engineer_tools)
         return tools
 
@@ -1539,7 +1711,10 @@ class ai:
             printer.error(f&#34;Failed to save session: {e}&#34;)
 
     @MethodHook
-    def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=False, stream=True, session_id=None):
+    def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=False, stream=True, session_id=None, chunk_callback=None):
+        if not self.engineer_key:
+            raise ValueError(&#34;Engineer API key not configured. Use &#39;connpy config --engineer-api-key &lt;key&gt;&#39; to set it.&#34;)
+            
         if chat_history is None: chat_history = []
         
         # Load session if provided and history is empty
@@ -1611,20 +1786,25 @@ class ai:
 
         # 3. Bucle de ejecución
         iteration = 0
-        soft_limit_warned = False
-        streamed_response = False
-        
         try:
+            # Set up remote interrupt callback if bridge is provided
+            if status and hasattr(status, &#34;on_interrupt&#34;):
+                status.on_interrupt = lambda: setattr(self, &#34;interrupted&#34;, True)
+
             while iteration &lt; self.hard_limit_iterations:
                 iteration += 1
                 
+                # Check for interruption
+                if self.interrupted:
+                    raise KeyboardInterrupt
+                
                 # Soft limit warning
                 if iteration == self.soft_limit_iterations and not soft_limit_warned:
-                    console.print(f&#34;[yellow]⚠ Agent has performed {iteration} steps. This is taking longer than expected.[/yellow]&#34;)
-                    console.print(f&#34;[yellow]  You can press Ctrl+C to interrupt and get a summary of progress.[/yellow]&#34;)
+                    self.console.print(f&#34;[warning]⚠ Agent has performed {iteration} steps. This is taking longer than expected.[/warning]&#34;)
+                    self.console.print(f&#34;[warning]  You can press Ctrl+C to interrupt and get a summary of progress.[/warning]&#34;)
                     soft_limit_warned = True
                 
-                label = &#34;[bold medium_purple]Architect&#34; if current_brain == &#34;architect&#34; else &#34;[bold blue]Engineer&#34;
+                label = &#34;[architect][bold]Architect[/bold][/architect]&#34; if current_brain == &#34;architect&#34; else &#34;[engineer][bold]Engineer[/bold][/engineer]&#34;
                 if status: status.update(f&#34;{label} is thinking... (step {iteration})&#34;)
                 
                 streamed_response = False
@@ -1633,13 +1813,14 @@ class ai:
                     if stream and not debug:
                         response, streamed_response = self._stream_completion(
                             model=model, messages=safe_messages, tools=tools, api_key=key,
-                            status=status, label=label, debug=debug, num_retries=3
+                            status=status, label=label, debug=debug, num_retries=3,
+                            chunk_callback=chunk_callback
                         )
                     else:
                         response = completion(model=model, messages=safe_messages, tools=tools, api_key=key, num_retries=3)
                 except Exception as e:
                     if current_brain == &#34;architect&#34;:
-                        if status: status.update(&#34;[bold orange3]Architect unavailable! Falling back to Engineer...&#34;)
+                        if status: status.update(&#34;[unavailable]Architect unavailable! Falling back to Engineer...&#34;)
                         # Preserve context when falling back - use clean_input directly
                         current_brain = &#34;engineer&#34;
                         model = self.engineer_model
@@ -1669,7 +1850,7 @@ class ai:
                 messages.append(msg_dict)
 
                 if debug and resp_msg.content:
-                    console.print(Panel(Markdown(resp_msg.content), title=f&#34;{label} Reasoning&#34;, border_style=&#34;medium_purple&#34; if current_brain == &#34;architect&#34; else &#34;blue&#34;))
+                    self.console.print(Panel(Markdown(resp_msg.content), title=f&#34;{label} Reasoning&#34;, border_style=&#34;architect&#34; if current_brain == &#34;architect&#34; else &#34;engineer&#34;))
 
                 if not resp_msg.tool_calls: break
                 
@@ -1686,16 +1867,16 @@ class ai:
                         continue
                     
                     if status:
-                        if fn == &#34;delegate_to_engineer&#34;: status.update(f&#34;[bold medium_purple]Architect: [DELEGATING MISSION] {args.get(&#39;task&#39;,&#39;&#39;)[:40]}...&#34;)
-                        elif fn == &#34;manage_memory_tool&#34;: status.update(f&#34;[bold medium_purple]Architect: [UPDATING MEMORY]&#34;)
+                        if fn == &#34;delegate_to_engineer&#34;: status.update(f&#34;[architect]Architect: [DELEGATING MISSION] {args.get(&#39;task&#39;,&#39;&#39;)[:40]}...&#34;)
+                        elif fn == &#34;manage_memory_tool&#34;: status.update(f&#34;[architect]Architect: [UPDATING MEMORY]&#34;)
 
-                    if debug: console.print(Panel(Text(json.dumps(args, indent=2)), title=f&#34;{label} Decision: {fn}&#34;, border_style=&#34;white&#34;))
+                    if debug: self.console.print(Panel(Text(json.dumps(args, indent=2)), title=f&#34;{label} Decision: {fn}&#34;, border_style=&#34;debug&#34;))
 
                     if fn == &#34;delegate_to_engineer&#34;:
                         obs, eng_usage = self._engineer_loop(args[&#34;task&#34;], status=status, debug=debug, chat_history=messages[:-1])
                         usage[&#34;input&#34;] += eng_usage[&#34;input&#34;]; usage[&#34;output&#34;] += eng_usage[&#34;output&#34;]; usage[&#34;total&#34;] += eng_usage[&#34;total&#34;]
                     elif fn == &#34;consult_architect&#34;:
-                        if status: status.update(&#34;[bold medium_purple]Engineer consulting Architect...&#34;)
+                        if status: status.update(&#34;[architect]Engineer consulting Architect...&#34;)
                         try:
                             # Consultation only - Engineer stays in control
                             claude_resp = completion(
@@ -1708,13 +1889,13 @@ class ai:
                                 num_retries=3
                             )
                             obs = claude_resp.choices[0].message.content
-                            if debug: console.print(Panel(Markdown(obs), title=&#34;[bold medium_purple]Architect Consultation[/bold medium_purple]&#34;, border_style=&#34;medium_purple&#34;))
+                            if debug: self.console.print(Panel(Markdown(obs), title=&#34;[architect]Architect Consultation[/architect]&#34;, border_style=&#34;architect&#34;))
                         except Exception as e:
-                            if status: status.update(&#34;[bold orange3]Architect unavailable! Engineer continuing alone...&#34;)
+                            if status: status.update(&#34;[unavailable]Architect unavailable! Engineer continuing alone...&#34;)
                             obs = f&#34;Architect unavailable ({str(e)}). Proceeding with your best technical judgment.&#34;
                     
                     elif fn == &#34;escalate_to_architect&#34;:
-                        if status: status.update(&#34;[bold medium_purple]Transferring control to Architect...&#34;)
+                        if status: status.update(&#34;[architect]Transferring control to Architect...&#34;)
                         # Full escalation - Architect takes over
                         current_brain = &#34;architect&#34;
                         model = self.architect_model
@@ -1725,10 +1906,10 @@ class ai:
                         handover_msg = f&#34;HANDOVER FROM EXECUTION ENGINE\n\nReason: {args[&#39;reason&#39;]}\n\nContext: {args[&#39;context&#39;]}\n\nYou are now in control of this conversation.&#34;
                         pending_user_message = handover_msg
                         obs = &#34;Control transferred to Architect. Handover context will be provided.&#34;
-                        if debug: console.print(Panel(Text(handover_msg), title=&#34;[bold medium_purple]Escalation to Architect[/bold medium_purple]&#34;, border_style=&#34;medium_purple&#34;))
+                        if debug: self.console.print(Panel(Text(handover_msg), title=&#34;[architect]Escalation to Architect[/architect]&#34;, border_style=&#34;architect&#34;))
                     
                     elif fn == &#34;return_to_engineer&#34;:
-                        if status: status.update(&#34;[bold blue]Transferring control back to Engineer...&#34;)
+                        if status: status.update(&#34;[engineer]Transferring control back to Engineer...&#34;)
                         # Architect returns control to Engineer
                         current_brain = &#34;engineer&#34;
                         model = self.engineer_model
@@ -1739,7 +1920,7 @@ class ai:
                         handover_msg = f&#34;HANDOVER FROM ARCHITECT\n\nSummary: {args[&#39;summary&#39;]}\n\nYou are now back in control. Continue handling the user&#39;s requests.&#34;
                         pending_user_message = handover_msg
                         obs = &#34;Control returned to Engineer. Handover summary will be provided.&#34;
-                        if debug: console.print(Panel(Text(handover_msg), title=&#34;[bold blue]Return to Engineer[/bold blue]&#34;, border_style=&#34;blue&#34;))
+                        if debug: self.console.print(Panel(Text(handover_msg), title=&#34;[engineer]Return to Engineer[/engineer]&#34;, border_style=&#34;engineer&#34;))
                     
                     elif fn == &#34;list_nodes&#34;: obs = self.list_nodes_tool(**args)
                     elif fn == &#34;run_commands&#34;: obs = self.run_commands_tool(**args, status=status)
@@ -1755,7 +1936,7 @@ class ai:
                     messages.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: pending_user_message})
             
             if iteration &gt;= self.hard_limit_iterations:
-                console.print(f&#34;[red]⛔ Agent reached hard limit ({self.hard_limit_iterations} steps). Forcing stop to prevent infinite loop.[/red]&#34;)
+                self.console.print(f&#34;[error]⛔ Agent reached hard limit ({self.hard_limit_iterations} steps). Forcing stop to prevent infinite loop.[/error]&#34;)
                 # Only inject user message if we&#39;re not in the middle of tool calls
                 last_msg = messages[-1] if messages else {}
                 if last_msg.get(&#34;role&#34;) != &#34;assistant&#34; or not last_msg.get(&#34;tool_calls&#34;):
@@ -1767,10 +1948,10 @@ class ai:
                         messages.append(resp_msg.model_dump(exclude_none=True))
                     except Exception as e:
                         if status:
-                            status.update(f&#34;[bold red]Error fetching summary: {e}[/bold red]&#34;)
+                            status.update(f&#34;[error]Error fetching summary: {e}[/error]&#34;)
                         printer.warning(f&#34;Failed to fetch final summary from LLM: {e}&#34;)
         except KeyboardInterrupt:
-            if status: status.update(&#34;[bold red]Interrupted! Closing pending tasks...&#34;)
+            if status: status.update(&#34;[error]Interrupted! Closing pending tasks...&#34;)
             last_msg = messages[-1]
             if last_msg.get(&#34;tool_calls&#34;):
                 for tc in last_msg[&#34;tool_calls&#34;]:
@@ -1778,7 +1959,8 @@ class ai:
             messages.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;USER INTERRUPTED. Briefly summarize what you were doing and stop.&#34;})
             try:
                 safe_messages = self._sanitize_messages(messages)
-                response = completion(model=model, messages=safe_messages, tools=tools, api_key=key)
+                # Use tools=None to force a text summary during interruption
+                response = completion(model=model, messages=safe_messages, tools=None, api_key=key)
                 resp_msg = response.choices[0].message
                 messages.append(resp_msg.model_dump(exclude_none=True))
             except Exception: pass
@@ -1844,7 +2026,7 @@ def engineer_system_prompt(self):
 <h3>Methods</h3>
 <dl>
 <dt id="connpy.ai.ask"><code class="name flex">
-<span>def <span class="ident">ask</span></span>(<span>self,<br>user_input,<br>dryrun=False,<br>chat_history=None,<br>status=None,<br>debug=False,<br>stream=True,<br>session_id=None)</span>
+<span>def <span class="ident">ask</span></span>(<span>self,<br>user_input,<br>dryrun=False,<br>chat_history=None,<br>status=None,<br>debug=False,<br>stream=True,<br>session_id=None,<br>chunk_callback=None)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -1852,7 +2034,10 @@ def engineer_system_prompt(self):
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@MethodHook
-def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=False, stream=True, session_id=None):
+def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=False, stream=True, session_id=None, chunk_callback=None):
+    if not self.engineer_key:
+        raise ValueError(&#34;Engineer API key not configured. Use &#39;connpy config --engineer-api-key &lt;key&gt;&#39; to set it.&#34;)
+        
     if chat_history is None: chat_history = []
     
     # Load session if provided and history is empty
@@ -1924,20 +2109,25 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
 
     # 3. Bucle de ejecución
     iteration = 0
-    soft_limit_warned = False
-    streamed_response = False
-    
     try:
+        # Set up remote interrupt callback if bridge is provided
+        if status and hasattr(status, &#34;on_interrupt&#34;):
+            status.on_interrupt = lambda: setattr(self, &#34;interrupted&#34;, True)
+
         while iteration &lt; self.hard_limit_iterations:
             iteration += 1
             
+            # Check for interruption
+            if self.interrupted:
+                raise KeyboardInterrupt
+            
             # Soft limit warning
             if iteration == self.soft_limit_iterations and not soft_limit_warned:
-                console.print(f&#34;[yellow]⚠ Agent has performed {iteration} steps. This is taking longer than expected.[/yellow]&#34;)
-                console.print(f&#34;[yellow]  You can press Ctrl+C to interrupt and get a summary of progress.[/yellow]&#34;)
+                self.console.print(f&#34;[warning]⚠ Agent has performed {iteration} steps. This is taking longer than expected.[/warning]&#34;)
+                self.console.print(f&#34;[warning]  You can press Ctrl+C to interrupt and get a summary of progress.[/warning]&#34;)
                 soft_limit_warned = True
             
-            label = &#34;[bold medium_purple]Architect&#34; if current_brain == &#34;architect&#34; else &#34;[bold blue]Engineer&#34;
+            label = &#34;[architect][bold]Architect[/bold][/architect]&#34; if current_brain == &#34;architect&#34; else &#34;[engineer][bold]Engineer[/bold][/engineer]&#34;
             if status: status.update(f&#34;{label} is thinking... (step {iteration})&#34;)
             
             streamed_response = False
@@ -1946,13 +2136,14 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
                 if stream and not debug:
                     response, streamed_response = self._stream_completion(
                         model=model, messages=safe_messages, tools=tools, api_key=key,
-                        status=status, label=label, debug=debug, num_retries=3
+                        status=status, label=label, debug=debug, num_retries=3,
+                        chunk_callback=chunk_callback
                     )
                 else:
                     response = completion(model=model, messages=safe_messages, tools=tools, api_key=key, num_retries=3)
             except Exception as e:
                 if current_brain == &#34;architect&#34;:
-                    if status: status.update(&#34;[bold orange3]Architect unavailable! Falling back to Engineer...&#34;)
+                    if status: status.update(&#34;[unavailable]Architect unavailable! Falling back to Engineer...&#34;)
                     # Preserve context when falling back - use clean_input directly
                     current_brain = &#34;engineer&#34;
                     model = self.engineer_model
@@ -1982,7 +2173,7 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
             messages.append(msg_dict)
 
             if debug and resp_msg.content:
-                console.print(Panel(Markdown(resp_msg.content), title=f&#34;{label} Reasoning&#34;, border_style=&#34;medium_purple&#34; if current_brain == &#34;architect&#34; else &#34;blue&#34;))
+                self.console.print(Panel(Markdown(resp_msg.content), title=f&#34;{label} Reasoning&#34;, border_style=&#34;architect&#34; if current_brain == &#34;architect&#34; else &#34;engineer&#34;))
 
             if not resp_msg.tool_calls: break
             
@@ -1999,16 +2190,16 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
                     continue
                 
                 if status:
-                    if fn == &#34;delegate_to_engineer&#34;: status.update(f&#34;[bold medium_purple]Architect: [DELEGATING MISSION] {args.get(&#39;task&#39;,&#39;&#39;)[:40]}...&#34;)
-                    elif fn == &#34;manage_memory_tool&#34;: status.update(f&#34;[bold medium_purple]Architect: [UPDATING MEMORY]&#34;)
+                    if fn == &#34;delegate_to_engineer&#34;: status.update(f&#34;[architect]Architect: [DELEGATING MISSION] {args.get(&#39;task&#39;,&#39;&#39;)[:40]}...&#34;)
+                    elif fn == &#34;manage_memory_tool&#34;: status.update(f&#34;[architect]Architect: [UPDATING MEMORY]&#34;)
 
-                if debug: console.print(Panel(Text(json.dumps(args, indent=2)), title=f&#34;{label} Decision: {fn}&#34;, border_style=&#34;white&#34;))
+                if debug: self.console.print(Panel(Text(json.dumps(args, indent=2)), title=f&#34;{label} Decision: {fn}&#34;, border_style=&#34;debug&#34;))
 
                 if fn == &#34;delegate_to_engineer&#34;:
                     obs, eng_usage = self._engineer_loop(args[&#34;task&#34;], status=status, debug=debug, chat_history=messages[:-1])
                     usage[&#34;input&#34;] += eng_usage[&#34;input&#34;]; usage[&#34;output&#34;] += eng_usage[&#34;output&#34;]; usage[&#34;total&#34;] += eng_usage[&#34;total&#34;]
                 elif fn == &#34;consult_architect&#34;:
-                    if status: status.update(&#34;[bold medium_purple]Engineer consulting Architect...&#34;)
+                    if status: status.update(&#34;[architect]Engineer consulting Architect...&#34;)
                     try:
                         # Consultation only - Engineer stays in control
                         claude_resp = completion(
@@ -2021,13 +2212,13 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
                             num_retries=3
                         )
                         obs = claude_resp.choices[0].message.content
-                        if debug: console.print(Panel(Markdown(obs), title=&#34;[bold medium_purple]Architect Consultation[/bold medium_purple]&#34;, border_style=&#34;medium_purple&#34;))
+                        if debug: self.console.print(Panel(Markdown(obs), title=&#34;[architect]Architect Consultation[/architect]&#34;, border_style=&#34;architect&#34;))
                     except Exception as e:
-                        if status: status.update(&#34;[bold orange3]Architect unavailable! Engineer continuing alone...&#34;)
+                        if status: status.update(&#34;[unavailable]Architect unavailable! Engineer continuing alone...&#34;)
                         obs = f&#34;Architect unavailable ({str(e)}). Proceeding with your best technical judgment.&#34;
                 
                 elif fn == &#34;escalate_to_architect&#34;:
-                    if status: status.update(&#34;[bold medium_purple]Transferring control to Architect...&#34;)
+                    if status: status.update(&#34;[architect]Transferring control to Architect...&#34;)
                     # Full escalation - Architect takes over
                     current_brain = &#34;architect&#34;
                     model = self.architect_model
@@ -2038,10 +2229,10 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
                     handover_msg = f&#34;HANDOVER FROM EXECUTION ENGINE\n\nReason: {args[&#39;reason&#39;]}\n\nContext: {args[&#39;context&#39;]}\n\nYou are now in control of this conversation.&#34;
                     pending_user_message = handover_msg
                     obs = &#34;Control transferred to Architect. Handover context will be provided.&#34;
-                    if debug: console.print(Panel(Text(handover_msg), title=&#34;[bold medium_purple]Escalation to Architect[/bold medium_purple]&#34;, border_style=&#34;medium_purple&#34;))
+                    if debug: self.console.print(Panel(Text(handover_msg), title=&#34;[architect]Escalation to Architect[/architect]&#34;, border_style=&#34;architect&#34;))
                 
                 elif fn == &#34;return_to_engineer&#34;:
-                    if status: status.update(&#34;[bold blue]Transferring control back to Engineer...&#34;)
+                    if status: status.update(&#34;[engineer]Transferring control back to Engineer...&#34;)
                     # Architect returns control to Engineer
                     current_brain = &#34;engineer&#34;
                     model = self.engineer_model
@@ -2052,7 +2243,7 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
                     handover_msg = f&#34;HANDOVER FROM ARCHITECT\n\nSummary: {args[&#39;summary&#39;]}\n\nYou are now back in control. Continue handling the user&#39;s requests.&#34;
                     pending_user_message = handover_msg
                     obs = &#34;Control returned to Engineer. Handover summary will be provided.&#34;
-                    if debug: console.print(Panel(Text(handover_msg), title=&#34;[bold blue]Return to Engineer[/bold blue]&#34;, border_style=&#34;blue&#34;))
+                    if debug: self.console.print(Panel(Text(handover_msg), title=&#34;[engineer]Return to Engineer[/engineer]&#34;, border_style=&#34;engineer&#34;))
                 
                 elif fn == &#34;list_nodes&#34;: obs = self.list_nodes_tool(**args)
                 elif fn == &#34;run_commands&#34;: obs = self.run_commands_tool(**args, status=status)
@@ -2068,7 +2259,7 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
                 messages.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: pending_user_message})
         
         if iteration &gt;= self.hard_limit_iterations:
-            console.print(f&#34;[red]⛔ Agent reached hard limit ({self.hard_limit_iterations} steps). Forcing stop to prevent infinite loop.[/red]&#34;)
+            self.console.print(f&#34;[error]⛔ Agent reached hard limit ({self.hard_limit_iterations} steps). Forcing stop to prevent infinite loop.[/error]&#34;)
             # Only inject user message if we&#39;re not in the middle of tool calls
             last_msg = messages[-1] if messages else {}
             if last_msg.get(&#34;role&#34;) != &#34;assistant&#34; or not last_msg.get(&#34;tool_calls&#34;):
@@ -2080,10 +2271,10 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
                     messages.append(resp_msg.model_dump(exclude_none=True))
                 except Exception as e:
                     if status:
-                        status.update(f&#34;[bold red]Error fetching summary: {e}[/bold red]&#34;)
+                        status.update(f&#34;[error]Error fetching summary: {e}[/error]&#34;)
                     printer.warning(f&#34;Failed to fetch final summary from LLM: {e}&#34;)
     except KeyboardInterrupt:
-        if status: status.update(&#34;[bold red]Interrupted! Closing pending tasks...&#34;)
+        if status: status.update(&#34;[error]Interrupted! Closing pending tasks...&#34;)
         last_msg = messages[-1]
         if last_msg.get(&#34;tool_calls&#34;):
             for tc in last_msg[&#34;tool_calls&#34;]:
@@ -2091,7 +2282,8 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
         messages.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;USER INTERRUPTED. Briefly summarize what you were doing and stop.&#34;})
         try:
             safe_messages = self._sanitize_messages(messages)
-            response = completion(model=model, messages=safe_messages, tools=tools, api_key=key)
+            # Use tools=None to force a text summary during interruption
+            response = completion(model=model, messages=safe_messages, tools=None, api_key=key)
             resp_msg = response.choices[0].message
             messages.append(resp_msg.model_dump(exclude_none=True))
         except Exception: pass
@@ -2368,35 +2560,36 @@ def confirm(self, user_input): return True</code></pre>
             formatted_cmds = []
             for cmd in commands:
                 if cmd in unsafe_commands:
-                    formatted_cmds.append(f&#34;  • [yellow]{cmd}[/yellow]&#34;)
+                    formatted_cmds.append(f&#34;  • [warning]{cmd}[/warning]&#34;)
                 else:
                     formatted_cmds.append(f&#34;  • {cmd}&#34;)
             
             panel_content = f&#34;Target: {nodes_filter}\nCommands:\n&#34; + &#34;\n&#34;.join(formatted_cmds)
-            console.print(Panel(panel_content, title=&#34;[bold yellow]⚠️ UNSAFE COMMANDS DETECTED[/bold yellow]&#34;, border_style=&#34;yellow&#34;))
+            # Use print_important if available (for remote bridges) fallback to standard print
+            print_fn = getattr(self.console, &#34;print_important&#34;, self.console.print)
+            print_fn(Panel(panel_content, title=&#34;[bold warning]⚠️ UNSAFE COMMANDS DETECTED[/bold warning]&#34;, border_style=&#34;warning&#34;))
             
             try:
-                from rich.prompt import Prompt
-                user_resp = Prompt.ask(&#34;[bold yellow]Execute? (y: yes / n: no / a: allow all this session / &lt;text&gt;: feedback)[/bold yellow]&#34;, default=&#34;n&#34;)
+                user_resp = self.confirm_handler(&#34;[bold warning]Execute? (y: yes / n: no / a: allow all this session / &lt;text&gt;: feedback)[/bold warning]&#34;, default=&#34;n&#34;)
             except KeyboardInterrupt:
-                if status: status.update(&#34;[bold blue]Engineer: Resuming...&#34;)
-                console.print(&#34;[bold red]✗ Aborted by user (Ctrl+C).[/bold red]&#34;)
-                return &#34;Error: User cancelled execution (Ctrl+C).&#34;
+                if status: status.update(&#34;[ai_status]Engineer: Resuming...&#34;)
+                self.console.print(&#34;[fail]✗ Aborted by user (Ctrl+C).[/fail]&#34;)
+                raise
             
             # Resume the spinner
-            if status: status.update(&#34;[bold blue]Engineer: Processing user response...&#34;)
+            if status: status.update(&#34;[ai_status]Engineer: Processing user response...&#34;)
             
             user_resp_lower = user_resp.strip().lower()
             if user_resp_lower in [&#39;a&#39;, &#39;allow&#39;]:
                 self.trusted_session = True
-                console.print(&#34;[bold green]✓ Trust Mode Enabled. All future commands in this session will execute without confirmation.[/bold green]&#34;)
+                self.console.print(&#34;[pass]✓ Trust Mode Enabled. All future commands in this session will execute without confirmation.[/pass]&#34;)
             elif user_resp_lower in [&#39;y&#39;, &#39;yes&#39;]:
-                console.print(&#34;[bold green]✓ Executing...[/bold green]&#34;)
+                self.console.print(&#34;[pass]✓ Executing...[/pass]&#34;)
             elif user_resp_lower in [&#39;n&#39;, &#39;no&#39;, &#39;&#39;]:
-                console.print(&#34;[bold red]✗ Execution rejected by user.[/bold red]&#34;)
+                self.console.print(&#34;[fail]✗ Execution rejected by user.[/fail]&#34;)
                 return &#34;Error: User rejected execution.&#34;
             else:
-                console.print(f&#34;[bold cyan]User feedback: [/bold cyan]{user_resp}&#34;)
+                self.console.print(f&#34;[user_prompt]User feedback: [/user_prompt]{user_resp}&#34;)
                 return f&#34;User requested changes: {user_resp}. Please adjust the commands based on this feedback and try again.&#34;
     
     try:
@@ -2552,7 +2745,7 @@ class configfile:
                         printer.warning(f&#34;Legacy config {legacy_file} has invalid structure, skipping migration.&#34;)
                     else:
                         with open(self.file, &#39;w&#39;) as f:
-                            yaml.dump(old_data, f, default_flow_style=False, sort_keys=False)
+                            yaml.dump(old_data, f, Dumper=NoAliasDumper, default_flow_style=False, sort_keys=False)
                         # Verify the written YAML can be read back correctly
                         with open(self.file, &#39;r&#39;) as f:
                             verify = yaml.safe_load(f)
@@ -2630,7 +2823,7 @@ class configfile:
                     if self._validate_config(data):
                         # Re-write the YAML from good cache
                         with open(conf, &#39;w&#39;) as f:
-                            yaml.dump(data, f, default_flow_style=False, sort_keys=False)
+                            yaml.dump(data, f, Dumper=NoAliasDumper, default_flow_style=False, sort_keys=False)
                         return data
                 # Both broken or no cache - create fresh
                 printer.error(&#34;Config file is corrupt and no valid cache exists. Creating default config.&#34;)
@@ -2659,7 +2852,7 @@ class configfile:
         #Create config file (always writes defaults, safe for recovery)
         defaultconfig = {&#39;config&#39;: {&#39;case&#39;: False, &#39;idletime&#39;: 30, &#39;fzf&#39;: False}, &#39;connections&#39;: {}, &#39;profiles&#39;: { &#34;default&#34;: { &#34;host&#34;:&#34;&#34;, &#34;protocol&#34;:&#34;ssh&#34;, &#34;port&#34;:&#34;&#34;, &#34;user&#34;:&#34;&#34;, &#34;password&#34;:&#34;&#34;, &#34;options&#34;:&#34;&#34;, &#34;logs&#34;:&#34;&#34;, &#34;tags&#34;: &#34;&#34;, &#34;jumphost&#34;:&#34;&#34;}}}
         with open(conf, &#34;w&#34;) as f:
-            yaml.dump(defaultconfig, f, default_flow_style=False, sort_keys=False)
+            yaml.dump(defaultconfig, f, Dumper=NoAliasDumper, default_flow_style=False, sort_keys=False)
         os.chmod(conf, 0o600)
         try:
             with open(self.cachefile, &#39;w&#39;) as f:
@@ -2678,7 +2871,7 @@ class configfile:
         tmpfile = conf + &#39;.tmp&#39;
         try:
             with open(tmpfile, &#34;w&#34;) as f:
-                yaml.dump(newconfig, f, default_flow_style=False, sort_keys=False)
+                yaml.dump(newconfig, f, Dumper=NoAliasDumper, default_flow_style=False, sort_keys=False)
             # Atomic replace: only overwrite original if write succeeded
             shutil.move(tmpfile, conf)
             with open(self.cachefile, &#34;w&#34;) as f:
@@ -2695,11 +2888,14 @@ class configfile:
             return 1
         return 0
 
-    def _generate_nodes_cache(self):
+    def _generate_nodes_cache(self, nodes=None, folders=None, profiles=None):
         try:
-            nodes = self._getallnodes()
-            folders = self._getallfolders()
-            profiles = list(self.profiles.keys())
+            if nodes is None:
+                nodes = self._getallnodes()
+            if folders is None:
+                folders = self._getallfolders()
+            if profiles is None:
+                profiles = list(self.profiles.keys())
             
             with open(self.fzf_cachefile, &#34;w&#34;) as f:
                 f.write(&#34;\n&#34;.join(nodes))
@@ -2709,6 +2905,7 @@ class configfile:
                 f.write(&#34;\n&#34;.join(profiles))
         except Exception:
             pass
+
 
     def _createkey(self, keyfile):
         #Create key file
@@ -2944,7 +3141,8 @@ class configfile:
             elif isinstance(filter, list):
                 nodes = [item for item in nodes if any(re.search(pattern, item) for pattern in filter)]
             else:
-                raise ValueError(&#34;filter must be a string or a list of strings&#34;)
+                printer.error(&#34;Invalid filter: must be a string or a list of strings.&#34;)
+                sys.exit(1)
         return nodes
 
     @MethodHook
@@ -2969,7 +3167,8 @@ class configfile:
                 filter = [&#34;^(?!.*@).+$&#34; if item == &#34;@&#34; else item for item in filter]
                 nodes = {k: v for k, v in nodes.items() if any(re.search(pattern, k) for pattern in filter)}
             else:
-                raise ValueError(&#34;filter must be a string or a list of strings&#34;)
+                printer.error(&#34;Invalid filter: must be a string or a list of strings.&#34;)
+                sys.exit(1)
         if extract:
             for node, keys in nodes.items():
                 for key, value in keys.items():
@@ -3394,6 +3593,8 @@ class node:
                 profile = re.search(&#34;^@(.*)&#34;, password[i])
                 if profile and config != &#39;&#39;:
                     self.password.append(config.profiles[profile.group(1)][&#34;password&#34;])
+                else:
+                    self.password.append(password[i])
         else:
             self.password = [password]
         if self.jumphost != &#34;&#34; and config != &#39;&#39;:
@@ -3416,6 +3617,8 @@ class node:
                     profile = re.search(&#34;^@(.*)&#34;, self.jumphost[&#34;password&#34;][i])
                     if profile:
                         jumphost_password.append(config.profiles[profile.group(1)][&#34;password&#34;])
+                    else:
+                        jumphost_password.append(self.jumphost[&#34;password&#34;][i])
                 self.jumphost[&#34;password&#34;] = jumphost_password
             else:
                 self.jumphost[&#34;password&#34;] = [self.jumphost[&#34;password&#34;]]
@@ -3454,7 +3657,9 @@ class node:
                     decrypted = decryptor.decrypt(ast.literal_eval(passwd)).decode(&#34;utf-8&#34;)
                     dpass.append(decrypted)
                 except Exception:
-                    raise ValueError(&#34;Missing or corrupted key&#34;)
+                    printer.error(&#34;Decryption failed: Missing or corrupted key.&#34;)
+                    printer.info(&#34;Verify your RSA key and configuration settings.&#34;)
+                    sys.exit(1)
         return dpass
 
     
@@ -3537,7 +3742,7 @@ class node:
 
 
     @MethodHook
-    def interact(self, debug = False):
+    def interact(self, debug = False, logger = None):
         &#39;&#39;&#39;
         Allow user to interact with the node directly, mostly used by connection manager.
 
@@ -3545,12 +3750,15 @@ class node:
 
             - debug (bool): If True, display all the connecting information 
                             before interact. Default False.  
+            - logger (callable): Optional callback for status reporting.
         &#39;&#39;&#39;
-        connect = self._connect(debug = debug)
+        connect = self._connect(debug = debug, logger = logger)
         if connect == True:
             size = re.search(&#39;columns=([0-9]+).*lines=([0-9]+)&#39;,str(os.get_terminal_size()))
             self.child.setwinsize(int(size.group(2)),int(size.group(1)))
-            printer.success(&#34;Connected to &#34; + self.unique + &#34; at &#34; + self.host + (&#34;:&#34; if self.port != &#39;&#39; else &#39;&#39;) + self.port + &#34; via: &#34; + self.protocol)
+            if logger:
+                logger(&#34;success&#34;, &#34;Connected to &#34; + self.unique + &#34; at &#34; + self.host + (&#34;:&#34; if self.port != &#39;&#39; else &#39;&#39;) + self.port + &#34; via: &#34; + self.protocol)
+
             if &#39;logfile&#39; in dir(self):
                 # Initialize self.mylog
                 if not &#39;mylog&#39; in dir(self):
@@ -3575,13 +3783,18 @@ class node:
                     f.write(self._logclean(self.mylog.getvalue().decode(), True))
 
         else:
-            printer.error(connect)
-            exit(1)
+            if logger:
+                logger(&#34;error&#34;, str(connect))
+            else:
+                printer.error(f&#34;Connection failed: {str(connect)}&#34;)
+            sys.exit(1)
+
 
     @MethodHook
-    def run(self, commands, vars = None,*, folder = &#39;&#39;, prompt = r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, stdout = False, timeout = 10):
+    def run(self, commands, vars = None,*, folder = &#39;&#39;, prompt = r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, stdout = False, timeout = 10, logger = None):
         &#39;&#39;&#39;
         Run a command or list of commands on the node and return the output.
+
 
         ### Parameters:  
 
@@ -3619,9 +3832,12 @@ class node:
             str: Output of the commands you ran on the node.
 
         &#39;&#39;&#39;
-        connect = self._connect(timeout = timeout)
+        connect = self._connect(timeout = timeout, logger = logger)
         now = datetime.datetime.now().strftime(&#39;%Y-%m-%d_%H%M%S&#39;)
         if connect == True:
+            if logger:
+                logger(&#34;success&#34;, &#34;Connected to &#34; + self.unique + &#34; at &#34; + self.host + (&#34;:&#34; if self.port != &#39;&#39; else &#39;&#39;) + self.port + &#34; via: &#34; + self.protocol)
+
             # Attempt to set the terminal size
             try:
                 self.child.setwinsize(65535, 65535)
@@ -3633,6 +3849,7 @@ class node:
             if &#34;prompt&#34; in self.tags:
                 prompt = self.tags[&#34;prompt&#34;]
             expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
+
             output = &#39;&#39;
             status = &#39;&#39;
             if not isinstance(commands, list):
@@ -3652,8 +3869,8 @@ class node:
                 result = self.child.expect(expects, timeout = timeout)
             self.child.close()
             output = self._logclean(self.mylog.getvalue().decode(), True)
-            if stdout == True:
-                print(output)
+            if logger:
+                logger(&#34;output&#34;, output)
             if folder != &#39;&#39;:
                 with open(folder + &#34;/&#34; + self.unique + &#34;_&#34; + now + &#34;.txt&#34;, &#34;w&#34;) as f:
                     f.write(output)
@@ -3667,18 +3884,20 @@ class node:
         else:
             self.output = connect
             self.status = 1
-            if stdout == True:
-                print(connect)
+            if logger:
+                logger(&#34;error&#34;, f&#34;Connection failed: {connect}&#34;)
             if folder != &#39;&#39;:
                 with open(folder + &#34;/&#34; + self.unique + &#34;_&#34; + now + &#34;.txt&#34;, &#34;w&#34;) as f:
                     f.write(connect)
+
                     f.close()
             return connect
 
     @MethodHook
-    def test(self, commands, expected, vars = None,*, prompt = r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, timeout = 10):
+    def test(self, commands, expected, vars = None,*, prompt = r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, timeout = 10, logger = None):
         &#39;&#39;&#39;
         Run a command or list of commands on the node, then check if expected value appears on the output after the last command.
+
 
         ### Parameters:  
 
@@ -3715,8 +3934,11 @@ class node:
                   false if prompt is found before.
 
         &#39;&#39;&#39;
-        connect = self._connect(timeout = timeout)
+        connect = self._connect(timeout = timeout, logger = logger)
         if connect == True:
+            if logger:
+                logger(&#34;success&#34;, &#34;Connected to &#34; + self.unique + &#34; at &#34; + self.host + (&#34;:&#34; if self.port != &#39;&#39; else &#39;&#39;) + self.port + &#34; via: &#34; + self.protocol)
+
             # Attempt to set the terminal size
             try:
                 self.child.setwinsize(65535, 65535)
@@ -3831,12 +4053,14 @@ class node:
         elif self.protocol == &#34;docker&#34;:
             return self._generate_docker_cmd()
         else:
-            raise ValueError(f&#34;Invalid protocol: {self.protocol}&#34;)
+            printer.error(f&#34;Invalid protocol: {self.protocol}&#34;)
+            sys.exit(1)
 
     @MethodHook
-    def _connect(self, debug=False, timeout=10, max_attempts=3):
+    def _connect(self, debug=False, timeout=10, max_attempts=3, logger=None):
+
         cmd = self._get_cmd()
-        passwords = self._passtx(self.password) if self.password[0] else []
+        passwords = self._passtx(self.password) if self.password and any(self.password) else []
         if self.logs != &#39;&#39;:
             self.logfile = self._logfile()
         default_prompt = r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;
@@ -3881,9 +4105,11 @@ class node:
             if isinstance(self.tags, dict) and self.tags.get(&#34;console&#34;):
                 child.sendline()
             if debug:
-                printer.debug(f&#34;Command:\n{cmd}&#34;)
+                if logger:
+                    logger(&#34;debug&#34;, f&#34;Command:\n{cmd}&#34;)
                 self.mylog = io.BytesIO()
                 child.logfile_read = self.mylog
+
 
             endloop = False
             for i in range(len(passwords) if passwords else 1):
@@ -3991,7 +4217,7 @@ class node:
 <h3>Methods</h3>
 <dl>
 <dt id="connpy.node.interact"><code class="name flex">
-<span>def <span class="ident">interact</span></span>(<span>self, debug=False)</span>
+<span>def <span class="ident">interact</span></span>(<span>self, debug=False, logger=None)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -3999,7 +4225,7 @@ class node:
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@MethodHook
-def interact(self, debug = False):
+def interact(self, debug = False, logger = None):
     &#39;&#39;&#39;
     Allow user to interact with the node directly, mostly used by connection manager.
 
@@ -4007,12 +4233,15 @@ def interact(self, debug = False):
 
         - debug (bool): If True, display all the connecting information 
                         before interact. Default False.  
+        - logger (callable): Optional callback for status reporting.
     &#39;&#39;&#39;
-    connect = self._connect(debug = debug)
+    connect = self._connect(debug = debug, logger = logger)
     if connect == True:
         size = re.search(&#39;columns=([0-9]+).*lines=([0-9]+)&#39;,str(os.get_terminal_size()))
         self.child.setwinsize(int(size.group(2)),int(size.group(1)))
-        printer.success(&#34;Connected to &#34; + self.unique + &#34; at &#34; + self.host + (&#34;:&#34; if self.port != &#39;&#39; else &#39;&#39;) + self.port + &#34; via: &#34; + self.protocol)
+        if logger:
+            logger(&#34;success&#34;, &#34;Connected to &#34; + self.unique + &#34; at &#34; + self.host + (&#34;:&#34; if self.port != &#39;&#39; else &#39;&#39;) + self.port + &#34; via: &#34; + self.protocol)
+
         if &#39;logfile&#39; in dir(self):
             # Initialize self.mylog
             if not &#39;mylog&#39; in dir(self):
@@ -4037,17 +4266,21 @@ def interact(self, debug = False):
                 f.write(self._logclean(self.mylog.getvalue().decode(), True))
 
     else:
-        printer.error(connect)
-        exit(1)</code></pre>
+        if logger:
+            logger(&#34;error&#34;, str(connect))
+        else:
+            printer.error(f&#34;Connection failed: {str(connect)}&#34;)
+        sys.exit(1)</code></pre>
 </details>
 <div class="desc"><p>Allow user to interact with the node directly, mostly used by connection manager.</p>
 <h3 id="optional-parameters">Optional Parameters:</h3>
 <pre><code>- debug (bool): If True, display all the connecting information 
-                before interact. Default False.
+                before interact. Default False.  
+- logger (callable): Optional callback for status reporting.
 </code></pre></div>
 </dd>
 <dt id="connpy.node.run"><code class="name flex">
-<span>def <span class="ident">run</span></span>(<span>self,<br>commands,<br>vars=None,<br>*,<br>folder='',<br>prompt=&#x27;&gt;$|#$|\\$$|&gt;.$|#.$|\\$.$&#x27;,<br>stdout=False,<br>timeout=10)</span>
+<span>def <span class="ident">run</span></span>(<span>self,<br>commands,<br>vars=None,<br>*,<br>folder='',<br>prompt=&#x27;&gt;$|#$|\\$$|&gt;.$|#.$|\\$.$&#x27;,<br>stdout=False,<br>timeout=10,<br>logger=None)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -4055,9 +4288,10 @@ def interact(self, debug = False):
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@MethodHook
-def run(self, commands, vars = None,*, folder = &#39;&#39;, prompt = r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, stdout = False, timeout = 10):
+def run(self, commands, vars = None,*, folder = &#39;&#39;, prompt = r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, stdout = False, timeout = 10, logger = None):
     &#39;&#39;&#39;
     Run a command or list of commands on the node and return the output.
+
 
     ### Parameters:  
 
@@ -4095,9 +4329,12 @@ def run(self, commands, vars = None,*, folder = &#39;&#39;, prompt = r&#39;&gt;$
         str: Output of the commands you ran on the node.
 
     &#39;&#39;&#39;
-    connect = self._connect(timeout = timeout)
+    connect = self._connect(timeout = timeout, logger = logger)
     now = datetime.datetime.now().strftime(&#39;%Y-%m-%d_%H%M%S&#39;)
     if connect == True:
+        if logger:
+            logger(&#34;success&#34;, &#34;Connected to &#34; + self.unique + &#34; at &#34; + self.host + (&#34;:&#34; if self.port != &#39;&#39; else &#39;&#39;) + self.port + &#34; via: &#34; + self.protocol)
+
         # Attempt to set the terminal size
         try:
             self.child.setwinsize(65535, 65535)
@@ -4109,6 +4346,7 @@ def run(self, commands, vars = None,*, folder = &#39;&#39;, prompt = r&#39;&gt;$
         if &#34;prompt&#34; in self.tags:
             prompt = self.tags[&#34;prompt&#34;]
         expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
+
         output = &#39;&#39;
         status = &#39;&#39;
         if not isinstance(commands, list):
@@ -4128,8 +4366,8 @@ def run(self, commands, vars = None,*, folder = &#39;&#39;, prompt = r&#39;&gt;$
             result = self.child.expect(expects, timeout = timeout)
         self.child.close()
         output = self._logclean(self.mylog.getvalue().decode(), True)
-        if stdout == True:
-            print(output)
+        if logger:
+            logger(&#34;output&#34;, output)
         if folder != &#39;&#39;:
             with open(folder + &#34;/&#34; + self.unique + &#34;_&#34; + now + &#34;.txt&#34;, &#34;w&#34;) as f:
                 f.write(output)
@@ -4143,11 +4381,12 @@ def run(self, commands, vars = None,*, folder = &#39;&#39;, prompt = r&#39;&gt;$
     else:
         self.output = connect
         self.status = 1
-        if stdout == True:
-            print(connect)
+        if logger:
+            logger(&#34;error&#34;, f&#34;Connection failed: {connect}&#34;)
         if folder != &#39;&#39;:
             with open(folder + &#34;/&#34; + self.unique + &#34;_&#34; + now + &#34;.txt&#34;, &#34;w&#34;) as f:
                 f.write(connect)
+
                 f.close()
         return connect</code></pre>
 </details>
@@ -4185,7 +4424,7 @@ def run(self, commands, vars = None,*, folder = &#39;&#39;, prompt = r&#39;&gt;$
 </code></pre></div>
 </dd>
 <dt id="connpy.node.test"><code class="name flex">
-<span>def <span class="ident">test</span></span>(<span>self,<br>commands,<br>expected,<br>vars=None,<br>*,<br>prompt=&#x27;&gt;$|#$|\\$$|&gt;.$|#.$|\\$.$&#x27;,<br>timeout=10)</span>
+<span>def <span class="ident">test</span></span>(<span>self,<br>commands,<br>expected,<br>vars=None,<br>*,<br>prompt=&#x27;&gt;$|#$|\\$$|&gt;.$|#.$|\\$.$&#x27;,<br>timeout=10,<br>logger=None)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -4193,9 +4432,10 @@ def run(self, commands, vars = None,*, folder = &#39;&#39;, prompt = r&#39;&gt;$
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@MethodHook
-def test(self, commands, expected, vars = None,*, prompt = r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, timeout = 10):
+def test(self, commands, expected, vars = None,*, prompt = r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, timeout = 10, logger = None):
     &#39;&#39;&#39;
     Run a command or list of commands on the node, then check if expected value appears on the output after the last command.
+
 
     ### Parameters:  
 
@@ -4232,8 +4472,11 @@ def test(self, commands, expected, vars = None,*, prompt = r&#39;&gt;$|#$|\$$|&g
               false if prompt is found before.
 
     &#39;&#39;&#39;
-    connect = self._connect(timeout = timeout)
+    connect = self._connect(timeout = timeout, logger = logger)
     if connect == True:
+        if logger:
+            logger(&#34;success&#34;, &#34;Connected to &#34; + self.unique + &#34; at &#34; + self.host + (&#34;:&#34; if self.port != &#39;&#39; else &#39;&#39;) + self.port + &#34; via: &#34; + self.protocol)
+
         # Attempt to set the terminal size
         try:
             self.child.setwinsize(65535, 65535)
@@ -4400,9 +4643,10 @@ class nodes:
 
 
     @MethodHook
-    def run(self, commands, vars = None,*, folder = None, prompt = None, stdout = None, parallel = 10, timeout = None, on_complete = None):
+    def run(self, commands, vars = None,*, folder = None, prompt = None, stdout = None, parallel = 10, timeout = None, on_complete = None, logger = None):
         &#39;&#39;&#39;
         Run a command or list of commands on all the nodes in nodelist.
+
 
         ### Parameters:  
 
@@ -4482,11 +4726,17 @@ class nodes:
                     nodesargs[n.unique][&#34;vars&#34;].update(vars[&#34;__global__&#34;])
                 if n.unique in vars.keys():
                     nodesargs[n.unique][&#34;vars&#34;].update(vars[n.unique])
+            
+            # Pass the logger to the node
+            nodesargs[n.unique][&#34;logger&#34;] = logger
+
             if on_complete:
                 tasks.append(threading.Thread(target=_run_node, args=(n, nodesargs[n.unique], on_complete)))
             else:
                 tasks.append(threading.Thread(target=n.run, kwargs=nodesargs[n.unique]))
+
         taskslist = list(self._splitlist(tasks, parallel))
+
         for t in taskslist:
             for i in t:
                 i.start()
@@ -4500,9 +4750,10 @@ class nodes:
         return output
 
     @MethodHook
-    def test(self, commands, expected, vars = None,*, prompt = None, parallel = 10, timeout = None):
+    def test(self, commands, expected, vars = None,*, prompt = None, parallel = 10, timeout = None, on_complete = None, logger = None):
         &#39;&#39;&#39;
         Run a command or list of commands on all the nodes in nodelist, then check if expected value appears on the output after the last command.
+
 
         ### Parameters:  
 
@@ -4538,6 +4789,11 @@ class nodes:
             - timeout  (int): Time in seconds for expect to wait for prompt/EOF.
                               default 10.
 
+            - on_complete (callable): Optional callback called when each node 
+                                      finishes. Receives (unique, output, status).
+                                      Called from the node&#39;s thread so it must
+                                      be thread-safe.
+
         ### Returns:  
 
             dict: Dictionary formed by nodes unique as keys, value is True if 
@@ -4557,6 +4813,13 @@ class nodes:
         result = {}
         status = {}
         tasks = []
+
+        def _test_node(node_obj, node_args, callback):
+            &#34;&#34;&#34;Wrapper that runs a node test and fires the callback on completion.&#34;&#34;&#34;
+            node_obj.test(**node_args)
+            if callback:
+                callback(node_obj.unique, node_obj.output, node_obj.status, node_obj.result)
+
         for n in self.nodelist:
             nodesargs[n.unique] = deepcopy(args)
             if vars != None:
@@ -4565,7 +4828,13 @@ class nodes:
                     nodesargs[n.unique][&#34;vars&#34;].update(vars[&#34;__global__&#34;])
                 if n.unique in vars.keys():
                     nodesargs[n.unique][&#34;vars&#34;].update(vars[n.unique])
-            tasks.append(threading.Thread(target=n.test, kwargs=nodesargs[n.unique]))
+            nodesargs[n.unique][&#34;logger&#34;] = logger
+            
+            if on_complete:
+                tasks.append(threading.Thread(target=_test_node, args=(n, nodesargs[n.unique], on_complete)))
+            else:
+                tasks.append(threading.Thread(target=n.test, kwargs=nodesargs[n.unique]))
+
         taskslist = list(self._splitlist(tasks, parallel))
         for t in taskslist:
             for i in t:
@@ -4619,7 +4888,7 @@ class nodes:
 <h3>Methods</h3>
 <dl>
 <dt id="connpy.nodes.run"><code class="name flex">
-<span>def <span class="ident">run</span></span>(<span>self,<br>commands,<br>vars=None,<br>*,<br>folder=None,<br>prompt=None,<br>stdout=None,<br>parallel=10,<br>timeout=None,<br>on_complete=None)</span>
+<span>def <span class="ident">run</span></span>(<span>self,<br>commands,<br>vars=None,<br>*,<br>folder=None,<br>prompt=None,<br>stdout=None,<br>parallel=10,<br>timeout=None,<br>on_complete=None,<br>logger=None)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -4627,9 +4896,10 @@ class nodes:
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@MethodHook
-def run(self, commands, vars = None,*, folder = None, prompt = None, stdout = None, parallel = 10, timeout = None, on_complete = None):
+def run(self, commands, vars = None,*, folder = None, prompt = None, stdout = None, parallel = 10, timeout = None, on_complete = None, logger = None):
     &#39;&#39;&#39;
     Run a command or list of commands on all the nodes in nodelist.
+
 
     ### Parameters:  
 
@@ -4709,11 +4979,17 @@ def run(self, commands, vars = None,*, folder = None, prompt = None, stdout = No
                 nodesargs[n.unique][&#34;vars&#34;].update(vars[&#34;__global__&#34;])
             if n.unique in vars.keys():
                 nodesargs[n.unique][&#34;vars&#34;].update(vars[n.unique])
+        
+        # Pass the logger to the node
+        nodesargs[n.unique][&#34;logger&#34;] = logger
+
         if on_complete:
             tasks.append(threading.Thread(target=_run_node, args=(n, nodesargs[n.unique], on_complete)))
         else:
             tasks.append(threading.Thread(target=n.run, kwargs=nodesargs[n.unique]))
+
     taskslist = list(self._splitlist(tasks, parallel))
+
     for t in taskslist:
         for i in t:
             i.start()
@@ -4772,7 +5048,7 @@ def run(self, commands, vars = None,*, folder = None, prompt = None, stdout = No
 </code></pre></div>
 </dd>
 <dt id="connpy.nodes.test"><code class="name flex">
-<span>def <span class="ident">test</span></span>(<span>self, commands, expected, vars=None, *, prompt=None, parallel=10, timeout=None)</span>
+<span>def <span class="ident">test</span></span>(<span>self,<br>commands,<br>expected,<br>vars=None,<br>*,<br>prompt=None,<br>parallel=10,<br>timeout=None,<br>on_complete=None,<br>logger=None)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -4780,9 +5056,10 @@ def run(self, commands, vars = None,*, folder = None, prompt = None, stdout = No
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@MethodHook
-def test(self, commands, expected, vars = None,*, prompt = None, parallel = 10, timeout = None):
+def test(self, commands, expected, vars = None,*, prompt = None, parallel = 10, timeout = None, on_complete = None, logger = None):
     &#39;&#39;&#39;
     Run a command or list of commands on all the nodes in nodelist, then check if expected value appears on the output after the last command.
+
 
     ### Parameters:  
 
@@ -4818,6 +5095,11 @@ def test(self, commands, expected, vars = None,*, prompt = None, parallel = 10, 
         - timeout  (int): Time in seconds for expect to wait for prompt/EOF.
                           default 10.
 
+        - on_complete (callable): Optional callback called when each node 
+                                  finishes. Receives (unique, output, status).
+                                  Called from the node&#39;s thread so it must
+                                  be thread-safe.
+
     ### Returns:  
 
         dict: Dictionary formed by nodes unique as keys, value is True if 
@@ -4837,6 +5119,13 @@ def test(self, commands, expected, vars = None,*, prompt = None, parallel = 10, 
     result = {}
     status = {}
     tasks = []
+
+    def _test_node(node_obj, node_args, callback):
+        &#34;&#34;&#34;Wrapper that runs a node test and fires the callback on completion.&#34;&#34;&#34;
+        node_obj.test(**node_args)
+        if callback:
+            callback(node_obj.unique, node_obj.output, node_obj.status, node_obj.result)
+
     for n in self.nodelist:
         nodesargs[n.unique] = deepcopy(args)
         if vars != None:
@@ -4845,7 +5134,13 @@ def test(self, commands, expected, vars = None,*, prompt = None, parallel = 10, 
                 nodesargs[n.unique][&#34;vars&#34;].update(vars[&#34;__global__&#34;])
             if n.unique in vars.keys():
                 nodesargs[n.unique][&#34;vars&#34;].update(vars[n.unique])
-        tasks.append(threading.Thread(target=n.test, kwargs=nodesargs[n.unique]))
+        nodesargs[n.unique][&#34;logger&#34;] = logger
+        
+        if on_complete:
+            tasks.append(threading.Thread(target=_test_node, args=(n, nodesargs[n.unique], on_complete)))
+        else:
+            tasks.append(threading.Thread(target=n.test, kwargs=nodesargs[n.unique]))
+
     taskslist = list(self._splitlist(tasks, parallel))
     for t in taskslist:
         for i in t:
@@ -4892,6 +5187,11 @@ def test(self, commands, expected, vars = None,*, prompt = None, parallel = 10, 
 
 - timeout  (int): Time in seconds for expect to wait for prompt/EOF.
                   default 10.
+
+- on_complete (callable): Optional callback called when each node 
+                          finishes. Receives (unique, output, status).
+                          Called from the node's thread so it must
+                          be thread-safe.
 </code></pre>
 <h3 id="returns">Returns:</h3>
 <pre><code>dict: Dictionary formed by nodes unique as keys, value is True if 
@@ -4915,6 +5215,7 @@ def test(self, commands, expected, vars = None,*, prompt = None, parallel = 10, 
 </ul>
 </li>
 <li><a href="#plugin-requirements-for-connpy">Plugin Requirements for Connpy</a><ul>
+<li><a href="#remote-plugin-execution">Remote Plugin Execution</a></li>
 <li><a href="#general-structure">General Structure</a></li>
 <li><a href="#specific-class-requirements">Specific Class Requirements</a></li>
 <li><a href="#class-dependencies-and-combinations">Class Dependencies and Combinations</a></li>
@@ -4925,16 +5226,13 @@ def test(self, commands, expected, vars = None,*, prompt = None, parallel = 10, 
 </li>
 <li><a href="#executable-block">Executable Block</a></li>
 <li><a href="#command-completion-support">Command Completion Support</a><ul>
-<li><a href="#function-signature">Function Signature</a></li>
-<li><a href="#parameters">Parameters</a></li>
-<li><a href="#contents-of-info">Contents of info</a></li>
-<li><a href="#return-value">Return Value</a></li>
-<li><a href="#example">Example</a></li>
+<li><a href="#1-tree-based-completion-recommended">1. Tree-based Completion (Recommended)</a></li>
+<li><a href="#2-legacy-function-based-completion">2. Legacy Function-based Completion</a></li>
 </ul>
 </li>
 <li><a href="#handling-unknown-arguments">Handling Unknown Arguments</a><ul>
 <li><a href="#behavior">Behavior:</a></li>
-<li><a href="#example_1">Example:</a></li>
+<li><a href="#example">Example:</a></li>
 <li><a href="#note">Note:</a></li>
 </ul>
 </li>
@@ -4942,27 +5240,10 @@ def test(self, commands, expected, vars = None,*, prompt = None, parallel = 10, 
 <li><a href="#example-script">Example Script</a></li>
 </ul>
 </li>
-<li><a href="#http-api">http API</a><ul>
-<li><a href="#1-list-nodes">1. List Nodes</a><ul>
-<li><a href="#request-body">Request Body:</a></li>
-<li><a href="#response">Response:</a></li>
-</ul>
-</li>
-<li><a href="#2-get-nodes">2. Get Nodes</a><ul>
-<li><a href="#request-body_1">Request Body:</a></li>
-<li><a href="#response_1">Response:</a></li>
-</ul>
-</li>
-<li><a href="#3-run-commands">3. Run Commands</a><ul>
-<li><a href="#request-body_2">Request Body:</a></li>
-<li><a href="#response_2">Response:</a></li>
-</ul>
-</li>
-<li><a href="#4-ask-ai">4. Ask AI</a><ul>
-<li><a href="#request-body_3">Request Body:</a></li>
-<li><a href="#response_3">Response:</a></li>
-</ul>
-</li>
+<li><a href="#grpc-service-architecture">gRPC Service Architecture</a><ul>
+<li><a href="#1-start-the-server">1. Start the Server</a></li>
+<li><a href="#2-connect-the-client">2. Connect the Client</a></li>
+<li><a href="#programmatic-access-grpc-soa">Programmatic Access (gRPC &amp; SOA)</a></li>
 </ul>
 </li>
 <li><a href="#automation-module">Automation module</a><ul>
@@ -4976,11 +5257,15 @@ def test(self, commands, expected, vars = None,*, prompt = None, parallel = 10, 
 </li>
 </ul>
 </li>
+<li><a href="#developer-notes-soa-architecture">Developer Notes (SOA Architecture)</a></li>
 </ul>
 </div>
 <ul id="index">
 <li><h3><a href="#header-submodules">Sub-modules</a></h3>
 <ul>
+<li><code><a title="connpy.cli" href="cli/index.html">connpy.cli</a></code></li>
+<li><code><a title="connpy.grpc" href="grpc/index.html">connpy.grpc</a></code></li>
+<li><code><a title="connpy.services" href="services/index.html">connpy.services</a></code></li>
 <li><code><a title="connpy.tests" href="tests/index.html">connpy.tests</a></code></li>
 </ul>
 </li>

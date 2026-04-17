@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import re
 import datetime
@@ -23,11 +24,20 @@ console = printer.console
 class ai:
     """Hybrid Multi-Agent System: Selective Escalation with Role Persistence."""
 
-    SAFE_COMMANDS = [r'^show\s+', r'^ls\s*', r'^cat\s+', r'^ip\s+route\s+show', r'^ip\s+addr\s+show', r'^ip\s+link\s+show', r'^pwd$', r'^hostname$', r'^uname', r'^df\s*', r'^free\s*', r'^ps\s*', r'^ping\s+', r'^traceroute\s+']
+    SAFE_COMMANDS = [
+        r'^show\s+', r'^ls\s*', r'^cat\s+', r'^ip\s+', r'^pwd$', r'^hostname$', r'^uname', 
+        r'^df\s*', r'^free\s*', r'^ps\s*', r'^ping\s+', r'^traceroute\s+', r'^whois\s+', 
+        r'^kubectl\s+(get|describe|version|logs|top|explain|cluster-info|api-resources|api-versions)\s+',
+        r'^systemctl\s+status\s+', r'^journalctl\s+'
+    ]
 
-    def __init__(self, config, org=None, api_key=None, engineer_model=None, architect_model=None, engineer_api_key=None, architect_api_key=None):
+    def __init__(self, config, org=None, api_key=None, engineer_model=None, architect_model=None, engineer_api_key=None, architect_api_key=None, console=None, confirm_handler=None, trust=False):
         self.config = config
-        self.trusted_session = False  # Trust mode for the entire session
+        self.console = console or printer.console
+        self.confirm_handler = confirm_handler or self._local_confirm_handler
+        self.trusted_session = trust  # Trust mode for the entire session
+        self.interrupted = False
+
         
         # 1. Cargar configuración genérica
         aiconfig = self.config.config.get("ai", {})
@@ -39,13 +49,12 @@ class ai:
         # API Keys (Prioridad: Argumento -> Config)
         self.engineer_key = engineer_api_key or aiconfig.get("engineer_api_key")
         self.architect_key = architect_api_key or aiconfig.get("architect_api_key")
-        
-        # Validate configuration
-        if not self.engineer_key:
-            raise ValueError("Engineer API key not configured. Use 'conn config ai engineer_api_key <key>' to set it.")
-        if not self.architect_key:
-            console.print("[yellow]Warning: Architect API key not configured. Architect will be unavailable.[/yellow]")
-            console.print("[yellow]Use 'conn config ai architect_api_key <key>' to enable it.[/yellow]")
+
+        # Custom Trusted Commands Regexes
+        custom_trusted = aiconfig.get("trusted_commands", [])
+        if isinstance(custom_trusted, str):
+            custom_trusted = [c.strip() for c in custom_trusted.split(",") if c.strip()]
+        self.safe_commands = list(self.SAFE_COMMANDS) + (custom_trusted if isinstance(custom_trusted, list) else [])
         
         # Límites
         self.max_history = 30
@@ -71,9 +80,9 @@ class ai:
             except FileNotFoundError:
                 self.long_term_memory = ""
             except PermissionError as e:
-                console.print(f"[yellow]Warning: Cannot read AI memory file: {e}[/yellow]")
+                self.console.print(f"[warning]Warning: Cannot read AI memory file: {e}[/warning]")
             except Exception as e:
-                console.print(f"[yellow]Warning: Failed to load AI memory: {e}[/yellow]")
+                self.console.print(f"[warning]Warning: Failed to load AI memory: {e}[/warning]")
 
         # Session Management
         self.sessions_dir = os.path.join(self.config.defaultdir, "ai_sessions")
@@ -82,20 +91,9 @@ class ai:
         self.session_path = None
 
         # Prompts base agnósticos
-        self._engineer_base_prompt = dedent(f"""
-            Role: TECHNICAL EXECUTION ENGINE.
-            Expertise: Universal Networking (Cisco, Nokia, Juniper, 6wind, etc.).
-            
-            Rules:
-            - BE FAST: Execute tools directly to provide swift technical answers.
-            - AUTONOMY: Proactively use iterative tool calls (list_nodes, run_commands) to find the root cause.
-            - BATCH OPERATIONS: When working on multiple devices, call tools in parallel (multiple tool_calls in same response).
-            - COMPLETE MISSIONS: Execute ALL steps of a mission before reporting back. Don't stop halfway.
-            - DIAGRAM: Use ASCII art or Unicode box-drawing characters directly in your responses to visualize topologies or paths when helpful.
-            - EVIDENCE: Include 'Key Snippets' from tool outputs. Be token-efficient.
-            - NO WANDERING: Do not speculate. If stuck, report attempts.
-            - SAFETY: When you use 'run_commands' with configuration commands, the system automatically prompts the user for confirmation. Just execute - don't ask permission first.
-            
+        architect_instructions = ""
+        if self.architect_key:
+            architect_instructions = """
             CRITICAL - CONSULT vs ESCALATE:
             - ALWAYS use 'consult_architect' for: Configuration planning, design decisions, complex troubleshooting.
               Examples: "consultalo con el arquitecto", "preguntale al arquitecto", "que opina el arquitecto"
@@ -106,8 +104,33 @@ class ai:
               After escalation, you hand over control completely.
             
             - DEFAULT: When in doubt, use 'consult_architect'. Escalation is rare.
+"""
+        else:
+            architect_instructions = """
+            CRITICAL - ARCHITECT UNAVAILABLE:
+            - The Strategic Reasoning Engine (Architect) is currently UNAVAILABLE because its API key is not configured.
+            - DO NOT attempt to consult or escalate to the architect.
+            - If the user asks to consult the architect, inform them that the Architect is offline and offer to help them directly to the best of your abilities.
+"""
+
+        self._engineer_base_prompt = dedent(f"""
+            Role: TECHNICAL EXECUTION ENGINE.
+            Expertise: Universal Networking (Cisco, Nokia, Juniper, 6wind, etc.).
             
-            Network Context: {self.long_term_memory if self.long_term_memory else "Empty."}
+            Rules:
+            - BE FAST AND EXTREMELY CONCISE: Provide direct answers. No filler words, no decorative language, no polite pleasantries. Save output tokens at all costs.
+            - KNOWLEDGE FIRST: For general networking questions (AS numbers, protocol details, standards, generic commands), use your internal knowledge. ONLY use tools when the user's specific infrastructure data is required.
+            - INVENTORY ONLY: 'run_commands', 'list_nodes', and 'get_node_info' are ONLY for interacting with the user's inventory.
+            - BROADCAST RESTRICTION: Avoid using filter '.*' in 'run_commands' unless the user explicitly requests a global action. Try to target specific nodes or groups based on the conversation.
+            - AUTONOMY: Proactively use iterative tool calls to find the root cause of infrastructure issues.
+            - BATCH OPERATIONS: When working on multiple devices, call tools in parallel.
+            - COMPLETE MISSIONS: Execute ALL steps of a mission before reporting back.
+            - DIAGRAM: Use ASCII art or Unicode box-drawing characters directly in your responses to visualize topologies or paths when helpful.
+            - EVIDENCE: Include 'Key Snippets' from tool outputs. Be token-efficient.
+            - NO WANDERING: Do not speculate. If stuck, report attempts.
+            - SAFETY: When you use 'run_commands' with configuration commands, the system automatically prompts the user for confirmation. Just execute - don't ask permission first.
+{architect_instructions}
+            Network Context: {{self.long_term_memory if self.long_term_memory else "Empty."}}
         """).strip()
 
         self._architect_base_prompt = dedent(f"""
@@ -115,6 +138,7 @@ class ai:
             Expertise: Network Architecture, Complex Troubleshooting, and Design Validation.
             
             Rules:
+            - CONCISENESS IS MANDATORY: Strip out fluff, decorative language, and filler words. Provide direct, tactical instructions and analysis to save output tokens.
             - STRATEGY: Define technical missions for the Engineer. 
             - DIAGRAM: Use ASCII art or Unicode box-drawing characters in your responses to visualize topologies, traffic paths, or logic flows.
             - ENGINEER CAPABILITIES: Your Engineer can:
@@ -136,6 +160,11 @@ class ai:
             
             Network Context: {self.long_term_memory if self.long_term_memory else "Empty."}
         """).strip()
+
+    def _local_confirm_handler(self, prompt, default="n"):
+        """Default confirmation handler using rich.prompt."""
+        from rich.prompt import Prompt
+        return Prompt.ask(prompt, default=default)
 
     @property
     def engineer_system_prompt(self):
@@ -177,57 +206,65 @@ class ai:
         if status_formatter:
             self.tool_status_formatters[name] = status_formatter
 
-    def _stream_completion(self, model, messages, tools, api_key, status=None, label="", debug=False, **kwargs):
+    def _stream_completion(self, model, messages, tools, api_key, status=None, label="", debug=False, chunk_callback=None, **kwargs):
         """Stream a completion call, rendering styled Markdown in real-time.
-        
+
         Returns (response, streamed) where:
         - response: reconstructed ModelResponse (same as non-streaming)
         - streamed: True if text was rendered to console during streaming
         """
         from rich.live import Live
-        
+
         stream_resp = completion(model=model, messages=messages, tools=tools, api_key=api_key, stream=True, **kwargs)
-        
+
         chunks = []
         full_content = ""
         is_streaming_text = False
         has_tool_calls = False
         live_display = None
-        
+
         # Determine styling based on current brain
         role_label = "Network Architect" if "architect" in label.lower() else "Network Engineer"
-        border = "medium_purple" if "architect" in label.lower() else "blue"
-        title = f"[bold {border}]{role_label}[/bold {border}]"
-        
+        alias = "architect" if "architect" in label.lower() else "engineer"
+        title = f"[bold {alias}]{role_label}[/bold {alias}]"
+        border = alias
+
         try:
             for chunk in stream_resp:
                 chunks.append(chunk)
                 delta = chunk.choices[0].delta
-                
+
                 # Detect tool calls
                 if hasattr(delta, 'tool_calls') and delta.tool_calls:
                     has_tool_calls = True
-                
+
                 # Stream text content with styled rendering
-                if hasattr(delta, 'content') and delta.content and not debug:
+                if hasattr(delta, 'content') and delta.content:
                     full_content += delta.content
-                    
-                    if not is_streaming_text:
-                        # Stop spinner before starting live display
-                        if status:
-                            status.stop()
-                        live_display = Live(
-                            Panel(Markdown(full_content), title=title, border_style=border, expand=False),
-                            console=console,
-                            refresh_per_second=8,
-                            transient=False
-                        )
-                        live_display.start()
-                        is_streaming_text = True
-                    else:
-                        live_display.update(
-                            Panel(Markdown(full_content), title=title, border_style=border, expand=False)
-                        )
+
+                    if chunk and chunk_callback:
+                        # Check for remote interruption during streaming
+                        if hasattr(self, "interrupted") and self.interrupted:
+                            raise KeyboardInterrupt
+                        chunk_callback(delta.content)
+
+                    if not debug and not chunk_callback:
+                        if not is_streaming_text:
+                            # Stop spinner before starting live display
+                            if status:
+                                status.stop()
+                            live_display = Live(
+                                Panel(Markdown(full_content), title=title, border_style=border, expand=False),
+                                console=self.console,
+                                refresh_per_second=8,
+                                transient=False
+                            )
+                            live_display.start()
+                            is_streaming_text = True
+                        else:
+                            live_display.update(
+                                Panel(Markdown(full_content), title=title, border_style=border, expand=False)
+                            )
         except Exception as e:
             if not chunks:
                 raise
@@ -297,6 +334,7 @@ class ai:
         3. Orphaned tool_calls at the end are removed
         4. Orphaned tool responses without a preceding tool_call are removed
         5. Incompatible metadata like cache_control is stripped for non-Anthropic models
+        6. Enforces strict alternating history to prevent BadRequestError on Gemini.
         """
         if not messages:
             return messages
@@ -309,8 +347,10 @@ class ai:
             
             # Convert content list to plain string if it's a system message with caching metadata
             if m.get('role') == 'system' and isinstance(m.get('content'), list):
-                # Extraer texto de [{"type": "text", "text": "...", "cache_control": ...}]
-                m['content'] = m['content'][0]['text'] if m['content'] else ""
+                if m['content'] and isinstance(m['content'][0], dict) and m['content'][0].get('text'):
+                    m['content'] = m['content'][0]['text']
+                else:
+                    m['content'] = ""
 
             # Remove any explicit cache_control key anywhere
             if 'cache_control' in m: del m['cache_control']
@@ -321,43 +361,72 @@ class ai:
             pre_sanitized.append(m)
 
         sanitized = []
+        last_role = None
+        
         i = 0
         while i < len(pre_sanitized):
             msg = pre_sanitized[i]
             role = msg.get('role', '')
             
-            if role == 'assistant' and msg.get('tool_calls'):
-                # Collect all expected tool_call_ids
-                expected_ids = set()
-                for tc in msg['tool_calls']:
-                    tc_id = tc.get('id') if isinstance(tc, dict) else getattr(tc, 'id', None)
-                    if tc_id:
-                        expected_ids.add(tc_id)
+            if role == 'system':
+                sanitized.append(msg)
+                last_role = 'system'
+                i += 1
                 
-                # Look ahead for matching tool responses
-                tool_responses = []
-                j = i + 1
-                while j < len(pre_sanitized):
-                    next_msg = pre_sanitized[j]
-                    if next_msg.get('role') == 'tool':
-                        tool_responses.append(next_msg)
-                        j += 1
-                    else:
-                        break
-                
-                # Only include this assistant+tools block if we have responses
-                if tool_responses:
-                    sanitized.append(msg)
-                    sanitized.extend(tool_responses)
-                    i = j
+            elif role == 'user':
+                if last_role == 'user' and sanitized:
+                    # Combine consecutive user messages
+                    sanitized[-1]['content'] = str(sanitized[-1].get('content', '') or '') + '\n' + str(msg.get('content', '') or '')
                 else:
-                    # Orphaned tool_calls with no responses - skip the assistant message
+                    sanitized.append(msg)
+                    last_role = 'user'
+                i += 1
+                
+            elif role == 'assistant':
+                has_tools = bool(msg.get('tool_calls'))
+                
+                # Gemini strict sequence: Assistant MUST be preceded by user or tool.
+                # If preceded by system, assistant, or if it's the very first message...
+                if last_role not in ('user', 'tool'):
+                    sanitized.append({"role": "user", "content": "[System sequence separator: History Truncated/Merged]"})
+                    last_role = 'user'
+                
+                if has_tools:
+                    # Look ahead for matching tool responses
+                    tool_responses = []
+                    j = i + 1
+                    while j < len(pre_sanitized):
+                        next_msg = pre_sanitized[j]
+                        if next_msg.get('role') == 'tool':
+                            tool_responses.append(next_msg)
+                            j += 1
+                        else:
+                            break
+                    
+                    if tool_responses:
+                        sanitized.append(msg)
+                        sanitized.extend(tool_responses)
+                        last_role = 'tool'
+                        i = j
+                    else:
+                        # Orphaned tool_calls with no responses - skip the assistant message
+                        # If we just added a dummy user message for this assistant, remove it too
+                        if sanitized and sanitized[-1].get('content') == "[System sequence separator: History Truncated/Merged]":
+                            sanitized.pop()
+                            last_role = sanitized[-1].get('role', '') if sanitized else None
+                        i += 1
+                else:
+                    sanitized.append(msg)
+                    last_role = 'assistant'
                     i += 1
+                    
             elif role == 'tool':
                 # Orphaned tool response (no preceding assistant with tool_calls) - skip
                 i += 1
+                
             else:
                 sanitized.append(msg)
+                last_role = role
                 i += 1
         
         return sanitized
@@ -414,7 +483,7 @@ class ai:
 
     def _is_safe_command(self, cmd):
         """Check if a command matches safe patterns."""
-        return any(re.match(pattern, cmd.strip(), re.IGNORECASE) for pattern in self.SAFE_COMMANDS)
+        return any(re.match(pattern, cmd.strip(), re.IGNORECASE) for pattern in self.safe_commands)
     
     def run_commands_tool(self, nodes_filter, commands, status=None):
         """Execute commands on nodes matching the filter. Native interactive confirmation for unsafe commands."""
@@ -445,35 +514,36 @@ class ai:
                 formatted_cmds = []
                 for cmd in commands:
                     if cmd in unsafe_commands:
-                        formatted_cmds.append(f"  • [yellow]{cmd}[/yellow]")
+                        formatted_cmds.append(f"  • [warning]{cmd}[/warning]")
                     else:
                         formatted_cmds.append(f"  • {cmd}")
                 
                 panel_content = f"Target: {nodes_filter}\nCommands:\n" + "\n".join(formatted_cmds)
-                console.print(Panel(panel_content, title="[bold yellow]⚠️ UNSAFE COMMANDS DETECTED[/bold yellow]", border_style="yellow"))
+                # Use print_important if available (for remote bridges) fallback to standard print
+                print_fn = getattr(self.console, "print_important", self.console.print)
+                print_fn(Panel(panel_content, title="[bold warning]⚠️ UNSAFE COMMANDS DETECTED[/bold warning]", border_style="warning"))
                 
                 try:
-                    from rich.prompt import Prompt
-                    user_resp = Prompt.ask("[bold yellow]Execute? (y: yes / n: no / a: allow all this session / <text>: feedback)[/bold yellow]", default="n")
+                    user_resp = self.confirm_handler("[bold warning]Execute? (y: yes / n: no / a: allow all this session / <text>: feedback)[/bold warning]", default="n")
                 except KeyboardInterrupt:
-                    if status: status.update("[bold blue]Engineer: Resuming...")
-                    console.print("[bold red]✗ Aborted by user (Ctrl+C).[/bold red]")
-                    return "Error: User cancelled execution (Ctrl+C)."
+                    if status: status.update("[ai_status]Engineer: Resuming...")
+                    self.console.print("[fail]✗ Aborted by user (Ctrl+C).[/fail]")
+                    raise
                 
                 # Resume the spinner
-                if status: status.update("[bold blue]Engineer: Processing user response...")
+                if status: status.update("[ai_status]Engineer: Processing user response...")
                 
                 user_resp_lower = user_resp.strip().lower()
                 if user_resp_lower in ['a', 'allow']:
                     self.trusted_session = True
-                    console.print("[bold green]✓ Trust Mode Enabled. All future commands in this session will execute without confirmation.[/bold green]")
+                    self.console.print("[pass]✓ Trust Mode Enabled. All future commands in this session will execute without confirmation.[/pass]")
                 elif user_resp_lower in ['y', 'yes']:
-                    console.print("[bold green]✓ Executing...[/bold green]")
+                    self.console.print("[pass]✓ Executing...[/pass]")
                 elif user_resp_lower in ['n', 'no', '']:
-                    console.print("[bold red]✗ Execution rejected by user.[/bold red]")
+                    self.console.print("[fail]✗ Execution rejected by user.[/fail]")
                     return "Error: User rejected execution."
                 else:
-                    console.print(f"[bold cyan]User feedback: [/bold cyan]{user_resp}")
+                    self.console.print(f"[user_prompt]User feedback: [/user_prompt]{user_resp}")
                     return f"User requested changes: {user_resp}. Please adjust the commands based on this feedback and try again."
         
         try:
@@ -517,22 +587,31 @@ class ai:
         soft_limit_warned = False
         
         try:
+            # Set up remote interrupt callback if bridge is provided
+            if status and hasattr(status, "on_interrupt"):
+                status.on_interrupt = lambda: setattr(self, "interrupted", True)
+
             while iteration < self.hard_limit_iterations:
                 iteration += 1
                 
+                # Check for interruption
+                if self.interrupted:
+                    raise KeyboardInterrupt
+                
                 # Soft limit warning
                 if iteration == self.soft_limit_iterations and not soft_limit_warned:
-                    console.print(f"[yellow]⚠ Engineer has performed {iteration} steps. This is taking longer than expected.[/yellow]")
-                    console.print(f"[yellow]  You can press Ctrl+C to interrupt and get a summary.[/yellow]")
+                    self.console.print(f"[warning]⚠ Engineer has performed {iteration} steps. This is taking longer than expected.[/warning]")
+                    self.console.print(f"[warning]  You can press Ctrl+C to interrupt and get a summary.[/warning]")
                     soft_limit_warned = True
                 
-                if status: status.update(f"[bold blue]Engineer: Analyzing mission... (step {iteration})")
+                if status: status.update(f"[ai_status]Engineer: Analyzing mission... (step {iteration})")
                 
                 try:
                     safe_messages = self._sanitize_messages(messages)
                     response = completion(model=self.engineer_model, messages=safe_messages, tools=tools, api_key=self.engineer_key)
                 except Exception as e:
-                    return f"Engineer failed to connect: {str(e)}", usage
+                    if status: status.stop()
+                    raise ValueError(f"Engineer failed to connect: {str(e)}")
                 
                 if hasattr(response, "usage") and response.usage:
                     usage["input"] += getattr(response.usage, "prompt_tokens", 0)
@@ -550,15 +629,15 @@ class ai:
                     
                     # Notificación en tiempo real de la tarea técnica
                     if status:
-                        if fn == "list_nodes": status.update(f"[bold blue]Engineer: [SEARCH] {args.get('filter_pattern','.*')}")
+                        if fn == "list_nodes": status.update(f"[ai_status]Engineer: [SEARCH] {args.get('filter_pattern','.*')}")
                         elif fn == "run_commands": 
                             cmds = args.get('commands', [])
                             cmd_str = cmds[0] if cmds else ""
-                            status.update(f"[bold blue]Engineer: [CMD] {cmd_str}")
-                        elif fn == "get_node_info": status.update(f"[bold blue]Engineer: [INSPECT] {args.get('node_name','')}")
+                            status.update(f"[ai_status]Engineer: [CMD] {cmd_str}")
+                        elif fn == "get_node_info": status.update(f"[ai_status]Engineer: [INSPECT] {args.get('node_name','')}")
                         elif fn in self.tool_status_formatters: status.update(self.tool_status_formatters[fn](args))
 
-                    if debug: console.print(Panel(Text(json.dumps(args, indent=2)), title=f"[bold blue]Engineer Tool: {fn}[/bold blue]", border_style="blue"))
+                    if debug: self.console.print(Panel(Text(json.dumps(args, indent=2)), title=f"[bold engineer]Engineer Tool: {fn}[/bold engineer]", border_style="engineer"))
                     
                     if fn == "list_nodes": obs = self.list_nodes_tool(**args)
                     elif fn == "run_commands": obs = self.run_commands_tool(**args, status=status)
@@ -566,14 +645,14 @@ class ai:
                     elif fn in self.external_tool_handlers: obs = self.external_tool_handlers[fn](self, **args)
                     else: obs = f"Error: Unknown tool '{fn}'."
                     
-                    if debug: console.print(Panel(Text(str(obs)), title=f"[bold green]Engineer Observation: {fn}[/bold green]", border_style="green"))
+                    if debug: self.console.print(Panel(Text(str(obs)), title=f"[bold pass]Engineer Observation: {fn}[/bold pass]", border_style="success"))
                     messages.append({"tool_call_id": tc.id, "role": "tool", "name": fn, "content": obs})
             
             if iteration >= self.hard_limit_iterations:
-                console.print(f"[red]⛔ Engineer reached hard limit ({self.hard_limit_iterations} steps). Forcing stop.[/red]")
+                self.console.print(f"[error]⛔ Engineer reached hard limit ({self.hard_limit_iterations} steps). Forcing stop.[/error]")
             
             if debug and resp_msg.content:
-                console.print(Panel(Text(resp_msg.content), title="[bold blue]Engineer Final Report to Architect[/bold blue]", border_style="blue"))
+                self.console.print(Panel(Text(resp_msg.content), title="[bold engineer]Engineer Final Report to Architect[/bold engineer]", border_style="engineer"))
             
             return resp_msg.content, usage
         except Exception as e:
@@ -584,10 +663,15 @@ class ai:
         tools = [
             {"type": "function", "function": {"name": "list_nodes", "description": "Lists available nodes in the inventory.", "parameters": {"type": "object", "properties": {"filter_pattern": {"type": "string", "description": "Regex to filter nodes (e.g. '.*', 'border.*')."}}}}},
             {"type": "function", "function": {"name": "run_commands", "description": "Runs one or more commands on matched nodes. MANDATORY: You MUST call 'list_nodes' first to verify the target list.", "parameters": {"type": "object", "properties": {"nodes_filter": {"type": "string", "description": "Exact node name or verified filter pattern."}, "commands": {"type": "array", "items": {"type": "string"}, "description": "List of commands (e.g. ['show ip route', 'show int desc'])."}}, "required": ["nodes_filter", "commands"]}}},
-            {"type": "function", "function": {"name": "get_node_info", "description": "Gets full metadata for a specific node.", "parameters": {"type": "object", "properties": {"node_name": {"type": "string"}}, "required": ["node_name"]}}},
-            {"type": "function", "function": {"name": "consult_architect", "description": "Ask the Strategic Reasoning Engine for advice on complex design, architecture, or troubleshooting decisions. You remain in control and will present the response to the user. Use this for: configuration planning, design validation, complex troubleshooting.", "parameters": {"type": "object", "properties": {"question": {"type": "string", "description": "Strategic question or decision needed."}, "technical_summary": {"type": "string", "description": "Technical findings and context gathered so far."}}, "required": ["question", "technical_summary"]}}},
-            {"type": "function", "function": {"name": "escalate_to_architect", "description": "Transfer full control to the Strategic Reasoning Engine. Use ONLY when the user explicitly requests the Architect or when the problem requires strategic oversight beyond consultation. After escalation, the Architect takes over the conversation.", "parameters": {"type": "object", "properties": {"reason": {"type": "string", "description": "Why you're escalating (e.g. 'User requested Architect', 'Complex multi-site design needed')."}, "context": {"type": "string", "description": "Full context and findings to hand over."}}, "required": ["reason", "context"]}}}
+            {"type": "function", "function": {"name": "get_node_info", "description": "Gets full metadata for a specific node.", "parameters": {"type": "object", "properties": {"node_name": {"type": "string"}}, "required": ["node_name"]}}}
         ]
+        
+        if self.architect_key:
+            tools.extend([
+                {"type": "function", "function": {"name": "consult_architect", "description": "Ask the Strategic Reasoning Engine for advice on complex design, architecture, or troubleshooting decisions. You remain in control and will present the response to the user. Use this for: configuration planning, design validation, complex troubleshooting.", "parameters": {"type": "object", "properties": {"question": {"type": "string", "description": "Strategic question or decision needed."}, "technical_summary": {"type": "string", "description": "Technical findings and context gathered so far."}}, "required": ["question", "technical_summary"]}}},
+                {"type": "function", "function": {"name": "escalate_to_architect", "description": "Transfer full control to the Strategic Reasoning Engine. Use ONLY when the user explicitly requests the Architect or when the problem requires strategic oversight beyond consultation. After escalation, the Architect takes over the conversation.", "parameters": {"type": "object", "properties": {"reason": {"type": "string", "description": "Why you're escalating (e.g. 'User requested Architect', 'Complex multi-site design needed')."}, "context": {"type": "string", "description": "Full context and findings to hand over."}}, "required": ["reason", "context"]}}}
+            ])
+            
         tools.extend(self.external_engineer_tools)
         return tools
 
@@ -709,7 +793,10 @@ class ai:
             printer.error(f"Failed to save session: {e}")
 
     @MethodHook
-    def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=False, stream=True, session_id=None):
+    def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=False, stream=True, session_id=None, chunk_callback=None):
+        if not self.engineer_key:
+            raise ValueError("Engineer API key not configured. Use 'connpy config --engineer-api-key <key>' to set it.")
+            
         if chat_history is None: chat_history = []
         
         # Load session if provided and history is empty
@@ -781,20 +868,25 @@ class ai:
 
         # 3. Bucle de ejecución
         iteration = 0
-        soft_limit_warned = False
-        streamed_response = False
-        
         try:
+            # Set up remote interrupt callback if bridge is provided
+            if status and hasattr(status, "on_interrupt"):
+                status.on_interrupt = lambda: setattr(self, "interrupted", True)
+
             while iteration < self.hard_limit_iterations:
                 iteration += 1
                 
+                # Check for interruption
+                if self.interrupted:
+                    raise KeyboardInterrupt
+                
                 # Soft limit warning
                 if iteration == self.soft_limit_iterations and not soft_limit_warned:
-                    console.print(f"[yellow]⚠ Agent has performed {iteration} steps. This is taking longer than expected.[/yellow]")
-                    console.print(f"[yellow]  You can press Ctrl+C to interrupt and get a summary of progress.[/yellow]")
+                    self.console.print(f"[warning]⚠ Agent has performed {iteration} steps. This is taking longer than expected.[/warning]")
+                    self.console.print(f"[warning]  You can press Ctrl+C to interrupt and get a summary of progress.[/warning]")
                     soft_limit_warned = True
                 
-                label = "[bold medium_purple]Architect" if current_brain == "architect" else "[bold blue]Engineer"
+                label = "[architect][bold]Architect[/bold][/architect]" if current_brain == "architect" else "[engineer][bold]Engineer[/bold][/engineer]"
                 if status: status.update(f"{label} is thinking... (step {iteration})")
                 
                 streamed_response = False
@@ -803,13 +895,14 @@ class ai:
                     if stream and not debug:
                         response, streamed_response = self._stream_completion(
                             model=model, messages=safe_messages, tools=tools, api_key=key,
-                            status=status, label=label, debug=debug, num_retries=3
+                            status=status, label=label, debug=debug, num_retries=3,
+                            chunk_callback=chunk_callback
                         )
                     else:
                         response = completion(model=model, messages=safe_messages, tools=tools, api_key=key, num_retries=3)
                 except Exception as e:
                     if current_brain == "architect":
-                        if status: status.update("[bold orange3]Architect unavailable! Falling back to Engineer...")
+                        if status: status.update("[unavailable]Architect unavailable! Falling back to Engineer...")
                         # Preserve context when falling back - use clean_input directly
                         current_brain = "engineer"
                         model = self.engineer_model
@@ -839,7 +932,7 @@ class ai:
                 messages.append(msg_dict)
 
                 if debug and resp_msg.content:
-                    console.print(Panel(Markdown(resp_msg.content), title=f"{label} Reasoning", border_style="medium_purple" if current_brain == "architect" else "blue"))
+                    self.console.print(Panel(Markdown(resp_msg.content), title=f"{label} Reasoning", border_style="architect" if current_brain == "architect" else "engineer"))
 
                 if not resp_msg.tool_calls: break
                 
@@ -856,16 +949,16 @@ class ai:
                         continue
                     
                     if status:
-                        if fn == "delegate_to_engineer": status.update(f"[bold medium_purple]Architect: [DELEGATING MISSION] {args.get('task','')[:40]}...")
-                        elif fn == "manage_memory_tool": status.update(f"[bold medium_purple]Architect: [UPDATING MEMORY]")
+                        if fn == "delegate_to_engineer": status.update(f"[architect]Architect: [DELEGATING MISSION] {args.get('task','')[:40]}...")
+                        elif fn == "manage_memory_tool": status.update(f"[architect]Architect: [UPDATING MEMORY]")
 
-                    if debug: console.print(Panel(Text(json.dumps(args, indent=2)), title=f"{label} Decision: {fn}", border_style="white"))
+                    if debug: self.console.print(Panel(Text(json.dumps(args, indent=2)), title=f"{label} Decision: {fn}", border_style="debug"))
 
                     if fn == "delegate_to_engineer":
                         obs, eng_usage = self._engineer_loop(args["task"], status=status, debug=debug, chat_history=messages[:-1])
                         usage["input"] += eng_usage["input"]; usage["output"] += eng_usage["output"]; usage["total"] += eng_usage["total"]
                     elif fn == "consult_architect":
-                        if status: status.update("[bold medium_purple]Engineer consulting Architect...")
+                        if status: status.update("[architect]Engineer consulting Architect...")
                         try:
                             # Consultation only - Engineer stays in control
                             claude_resp = completion(
@@ -878,13 +971,13 @@ class ai:
                                 num_retries=3
                             )
                             obs = claude_resp.choices[0].message.content
-                            if debug: console.print(Panel(Markdown(obs), title="[bold medium_purple]Architect Consultation[/bold medium_purple]", border_style="medium_purple"))
+                            if debug: self.console.print(Panel(Markdown(obs), title="[architect]Architect Consultation[/architect]", border_style="architect"))
                         except Exception as e:
-                            if status: status.update("[bold orange3]Architect unavailable! Engineer continuing alone...")
+                            if status: status.update("[unavailable]Architect unavailable! Engineer continuing alone...")
                             obs = f"Architect unavailable ({str(e)}). Proceeding with your best technical judgment."
                     
                     elif fn == "escalate_to_architect":
-                        if status: status.update("[bold medium_purple]Transferring control to Architect...")
+                        if status: status.update("[architect]Transferring control to Architect...")
                         # Full escalation - Architect takes over
                         current_brain = "architect"
                         model = self.architect_model
@@ -895,10 +988,10 @@ class ai:
                         handover_msg = f"HANDOVER FROM EXECUTION ENGINE\n\nReason: {args['reason']}\n\nContext: {args['context']}\n\nYou are now in control of this conversation."
                         pending_user_message = handover_msg
                         obs = "Control transferred to Architect. Handover context will be provided."
-                        if debug: console.print(Panel(Text(handover_msg), title="[bold medium_purple]Escalation to Architect[/bold medium_purple]", border_style="medium_purple"))
+                        if debug: self.console.print(Panel(Text(handover_msg), title="[architect]Escalation to Architect[/architect]", border_style="architect"))
                     
                     elif fn == "return_to_engineer":
-                        if status: status.update("[bold blue]Transferring control back to Engineer...")
+                        if status: status.update("[engineer]Transferring control back to Engineer...")
                         # Architect returns control to Engineer
                         current_brain = "engineer"
                         model = self.engineer_model
@@ -909,7 +1002,7 @@ class ai:
                         handover_msg = f"HANDOVER FROM ARCHITECT\n\nSummary: {args['summary']}\n\nYou are now back in control. Continue handling the user's requests."
                         pending_user_message = handover_msg
                         obs = "Control returned to Engineer. Handover summary will be provided."
-                        if debug: console.print(Panel(Text(handover_msg), title="[bold blue]Return to Engineer[/bold blue]", border_style="blue"))
+                        if debug: self.console.print(Panel(Text(handover_msg), title="[engineer]Return to Engineer[/engineer]", border_style="engineer"))
                     
                     elif fn == "list_nodes": obs = self.list_nodes_tool(**args)
                     elif fn == "run_commands": obs = self.run_commands_tool(**args, status=status)
@@ -925,7 +1018,7 @@ class ai:
                     messages.append({"role": "user", "content": pending_user_message})
             
             if iteration >= self.hard_limit_iterations:
-                console.print(f"[red]⛔ Agent reached hard limit ({self.hard_limit_iterations} steps). Forcing stop to prevent infinite loop.[/red]")
+                self.console.print(f"[error]⛔ Agent reached hard limit ({self.hard_limit_iterations} steps). Forcing stop to prevent infinite loop.[/error]")
                 # Only inject user message if we're not in the middle of tool calls
                 last_msg = messages[-1] if messages else {}
                 if last_msg.get("role") != "assistant" or not last_msg.get("tool_calls"):
@@ -937,10 +1030,10 @@ class ai:
                         messages.append(resp_msg.model_dump(exclude_none=True))
                     except Exception as e:
                         if status:
-                            status.update(f"[bold red]Error fetching summary: {e}[/bold red]")
+                            status.update(f"[error]Error fetching summary: {e}[/error]")
                         printer.warning(f"Failed to fetch final summary from LLM: {e}")
         except KeyboardInterrupt:
-            if status: status.update("[bold red]Interrupted! Closing pending tasks...")
+            if status: status.update("[error]Interrupted! Closing pending tasks...")
             last_msg = messages[-1]
             if last_msg.get("tool_calls"):
                 for tc in last_msg["tool_calls"]:
@@ -948,7 +1041,8 @@ class ai:
             messages.append({"role": "user", "content": "USER INTERRUPTED. Briefly summarize what you were doing and stop."})
             try:
                 safe_messages = self._sanitize_messages(messages)
-                response = completion(model=model, messages=safe_messages, tools=tools, api_key=key)
+                # Use tools=None to force a text summary during interruption
+                response = completion(model=model, messages=safe_messages, tools=None, api_key=key)
                 resp_msg = response.choices[0].message
                 messages.append(resp_msg.model_dump(exclude_none=True))
             except Exception: pass

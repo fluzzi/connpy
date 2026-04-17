@@ -115,8 +115,9 @@ el.replaceWith(d);
 
     def test_invalid_protocol_raises(self):
         n = self._make_node(protocol=&#34;invalid_proto&#34;)
-        with pytest.raises(ValueError, match=&#34;Invalid protocol&#34;):
+        with pytest.raises(SystemExit) as exc:
             n._get_cmd()
+        assert exc.value.code == 1
 
     def test_ssh_cmd_no_user(self):
         n = self._make_node(user=&#34;&#34;)
@@ -155,8 +156,9 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def test_invalid_protocol_raises(self):
     n = self._make_node(protocol=&#34;invalid_proto&#34;)
-    with pytest.raises(ValueError, match=&#34;Invalid protocol&#34;):
-        n._get_cmd()</code></pre>
+    with pytest.raises(SystemExit) as exc:
+        n._get_cmd()
+    assert exc.value.code == 1</code></pre>
 </details>
 <div class="desc"></div>
 </dd>

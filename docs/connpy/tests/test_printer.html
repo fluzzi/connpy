@@ -98,11 +98,80 @@ el.replaceWith(d);
         assert lines[0] == &#34;[i] line1&#34;
         # Second line should be indented by len(&#34;[i] &#34;) = 4 chars
         assert lines[1].startswith(&#34;    line2&#34;)
-        assert lines[2].startswith(&#34;    line3&#34;)</code></pre>
+        assert lines[2].startswith(&#34;    line3&#34;)
+
+    def test_data_output(self, capsys):
+        printer.data(&#34;my title&#34;, &#34;key: value&#34;)
+        captured = capsys.readouterr()
+        # Rich output is formatted with ansi escape sequences or box drawing chars
+        # Just check that title and content appear in the output stream
+        assert &#34;my title&#34; in captured.out
+        assert &#34;key&#34; in captured.out
+
+    def test_node_panel_pass(self, capsys):
+        printer.node_panel(&#34;node1&#34;, &#34;output line\n&#34;, 0)
+        captured = capsys.readouterr()
+        assert &#34;node1&#34; in captured.out
+        assert &#34;PASS&#34; in captured.out
+        assert &#34;output line&#34; in captured.out
+
+    def test_node_panel_fail(self, capsys):
+        printer.node_panel(&#34;node2&#34;, &#34;error line\n&#34;, 1)
+        captured = capsys.readouterr()
+        assert &#34;node2&#34; in captured.out
+        assert &#34;FAIL&#34; in captured.out
+        assert &#34;error line&#34; in captured.out
+
+    def test_test_panel(self, capsys):
+        printer.test_panel(&#34;node1&#34;, &#34;output&#34;, 0, {&#34;check1&#34;: True, &#34;check2&#34;: False})
+        captured = capsys.readouterr()
+        assert &#34;node1&#34; in captured.out
+        assert &#34;check1&#34; in captured.out
+        assert &#34;check2&#34; in captured.out
+
+    def test_test_summary(self, capsys):
+        results = {&#34;node1&#34;: {&#34;test1&#34;: True}, &#34;node2&#34;: {&#34;test2&#34;: False}}
+        printer.test_summary(results)
+        captured = capsys.readouterr()
+        assert &#34;node1&#34; in captured.out
+        assert &#34;node2&#34; in captured.out
+        assert &#34;test1&#34; in captured.out
+        assert &#34;test2&#34; in captured.out
+
+    def test_header_output(self, capsys):
+        printer.header(&#34;My Header&#34;)
+        captured = capsys.readouterr()
+        assert &#34;My Header&#34; in captured.out
+
+    def test_kv_output(self, capsys):
+        printer.kv(&#34;mykeystring&#34;, &#34;myvaluestring&#34;)
+        captured = capsys.readouterr()
+        assert &#34;mykeystring&#34; in captured.out
+        assert &#34;myvaluestring&#34; in captured.out
+
+    def test_confirm_action(self, capsys):
+        printer.confirm_action(&#34;router1&#34;, &#34;delete&#34;)
+        captured = capsys.readouterr()
+        assert &#34;[i] delete: router1&#34; in captured.out</code></pre>
 </details>
 <div class="desc"></div>
 <h3>Methods</h3>
 <dl>
+<dt id="connpy.tests.test_printer.TestPrinter.test_confirm_action"><code class="name flex">
+<span>def <span class="ident">test_confirm_action</span></span>(<span>self, capsys)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_confirm_action(self, capsys):
+    printer.confirm_action(&#34;router1&#34;, &#34;delete&#34;)
+    captured = capsys.readouterr()
+    assert &#34;[i] delete: router1&#34; in captured.out</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
 <dt id="connpy.tests.test_printer.TestPrinter.test_custom_output"><code class="name flex">
 <span>def <span class="ident">test_custom_output</span></span>(<span>self, capsys)</span>
 </code></dt>
@@ -115,6 +184,24 @@ el.replaceWith(d);
     printer.custom(&#34;TAG&#34;, &#34;custom message&#34;)
     captured = capsys.readouterr()
     assert &#34;[TAG] custom message&#34; in captured.out</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_printer.TestPrinter.test_data_output"><code class="name flex">
+<span>def <span class="ident">test_data_output</span></span>(<span>self, capsys)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_data_output(self, capsys):
+    printer.data(&#34;my title&#34;, &#34;key: value&#34;)
+    captured = capsys.readouterr()
+    # Rich output is formatted with ansi escape sequences or box drawing chars
+    # Just check that title and content appear in the output stream
+    assert &#34;my title&#34; in captured.out
+    assert &#34;key&#34; in captured.out</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -148,6 +235,21 @@ el.replaceWith(d);
 </details>
 <div class="desc"></div>
 </dd>
+<dt id="connpy.tests.test_printer.TestPrinter.test_header_output"><code class="name flex">
+<span>def <span class="ident">test_header_output</span></span>(<span>self, capsys)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_header_output(self, capsys):
+    printer.header(&#34;My Header&#34;)
+    captured = capsys.readouterr()
+    assert &#34;My Header&#34; in captured.out</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
 <dt id="connpy.tests.test_printer.TestPrinter.test_info_output"><code class="name flex">
 <span>def <span class="ident">test_info_output</span></span>(<span>self, capsys)</span>
 </code></dt>
@@ -160,6 +262,22 @@ el.replaceWith(d);
     printer.info(&#34;hello world&#34;)
     captured = capsys.readouterr()
     assert &#34;[i] hello world&#34; in captured.out</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_printer.TestPrinter.test_kv_output"><code class="name flex">
+<span>def <span class="ident">test_kv_output</span></span>(<span>self, capsys)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_kv_output(self, capsys):
+    printer.kv(&#34;mykeystring&#34;, &#34;myvaluestring&#34;)
+    captured = capsys.readouterr()
+    assert &#34;mykeystring&#34; in captured.out
+    assert &#34;myvaluestring&#34; in captured.out</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -179,6 +297,40 @@ el.replaceWith(d);
     # Second line should be indented by len(&#34;[i] &#34;) = 4 chars
     assert lines[1].startswith(&#34;    line2&#34;)
     assert lines[2].startswith(&#34;    line3&#34;)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_printer.TestPrinter.test_node_panel_fail"><code class="name flex">
+<span>def <span class="ident">test_node_panel_fail</span></span>(<span>self, capsys)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_node_panel_fail(self, capsys):
+    printer.node_panel(&#34;node2&#34;, &#34;error line\n&#34;, 1)
+    captured = capsys.readouterr()
+    assert &#34;node2&#34; in captured.out
+    assert &#34;FAIL&#34; in captured.out
+    assert &#34;error line&#34; in captured.out</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_printer.TestPrinter.test_node_panel_pass"><code class="name flex">
+<span>def <span class="ident">test_node_panel_pass</span></span>(<span>self, capsys)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_node_panel_pass(self, capsys):
+    printer.node_panel(&#34;node1&#34;, &#34;output line\n&#34;, 0)
+    captured = capsys.readouterr()
+    assert &#34;node1&#34; in captured.out
+    assert &#34;PASS&#34; in captured.out
+    assert &#34;output line&#34; in captured.out</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -209,6 +361,42 @@ el.replaceWith(d);
     printer.success(&#34;done&#34;)
     captured = capsys.readouterr()
     assert &#34;[✓] done&#34; in captured.out</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_printer.TestPrinter.test_test_panel"><code class="name flex">
+<span>def <span class="ident">test_test_panel</span></span>(<span>self, capsys)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_test_panel(self, capsys):
+    printer.test_panel(&#34;node1&#34;, &#34;output&#34;, 0, {&#34;check1&#34;: True, &#34;check2&#34;: False})
+    captured = capsys.readouterr()
+    assert &#34;node1&#34; in captured.out
+    assert &#34;check1&#34; in captured.out
+    assert &#34;check2&#34; in captured.out</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_printer.TestPrinter.test_test_summary"><code class="name flex">
+<span>def <span class="ident">test_test_summary</span></span>(<span>self, capsys)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_test_summary(self, capsys):
+    results = {&#34;node1&#34;: {&#34;test1&#34;: True}, &#34;node2&#34;: {&#34;test2&#34;: False}}
+    printer.test_summary(results)
+    captured = capsys.readouterr()
+    assert &#34;node1&#34; in captured.out
+    assert &#34;node2&#34; in captured.out
+    assert &#34;test1&#34; in captured.out
+    assert &#34;test2&#34; in captured.out</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -247,13 +435,21 @@ el.replaceWith(d);
 <li>
 <h4><code><a title="connpy.tests.test_printer.TestPrinter" href="#connpy.tests.test_printer.TestPrinter">TestPrinter</a></code></h4>
 <ul class="">
+<li><code><a title="connpy.tests.test_printer.TestPrinter.test_confirm_action" href="#connpy.tests.test_printer.TestPrinter.test_confirm_action">test_confirm_action</a></code></li>
 <li><code><a title="connpy.tests.test_printer.TestPrinter.test_custom_output" href="#connpy.tests.test_printer.TestPrinter.test_custom_output">test_custom_output</a></code></li>
+<li><code><a title="connpy.tests.test_printer.TestPrinter.test_data_output" href="#connpy.tests.test_printer.TestPrinter.test_data_output">test_data_output</a></code></li>
 <li><code><a title="connpy.tests.test_printer.TestPrinter.test_debug_output" href="#connpy.tests.test_printer.TestPrinter.test_debug_output">test_debug_output</a></code></li>
 <li><code><a title="connpy.tests.test_printer.TestPrinter.test_error_output" href="#connpy.tests.test_printer.TestPrinter.test_error_output">test_error_output</a></code></li>
+<li><code><a title="connpy.tests.test_printer.TestPrinter.test_header_output" href="#connpy.tests.test_printer.TestPrinter.test_header_output">test_header_output</a></code></li>
 <li><code><a title="connpy.tests.test_printer.TestPrinter.test_info_output" href="#connpy.tests.test_printer.TestPrinter.test_info_output">test_info_output</a></code></li>
+<li><code><a title="connpy.tests.test_printer.TestPrinter.test_kv_output" href="#connpy.tests.test_printer.TestPrinter.test_kv_output">test_kv_output</a></code></li>
 <li><code><a title="connpy.tests.test_printer.TestPrinter.test_multiline_indentation" href="#connpy.tests.test_printer.TestPrinter.test_multiline_indentation">test_multiline_indentation</a></code></li>
+<li><code><a title="connpy.tests.test_printer.TestPrinter.test_node_panel_fail" href="#connpy.tests.test_printer.TestPrinter.test_node_panel_fail">test_node_panel_fail</a></code></li>
+<li><code><a title="connpy.tests.test_printer.TestPrinter.test_node_panel_pass" href="#connpy.tests.test_printer.TestPrinter.test_node_panel_pass">test_node_panel_pass</a></code></li>
 <li><code><a title="connpy.tests.test_printer.TestPrinter.test_start_output" href="#connpy.tests.test_printer.TestPrinter.test_start_output">test_start_output</a></code></li>
 <li><code><a title="connpy.tests.test_printer.TestPrinter.test_success_output" href="#connpy.tests.test_printer.TestPrinter.test_success_output">test_success_output</a></code></li>
+<li><code><a title="connpy.tests.test_printer.TestPrinter.test_test_panel" href="#connpy.tests.test_printer.TestPrinter.test_test_panel">test_test_panel</a></code></li>
+<li><code><a title="connpy.tests.test_printer.TestPrinter.test_test_summary" href="#connpy.tests.test_printer.TestPrinter.test_test_summary">test_test_summary</a></code></li>
 <li><code><a title="connpy.tests.test_printer.TestPrinter.test_warning_output" href="#connpy.tests.test_printer.TestPrinter.test_warning_output">test_warning_output</a></code></li>
 </ul>
 </li>

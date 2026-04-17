@@ -3,6 +3,7 @@
 import json
 import os
 import re
+import sys
 import yaml
 import shutil
 from Crypto.PublicKey import RSA
@@ -12,9 +13,9 @@ from copy import deepcopy
 from .hooks import MethodHook, ClassHook
 from . import printer
 
-
-
-#functions and classes
+class NoAliasDumper(yaml.SafeDumper):
+    def ignore_aliases(self, data):
+        return True
 
 @ClassHook
 class configfile:
@@ -95,7 +96,7 @@ class configfile:
                         printer.warning(f"Legacy config {legacy_file} has invalid structure, skipping migration.")
                     else:
                         with open(self.file, 'w') as f:
-                            yaml.dump(old_data, f, default_flow_style=False, sort_keys=False)
+                            yaml.dump(old_data, f, Dumper=NoAliasDumper, default_flow_style=False, sort_keys=False)
                         # Verify the written YAML can be read back correctly
                         with open(self.file, 'r') as f:
                             verify = yaml.safe_load(f)
@@ -173,7 +174,7 @@ class configfile:
                     if self._validate_config(data):
                         # Re-write the YAML from good cache
                         with open(conf, 'w') as f:
-                            yaml.dump(data, f, default_flow_style=False, sort_keys=False)
+                            yaml.dump(data, f, Dumper=NoAliasDumper, default_flow_style=False, sort_keys=False)
                         return data
                 # Both broken or no cache - create fresh
                 printer.error("Config file is corrupt and no valid cache exists. Creating default config.")
@@ -202,7 +203,7 @@ class configfile:
         #Create config file (always writes defaults, safe for recovery)
         defaultconfig = {'config': {'case': False, 'idletime': 30, 'fzf': False}, 'connections': {}, 'profiles': { "default": { "host":"", "protocol":"ssh", "port":"", "user":"", "password":"", "options":"", "logs":"", "tags": "", "jumphost":""}}}
         with open(conf, "w") as f:
-            yaml.dump(defaultconfig, f, default_flow_style=False, sort_keys=False)
+            yaml.dump(defaultconfig, f, Dumper=NoAliasDumper, default_flow_style=False, sort_keys=False)
         os.chmod(conf, 0o600)
         try:
             with open(self.cachefile, 'w') as f:
@@ -221,7 +222,7 @@ class configfile:
         tmpfile = conf + '.tmp'
         try:
             with open(tmpfile, "w") as f:
-                yaml.dump(newconfig, f, default_flow_style=False, sort_keys=False)
+                yaml.dump(newconfig, f, Dumper=NoAliasDumper, default_flow_style=False, sort_keys=False)
             # Atomic replace: only overwrite original if write succeeded
             shutil.move(tmpfile, conf)
             with open(self.cachefile, "w") as f:
@@ -238,11 +239,14 @@ class configfile:
             return 1
         return 0
 
-    def _generate_nodes_cache(self):
+    def _generate_nodes_cache(self, nodes=None, folders=None, profiles=None):
         try:
-            nodes = self._getallnodes()
-            folders = self._getallfolders()
-            profiles = list(self.profiles.keys())
+            if nodes is None:
+                nodes = self._getallnodes()
+            if folders is None:
+                folders = self._getallfolders()
+            if profiles is None:
+                profiles = list(self.profiles.keys())
             
             with open(self.fzf_cachefile, "w") as f:
                 f.write("\n".join(nodes))
@@ -252,6 +256,7 @@ class configfile:
                 f.write("\n".join(profiles))
         except Exception:
             pass
+
 
     def _createkey(self, keyfile):
         #Create key file
@@ -487,7 +492,8 @@ class configfile:
             elif isinstance(filter, list):
                 nodes = [item for item in nodes if any(re.search(pattern, item) for pattern in filter)]
             else:
-                raise ValueError("filter must be a string or a list of strings")
+                printer.error("Invalid filter: must be a string or a list of strings.")
+                sys.exit(1)
         return nodes
 
     @MethodHook
@@ -512,7 +518,8 @@ class configfile:
                 filter = ["^(?!.*@).+$" if item == "@" else item for item in filter]
                 nodes = {k: v for k, v in nodes.items() if any(re.search(pattern, k) for pattern in filter)}
             else:
-                raise ValueError("filter must be a string or a list of strings")
+                printer.error("Invalid filter: must be a string or a list of strings.")
+                sys.exit(1)
         if extract:
             for node, keys in nodes.items():
                 for key, value in keys.items():

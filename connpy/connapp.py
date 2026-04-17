@@ -2,37 +2,47 @@
 #Imports
 import os
 import re
-import ast
 import argparse
 import sys
-import inquirer
+import yaml
+import sys
 from .core import node,nodes
 from ._version import __version__
 from . import printer
-from .api import start_api,stop_api,debug_api,app
+from .api import start_api,stop_api,debug_api
 from .ai import ai
+
 from .plugins import Plugins
-import yaml
-import shutil
-class NoAliasDumper(yaml.SafeDumper):
-    def ignore_aliases(self, data):
-        return True
-from rich.markdown import Markdown
-from rich.markdown import Markdown
-from rich.panel import Panel
-from rich.text import Text
-from rich.rule import Rule
-from rich.style import Style
-from rich.prompt import Prompt
-mdprint = printer.console.print
+from .services import (
+    NodeService, ProfileService, ConfigService, 
+    PluginService, AIService, SystemService,
+    ExecutionService, ImportExportService, ConnpyError,
+    ProfileNotFoundError, ReservedNameError
+)
+
+from rich_argparse import RichHelpFormatter
+# Bridge rich-argparse with our design system
+RichHelpFormatter.console = printer.console
+RichHelpFormatter.styles.update({
+    "argparse.args": printer.STYLES["info"],
+    "argparse.groups": printer.STYLES["header"],
+    "argparse.prog": printer.STYLES["pass"],
+    "argparse.metavar": printer.STYLES["key"],
+    "argparse.syntax": printer.STYLES["header"],
+    "argparse.text": "default",
+    "argparse.help": "default",
+})
+RichHelpFormatter.group_name_formatter = str.upper
+
+from .cli import (
+    NodeHandler, ProfileHandler, ConfigHandler, RunHandler,
+    AIHandler, APIHandler, PluginHandler, ImportExportHandler,
+    ContextHandler
+)
+from .cli.helpers import nodes_completer, folders_completer, profiles_completer
+from .cli.help_text import get_help
+
 console = printer.console
-
-try:
-    from pyfzf.pyfzf import FzfPrompt
-except ImportError:
-    FzfPrompt = None
-
-
 
 #functions and classes
 
@@ -50,23 +60,134 @@ class connapp:
                             the config file.
 
         '''
-        self.app = app
+        self.config = config
+
+        # Instantiate services
+        from .services.provider import ServiceProvider
+        mode = self.config.config.get("service_mode", "local")
+        remote_host = self.config.config.get("remote_host", None)
+        try:
+            self.services = ServiceProvider(self.config, mode=mode, remote_host=remote_host)
+        except ConnpyError as e:
+            printer.error(f"Initialization error: {e}")
+            sys.exit(1)
+
         self.node = node
         self.nodes = nodes
         self.start_api = start_api
-        self.stop_api = stop_api
+        self.stop_api = stop_api # Using SystemService logic eventually
         self.debug_api = debug_api
         self.ai = ai
-        self.config = config
-        self.nodes_list = self.config._getallnodes()
-        self.folders = self.config._getallfolders()
-        self.profiles = list(self.config.profiles.keys())
-        self.case = self.config.config["case"]
-        try:
-            self.fzf = self.config.config["fzf"]
-        except KeyError:
-            self.fzf = False
+        
+        # Register context filtering hooks
+        self.services.context.config._getallnodes.register_post_hook(self.services.context.filter_node_list)
+        self.services.context.config._getallfolders.register_post_hook(self.services.context.filter_node_list)
+        self.services.context.config._getallnodesfull.register_post_hook(self.services.context.filter_node_dict)
 
+        if hasattr(self.services.nodes, "list_nodes") and hasattr(self.services.nodes.list_nodes, "register_post_hook"):
+            self.services.nodes.list_nodes.register_post_hook(self.services.context.filter_node_list)
+        if hasattr(self.services.nodes, "list_folders") and hasattr(self.services.nodes.list_folders, "register_post_hook"):
+            self.services.nodes.list_folders.register_post_hook(self.services.context.filter_node_list)
+
+        # Populate data via services
+        try:
+            self.nodes_list = self.services.nodes.list_nodes()
+            self.folders = self.services.nodes.list_folders()
+            self.profiles = self.services.profiles.list_profiles()
+            
+            # Apply initial context filter to in-memory data
+            self.nodes_list = self.services.context.filter_node_list(result=self.nodes_list)
+            self.folders = self.services.context.filter_node_list(result=self.folders)
+        except NotImplementedError:
+            self.nodes_list = []
+            self.folders = []
+            self.profiles = []
+        except ConnpyError as e:
+            # If in remote mode, connectivity issues should be reported
+            if mode == "remote":
+                printer.warning(f"Failed to fetch data from remote server: {e}")
+            self.nodes_list = []
+            self.folders = []
+            self.profiles = []
+        except Exception as e:
+            if mode == "remote":
+                printer.warning(f"Unexpected error connecting to remote: {e}")
+            self.nodes_list = []
+            self.folders = []
+            self.profiles = []
+        
+        # Get settings for CLI behavior from local config
+        settings = self.services.config_svc.get_settings()
+        self.case = settings.get("case", False)
+        self.fzf = settings.get("fzf", False)
+        
+        from .cli.node_handler import NodeHandler
+        from .cli.profile_handler import ProfileHandler
+        from .cli.config_handler import ConfigHandler
+        from .cli.run_handler import RunHandler
+        from .cli.ai_handler import AIHandler
+        from .cli.api_handler import APIHandler
+        from .cli.plugin_handler import PluginHandler
+        from .cli.context_handler import ContextHandler
+        from .cli.import_export_handler import ImportExportHandler
+        from .cli.sync_handler import SyncHandler
+        
+        # Instantiate Handlers
+        self._node = NodeHandler(self)
+        self._profile = ProfileHandler(self)
+        self._config = ConfigHandler(self)
+        self._run = RunHandler(self)
+        self._ai = AIHandler(self)
+        self._api = APIHandler(self)
+        self._plugin = PluginHandler(self)
+        self._context = ContextHandler(self)
+        self._import_export = ImportExportHandler(self)
+        self._sync = SyncHandler(self)
+
+        # Register auto-sync hook to trigger after config saves
+        from .configfile import configfile
+        def auto_sync_hook(*args, **kwargs):
+            self.services.sync.perform_sync(self)
+            return kwargs.get("result")
+
+        configfile._saveconfig.register_post_hook(auto_sync_hook)
+        
+        # Apply theme from config if exists
+        user_theme = self.config.config.get("theme", {})
+        self._apply_app_theme(user_theme)
+
+    def _apply_app_theme(self, styles):
+        """Unified method to apply theme to printer and help formatter."""
+        active_styles = printer.apply_theme(styles)
+        # Re-map help styles using the now active (potentially merged) styles
+        RichHelpFormatter.styles.update({
+            "argparse.args": active_styles["info"],
+            "argparse.groups": active_styles["header"],
+            "argparse.prog": active_styles["pass"],
+            "argparse.metavar": active_styles["key"],
+            "argparse.syntax": active_styles["header"],
+        })
+
+    def _service_logger(self, type, message):
+        """Bridge between core services and CLI printer."""
+        if type == "success":
+            printer.success(message)
+        elif type == "error":
+            printer.error(message)
+        elif type == "warning":
+            printer.warning(message)
+        elif type == "debug":
+            printer.info(f"[DEBUG] {message}")
+        elif type == "output":
+            # Print raw output without tags for cleaner terminal experience
+            printer.console.print(message)
+        else:
+            printer.info(message)
+
+    def _custom_error(self, message):
+        """Custom error handler for argparse to use the application's printer."""
+        printer.error(message)
+        sys.exit(2)
 
     def start(self,argv = sys.argv[1:]):
         ''' 
@@ -77,13 +198,26 @@ class connapp:
                            Default: sys.argv[1:]
 
         ''' 
+    def get_parser(self):
         #DEFAULTPARSER
-        defaultparser = argparse.ArgumentParser(prog = "connpy", description = "SSH and Telnet connection manager", formatter_class=argparse.RawTextHelpFormatter)
-        subparsers = defaultparser.add_subparsers(title="Commands", dest="subcommand")
+        defaultparser = argparse.ArgumentParser(prog = "connpy", description = "SSH and Telnet connection manager", formatter_class=RichHelpFormatter)
+        defaultparser.error = self._custom_error
+        # We add the node options to defaultparser purely so they show up in connpy --help, since 'node' is the default command.
+        defaultparser.add_argument("-v","--version", dest="action", action="store_const", help="Show version", const="version", default="connect")
+        defaultparser.add_argument("-a","--add", dest="action", action="store_const", help="Add new node[@subfolder][@folder] or [@subfolder]@folder", const="add", default="connect")
+        defaultparser.add_argument("-r","--del", "--rm", dest="action", action="store_const", help="Delete node[@subfolder][@folder] or [@subfolder]@folder", const="del", default="connect")
+        defaultparser.add_argument("-e","--mod", "--edit", dest="action", action="store_const", help="Modify node[@subfolder][@folder]", const="mod", default="connect")
+        defaultparser.add_argument("-s","--show", dest="action", action="store_const", help="Show node[@subfolder][@folder]", const="show", default="connect")
+        defaultparser.add_argument("-d","--debug", dest="debug", action="store_true", help="Display all conections steps")
+        defaultparser.add_argument("-t","--sftp", dest="sftp", action="store_true", help="Connects using sftp instead of ssh")
+        
+        subparsers = defaultparser.add_subparsers(title="Commands", dest="subcommand", metavar="COMMAND")
+        self.subparsers = subparsers
         #NODEPARSER
-        nodeparser = subparsers.add_parser("node", formatter_class=argparse.RawTextHelpFormatter) 
+        nodeparser = subparsers.add_parser("node", help="Connect to specific node or show all matching nodes", formatter_class=RichHelpFormatter) 
+        nodeparser.error = self._custom_error
         nodecrud = nodeparser.add_mutually_exclusive_group()
-        nodeparser.add_argument("node", metavar="node|folder", nargs='?', default=None, action=self._store_type, help=self._help("node"))
+        nodeparser.add_argument("node", metavar="node|folder", nargs='?', default=None, action=self._store_type, help=get_help("node"))
         nodecrud.add_argument("-v","--version", dest="action", action="store_const", help="Show version", const="version", default="connect")
         nodecrud.add_argument("-a","--add", dest="action", action="store_const", help="Add new node[@subfolder][@folder] or [@subfolder]@folder", const="add", default="connect")
         nodecrud.add_argument("-r","--del", "--rm", dest="action", action="store_const", help="Delete node[@subfolder][@folder] or [@subfolder]@folder", const="del", default="connect")
@@ -91,82 +225,111 @@ class connapp:
         nodecrud.add_argument("-s","--show", dest="action", action="store_const", help="Show node[@subfolder][@folder]", const="show", default="connect")
         nodecrud.add_argument("-d","--debug", dest="debug", action="store_true", help="Display all conections steps")
         nodeparser.add_argument("-t","--sftp", dest="sftp", action="store_true", help="Connects using sftp instead of ssh")
-        nodeparser.set_defaults(func=self._func_node)
+        nodeparser.set_defaults(func=self._node.dispatch)
         #PROFILEPARSER
-        profileparser = subparsers.add_parser("profile", description="Manage profiles") 
+        profileparser = subparsers.add_parser("profile", help="Manage profiles", description="Manage profiles", formatter_class=RichHelpFormatter) 
+        profileparser.error = self._custom_error
         profileparser.add_argument("profile", nargs=1, action=self._store_type, type=self._type_profile, help="Name of profile to manage")
         profilecrud = profileparser.add_mutually_exclusive_group(required=True)
         profilecrud.add_argument("-a", "--add", dest="action", action="store_const", help="Add new profile", const="add")
         profilecrud.add_argument("-r", "--del", "--rm", dest="action", action="store_const", help="Delete profile", const="del")
         profilecrud.add_argument("-e", "--mod", "--edit", dest="action", action="store_const", help="Modify profile", const="mod")
         profilecrud.add_argument("-s", "--show", dest="action", action="store_const", help="Show profile", const="show")
-        profileparser.set_defaults(func=self._func_profile)
+        profileparser.set_defaults(func=self._profile.dispatch)
         #MOVEPARSER
-        moveparser = subparsers.add_parser("move", aliases=["mv"], description="Move node") 
+        moveparser = subparsers.add_parser("move", aliases=["mv"], help="Move node", description="Move node", formatter_class=RichHelpFormatter) 
+        moveparser.error = self._custom_error
         moveparser.add_argument("move", nargs=2, action=self._store_type, help="Move node[@subfolder][@folder] dest_node[@subfolder][@folder]", default="move", type=self._type_node)
-        moveparser.set_defaults(func=self._func_others)
+        moveparser.set_defaults(func=self._mvcp)
         #COPYPARSER
-        copyparser = subparsers.add_parser("copy", aliases=["cp"], description="Copy node") 
+        copyparser = subparsers.add_parser("copy", aliases=["cp"], help="Copy node", description="Copy node", formatter_class=RichHelpFormatter) 
+        copyparser.error = self._custom_error
         copyparser.add_argument("cp", nargs=2, action=self._store_type, help="Copy node[@subfolder][@folder] new_node[@subfolder][@folder]", default="cp", type=self._type_node)
-        copyparser.set_defaults(func=self._func_others)
+        copyparser.set_defaults(func=self._mvcp)
         #LISTPARSER
-        lsparser = subparsers.add_parser("list", aliases=["ls"], description="List profiles, nodes or folders") 
+        lsparser = subparsers.add_parser("list", aliases=["ls"], help="List profiles, nodes or folders", description="List profiles, nodes or folders", formatter_class=RichHelpFormatter) 
+        lsparser.error = self._custom_error
         lsparser.add_argument("ls", action=self._store_type, choices=["profiles","nodes","folders"], help="List profiles, nodes or folders", default=False)
         lsparser.add_argument("--filter", nargs=1, help="Filter results")
         lsparser.add_argument("--format", nargs=1, help="Format of the output of nodes using {name}, {NAME}, {location}, {LOCATION}, {host} and {HOST}")
-        lsparser.set_defaults(func=self._func_others)
+        lsparser.set_defaults(func=self._ls)
         #BULKPARSER
-        bulkparser = subparsers.add_parser("bulk", description="Add nodes in bulk") 
-        bulkparser.add_argument("bulk", const="bulk", nargs=0, action=self._store_type, help="Add nodes in bulk")
+        bulkparser = subparsers.add_parser("bulk", help="Add nodes in bulk", description="Add nodes in bulk", formatter_class=RichHelpFormatter) 
+        bulkparser.error = self._custom_error
         bulkparser.add_argument("-f", "--file", nargs=1, help="Import nodes from a file. First line nodes, second line hosts")
-        bulkparser.set_defaults(func=self._func_others)
+        bulkparser.set_defaults(func=self._import_export.bulk)
         # EXPORTPARSER
-        exportparser = subparsers.add_parser("export", description="Export connection folder to Yaml file") 
-        exportparser.add_argument("export", nargs="+", action=self._store_type, help="Export /path/to/file.yml [@subfolder1][@folder1] [@subfolderN][@folderN]")
-        exportparser.set_defaults(func=self._func_export)
+        exportparser = subparsers.add_parser("export", help="Export connection folder to YAML file", formatter_class=RichHelpFormatter) 
+        exportparser.error = self._custom_error
+        exportparser.add_argument("export", nargs="+", action=self._store_type, help=get_help("export")).completer = folders_completer
+        exportparser.set_defaults(func=self._import_export.dispatch_export)
         # IMPORTPARSER
-        importparser = subparsers.add_parser("import", description="Import connection folder to config from Yaml file") 
-        importparser.add_argument("file", nargs=1, action=self._store_type, help="Import /path/to/file.yml")
-        importparser.set_defaults(func=self._func_import)
+        importparser = subparsers.add_parser("import", help="Import connection folder from YAML file", formatter_class=RichHelpFormatter) 
+        importparser.error = self._custom_error
+        importparser.add_argument("file", nargs=1, action=self._store_type, help=get_help("import"))
+
+
+        importparser.set_defaults(func=self._import_export.dispatch_import)
         # AIPARSER
-        aiparser = subparsers.add_parser("ai", description="Make request to an AI") 
+        aiparser = subparsers.add_parser("ai", help="Make request to an AI", description="Make request to an AI", formatter_class=RichHelpFormatter) 
+        aiparser.error = self._custom_error
         aiparser.add_argument("ask", nargs='*', help="Ask connpy AI something")
         aiparser.add_argument("--engineer-model", nargs=1, help="Override engineer model")
         aiparser.add_argument("--engineer-api-key", nargs=1, help="Override engineer api key")
         aiparser.add_argument("--architect-model", nargs=1, help="Override architect model")
         aiparser.add_argument("--architect-api-key", nargs=1, help="Override architect api key")
         aiparser.add_argument("--debug", action="store_true", help="Show AI reasoning and tool calls")
+        aiparser.add_argument("-y", "--trust", action="store_true", help="Trust AI to execute unsafe commands without confirmation")
         aiparser.add_argument("--list", "--list-sessions", dest="list_sessions", action="store_true", help="List saved AI sessions")
         aiparser.add_argument("--session", nargs=1, help="Resume a specific AI session by ID")
         aiparser.add_argument("--resume", action="store_true", help="Resume the most recent AI session")
         aiparser.add_argument("--delete", "--delete-session", dest="delete_session", nargs=1, help="Delete an AI session by ID")
-        aiparser.set_defaults(func=self._func_ai)
+        aiparser.set_defaults(func=self._ai.dispatch)
         #RUNPARSER
-        runparser = subparsers.add_parser("run", description="Run scripts or commands on nodes", formatter_class=argparse.RawTextHelpFormatter) 
-        runparser.add_argument("run", nargs='+', action=self._store_type, help=self._help("run"), default="run")
+        runparser = subparsers.add_parser("run", help="Run scripts or commands on nodes", description="Run scripts or commands on nodes", formatter_class=RichHelpFormatter) 
+        runparser.error = self._custom_error
+        runparser.add_argument("run", nargs='+', action=self._store_type, help=get_help("run"), default="run").completer = nodes_completer
         runparser.add_argument("-g","--generate", dest="action", action="store_const", help="Generate yaml file template", const="generate", default="run")
-        runparser.set_defaults(func=self._func_run)
+        runparser.set_defaults(func=self._run.dispatch)
         #APIPARSER
-        apiparser = subparsers.add_parser("api", description="Start and stop connpy api") 
+        apiparser = subparsers.add_parser("api", help="Start and stop connpy API", description="Start and stop connpy API", formatter_class=RichHelpFormatter) 
+        apiparser.error = self._custom_error
         apicrud = apiparser.add_mutually_exclusive_group(required=True)
         apicrud.add_argument("-s","--start", dest="start", nargs="?", action=self._store_type, help="Start conppy api", type=int, default=8048, metavar="PORT")
         apicrud.add_argument("-r","--restart", dest="restart", nargs=0, action=self._store_type, help="Restart conppy api")
         apicrud.add_argument("-x","--stop", dest="stop", nargs=0, action=self._store_type, help="Stop conppy api")
         apicrud.add_argument("-d", "--debug", dest="debug", nargs="?", action=self._store_type, help="Run connpy server on debug mode", type=int, default=8048, metavar="PORT")
-        apiparser.set_defaults(func=self._func_api)
+        apiparser.set_defaults(func=self._api.dispatch)
+        #CONTEXTPARSER
+        contextparser = subparsers.add_parser("context", help="Manage regex-based contexts", description="Manage regex-based contexts", formatter_class=RichHelpFormatter)
+        contextparser.error = self._custom_error
+        contextparser.add_argument("context_name", help="Name of the context", nargs='?')
+        contextcrud = contextparser.add_mutually_exclusive_group(required=False)
+        contextcrud.add_argument("-a", "--add", nargs='+', help='Add a new context with regex values')
+        contextcrud.add_argument("-r", "--rm", "--del", dest="rm", action='store_true', help="Delete a context")
+        contextcrud.add_argument("--ls", action='store_true', help="List all contexts")
+        contextcrud.add_argument("--set", action='store_true', help="Set the active context")
+        contextcrud.add_argument("-s", "--show", action='store_true', help="Show defined regex of a context")
+        contextcrud.add_argument("-e", "--edit", "--mod", dest="edit", nargs='+', help='Modify an existing context')
+        contextparser.set_defaults(func=self._context.dispatch)
         #PLUGINSPARSER
-        pluginparser = subparsers.add_parser("plugin", description="Manage plugins") 
+        pluginparser = subparsers.add_parser("plugin", help="Manage plugins", description="Manage plugins", formatter_class=RichHelpFormatter) 
+        pluginparser.error = self._custom_error
         plugincrud = pluginparser.add_mutually_exclusive_group(required=True)
         plugincrud.add_argument("--add", metavar=("PLUGIN", "FILE"), nargs=2, help="Add new plugin")
         plugincrud.add_argument("--update", metavar=("PLUGIN", "FILE"), nargs=2, help="Update plugin")
         plugincrud.add_argument("--del", dest="delete", metavar="PLUGIN", nargs=1, help="Delete plugin")
         plugincrud.add_argument("--enable", metavar="PLUGIN", nargs=1, help="Enable plugin")
         plugincrud.add_argument("--disable", metavar="PLUGIN", nargs=1, help="Disable plugin")
-        plugincrud.add_argument("--list", dest="list", action="store_true", help="Disable plugin")
-        pluginparser.set_defaults(func=self._func_plugin)
+        plugincrud.add_argument("--list", dest="list", action="store_true", help="List plugins")
+        plugincrud.add_argument("--sync", dest="sync", action="store_true", help="Sync remote plugins cache")
+        
+        pluginparser.add_argument("--remote", action="store_true", help="Target remote server plugins")
+        pluginparser.set_defaults(func=self._plugin.dispatch)
         #CONFIGPARSER
-        configparser = subparsers.add_parser("config", description="Manage app config") 
-        configcrud = configparser.add_mutually_exclusive_group(required=True)
+        configparser = subparsers.add_parser("config", help="Manage app config", description="Manage app config", formatter_class=RichHelpFormatter) 
+        configparser.error = self._custom_error
+        configcrud = configparser.add_mutually_exclusive_group(required=False)
         configcrud.add_argument("--allow-uppercase", dest="case", nargs=1, action=self._store_type, help="Allow case sensitive names", choices=["true","false"])
         configcrud.add_argument("--fzf", dest="fzf", nargs=1, action=self._store_type, help="Use fzf for lists", choices=["true","false"])
         configcrud.add_argument("--keepalive", dest="idletime", nargs=1, action=self._store_type, help="Set keepalive time in seconds, 0 to disable", type=int, metavar="INT")
@@ -175,52 +338,126 @@ class connapp:
         configcrud.add_argument("--configfolder", dest="configfolder", nargs=1, action=self._store_type, help="Set the default location for config file", metavar="FOLDER")
         configcrud.add_argument("--engineer-model", dest="engineer_model", nargs=1, action=self._store_type, help="Set engineer model", metavar="MODEL")
         configcrud.add_argument("--engineer-api-key", dest="engineer_api_key", nargs=1, action=self._store_type, help="Set engineer api_key", metavar="API_KEY")
+        configcrud.add_argument("--theme", dest="theme", nargs=1, action=self._store_type, help="Set application theme (dark, light, or YAML file path)", metavar="THEME")
+        configcrud.add_argument("--service-mode", dest="service_mode", nargs=1, action=self._store_type, help="Set the backend service mode (local or remote)", choices=["local", "remote"])
+        configcrud.add_argument("--remote", dest="remote_host", nargs=1, action=self._store_type, help="Connect to a remote connpy service via gRPC", metavar="HOST:PORT")
         configcrud.add_argument("--architect-model", dest="architect_model", nargs=1, action=self._store_type, help="Set architect model", metavar="MODEL")
         configcrud.add_argument("--architect-api-key", dest="architect_api_key", nargs=1, action=self._store_type, help="Set architect api_key", metavar="API_KEY")
-        configparser.set_defaults(func=self._func_others)
+        configcrud.add_argument("--sync-remote", dest="sync_remote", nargs=1, action=self._store_type, help="Sync remote nodes to Google Drive", choices=["true","false"])
+        configparser.add_argument("--trusted-commands", dest="trusted_commands", nargs=1, action=self._store_type, help="Set custom trusted commands regexes (comma separated)", metavar="REGEX,REGEX")
+        configparser.set_defaults(func=self._config.dispatch)
+
+        #SYNCPARSER
+        syncparser = subparsers.add_parser("sync", help="Sync config with Google Drive", description="Sync config with Google Drive", formatter_class=RichHelpFormatter)
+        syncparser.error = self._custom_error
+        synccrud = syncparser.add_mutually_exclusive_group(required=True)
+        synccrud.add_argument("--login", dest="action", action="store_const", const="login", help="Login to Google to enable synchronization")
+        synccrud.add_argument("--logout", dest="action", action="store_const", const="logout", help="Logout from Google")
+        synccrud.add_argument("--status", dest="action", action="store_const", const="status", help="Check the current status of synchronization")
+        synccrud.add_argument("--list", dest="action", action="store_const", const="list", help="List all backups stored on Google")
+        synccrud.add_argument("--once", dest="action", action="store_const", const="once", help="Backup current configuration to Google once")
+        synccrud.add_argument("--restore", dest="action", action="store_const", const="restore", help="Restore data from Google")
+        synccrud.add_argument("--start", dest="action", action="store_const", const="start", help="Enable auto-sync")
+        synccrud.add_argument("--stop", dest="action", action="store_const", const="stop", help="Disable auto-sync")
+        syncparser.add_argument("--id", dest="id", type=str, help="Optional file ID to restore a specific backup", required=False)
+        syncparser.add_argument("--nodes", dest="restore_nodes", action="store_true", help="Restore only nodes and profiles")
+        syncparser.add_argument("--config", dest="restore_config", action="store_true", help="Restore only local settings and RSA key")
+        syncparser.set_defaults(func=self._sync.dispatch)
+
         #Add plugins
+
         self.plugins = Plugins()
+        self.plugins._load_preferences(self.services.config_svc.get_default_dir())
+        remote_enabled = (self.services.mode == "remote")
+        force_sync = "--sync" in sys.argv and "plugin" in sys.argv
+
         try:
             core_path = os.path.dirname(os.path.realpath(__file__)) + "/core_plugins"
-            self.plugins._import_plugins_to_argparse(core_path, subparsers)
+            self.plugins._import_plugins_to_argparse(core_path, subparsers, remote_enabled=remote_enabled)
         except Exception as e:
             printer.warning(e)
         try:
-            file_path = self.config.defaultdir + "/plugins"
-            self.plugins._import_plugins_to_argparse(file_path, subparsers)
+            file_path = self.services.config_svc.get_default_dir() + "/plugins"
+            self.plugins._import_plugins_to_argparse(file_path, subparsers, remote_enabled=remote_enabled)
         except Exception as e:
             printer.warning(e)
+            
+        if remote_enabled:
+            cache_dir = os.path.join(self.services.config_svc.get_default_dir(), "remote_plugins")
+            try:
+                self.plugins._import_remote_plugins_to_argparse(
+                    self.services.plugins,
+                    subparsers,
+                    cache_dir,
+                    force_sync=force_sync
+                )
+            except Exception:
+                pass
+
+
         for preload in self.plugins.preloads.values():
             preload.Preload(self)
-            
+
         # Update internal state and force cache generation after all preloads
-        self.nodes_list = self.config._getallnodes()
-        self.folders = self.config._getallfolders()
-        self.config._generate_nodes_cache()
+        try:
+            self.nodes_list = self.services.nodes.list_nodes()
+            self.folders = self.services.nodes.list_folders()
+            self.profiles = self.services.profiles.list_profiles()
+            self.services.nodes.generate_cache(nodes=self.nodes_list, folders=self.folders, profiles=self.profiles)
+
+            #Manage sys arguments
+            self.commands = list(subparsers.choices.keys())
+            self.services.nodes.set_reserved_names(self.commands)
+            self.services.import_export.set_reserved_names(self.commands)
+        except (NotImplementedError, ConnpyError, Exception):
+            self.commands = list(subparsers.choices.keys())
             
         #Generate helps
-        nodeparser.usage = self._help("usage", subparsers)
-        nodeparser.epilog = self._help("end", subparsers)
-        nodeparser.help = self._help("node")
-        #Manage sys arguments
-        self.commands = list(subparsers.choices.keys())
+        defaultparser.usage = get_help("usage", subparsers)
+        nodeparser.help = get_help("node")
         profilecmds = []
         for action in profileparser._actions:
             profilecmds.extend(action.option_strings)
+            
+        return defaultparser, profilecmds
+
+    def start(self, argv=sys.argv[1:]):
+        """
+        Starts the application CLI with the provided arguments.
+        """
+        if argv is None:
+            argv = sys.argv[1:]
+            
+        defaultparser, profilecmds = self.get_parser()
+
         if len(argv) >= 2 and argv[1] == "profile" and argv[0] in profilecmds:
             argv[1] = argv[0]
             argv[0] = "profile"
-        if len(argv) < 1 or argv[0] not in self.commands:
+        
+        # Only insert default 'node' command if missing
+        if len(argv) < 1 or (argv[0] not in self.commands and argv[0] not in ["-h", "--help"]):
             argv.insert(0,"node")
         args, unknown_args = defaultparser.parse_known_args(argv)
         if hasattr(args, "unknown_args"):
             args.unknown_args = unknown_args
         else:
             args = defaultparser.parse_args(argv)
-        if args.subcommand in self.plugins.plugins:
-            self.plugins.plugins[args.subcommand].Entrypoint(args, self.plugins.plugin_parsers[args.subcommand].parser, self)
-        else:
-            return args.func(args)
+
+        try:
+            if args.subcommand in getattr(self.plugins, "remote_plugins", {}):
+                for chunk in self.services.plugins.invoke_plugin(args.subcommand, args):
+                    print(chunk, end="", flush=True)
+            elif args.subcommand in self.plugins.plugins:
+                self.plugins.plugins[args.subcommand].Entrypoint(args, self.plugins.plugin_parsers[args.subcommand].parser, self)
+            else:
+                return args.func(args)
+        except ConnpyError as e:
+            printer.error(str(e))
+            sys.exit(1)
+        except KeyboardInterrupt:
+            # Handle global Ctrl+C gracefully
+            printer.warning("Operation cancelled by user.")
+            sys.exit(130)
 
     class _store_type(argparse.Action):
         #Custom store type for cli app.
@@ -229,1541 +466,61 @@ class connapp:
             delattr(args,self.dest)
             setattr(args, "command", self.dest)
 
-    def _func_node(self, args):
-        #Function called when connecting or managing nodes.
-        if not self.case and args.data != None:
-            args.data = args.data.lower()
-        actions = {"version": self._version, "connect": self._connect, "add": self._add, "del": self._del, "mod": self._mod, "show": self._show}
-        return actions.get(args.action)(args)
-
-    def _version(self, args):
-        printer.info(f"Connpy {__version__}")
-
-    def _connect(self, args):
-        if args.data == None:
-            matches = self.nodes_list
-            if len(matches) == 0:
-                printer.warning("There are no nodes created")
-                printer.info("try: connpy --help")
-                exit(9)
-        else:
-            if args.data.startswith("@"):
-                matches = list(filter(lambda k: args.data in k, self.nodes_list))
-            else:
-                matches = list(filter(lambda k: k.startswith(args.data), self.nodes_list))
-        if len(matches) == 0:
-            printer.error("{} not found".format(args.data))
-            exit(2)
-        elif len(matches) > 1:
-            matches[0] = self._choose(matches,"node", "connect")
-        if matches[0] == None:
-            exit(7)
-        node = self.config.getitem(matches[0])
-        node = self.node(matches[0],**node, config = self.config)
-        if args.sftp:
-            node.protocol = "sftp"
-        if args.debug:
-            node.interact(debug = True)
-        else:
-            node.interact()
-
-    def _del(self, args):
-        if args.data == None:
-            printer.error("Missing argument node")
-            exit(3)
-        elif args.data.startswith("@"):
-            matches = list(filter(lambda k: k == args.data, self.folders))
-        else:
-            matches = self.config._getallnodes(args.data)
-        if len(matches) == 0:
-            printer.error("{} not found".format(args.data))
-            exit(2)
-        printer.info("Removing: {}".format(matches))
-        question = [inquirer.Confirm("delete", message="Are you sure you want to continue?")]
-        confirm = inquirer.prompt(question)
-        if confirm == None:
-            exit(7)
-        if confirm["delete"]:
-            if args.data.startswith("@"):
-                uniques = self.config._explode_unique(matches[0])
-                self.config._folder_del(**uniques)
-            else:
-                for node in matches:
-                    nodeuniques = self.config._explode_unique(node)
-                    self.config._connections_del(**nodeuniques)
-            self.config._saveconfig(self.config.file)
-            if len(matches) == 1:
-                printer.success("{} deleted successfully".format(matches[0]))
-            else:
-                printer.success(f"{len(matches)} nodes deleted successfully")
-
-    def _add(self, args):
-        args.data = self._type_node(args.data)
-        if args.data == None:
-            printer.error("Missing argument node")
-            exit(3)
-        elif args.data.startswith("@"):
-            type = "folder"
-            matches = list(filter(lambda k: k == args.data, self.folders))
-            reversematches = list(filter(lambda k: "@" + k == args.data, self.nodes_list))
-        else:
-            type = "node"
-            matches = list(filter(lambda k: k == args.data, self.nodes_list))
-            reversematches = list(filter(lambda k: k == "@" + args.data, self.folders))
-        if len(matches) > 0:
-            printer.error("{} already exist".format(matches[0]))
-            exit(4)
-        if len(reversematches) > 0:
-            printer.error("{} already exist".format(reversematches[0]))
-            exit(4)
-        else:
-            if type == "folder":
-                uniques = self.config._explode_unique(args.data)
-                if uniques == False:
-                    printer.error("Invalid folder {}".format(args.data))
-                    exit(5)
-                if "subfolder" in uniques.keys():
-                    parent = "@" + uniques["folder"]
-                    if parent not in self.folders:
-                        printer.error("Folder {} not found".format(uniques["folder"]))
-                        exit(2)
-                self.config._folder_add(**uniques)
-                self.config._saveconfig(self.config.file)
-                printer.success("{} added successfully".format(args.data))
-            if type == "node":
-                nodefolder = args.data.partition("@")
-                nodefolder = "@" + nodefolder[2]
-                if nodefolder not in self.folders and nodefolder != "@":
-                    printer.error(nodefolder + " not found")
-                    exit(2)
-                uniques = self.config._explode_unique(args.data)
-                if uniques == False:
-                    printer.error("Invalid node {}".format(args.data))
-                    exit(5)
-                self._print_instructions()
-                newnode = self._questions_nodes(args.data, uniques)
-                if newnode == False:
-                    exit(7)
-                self.config._connections_add(**newnode)
-                self.config._saveconfig(self.config.file)
-                printer.success("{} added successfully".format(args.data))
-
-    def _show(self, args):
-        if args.data == None:
-            printer.error("Missing argument node")
-            exit(3)
-        if args.data.startswith("@"):
-            matches = list(filter(lambda k: args.data in k, self.nodes_list))
-        else:
-            matches = list(filter(lambda k: k.startswith(args.data), self.nodes_list))
-        if len(matches) == 0:
-            printer.error("{} not found".format(args.data))
-            exit(2)
-        elif len(matches) > 1:
-            matches[0] = self._choose(matches,"node", "connect")
-        if matches[0] == None:
-            exit(7)
-        node = self.config.getitem(matches[0])
-        yaml_output = yaml.dump(node, sort_keys=False, default_flow_style=False)
-        printer.custom(matches[0],"")
-        print(yaml_output)
-
-    def _mod(self, args):
-        if args.data == None:
-            printer.error("Missing argument node")
-            exit(3)
-        matches = self.config._getallnodes(args.data)
-        if len(matches) == 0:
-            printer.error("No connection found with filter: {}".format(args.data))
-            exit(2)
-        elif len(matches) == 1:
-            uniques = self.config._explode_unique(matches[0])
-            unique = matches[0]
-        else:
-            uniques = {"id": None, "folder": None}
-            unique = None
-        printer.info("Editing: {}".format(matches))
-        node = {}
-        for i in matches:
-            node[i] = self.config.getitem(i)
-        edits = self._questions_edit()
-        if edits == None:
-            exit(7)
-        updatenode = self._questions_nodes(unique, uniques, edit=edits)
-        if not updatenode:
-            exit(7)
-        if len(matches) == 1:
-            uniques.update(node[matches[0]])
-            uniques["type"] = "connection"
-            if sorted(updatenode.items()) == sorted(uniques.items()):
-                printer.info("Nothing to do here")
-                return
-            else:
-                self.config._connections_add(**updatenode)
-                self.config._saveconfig(self.config.file)
-                printer.success("{} edited successfully".format(args.data))
-        else:
-            for k in node:
-                updatednode = self.config._explode_unique(k)
-                updatednode["type"] = "connection"
-                updatednode.update(node[k])
-                editcount = 0
-                for key, should_edit in edits.items():
-                    if should_edit:
-                        editcount += 1
-                        updatednode[key] = updatenode[key]
-                if not editcount:
-                    printer.info("Nothing to do here")
-                    return
-                else:
-                    self.config._connections_add(**updatednode)
-            self.config._saveconfig(self.config.file)
-            printer.success("{} edited successfully".format(matches))
-            return
-
-
-    def _func_profile(self, args):
-        #Function called when managing profiles
-        if not self.case:
-            args.data[0] = args.data[0].lower()
-        actions = {"add": self._profile_add, "del": self._profile_del, "mod": self._profile_mod, "show": self._profile_show}
-        return actions.get(args.action)(args)
-
-    def _profile_del(self, args):
-        matches = list(filter(lambda k: k == args.data[0], self.profiles))
-        if len(matches) == 0:
-            printer.error("{} not found".format(args.data[0]))
-            exit(2)
-        if matches[0] == "default":
-            printer.error("Can't delete default profile")
-            exit(6)
-        usedprofile = self.config._profileused(matches[0])
-        if len(usedprofile) > 0:
-            printer.error(f"Profile {matches[0]} used in the following nodes:\n{', '.join(usedprofile)}")
-            exit(8)
-        question = [inquirer.Confirm("delete", message="Are you sure you want to delete {}?".format(matches[0]))]
-        confirm = inquirer.prompt(question)
-        if confirm["delete"]:
-            self.config._profiles_del(id = matches[0])
-            self.config._saveconfig(self.config.file)
-            printer.success("{} deleted successfully".format(matches[0]))
-
-    def _profile_show(self, args):
-        matches = list(filter(lambda k: k == args.data[0], self.profiles))
-        if len(matches) == 0:
-            printer.error("{} not found".format(args.data[0]))
-            exit(2)
-        profile = self.config.profiles[matches[0]]
-        yaml_output = yaml.dump(profile, sort_keys=False, default_flow_style=False)
-        printer.custom(matches[0],"")
-        print(yaml_output)
-
-    def _profile_add(self, args):
-        matches = list(filter(lambda k: k == args.data[0], self.profiles))
-        if len(matches) > 0:
-            printer.error("Profile {} Already exist".format(matches[0]))
-            exit(4)
-        newprofile = self._questions_profiles(args.data[0])
-        if newprofile == False:
-            exit(7)
-        self.config._profiles_add(**newprofile)
-        self.config._saveconfig(self.config.file)
-        printer.success("{} added successfully".format(args.data[0]))
-
-    def _profile_mod(self, args):
-        matches = list(filter(lambda k: k == args.data[0], self.profiles))
-        if len(matches) == 0:
-            printer.error("{} not found".format(args.data[0]))
-            exit(2)
-        profile = self.config.profiles[matches[0]]
-        oldprofile = {"id": matches[0]}
-        oldprofile.update(profile)
-        edits = self._questions_edit()
-        if edits == None:
-            exit(7)
-        updateprofile = self._questions_profiles(matches[0], edit=edits)
-        if not updateprofile:
-            exit(7)
-        if sorted(updateprofile.items()) == sorted(oldprofile.items()):
-            printer.info("Nothing to do here")
-            return
-        else:
-            self.config._profiles_add(**updateprofile)
-            self.config._saveconfig(self.config.file)
-            printer.success("{} edited successfully".format(args.data[0]))
-    
-    def _func_others(self, args):
-        #Function called when using other commands
-        actions = {"ls": self._ls, "move": self._mvcp, "cp": self._mvcp, "bulk": self._bulk, "completion": self._completion, "fzf_wrapper": self._fzf_wrapper, "case": self._case, "fzf": self._fzf, "idletime": self._idletime, "configfolder": self._configfolder, "engineer_model": self._ai_config, "engineer_api_key": self._ai_config, "architect_model": self._ai_config, "architect_api_key": self._ai_config}
-        return actions.get(args.command)(args)
-
-    def _ai_config(self, args):
-        if "ai" in self.config.config:
-            aiconfig = self.config.config["ai"]
-        else:
-            aiconfig = {}
-        aiconfig[args.command] = args.data[0]
-        self._change_settings("ai", aiconfig)
-
-    def _ls(self, args):
-        if args.data == "nodes":
-            attribute = "nodes_list"
-        else:
-            attribute = args.data
-        items = getattr(self, attribute)
-        if args.filter:
-            items = [ item for item in items if re.search(args.filter[0], item)]
-        if args.format and args.data == "nodes":
-            newitems = []
-            for i in items:
-                formated = {}
-                info = self.config.getitem(i)
-                if "@" in i:
-                    name_part, location_part = i.split("@", 1)
-                    formated["location"] = "@" + location_part
-                else:
-                    name_part = i
-                    formated["location"] = ""
-                formated["name"] = name_part
-                formated["host"] = info["host"]
-                items_copy = list(formated.items())
-                for key, value in items_copy:
-                    upper_key = key.upper()
-                    upper_value = value.upper()
-                    formated[upper_key] = upper_value
-                newitems.append(args.format[0].format(**formated))
-            items = newitems
-        yaml_output = yaml.dump(items, sort_keys=False, default_flow_style=False)
-        printer.custom(args.data,"")
-        print(yaml_output)
-
-    def _mvcp(self, args):
-        if not self.case:
-            args.data[0] = args.data[0].lower()
-            args.data[1] = args.data[1].lower()
-        source = list(filter(lambda k: k == args.data[0], self.nodes_list))
-        dest = list(filter(lambda k: k == args.data[1], self.nodes_list))
-        if len(source) != 1:
-            printer.error("{} not found".format(args.data[0]))
-            exit(2)
-        if len(dest) > 0:
-            printer.error("Node {} Already exist".format(args.data[1]))
-            exit(4)
-        nodefolder = args.data[1].partition("@")
-        nodefolder = "@" + nodefolder[2]
-        if nodefolder not in self.folders and nodefolder != "@":
-            printer.error("{} not found".format(nodefolder))
-            exit(2)
-        olduniques = self.config._explode_unique(args.data[0])
-        newuniques = self.config._explode_unique(args.data[1])
-        if newuniques == False:
-            printer.error("Invalid node {}".format(args.data[1]))
-            exit(5)
-        node = self.config.getitem(source[0])
-        newnode = {**newuniques, **node}
-        self.config._connections_add(**newnode)
-        if args.command == "move":
-           self.config._connections_del(**olduniques) 
-        self.config._saveconfig(self.config.file)
-        action = "moved" if args.command == "move" else "copied"
-        printer.success("{} {} successfully to {}".format(args.data[0],action, args.data[1]))
-
-    def _bulk(self, args):
-        if args.file and os.path.isfile(args.file[0]):
-            with open(args.file[0], 'r') as f:
-                lines = f.readlines()
-
-            # Expecting exactly 2 lines
-            if len(lines) < 2:
-                printer.error("The file must contain at least two lines: one for nodes, one for hosts.")
-                exit(11)
-        
-
-            nodes = lines[0].strip()
-            hosts = lines[1].strip()
-            newnodes = self._questions_bulk(nodes, hosts)
-        else:
-            newnodes = self._questions_bulk()
-        if newnodes == False:
-            exit(7)
-        if not self.case:
-            newnodes["location"] = newnodes["location"].lower()
-            newnodes["ids"] = newnodes["ids"].lower()
-        ids = newnodes["ids"].split(",")
-        hosts = newnodes["host"].split(",")
-        count = 0
-        for n in ids:
-            unique = n + newnodes["location"]
-            matches = list(filter(lambda k: k == unique, self.nodes_list))
-            reversematches = list(filter(lambda k: k == "@" + unique, self.folders))
-            if len(matches) > 0:
-                printer.info("Node {} already exist, ignoring it".format(unique))
-                continue
-            if len(reversematches) > 0:
-                printer.info("Folder with name {} already exist, ignoring it".format(unique))
-                continue
-            newnode = {"id": n}
-            if newnodes["location"] != "":
-                location = self.config._explode_unique(newnodes["location"])
-                newnode.update(location)
-            if len(hosts) > 1:
-                index = ids.index(n)
-                newnode["host"] = hosts[index]
-            else:
-                newnode["host"] = hosts[0]
-            newnode["protocol"] = newnodes["protocol"]
-            newnode["port"] = newnodes["port"]
-            newnode["options"] = newnodes["options"]
-            newnode["logs"] = newnodes["logs"]
-            newnode["tags"] = newnodes["tags"]
-            newnode["jumphost"] = newnodes["jumphost"]
-            newnode["user"] = newnodes["user"]
-            newnode["password"] = newnodes["password"]
-            count +=1
-            self.config._connections_add(**newnode)
-            self.nodes_list = self.config._getallnodes()
-        if count > 0:
-            self.config._saveconfig(self.config.file)
-            printer.success("Successfully added {} nodes".format(count))
-        else:
-            printer.info("0 nodes added")
-
-    def _completion(self, args):
-        if args.data[0] == "bash":
-            print(self._help("bashcompletion"))
-        elif args.data[0] == "zsh":
-            print(self._help("zshcompletion"))
-
-    def _fzf_wrapper(self, args):
-        if args.data[0] == "bash":
-            print(self._help("fzf_wrapper_bash"))
-        elif args.data[0] == "zsh":
-            print(self._help("fzf_wrapper_zsh"))
-
-    def _case(self, args):
-        if args.data[0] == "true":
-            args.data[0] = True
-        elif args.data[0] == "false":
-            args.data[0] = False
-        self._change_settings(args.command, args.data[0])
-
-    def _fzf(self, args):
-        if args.data[0] == "true":
-            args.data[0] = True
-        elif args.data[0] == "false":
-            args.data[0] = False
-        self._change_settings(args.command, args.data[0])
-
-    def _idletime(self, args):
-        if args.data[0] < 0:
-            args.data[0] = 0
-        self._change_settings(args.command, args.data[0])
-
-    def _configfolder(self, args):
-        if not os.path.isdir(args.data[0]):
-            raise argparse.ArgumentTypeError(f"readable_dir:{args.data[0]} is not a valid path")
-        else:
-            pathfile = self.config.anchor_path + "/.folder"
-            folder = os.path.abspath(args.data[0]).rstrip('/')
-            with open(pathfile, "w") as f:
-                f.write(str(folder))
-            printer.success("Config saved")
-        
-    def _openai(self, args):
-        if "openai" in self.config.config:
-            openaikeys = self.config.config["openai"]
-        else:
-            openaikeys = {}
-        openaikeys[args.command] = args.data[0]
-        self._change_settings("openai", openaikeys)
-
-    def _anthropic(self, args):
-        if "anthropic" in self.config.config:
-            anthropickeys = self.config.config["anthropic"]
-        else:
-            anthropickeys = {}
-        # Mapear el nombre del argumento al nombre de la clave en el config (sin el prefijo 'anthropic_')
-        key_name = args.command.replace("anthropic_", "")
-        anthropickeys[key_name] = args.data[0]
-        self._change_settings("anthropic", anthropickeys)
-
-    def _google(self, args):
-        if "google" in self.config.config:
-            googlekeys = self.config.config["google"]
-        else:
-            googlekeys = {}
-        # Mapear el nombre del argumento al nombre de la clave en el config (sin el prefijo 'google_')
-        key_name = args.command.replace("google_", "")
-        googlekeys[key_name] = args.data[0]
-        self._change_settings("google", googlekeys)
-
-
-    def _change_settings(self, name, value):
-        self.config.config[name] = value
-        self.config._saveconfig(self.config.file)
-        printer.success("Config saved")
-
-    def _func_plugin(self, args):
-        if args.add:
-            if not os.path.exists(args.add[1]):
-                printer.error("File {} dosn't exists.".format(args.add[1]))
-                exit(14)
-            if args.add[0].isalpha() and args.add[0].islower() and len(args.add[0]) <= 15:
-                disabled_dest_file = os.path.join(self.config.defaultdir + "/plugins", args.add[0] + ".py.bkp")
-                if args.add[0] in self.commands or os.path.exists(disabled_dest_file):
-                    printer.error("Plugin name can't be the same as other commands.")
-                    exit(15)
-                else:
-                    check_bad_script = self.plugins.verify_script(args.add[1])
-                    if check_bad_script:
-                        printer.error(check_bad_script)
-                        exit(16)
-                    else:
-                        try:
-                            dest_file = os.path.join(self.config.defaultdir + "/plugins", args.add[0] + ".py")
-                            shutil.copy2(args.add[1], dest_file)
-                            printer.success(f"Plugin {args.add[0]} added successfully.")
-                        except Exception as e:
-                            printer.error(f"Failed importing plugin file. {e}")
-                            exit(17)
-            else:
-                printer.error("Plugin name should be lowercase letters up to 15 characters.")
-                exit(15)
-        elif args.update:
-            if not os.path.exists(args.update[1]):
-                printer.error("File {} dosn't exists.".format(args.update[1]))
-                exit(14)
-            plugin_file = os.path.join(self.config.defaultdir + "/plugins", args.update[0] + ".py")
-            disabled_plugin_file = os.path.join(self.config.defaultdir + "/plugins", args.update[0] + ".py.bkp")
-            plugin_exist = os.path.exists(plugin_file)
-            disabled_plugin_exist = os.path.exists(disabled_plugin_file)
-            if plugin_exist or disabled_plugin_exist:
-                check_bad_script = self.plugins.verify_script(args.update[1])
-                if check_bad_script:
-                    printer.error(check_bad_script)
-                    exit(16)
-                else:
-                    try:
-                        disabled_dest_file = os.path.join(self.config.defaultdir + "/plugins", args.update[0] + ".py.bkp")
-                        dest_file = os.path.join(self.config.defaultdir + "/plugins", args.update[0] + ".py")
-                        if disabled_plugin_exist:
-                            shutil.copy2(args.update[1], disabled_dest_file)
-                        else:
-                            shutil.copy2(args.update[1], dest_file)
-                        printer.success(f"Plugin {args.update[0]} updated successfully.")
-                    except Exception as e:
-                        printer.error(f"Failed updating plugin file. {e}")
-                        exit(17)
-
-            else:
-                printer.error("Plugin {} dosn't exist.".format(args.update[0]))
-                exit(14)
-        elif args.delete:
-            plugin_file = os.path.join(self.config.defaultdir + "/plugins", args.delete[0] + ".py")
-            disabled_plugin_file = os.path.join(self.config.defaultdir + "/plugins", args.delete[0] + ".py.bkp")
-            plugin_exist = os.path.exists(plugin_file)
-            disabled_plugin_exist = os.path.exists(disabled_plugin_file)
-            if not plugin_exist and not disabled_plugin_exist:
-                printer.error("Plugin {} dosn't exist.".format(args.delete[0]))
-                exit(14)
-            question = [inquirer.Confirm("delete", message="Are you sure you want to delete {} plugin?".format(args.delete[0]))]
-            confirm = inquirer.prompt(question)
-            if confirm == None:
-                exit(7)
-            if confirm["delete"]:
-                try:
-                    if plugin_exist:
-                        os.remove(plugin_file)
-                    elif disabled_plugin_exist:
-                        os.remove(disabled_plugin_file)
-                    printer.success(f"plugin {args.delete[0]} deleted successfully.")
-                except Exception as e:
-                    printer.error(f"Failed deleting plugin file. {e}")
-                    exit(17)
-        elif args.disable:
-            plugin_file = os.path.join(self.config.defaultdir + "/plugins", args.disable[0] + ".py")
-            disabled_plugin_file = os.path.join(self.config.defaultdir + "/plugins", args.disable[0] + ".py.bkp")
-            if not os.path.exists(plugin_file) or os.path.exists(disabled_plugin_file):
-                printer.error("Plugin {} dosn't exist or it's disabled.".format(args.disable[0]))
-                exit(14)
-            try:
-                os.rename(plugin_file, disabled_plugin_file)
-                printer.success(f"plugin {args.disable[0]} disabled successfully.")
-            except Exception as e:
-                printer.error(f"Failed disabling plugin file. {e}")
-                exit(17)
-        elif args.enable:
-            plugin_file = os.path.join(self.config.defaultdir + "/plugins", args.enable[0] + ".py")
-            disabled_plugin_file = os.path.join(self.config.defaultdir + "/plugins", args.enable[0] + ".py.bkp")
-            if os.path.exists(plugin_file) or not os.path.exists(disabled_plugin_file):
-                printer.error("Plugin {} dosn't exist or it's enabled.".format(args.enable[0]))
-                exit(14)
-            try:
-                os.rename(disabled_plugin_file, plugin_file)
-                printer.success(f"plugin {args.enable[0]} enabled successfully.")
-            except Exception as e:
-                printer.error(f"Failed enabling plugin file. {e}")
-                exit(17)
-        elif args.list:
-            enabled_files = []
-            disabled_files = []
-            plugins = {}
-        
-            # Iterate over all files in the specified folder
-            plugins_dir = self.config.defaultdir + "/plugins"
-            if os.path.exists(plugins_dir):
-                for file in os.listdir(plugins_dir):
-                    # Check if the file is a Python file
-                    if file.endswith('.py'):
-                        enabled_files.append(os.path.splitext(file)[0])
-                    # Check if the file is a Python backup file
-                    elif file.endswith('.py.bkp'):
-                        disabled_files.append(os.path.splitext(os.path.splitext(file)[0])[0])
-            if enabled_files:
-                plugins["Enabled"] = enabled_files
-            if disabled_files:
-                plugins["Disabled"] = disabled_files
-            if plugins:
-                printer.custom("plugins","")
-                print(yaml.dump(plugins, sort_keys=False))
-            else:
-                printer.warning("There are no plugins added.")
-
-
-
-
-    def _func_import(self, args):
-        if not os.path.exists(args.data[0]):
-            printer.error("File {} dosn't exist".format(args.data[0]))
-            exit(14)
-        printer.warning("This could overwrite your current configuration!")
-        question = [inquirer.Confirm("import", message="Are you sure you want to import {} file?".format(args.data[0]))]
-        confirm = inquirer.prompt(question)
-        if confirm == None:
-            exit(7)
-        if confirm["import"]:
-            try:
-                with open(args.data[0]) as file:
-                    imported = yaml.load(file, Loader=yaml.FullLoader)
-            except Exception:
-                printer.error("failed reading file {}".format(args.data[0]))
-                exit(10)
-            for k,v in imported.items():
-                uniques = self.config._explode_unique(k)
-                if "folder" in uniques:
-                    folder = f"@{uniques['folder']}"
-                    matches = list(filter(lambda k: k == folder, self.folders))
-                    if len(matches) == 0:
-                        uniquefolder = self.config._explode_unique(folder)
-                        self.config._folder_add(**uniquefolder)
-                if "subfolder" in uniques:
-                    subfolder = f"@{uniques['subfolder']}@{uniques['folder']}"
-                    matches = list(filter(lambda k: k == subfolder, self.folders))
-                    if len(matches) == 0:
-                        uniquesubfolder = self.config._explode_unique(subfolder)
-                        self.config._folder_add(**uniquesubfolder)
-                uniques.update(v)
-                self.config._connections_add(**uniques)
-            self.config._saveconfig(self.config.file)
-            printer.success("File {} imported successfully".format(args.data[0]))
-        return
-
-    def _func_export(self, args):
-        if os.path.exists(args.data[0]):
-            printer.error("File {} already exists".format(args.data[0]))
-            exit(14)
-        if len(args.data[1:]) == 0:
-            foldercons = self.config._getallnodesfull(extract = False)
-        else:
-            for folder in args.data[1:]:
-                matches = list(filter(lambda k: k == folder, self.folders))
-                if len(matches) == 0 and folder != "@":
-                    printer.error("{} folder not found".format(folder))
-                    exit(2)
-            foldercons = self.config._getallnodesfull(args.data[1:], extract = False)
-        with open(args.data[0], "w") as file:
-            yaml.dump(foldercons, file, Dumper=NoAliasDumper, default_flow_style=False)
-            file.close()
-        printer.success("File {} generated successfully".format(args.data[0]))
-        exit()
-        return
-
-    def _func_run(self, args):
-        if len(args.data) > 1:
-            args.action = "noderun"
-        actions = {"noderun": self._node_run, "generate": self._yaml_generate, "run": self._yaml_run}
-        return actions.get(args.action)(args)
-
-    def _func_ai(self, args):
-        arguments = {}
-        
-        if args.engineer_model:
-            arguments["engineer_model"] = args.engineer_model[0]
-        if args.engineer_api_key:
-            arguments["engineer_api_key"] = args.engineer_api_key[0]
-        if args.architect_model:
-            arguments["architect_model"] = args.architect_model[0]
-        if args.architect_api_key:
-            arguments["architect_api_key"] = args.architect_api_key[0]
-        
-        self.myai = self.ai(self.config, **arguments)
-        
-        # 1. Gestionar comandos de sesión (Listar/Borrar)
-        if args.list_sessions:
-            self.myai.list_sessions()
-            return
-            
-        if args.delete_session:
-            self.myai.delete_session(args.delete_session[0])
-            return
-            
-        # 2. Determinar session_id para retomar
-        session_id = None
-        if args.resume:
-            session_id = self.myai.get_last_session_id()
-            if not session_id:
-                printer.warning("No previous session found to resume.")
-        elif args.session:
-            session_id = args.session[0]
-
-        if args.ask:
-            # Single question mode
-            query = " ".join(args.ask)
-            with console.status("[bold green]Agent is thinking and analyzing...") as status:
-                result = self.myai.ask(query, status=status, debug=args.debug, session_id=session_id)
-            
-            # Determine title and color based on responder
-            responder = result.get("responder", "engineer")
-            if responder == "architect":
-                title = "[bold medium_purple]Network Architect[/bold medium_purple]"
-                border_style = "medium_purple"
-            else:
-                title = "[bold blue]Network Engineer[/bold blue]"
-                border_style = "blue"
-            
-            # Only render in panel if response wasn't already streamed
-            if not result.get("streamed"):
-                mdprint(Panel(Markdown(result["response"]), title=title, border_style=border_style, expand=False))
-            
-            # Mostrar tokens consumidos
-            if "usage" in result:
-                u = result["usage"]
-                console.print(f"[dim]Tokens: {u['total']} (Input: {u['input']}, Output: {u['output']})[/dim]")
-            
-            print("\r")
-        else:
-            # Interactive chat mode
-            history = None
-            if session_id:
-                session_data = self.myai.load_session_data(session_id)
-                if session_data:
-                    history = session_data.get("history", [])
-                    mdprint(Rule(title=f"[bold cyan] Resuming Session: {session_data.get('title')} [/bold cyan]", style="cyan"))
-                else:
-                    printer.error(f"Could not load session {session_id}. Starting clean.")
-
-            if not history:
-                mdprint(Rule(style="bold blue"))
-                mdprint(Markdown("**Networking Expert Agent**: Hi! I'm your assistant. I can help you diagnose issues, run commands, and manage your nodes.\nType 'exit' to quit.\n"))
-                mdprint(Rule(style="bold blue"))
-            else:
-                mdprint(f"[dim]Analyzing {len(history)} previous messages...[/dim]\n")
-            
-            while True:
-                try:
-                    user_query = Prompt.ask("[bold cyan]User[/bold cyan]")
-                    
-                    if not user_query.strip():
-                        continue
-                        
-                    if user_query.lower() in ['exit', 'quit', 'bye']:
-                        break
-                    
-                    # User message is already in the prompt, no need to print it again
-
-                    try:
-                        with console.status("[bold green]Agent is thinking...") as status:
-                            result = self.myai.ask(user_query, chat_history=history, status=status, debug=args.debug)
-                    except KeyboardInterrupt:
-                        # La interrupción ahora se maneja dentro de myai.ask para no perder el contexto
-                        # y generar un resumen de lo que se estaba haciendo.
-                        continue
-                    
-                    history = result.get("chat_history")
-                    
-                    # Determine title and color based on responder
-                    responder = result.get("responder", "engineer")
-                    if responder == "architect":
-                        title = "[bold purple]Network Architect[/bold purple]"
-                        border_style = "purple"
-                    else:
-                        title = "[bold blue]Network Engineer[/bold blue]"
-                        border_style = "blue"
-                    
-                    # Only render in panel if response wasn't already streamed
-                    if not result.get("streamed"):
-                        mdprint(Panel(Markdown(result["response"]), title=title, border_style=border_style, expand=False))
-                    
-                    # Mostrar tokens consumidos
-                    if "usage" in result:
-                        u = result["usage"]
-                        console.print(f"[dim]Tokens: {u['total']} (Input: {u['input']}, Output: {u['output']})[/dim]")
-                    
-                    print("\r")
-                except KeyboardInterrupt:
-                    break
-        return
-
-
-    def _ai_validation(self, answers, current, regex = "^.+$"):
-        #Validate ai user chat.
-        if not re.match(regex, current):
-            raise inquirer.errors.ValidationError("", reason="Can't send empty messages")
-        return True
-
-    def _func_api(self, args):
-        if args.command == "stop" or args.command == "restart" or args.command == "stop":
-            args.data = self.stop_api()
-        if args.command == "start" or args.command == "restart":
-            if args.data:
-                self.start_api(args.data, config=self.config)
-            else:
-                self.start_api(config=self.config)
-        if args.command == "debug":
-            if args.data:
-                self.debug_api(args.data, config=self.config)
-            else:
-                self.debug_api(config=self.config)
-        return
-
-    def _node_run(self, args):
-        command = " ".join(args.data[1:])
-        script = {}
-        script["name"] = "Output"
-        script["action"] = "run"
-        script["nodes"] = args.data[0]
-        script["commands"] = [command]
-        script["output"] = "stdout"
-        self._cli_run(script)
-
-    def _yaml_generate(self, args):
-        if os.path.exists(args.data[0]):
-            printer.error("File {} already exists".format(args.data[0]))
-            exit(14)
-        else:
-            with open(args.data[0], "w") as file:
-                file.write(self._help("generate"))
-                file.close()
-            printer.success("File {} generated successfully".format(args.data[0]))
-            exit()
-
-    def _yaml_run(self, args):
-        try:
-            with open(args.data[0]) as file:
-                scripts = yaml.load(file, Loader=yaml.FullLoader)
-        except Exception:
-            printer.error("failed reading file {}".format(args.data[0]))
-            exit(10)
-        for script in scripts["tasks"]:
-            self._cli_run(script)
-
-
-    def _cli_run(self, script):
-        import threading as _threading
-        args = {}
-        try:
-            action = script["action"]
-            nodelist = script["nodes"]
-            args["commands"] = script["commands"]
-            output = script["output"]
-            if action == "test":
-                args["expected"] = script["expected"]
-        except KeyError as e:
-            printer.error("'{}' is mandatory".format(e.args[0]))
-            exit(11)
-        nodes = self.config._getallnodes(nodelist)
-        if len(nodes) == 0:
-            printer.error("{} don't match any node".format(nodelist))
-            exit(2)
-        nodes = self.nodes(self.config.getitems(nodes), config = self.config)
-        stdout = False
-        if output is None:
-            pass
-        elif output == "stdout":
-            stdout = True
-        elif isinstance(output, str) and action == "run":
-            args["folder"] = output
-        if "variables" in script:
-            args["vars"] = script["variables"]
-        if "vars" in script:
-            args["vars"] = script["vars"]
-        try:
-            options = script["options"]
-            thisoptions = {k: v for k, v in options.items() if k in ["prompt", "parallel", "timeout"]}
-            args.update(thisoptions)
-        except KeyError:
-            options = None
-        try:
-            size = str(os.get_terminal_size())
-            p = re.search(r'.*columns=([0-9]+)', size)
-            columns = int(p.group(1))
-        except (ValueError, OSError):
-            columns = 80
-
-        PANEL_WIDTH = columns
-        header = f"{script['name'].upper()}"
-
-        # Streaming mode: print each node's panel as it completes
-        if action == "run" and stdout:
-            mdprint(Rule(header, style="bold cyan"))
-            print_lock = _threading.Lock()
-
-            def _on_node_complete(unique, node_output, node_status):
-                if node_status == 0:
-                    status_str = "[bold green]✓ PASS[/bold green]"
-                    border = "green"
-                    title_line = f"[bold]{unique}[/bold] — {status_str}"
-                else:
-                    status_str = f"[bold red]✗ FAIL({node_status})[/bold red]"
-                    border = "red"
-                    title_line = f"[bold]{unique}[/bold] — {status_str}"
-                stripped = node_output.strip() if node_output else ""
-                code_block = Text(stripped + "\n") if stripped else Text()
-                panel_content = Group(Text(), Text(""), code_block)
-                with print_lock:
-                    mdprint(Panel(panel_content, title=title_line, width=PANEL_WIDTH, border_style=border))
-
-            nodes.run(**args, on_complete=_on_node_complete)
-            return
-
-        # Batch mode: wait for all nodes, then print
-        if action == "run":
-            nodes.run(**args)
-        elif action == "test":
-            nodes.test(**args)
-        else:
-            printer.error(f"Wrong action '{action}'")
-            exit(13)
-
-        mdprint(Rule(header, style="bold cyan"))
-
-        for node in nodes.status:
-            if nodes.status[node] == 0:
-                status_str = "[bold green]✓ PASS[/bold green]"
-                border = "green"
-            else:
-                status_str = f"[bold red]✗ FAIL({nodes.status[node]})[/bold red]"
-                border = "red"
-            title_line = f"[bold]{node}[/bold] — {status_str}"
-
-            test_output = Text()
-            if action == "test" and nodes.status[node] == 0:
-                results = nodes.result[node]
-                test_output.append("TEST RESULTS:\n", style="bold cyan")
-                max_key_len = max(len(k) for k in results.keys())
-                for k, v in results.items():
-                    if str(v).upper() == "TRUE":
-                        test_output.append(f"  {k.ljust(max_key_len)}  ✓\n", style="green")
-                    else:
-                        test_output.append(f"  {k.ljust(max_key_len)}  ✗\n", style="red")
-
-            output = nodes.output[node].strip()
-            code_block = Text()
-            if stdout and output:
-                code_block = Text(output + "\n")
-
-                if action == "test" and nodes.status[node] == 0:
-                    highlight_words = [k for k, v in nodes.result[node].items() if str(v).upper() == "TRUE"]
-                    code_block.highlight_words(highlight_words, style=Style(color="green", bold=True, underline=True))
-
-
-            panel_content = Group(test_output, Text(""), code_block)
-            mdprint(Panel(panel_content, title=title_line, width=PANEL_WIDTH, border_style=border))
-
-
-    def _choose(self, list, name, action):
-        #Generates an inquirer list to pick
-        if FzfPrompt and self.fzf:
-            fzf = FzfPrompt(executable_path="fzf-tmux")
-            if not self.case:
-                fzf = FzfPrompt(executable_path="fzf-tmux -i")
-            answer = fzf.prompt(list, fzf_options="-d 25%")
-            if len(answer) == 0:
-                return
-            else:
-                return answer[0]
-        else:
-            questions = [inquirer.List(name, message="Pick {} to {}:".format(name,action), choices=list, carousel=True)]
-            answer = inquirer.prompt(questions)
-            if answer == None:
-                return
-            else:
-                return answer[name]
-
-    def _host_validation(self, answers, current, regex = "^.+$"):
-        #Validate hostname in inquirer when managing nodes
-        if not re.match(regex, current):
-            raise inquirer.errors.ValidationError("", reason="Host cannot be empty")
-        if current.startswith("@"):
-            if current[1:] not in self.profiles:
-                raise inquirer.errors.ValidationError("", reason="Profile {} don't exist".format(current))
-        return True
-
-    def _profile_protocol_validation(self, answers, current, regex = "(^ssh$|^telnet$|^kubectl$|^docker$|^$)"):
-        #Validate protocol in inquirer when managing profiles
-        if not re.match(regex, current):
-            raise inquirer.errors.ValidationError("", reason="Pick between ssh, telnet, kubectl, docker or leave empty")
-        return True
-
-    def _protocol_validation(self, answers, current, regex = "(^ssh$|^telnet$|^kubectl$|^docker$|^$|^@.+$)"):
-        #Validate protocol in inquirer when managing nodes
-        if not re.match(regex, current):
-            raise inquirer.errors.ValidationError("", reason="Pick between ssh, telnet, kubectl, docker leave empty or @profile")
-        if current.startswith("@"):
-            if current[1:] not in self.profiles:
-                raise inquirer.errors.ValidationError("", reason="Profile {} don't exist".format(current))
-        return True
-
-    def _profile_port_validation(self, answers, current, regex = "(^[0-9]*$)"):
-        #Validate port in inquirer when managing profiles
-        if not re.match(regex, current):
-            raise inquirer.errors.ValidationError("", reason="Pick a port between 1-65535, @profile o leave empty")
-        try:
-            port = int(current)
-        except ValueError:
-            port = 0
-        if current != "" and not 1 <= int(port) <= 65535:
-            raise inquirer.errors.ValidationError("", reason="Pick a port between 1-65535 or leave empty")
-        return True
-
-    def _port_validation(self, answers, current, regex = "(^[0-9]*$|^@.+$)"):
-        #Validate port in inquirer when managing nodes
-        if not re.match(regex, current):
-            raise inquirer.errors.ValidationError("", reason="Pick a port between 1-6553/app5, @profile or leave empty")
-        try:
-            port = int(current)
-        except ValueError:
-            port = 0
-        if current.startswith("@"):
-            if current[1:] not in self.profiles:
-                raise inquirer.errors.ValidationError("", reason="Profile {} don't exist".format(current))
-        elif current != "" and not 1 <= int(port) <= 65535:
-            raise inquirer.errors.ValidationError("", reason="Pick a port between 1-65535, @profile o leave empty")
-        return True
-
-    def _pass_validation(self, answers, current, regex = "(^@.+$)"):
-        #Validate password in inquirer
-        profiles = current.split(",")
-        for i in profiles:
-            if not re.match(regex, i) or i[1:] not in self.profiles:
-                raise inquirer.errors.ValidationError("", reason="Profile {} don't exist".format(i))
-        return True
-
-    def _tags_validation(self, answers, current):
-        #Validation for Tags in inquirer when managing nodes
-        if current.startswith("@"):
-            if current[1:] not in self.profiles:
-                raise inquirer.errors.ValidationError("", reason="Profile {} don't exist".format(current))
-        elif current != "":
-            isdict = False
-            try:
-                isdict = ast.literal_eval(current)
-            except Exception:
-                pass
-            if not isinstance (isdict, dict):
-                raise inquirer.errors.ValidationError("", reason="Tags should be a python dictionary.".format(current))
-        return True
-
-    def _profile_tags_validation(self, answers, current):
-        #Validation for Tags in inquirer when managing profiles
-        if current != "":
-            isdict = False
-            try:
-                isdict = ast.literal_eval(current)
-            except Exception:
-                pass
-            if not isinstance (isdict, dict):
-                raise inquirer.errors.ValidationError("", reason="Tags should be a python dictionary.".format(current))
-        return True
-
-    def _jumphost_validation(self, answers, current):
-        #Validation for Jumphost in inquirer when managing nodes
-        if current.startswith("@"):
-            if current[1:] not in self.profiles:
-                raise inquirer.errors.ValidationError("", reason="Profile {} don't exist".format(current))
-        elif current != "":
-            if current not in self.nodes_list :
-                raise inquirer.errors.ValidationError("", reason="Node {} don't exist.".format(current))
-        return True
-
-    def _profile_jumphost_validation(self, answers, current):
-        #Validation for Jumphost in inquirer when managing profiles
-        if current != "":
-            if current not in self.nodes_list :
-                raise inquirer.errors.ValidationError("", reason="Node {} don't exist.".format(current))
-        return True
-
-    def _default_validation(self, answers, current):
-        #Default validation type used in multiples questions in inquirer
-        if current.startswith("@"):
-            if current[1:] not in self.profiles:
-                raise inquirer.errors.ValidationError("", reason="Profile {} don't exist".format(current))
-        return True
-
-    def _bulk_node_validation(self, answers, current, regex = "^[0-9a-zA-Z_.,$#-]+$"):
-        #Validation of nodes when running bulk command
-        if not re.match(regex, current):
-            raise inquirer.errors.ValidationError("", reason="Host cannot be empty")
-        if current.startswith("@"):
-            if current[1:] not in self.profiles:
-                raise inquirer.errors.ValidationError("", reason="Profile {} don't exist".format(current))
-        return True
-
-    def _bulk_folder_validation(self, answers, current):
-        #Validation of folders when running bulk command
-        if not self.case:
-            current = current.lower()
-        matches = list(filter(lambda k: k == current, self.folders))
-        if current != "" and len(matches) == 0:
-            raise inquirer.errors.ValidationError("", reason="Location {} don't exist".format(current))
-        return True
-
-    def _bulk_host_validation(self, answers, current, regex = "^.+$"):
-        #Validate hostname when running bulk command
-        if not re.match(regex, current):
-            raise inquirer.errors.ValidationError("", reason="Host cannot be empty")
-        if current.startswith("@"):
-            if current[1:] not in self.profiles:
-                raise inquirer.errors.ValidationError("", reason="Profile {} don't exist".format(current))
-        hosts = current.split(",")
-        nodes = answers["ids"].split(",")
-        if len(hosts) > 1 and len(hosts) != len(nodes):
-                raise inquirer.errors.ValidationError("", reason="Hosts list should be the same length of nodes list")
-        return True
-
-    def _questions_edit(self):
-        #Inquirer questions when editing nodes or profiles
-        questions = []
-        questions.append(inquirer.Confirm("host", message="Edit Hostname/IP?"))
-        questions.append(inquirer.Confirm("protocol", message="Edit Protocol/app?"))
-        questions.append(inquirer.Confirm("port", message="Edit Port?"))
-        questions.append(inquirer.Confirm("options", message="Edit Options?"))
-        questions.append(inquirer.Confirm("logs", message="Edit logging path/file?"))
-        questions.append(inquirer.Confirm("tags", message="Edit tags?"))
-        questions.append(inquirer.Confirm("jumphost", message="Edit jumphost?"))
-        questions.append(inquirer.Confirm("user", message="Edit User?"))
-        questions.append(inquirer.Confirm("password", message="Edit password?"))
-        answers = inquirer.prompt(questions)
-        return answers
-
-    def _questions_nodes(self, unique, uniques = None, edit = None):
-        #Questions when adding or editing nodes
-        try:
-            defaults = self.config.getitem(unique)
-            if "tags" not in defaults:
-                defaults["tags"] = ""
-            if "jumphost" not in defaults:
-                defaults["jumphost"] = ""
-        except KeyError:
-            defaults = { "host":"", "protocol":"", "port":"", "user":"", "options":"", "logs":"" , "tags":"", "password":"", "jumphost":""}
-        node = {}
-        if edit == None:
-            edit = { "host":True, "protocol":True, "port":True, "user":True, "password": True,"options":True, "logs":True, "tags":True, "jumphost":True }
-        questions = []
-        if edit["host"]:
-            questions.append(inquirer.Text("host", message="Add Hostname or IP", validate=self._host_validation, default=defaults["host"]))
-        else:
-            node["host"] = defaults["host"]
-        if edit["protocol"]:
-            questions.append(inquirer.Text("protocol", message="Select Protocol/app", validate=self._protocol_validation, default=defaults["protocol"]))
-        else:
-            node["protocol"] = defaults["protocol"]
-        if edit["port"]:
-            questions.append(inquirer.Text("port", message="Select Port Number", validate=self._port_validation, default=defaults["port"]))
-        else:
-            node["port"] = defaults["port"]
-        if edit["options"]:
-            questions.append(inquirer.Text("options", message="Pass extra options to protocol/app", validate=self._default_validation, default=defaults["options"]))
-        else:
-            node["options"] = defaults["options"]
-        if edit["logs"]:
-            questions.append(inquirer.Text("logs", message="Pick logging path/file ",  validate=self._default_validation, default=defaults["logs"].replace("{","{{").replace("}","}}")))
-        else:
-            node["logs"] = defaults["logs"]
-        if edit["tags"]:
-            questions.append(inquirer.Text("tags", message="Add tags dictionary",  validate=self._tags_validation, default=str(defaults["tags"]).replace("{","{{").replace("}","}}")))
-        else:
-            node["tags"] = defaults["tags"]
-        if edit["jumphost"]:
-            questions.append(inquirer.Text("jumphost", message="Add Jumphost node",  validate=self._jumphost_validation, default=str(defaults["jumphost"]).replace("{","{{").replace("}","}}")))
-        else:
-            node["jumphost"] = defaults["jumphost"]
-        if edit["user"]:
-            questions.append(inquirer.Text("user", message="Pick username", validate=self._default_validation, default=defaults["user"]))
-        else:
-            node["user"] = defaults["user"]
-        if edit["password"]:
-            questions.append(inquirer.List("password", message="Password: Use a local password, no password or a list of profiles to reference?", choices=["Local Password", "Profiles", "No Password"]))
-        else:
-            node["password"] = defaults["password"]
-        answer = inquirer.prompt(questions)
-        if answer == None:
-            return False
-        if "password" in answer.keys():
-            if answer["password"] == "Local Password":
-                passq = [inquirer.Password("password", message="Set Password")]
-                passa = inquirer.prompt(passq)
-                if passa == None:
-                    return False
-                answer["password"] = self.config.encrypt(passa["password"])
-            elif answer["password"] == "Profiles":
-                passq = [(inquirer.Text("password", message="Set a @profile or a comma separated list of @profiles", validate=self._pass_validation))]
-                passa = inquirer.prompt(passq)
-                if passa == None:
-                    return False
-                answer["password"] = passa["password"].split(",")
-            elif answer["password"] == "No Password":
-                answer["password"] = ""
-        if "tags" in answer.keys() and not answer["tags"].startswith("@") and answer["tags"]:
-            answer["tags"] = ast.literal_eval(answer["tags"])
-        result = {**uniques, **answer, **node}
-        result["type"] = "connection"
-        return result
-
-    def _questions_profiles(self, unique, edit = None):
-        #Questions when adding or editing profiles
-        try:
-            defaults = self.config.profiles[unique]
-            if "tags" not in defaults:
-                defaults["tags"] = ""
-            if "jumphost" not in defaults:
-                defaults["jumphost"] = ""
-        except KeyError:
-            defaults = { "host":"", "protocol":"", "port":"", "user":"", "options":"", "logs":"", "tags": "", "jumphost": ""}
-        profile = {}
-        if edit == None:
-            edit = { "host":True, "protocol":True, "port":True, "user":True, "password": True,"options":True, "logs":True, "tags":True, "jumphost":True }
-        questions = []
-        if edit["host"]:
-            questions.append(inquirer.Text("host", message="Add Hostname or IP", default=defaults["host"]))
-        else:
-            profile["host"] = defaults["host"]
-        if edit["protocol"]:
-            questions.append(inquirer.Text("protocol", message="Select Protocol/app", validate=self._profile_protocol_validation, default=defaults["protocol"]))
-        else:
-            profile["protocol"] = defaults["protocol"]
-        if edit["port"]:
-            questions.append(inquirer.Text("port", message="Select Port Number", validate=self._profile_port_validation, default=defaults["port"]))
-        else:
-            profile["port"] = defaults["port"]
-        if edit["options"]:
-            questions.append(inquirer.Text("options", message="Pass extra options to protocol/app", default=defaults["options"]))
-        else:
-            profile["options"] = defaults["options"]
-        if edit["logs"]:
-            questions.append(inquirer.Text("logs", message="Pick logging path/file ", default=defaults["logs"].replace("{","{{").replace("}","}}")))
-        else:
-            profile["logs"] = defaults["logs"]
-        if edit["tags"]:
-            questions.append(inquirer.Text("tags", message="Add tags dictionary",  validate=self._profile_tags_validation, default=str(defaults["tags"]).replace("{","{{").replace("}","}}")))
-        else:
-            profile["tags"] = defaults["tags"]
-        if edit["jumphost"]:
-            questions.append(inquirer.Text("jumphost", message="Add Jumphost node",  validate=self._profile_jumphost_validation, default=str(defaults["jumphost"]).replace("{","{{").replace("}","}}")))
-        else:
-            profile["jumphost"] = defaults["jumphost"]
-        if edit["user"]:
-            questions.append(inquirer.Text("user", message="Pick username", default=defaults["user"]))
-        else:
-            profile["user"] = defaults["user"]
-        if edit["password"]:
-            questions.append(inquirer.Password("password", message="Set Password"))
-        else:
-            profile["password"] = defaults["password"]
-        answer = inquirer.prompt(questions)
-        if answer == None:
-            return False
-        if "password" in answer.keys():
-            if answer["password"] != "":
-                answer["password"] = self.config.encrypt(answer["password"])
-        if "tags" in answer.keys() and answer["tags"]:
-            answer["tags"] = ast.literal_eval(answer["tags"])
-        result = {**answer, **profile}
-        result["id"] = unique
-        return result
-
-    def _questions_bulk(self, nodes="", hosts=""):
-        #Questions when using bulk command
-        questions = []
-        questions.append(inquirer.Text("ids", message="add a comma separated list of nodes to add", default=nodes, validate=self._bulk_node_validation))
-        questions.append(inquirer.Text("location", message="Add a @folder, @subfolder@folder or leave empty", validate=self._bulk_folder_validation))
-        questions.append(inquirer.Text("host", message="Add comma separated list of Hostnames or IPs", default=hosts, validate=self._bulk_host_validation))
-        questions.append(inquirer.Text("protocol", message="Select Protocol/app", validate=self._protocol_validation))
-        questions.append(inquirer.Text("port", message="Select Port Number", validate=self._port_validation))
-        questions.append(inquirer.Text("options", message="Pass extra options to protocol/app", validate=self._default_validation))
-        questions.append(inquirer.Text("logs", message="Pick logging path/file ", validate=self._default_validation))
-        questions.append(inquirer.Text("tags", message="Add tags dictionary",  validate=self._tags_validation))
-        questions.append(inquirer.Text("jumphost", message="Add Jumphost node",  validate=self._jumphost_validation))
-        questions.append(inquirer.Text("user", message="Pick username", validate=self._default_validation))
-        questions.append(inquirer.List("password", message="Password: Use a local password, no password or a list of profiles to reference?", choices=["Local Password", "Profiles", "No Password"]))
-        answer = inquirer.prompt(questions)
-        if answer == None:
-            return False
-        if "password" in answer.keys():
-            if answer["password"] == "Local Password":
-                passq = [inquirer.Password("password", message="Set Password")]
-                passa = inquirer.prompt(passq)
-                answer["password"] = self.config.encrypt(passa["password"])
-            elif answer["password"] == "Profiles":
-                passq = [(inquirer.Text("password", message="Set a @profile or a comma separated list of @profiles", validate=self._pass_validation))]
-                passa = inquirer.prompt(passq)
-                answer["password"] = passa["password"].split(",")
-            elif answer["password"] == "No Password":
-                answer["password"] = ""
-        answer["type"] = "connection"
-        if "tags" in answer.keys() and not answer["tags"].startswith("@") and answer["tags"]:
-            answer["tags"] = ast.literal_eval(answer["tags"])
-        return answer
-
     def _type_node(self, arg_value, pat=re.compile(r"^[0-9a-zA-Z_.$@#-]+$")):
         if arg_value == None:
-            raise ValueError("Missing argument node")
+            printer.error("Missing argument node")
+            sys.exit(3)
+        
+        # Check against reserved CLI commands
+        if hasattr(self, "commands") and arg_value in self.commands:
+            createrename = any(arg in ["-a", "--add", "add", "move", "mv", "copy", "cp", "bulk"] for arg in sys.argv)
+            if createrename:
+                printer.error(f"Argument error: '{arg_value}' is a reserved command name")
+                sys.exit(2)
+            
         if not pat.match(arg_value):
-            raise ValueError(f"Argument error: {arg_value}")
+            printer.error(f"Argument error: {arg_value}")
+            sys.exit(2)
         return arg_value
     
     def _type_profile(self, arg_value, pat=re.compile(r"^[0-9a-zA-Z_.$#-]+$")):
         if not pat.match(arg_value):
-            raise ValueError
+            printer.error(f"Argument error: {arg_value}")
+            sys.exit(2)
         return arg_value
 
-    def _help(self, type, parsers = None):
-        #Store text for help and other commands
-        if type == "node":
-            return "node[@subfolder][@folder]\nConnect to specific node or show all matching nodes\n[@subfolder][@folder]\nShow all available connections globally or in specified path"
-        if type == "usage":
-            commands = []
-            for subcommand, subparser in parsers.choices.items():
-                if subparser.description != None:
-                    commands.append(subcommand)
-            commands = ",".join(commands)
-            usage_help = f"connpy [-h] [--add | --del | --mod | --show | --debug] [node|folder] [--sftp]\n       connpy {{{commands}}} ..."
-            return usage_help
-        if type == "end":
-            help_dict = {}
-            for subcommand, subparser in parsers.choices.items():
-                if subparser.description == None and help_dict:
-                    previous_key = next(reversed(help_dict.keys()))
-                    help_dict[f"{previous_key}({subcommand})"] = help_dict.pop(previous_key)
-                else:
-                    help_dict[subcommand] = subparser.description
-                subparser.description = None
-            commands_help = "Commands:\n"
-            commands_help += "\n".join([f"  {cmd:<15} {help_text}" for cmd, help_text in help_dict.items() if help_text != None])
-            return commands_help
-        import os
-        completion_script = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'completion.py')
+    def _ls(self, args):
+        filter_str = args.filter[0] if args.filter else None
+        format_str = args.format[0] if args.format else None
+        
+        try:
+            if args.data == "nodes":
+                items = self.services.nodes.list_nodes(filter_str, format_str)
+            elif args.data == "folders":
+                items = self.services.nodes.list_folders(filter_str)
+            elif args.data == "profiles":
+                items = self.services.profiles.list_profiles(filter_str)
+            else:
+                return
 
-        if type == "bashcompletion":
-            return f'''
-#Here starts bash completion for conn
-_conn()
-{{
-        mapfile -t strings < <(python3 "{completion_script}" "bash" "${{#COMP_WORDS[@]}}" "${{COMP_WORDS[@]}}")
-        local IFS=$'\\t\\n'
-        local home_dir=$(eval echo ~)
-        local last_word=${{COMP_WORDS[-1]/\\~/$home_dir}}
-        COMPREPLY=($(compgen -W "$(printf '%s' "${{strings[@]}}")" -- "$last_word"))
-        if [ "$last_word" != "${{COMP_WORDS[-1]}}" ]; then
-            COMPREPLY=(${{COMPREPLY[@]/$home_dir/\\~}})
-        fi
-}}
+            if items:
+                yaml_str = yaml.dump(items, sort_keys=False, default_flow_style=False)
+                printer.data(args.data, yaml_str)
+            else:
+                msg = f"No {args.data} found"
+                if filter_str:
+                    msg += f" matching filter: {filter_str}"
+                printer.warning(msg)
+        except Exception as e:
+            printer.error(str(e))
 
-complete -o nospace -o nosort -F _conn conn
-complete -o nospace -o nosort -F _conn connpy
-#Here ends bash completion for conn
-        '''
-        if type == "zshcompletion":
-            return f'''
-#Here starts zsh completion for conn
-autoload -U compinit && compinit
-_conn()
-{{
-    local home_dir=$(eval echo ~)
-    last_word=${{words[-1]/\\~/$home_dir}}
-    strings=($(python3 "{completion_script}" "zsh" ${{#words}} $words[1,-2] $last_word))
-    for string in "${{strings[@]}}"; do
-        #Replace the expanded home directory with ~
-        if [ "$last_word" != "$words[-1]" ]; then
-            string=${{string/$home_dir/\\~}}
-        fi
-        if [[ "${{string}}" =~ .*/$ ]]; then
-            # If the string ends with a '/', do not append a space
-            compadd -Q -S '' -- "$string"
-        else
-            # If the string does not end with a '/', append a space
-            compadd -Q -S ' ' -- "$string"
-        fi
-    done
-}}
-compdef _conn conn
-compdef _conn connpy
-#Here ends zsh completion for conn
-            '''
-        if type == "fzf_wrapper_bash":
-            return '''\n#Here starts bash 0ms fzf wrapper for connpy
-connpy() {
-    if [ $# -eq 0 ]; then
-        local selected
-        local configdir=$(cat ~/.config/conn/.folder 2>/dev/null || echo ~/.config/conn)
-        if [ -s "$configdir/.fzf_nodes_cache.txt" ]; then
-            selected=$(cat "$configdir/.fzf_nodes_cache.txt" | fzf-tmux -i -d 25%)
-        else
-            command connpy
-            return
-        fi
-        if [ -n "$selected" ]; then
-            command connpy "$selected"
-        fi
-    else
-        command connpy "$@"
-    fi
-}
-alias c="connpy"
-#Here ends bash 0ms fzf wrapper\n'''
-
-        if type == "fzf_wrapper_zsh":
-            return '''\n#Here starts zsh 0ms fzf wrapper for connpy
-connpy() {
-    if [ $# -eq 0 ]; then
-        local selected
-        local configdir=$(cat ~/.config/conn/.folder 2>/dev/null || echo ~/.config/conn)
-        if [ -s "$configdir/.fzf_nodes_cache.txt" ]; then
-            selected=$(cat "$configdir/.fzf_nodes_cache.txt" | fzf-tmux -i -d 25%)
-        else
-            command connpy
-            return
-        fi
-        if [ -n "$selected" ]; then
-            command connpy "$selected"
-        fi
-    else
-        command connpy "$@"
-    fi
-}
-alias c="connpy"
-#Here ends zsh 0ms fzf wrapper\n'''
-        if type == "run":
-            return "node[@subfolder][@folder] commmand to run\nRun the specific command on the node and print output\n/path/to/file.yaml\nUse a yaml file to run an automation script"
-        if type == "generate":
-            return r'''---
-tasks:
-- name: "Config"
-
-  action: 'run' #Action can be test or run. Mandatory
-
-  nodes: #List of nodes to work on. Mandatory
-  - 'router1@office' #You can add specific nodes
-  - '@aws'  #entire folders or subfolders
-  - '@office':   #or filter inside a folder or subfolder
-    - 'router2'
-    - 'router7'
-
-  commands: #List of commands to send, use {name} to pass variables
-  - 'term len 0'
-  - 'conf t'
-  - 'interface {if}'
-  - 'ip address 10.100.100.{id} 255.255.255.255'
-  - '{commit}'
-  - 'end'
-
-  variables: #Variables to use on commands and expected. Optional
-    __global__: #Global variables to use on all nodes, fallback if missing in the node.
-      commit: ''
-      if: 'loopback100'
-    router1@office:
-      id: 1
-    router2@office:
-      id: 2
-      commit: 'commit'
-    router3@office:
-      id: 3
-    vrouter1@aws:
-      id: 4
-    vrouterN@aws:
-      id: 5
-  
-  output: /home/user/logs #Type of output, if null you only get Connection and test result. Choices are: null,stdout,/path/to/folder. Folder path only works on 'run' action.
-  
-  options:
-    prompt: r'>$|#$|\$$|>.$|#.$|\$.$' #Optional prompt to check on your devices, default should work on most devices.
-    parallel: 10 #Optional number of nodes to run commands on parallel. Default 10.
-    timeout: 20 #Optional time to wait in seconds for prompt, expected or EOF. Default 20. 
-
-- name: "TestConfig"
-  action: 'test'
-  nodes:
-  - 'router1@office'
-  - '@aws'
-  - '@office':
-    - 'router2'
-    - 'router7'
-  commands:
-  - 'ping 10.100.100.{id}'
-  expected: '!' #Expected text to find when running test action. Mandatory for 'test'
-  variables:
-    router1@office:
-      id: 1
-    router2@office:
-      id: 2
-      commit: 'commit'
-    router3@office:
-      id: 3
-    vrouter1@aws:
-      id: 4
-    vrouterN@aws:
-      id: 5
-  output: null
-...'''
-
-    def _print_instructions(self):
-        instructions = """
-Welcome to Connpy node Addition Wizard!
-
-Here are some important instructions and tips for configuring your new node:
-
-1. **Profiles**:
-   - You can use the configured settings in a profile using `@profilename`.
-
-2. **Available Protocols and Apps**:
-   - ssh
-   - telnet
-   - kubectl (`kubectl exec`)
-   - docker (`docker exec`)
-
-3. **Optional Values**:
-   - You can leave any value empty except for the hostname/IP.
-
-4. **Passwords**:
-   - You can pass one or more passwords using comma-separated `@profiles`.
-
-5. **Logging**:
-   - You can use the following variables in the logging file name:
-     - `${id}`
-     - `${unique}`
-     - `${host}`
-     - `${port}`
-     - `${user}`
-     - `${protocol}`
-
-6. **Well-Known Tags**:
-   - `os`: Identified by AI to generate commands based on the operating system.
-   - `screen_length_command`: Used by automation to avoid pagination on different devices (e.g., `terminal length 0` for Cisco devices).
-   - `prompt`: Replaces default app prompt to identify the end of output or where the user can start inputting commands.
-   - `kube_command`: Replaces the default command (`/bin/bash`) for `kubectl exec`.
-   - `docker_command`: Replaces the default command for `docker exec`.
-
-Please follow these instructions carefully to ensure proper configuration of your new node.
-"""
-
-        mdprint(Markdown(instructions))
+    def _mvcp(self, args):
+        src, dst = args.data[0], args.data[1]
+        is_copy = (args.command == "cp")
+        try:
+            self.services.nodes.move_node(src, dst, copy=is_copy)
+            action = "moved" if not is_copy else "copied"
+            printer.success(f"{src} {action} successfully to {dst}")
+        except ConnpyError as e:
+            printer.error(str(e))
+            sys.exit(1)

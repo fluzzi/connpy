@@ -145,3 +145,8 @@ package.json
 
 # Development docs
 connpy_roadmap.md
+testall/
+testremote/
+*.db
+*.patch
+scratch.py
