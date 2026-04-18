@@ -6,7 +6,6 @@ class SystemService(BaseService):
 
     def start_api(self, port=None):
         """Start the Connpy REST API."""
-        print(f"DEBUG SystemService: port type={type(port)} value={port}")
         from connpy.api import start_api
         try:
             start_api(port, config=self.config)

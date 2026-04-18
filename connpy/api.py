@@ -56,10 +56,14 @@ def debug_api(port=8048, config=None):
     server.stop(0)
 
 def start_server(port=8048, config=None):
-    from .grpc.server import serve
-    conf = config or configfile()
-    server = serve(conf, port=port, debug=False)
-    _wait_for_termination()
+    try:
+        from connpy.grpc.server import serve
+        conf = config or configfile()
+        server = serve(conf, port=port, debug=False)
+        _wait_for_termination()
+    except Exception as e:
+        printer.error(f"Background API failed to start: {e}")
+        os._exit(1)
 
 def start_api(port=8048, config=None):
     # Check if already running via PID file verification
@@ -70,6 +74,7 @@ def start_api(port=8048, config=None):
                     pid = int(f.readline().strip())
                 os.kill(pid, 0)
                 # If we get here, process exists
+                printer.info(f"API is already running (PID {pid})")
                 return
             except (ValueError, OSError, ProcessLookupError):
                 # Stale PID file, ignore here, start_api will overwrite
@@ -77,8 +82,11 @@ def start_api(port=8048, config=None):
 
     pid = os.fork()
     if pid == 0:
+        # Child process: detached from terminal
+        os.setsid()
         start_server(port, config=config)
     else:
+        # Parent process: record PID and exit
         try:
             with open(PID_FILE1, "w") as f:
                 f.write(str(pid) + "\n" + str(port))
@@ -89,4 +97,4 @@ def start_api(port=8048, config=None):
             except OSError:
                 printer.error("Couldn't create PID file.")
                 exit(1)
-        printer.start(f"gRPC Server is running with process ID {pid} on port {port}")
+        printer.start(f"gRPC Server started with process ID {pid} on port {port}")
