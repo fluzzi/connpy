@@ -179,7 +179,8 @@ el.replaceWith(d);
                     u = result[&#34;usage&#34;]
                     console.print(f&#34;[debug]Tokens: {u[&#39;total&#39;]} (Input: {u[&#39;input&#39;]}, Output: {u[&#39;output&#39;]})[/debug]&#34;)
                 console.print()
-            except KeyboardInterrupt:
+            except (KeyboardInterrupt, EOFError):
+                console.print(&#34;\n[dim]Session closed.[/dim]&#34;)
                 break</code></pre>
 </details>
 <div class="desc"></div>
@@ -306,7 +307,8 @@ el.replaceWith(d);
                 u = result[&#34;usage&#34;]
                 console.print(f&#34;[debug]Tokens: {u[&#39;total&#39;]} (Input: {u[&#39;input&#39;]}, Output: {u[&#39;output&#39;]})[/debug]&#34;)
             console.print()
-        except KeyboardInterrupt:
+        except (KeyboardInterrupt, EOFError):
+            console.print(&#34;\n[dim]Session closed.[/dim]&#34;)
             break</code></pre>
 </details>
 <div class="desc"></div>

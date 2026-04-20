@@ -2795,7 +2795,6 @@ el.replaceWith(d);
 
     def start_api(self, port=None):
         &#34;&#34;&#34;Start the Connpy REST API.&#34;&#34;&#34;
-        print(f&#34;DEBUG SystemService: port type={type(port)} value={port}&#34;)
         from connpy.api import start_api
         try:
             start_api(port, config=self.config)
@@ -2970,7 +2969,6 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def start_api(self, port=None):
     &#34;&#34;&#34;Start the Connpy REST API.&#34;&#34;&#34;
-    print(f&#34;DEBUG SystemService: port type={type(port)} value={port}&#34;)
     from connpy.api import start_api
     try:
         start_api(port, config=self.config)

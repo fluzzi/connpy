@@ -4,13 +4,28 @@ import json
 import re
 import datetime
 from textwrap import dedent
-import litellm
-from litellm import completion, stream_chunk_builder
 from .core import nodes
 
-# Silenciar feedback de litellm
-litellm.suppress_debug_info = True
-litellm.set_verbose = False
+_litellm_initialized = False
+
+def _init_litellm():
+    global _litellm_initialized
+    if not _litellm_initialized:
+        import litellm
+        # Silenciar feedback de litellm
+        litellm.suppress_debug_info = True
+        litellm.set_verbose = False
+        _litellm_initialized = True
+
+def completion(*args, **kwargs):
+    _init_litellm()
+    from litellm import completion as _completion
+    return _completion(*args, **kwargs)
+
+def stream_chunk_builder(*args, **kwargs):
+    _init_litellm()
+    from litellm import stream_chunk_builder as _stream_chunk_builder
+    return _stream_chunk_builder(*args, **kwargs)
 from .hooks import ClassHook, MethodHook
 from . import printer
 from rich.markdown import Markdown

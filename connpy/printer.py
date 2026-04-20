@@ -252,12 +252,20 @@ class _ConsoleProxy:
         return getattr(_get_console(), name)
     def __call__(self, *args, **kwargs):
         return _get_console()(*args, **kwargs)
+    def __enter__(self):
+        return _get_console().__enter__()
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        return _get_console().__exit__(exc_type, exc_val, exc_tb)
 
 class _ErrConsoleProxy:
     def __getattr__(self, name):
         return getattr(_get_err_console(), name)
     def __call__(self, *args, **kwargs):
         return _get_err_console()(*args, **kwargs)
+    def __enter__(self):
+        return _get_err_console().__enter__()
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        return _get_err_console().__exit__(exc_type, exc_val, exc_tb)
 
 console = _ConsoleProxy()
 err_console = _ErrConsoleProxy()
