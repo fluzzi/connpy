@@ -180,6 +180,7 @@ class PluginService(BaseService):
         from ..services.exceptions import InvalidConfigurationError
         from connpy.plugins import Plugins
         class MockApp:
+            is_mock = True
             def __init__(self, config):
                 from ..core import node, nodes
                 from ..ai import ai
@@ -191,14 +192,20 @@ class PluginService(BaseService):
                 self.ai = ai
                 
                 self.services = ServiceProvider(config, mode="local")
+                
+                # Get settings for CLI behavior
+                settings = self.services.config_svc.get_settings()
+                self.case = settings.get("case", False)
+                self.fzf = settings.get("fzf", False)
+                
                 try:
                     self.nodes_list = self.services.nodes.list_nodes()
                     self.folders = self.services.nodes.list_folders()
                     self.profiles = self.services.profiles.list_profiles()
                 except Exception:
-                    self.nodes_list = {}
-                    self.folders = {}
-                    self.profiles = {}
+                    self.nodes_list = []
+                    self.folders = []
+                    self.profiles = []
         
         args = Namespace(**args_dict)
         
@@ -225,26 +232,26 @@ class PluginService(BaseService):
         from .. import printer
         from rich.console import Console
         
+        from rich.console import Console
         buf = io.StringIO()
-        old_console = printer.console
-        old_err_console = printer.err_console
+        old_console = printer._get_console()
+        old_err_console = printer._get_err_console()
         
-        printer.console = Console(file=buf, theme=printer.connpy_theme, force_terminal=True)
-        printer.err_console = Console(file=buf, theme=printer.connpy_theme, force_terminal=True)
-        
-        old_stdout = sys.stdout
-        sys.stdout = buf
+        printer.set_thread_console(Console(file=buf, theme=printer.connpy_theme, force_terminal=True))
+        printer.set_thread_err_console(Console(file=buf, theme=printer.connpy_theme, force_terminal=True))
+        printer.set_thread_stream(buf)
         
         try:
             if hasattr(module, "Entrypoint"):
                 module.Entrypoint(args, parser, app)
-        except Exception as e:
-            import traceback
-            printer.err_console.print(traceback.format_exc())
+        except BaseException as e:
+            if not isinstance(e, SystemExit):
+                import traceback
+                printer.err_console.print(traceback.format_exc())
         finally:
-            sys.stdout = old_stdout
-            printer.console = old_console
-            printer.err_console = old_err_console
+            printer.set_thread_console(old_console)
+            printer.set_thread_err_console(old_err_console)
+            printer.set_thread_stream(None)
             
         for line in buf.getvalue().splitlines(keepends=True):
             yield line

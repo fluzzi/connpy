@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
 <meta name="generator" content="pdoc3 0.11.6">
-<title>connpy.cli.helpers API documentation</title>
-<meta name="description" content="">
+<title>connpy.grpc_layer.remote_plugin_pb2 API documentation</title>
+<meta name="description" content="Generated protocol buffer code.">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
@@ -33,154 +33,97 @@ el.replaceWith(d);
 <main>
 <article id="content">
 <header>
-<h1 class="title">Module <code>connpy.cli.helpers</code></h1>
+<h1 class="title">Module <code>connpy.grpc_layer.remote_plugin_pb2</code></h1>
 </header>
 <section id="section-intro">
+<p>Generated protocol buffer code.</p>
 </section>
 <section>
 </section>
 <section>
 </section>
 <section>
-<h2 class="section-title" id="header-functions">Functions</h2>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
 <dl>
-<dt id="connpy.cli.helpers.choose"><code class="name flex">
-<span>def <span class="ident">choose</span></span>(<span>app, list_, name, action)</span>
+<dt id="connpy.grpc_layer.remote_plugin_pb2.IdRequest"><code class="flex name class">
+<span>class <span class="ident">IdRequest</span></span>
+<span>(</span><span>*args, **kwargs)</span>
 </code></dt>
 <dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def choose(app, list_, name, action):
-    # Generates an inquirer list to pick
-    # Safeguard: Never prompt if running in autocomplete shell
-    if os.environ.get(&#34;_ARGCOMPLETE&#34;) or os.environ.get(&#34;COMP_LINE&#34;):
-        return None
-
-    if FzfPrompt and app.fzf and os.environ.get(&#34;_ARGCOMPLETE&#34;) is None and os.environ.get(&#34;COMP_LINE&#34;) is None:
-        fzf_prompt = FzfPrompt(executable_path=&#34;fzf-tmux&#34;)
-        if not app.case:
-            fzf_prompt = FzfPrompt(executable_path=&#34;fzf-tmux -i&#34;)
-        answer = fzf_prompt.prompt(list_, fzf_options=&#34;-d 25%&#34;)
-        if len(answer) == 0:
-            return None
-        else:
-            return answer[0]
-    else:
-        questions = [inquirer.List(name, message=&#34;Pick {} to {}:&#34;.format(name,action), choices=list_, carousel=True)]
-        answer = inquirer.prompt(questions)
-        if answer == None:
-            return None
-        else:
-            return answer[name]</code></pre>
-</details>
-<div class="desc"></div>
-</dd>
-<dt id="connpy.cli.helpers.folders_completer"><code class="name flex">
-<span>def <span class="ident">folders_completer</span></span>(<span>prefix, parsed_args, **kwargs)</span>
-</code></dt>
+<div class="desc"><p>A ProtocolMessage</p></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>google._upb._message.Message</li>
+<li>google.protobuf.message.Message</li>
+</ul>
+<h3>Class variables</h3>
+<dl>
+<dt id="connpy.grpc_layer.remote_plugin_pb2.IdRequest.DESCRIPTOR"><code class="name">var <span class="ident">DESCRIPTOR</span></code></dt>
 <dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def folders_completer(prefix, parsed_args, **kwargs):
-    configdir = get_config_dir()
-    cache_file = os.path.join(configdir, &#39;.folders_cache.txt&#39;)
-    if os.path.exists(cache_file):
-        with open(cache_file, &#34;r&#34;) as f:
-            return [line.strip() for line in f if line.startswith(prefix)]
-    return []</code></pre>
-</details>
-<div class="desc"></div>
-</dd>
-<dt id="connpy.cli.helpers.get_config_dir"><code class="name flex">
-<span>def <span class="ident">get_config_dir</span></span>(<span>)</span>
-</code></dt>
-<dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def get_config_dir():
-    home = os.path.expanduser(&#34;~&#34;)
-    defaultdir = os.path.join(home, &#39;.config/conn&#39;)
-    pathfile = os.path.join(defaultdir, &#39;.folder&#39;)
-    try:
-        with open(pathfile, &#34;r&#34;) as f:
-            return f.read().strip()
-    except:
-        return defaultdir</code></pre>
-</details>
-<div class="desc"></div>
-</dd>
-<dt id="connpy.cli.helpers.nodes_completer"><code class="name flex">
-<span>def <span class="ident">nodes_completer</span></span>(<span>prefix, parsed_args, **kwargs)</span>
-</code></dt>
-<dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def nodes_completer(prefix, parsed_args, **kwargs):
-    configdir = get_config_dir()
-    cache_file = os.path.join(configdir, &#39;.fzf_nodes_cache.txt&#39;)
-    if os.path.exists(cache_file):
-        with open(cache_file, &#34;r&#34;) as f:
-            return [line.strip() for line in f if line.startswith(prefix)]
-    return []</code></pre>
-</details>
-<div class="desc"></div>
-</dd>
-<dt id="connpy.cli.helpers.profiles_completer"><code class="name flex">
-<span>def <span class="ident">profiles_completer</span></span>(<span>prefix, parsed_args, **kwargs)</span>
-</code></dt>
-<dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def profiles_completer(prefix, parsed_args, **kwargs):
-    configdir = get_config_dir()
-    cache_file = os.path.join(configdir, &#39;.profiles_cache.txt&#39;)
-    if os.path.exists(cache_file):
-        with open(cache_file, &#34;r&#34;) as f:
-            return [line.strip() for line in f if line.startswith(prefix)]
-    return []</code></pre>
-</details>
-<div class="desc"></div>
-</dd>
-<dt id="connpy.cli.helpers.toplevel_completer"><code class="name flex">
-<span>def <span class="ident">toplevel_completer</span></span>(<span>prefix, parsed_args, **kwargs)</span>
-</code></dt>
-<dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def toplevel_completer(prefix, parsed_args, **kwargs):
-    commands = [&#34;node&#34;, &#34;profile&#34;, &#34;move&#34;, &#34;mv&#34;, &#34;copy&#34;, &#34;cp&#34;, &#34;list&#34;, &#34;ls&#34;, &#34;bulk&#34;, &#34;export&#34;, &#34;import&#34;, &#34;ai&#34;, &#34;run&#34;, &#34;api&#34;, &#34;context&#34;, &#34;plugin&#34;, &#34;config&#34;, &#34;sync&#34;]
-    
-    configdir = get_config_dir()
-    cache_file = os.path.join(configdir, &#39;.fzf_nodes_cache.txt&#39;)
-    nodes = []
-    if os.path.exists(cache_file):
-        with open(cache_file, &#34;r&#34;) as f:
-            nodes = [line.strip() for line in f if line.startswith(prefix)]
-            
-    cache_folders = os.path.join(configdir, &#39;.folders_cache.txt&#39;)
-    if os.path.exists(cache_folders):
-        with open(cache_folders, &#34;r&#34;) as f:
-            nodes += [line.strip() for line in f if line.startswith(prefix)]
-            
-    return [c for c in commands + nodes if c.startswith(prefix)]</code></pre>
-</details>
-<div class="desc"></div>
+<div class="desc"><p>The type of the None singleton.</p></div>
 </dd>
 </dl>
-</section>
-<section>
+</dd>
+<dt id="connpy.grpc_layer.remote_plugin_pb2.OutputChunk"><code class="flex name class">
+<span>class <span class="ident">OutputChunk</span></span>
+<span>(</span><span>*args, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>A ProtocolMessage</p></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>google._upb._message.Message</li>
+<li>google.protobuf.message.Message</li>
+</ul>
+<h3>Class variables</h3>
+<dl>
+<dt id="connpy.grpc_layer.remote_plugin_pb2.OutputChunk.DESCRIPTOR"><code class="name">var <span class="ident">DESCRIPTOR</span></code></dt>
+<dd>
+<div class="desc"><p>The type of the None singleton.</p></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.grpc_layer.remote_plugin_pb2.PluginInvokeRequest"><code class="flex name class">
+<span>class <span class="ident">PluginInvokeRequest</span></span>
+<span>(</span><span>*args, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>A ProtocolMessage</p></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>google._upb._message.Message</li>
+<li>google.protobuf.message.Message</li>
+</ul>
+<h3>Class variables</h3>
+<dl>
+<dt id="connpy.grpc_layer.remote_plugin_pb2.PluginInvokeRequest.DESCRIPTOR"><code class="name">var <span class="ident">DESCRIPTOR</span></code></dt>
+<dd>
+<div class="desc"><p>The type of the None singleton.</p></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.grpc_layer.remote_plugin_pb2.StringResponse"><code class="flex name class">
+<span>class <span class="ident">StringResponse</span></span>
+<span>(</span><span>*args, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>A ProtocolMessage</p></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>google._upb._message.Message</li>
+<li>google.protobuf.message.Message</li>
+</ul>
+<h3>Class variables</h3>
+<dl>
+<dt id="connpy.grpc_layer.remote_plugin_pb2.StringResponse.DESCRIPTOR"><code class="name">var <span class="ident">DESCRIPTOR</span></code></dt>
+<dd>
+<div class="desc"><p>The type of the None singleton.</p></div>
+</dd>
+</dl>
+</dd>
+</dl>
 </section>
 </article>
 <nav id="sidebar">
@@ -190,17 +133,35 @@ el.replaceWith(d);
 <ul id="index">
 <li><h3>Super-module</h3>
 <ul>
-<li><code><a title="connpy.cli" href="index.html">connpy.cli</a></code></li>
+<li><code><a title="connpy.grpc_layer" href="index.html">connpy.grpc_layer</a></code></li>
 </ul>
 </li>
-<li><h3><a href="#header-functions">Functions</a></h3>
-<ul class="two-column">
-<li><code><a title="connpy.cli.helpers.choose" href="#connpy.cli.helpers.choose">choose</a></code></li>
-<li><code><a title="connpy.cli.helpers.folders_completer" href="#connpy.cli.helpers.folders_completer">folders_completer</a></code></li>
-<li><code><a title="connpy.cli.helpers.get_config_dir" href="#connpy.cli.helpers.get_config_dir">get_config_dir</a></code></li>
-<li><code><a title="connpy.cli.helpers.nodes_completer" href="#connpy.cli.helpers.nodes_completer">nodes_completer</a></code></li>
-<li><code><a title="connpy.cli.helpers.profiles_completer" href="#connpy.cli.helpers.profiles_completer">profiles_completer</a></code></li>
-<li><code><a title="connpy.cli.helpers.toplevel_completer" href="#connpy.cli.helpers.toplevel_completer">toplevel_completer</a></code></li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="connpy.grpc_layer.remote_plugin_pb2.IdRequest" href="#connpy.grpc_layer.remote_plugin_pb2.IdRequest">IdRequest</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.grpc_layer.remote_plugin_pb2.IdRequest.DESCRIPTOR" href="#connpy.grpc_layer.remote_plugin_pb2.IdRequest.DESCRIPTOR">DESCRIPTOR</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.grpc_layer.remote_plugin_pb2.OutputChunk" href="#connpy.grpc_layer.remote_plugin_pb2.OutputChunk">OutputChunk</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.grpc_layer.remote_plugin_pb2.OutputChunk.DESCRIPTOR" href="#connpy.grpc_layer.remote_plugin_pb2.OutputChunk.DESCRIPTOR">DESCRIPTOR</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.grpc_layer.remote_plugin_pb2.PluginInvokeRequest" href="#connpy.grpc_layer.remote_plugin_pb2.PluginInvokeRequest">PluginInvokeRequest</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.grpc_layer.remote_plugin_pb2.PluginInvokeRequest.DESCRIPTOR" href="#connpy.grpc_layer.remote_plugin_pb2.PluginInvokeRequest.DESCRIPTOR">DESCRIPTOR</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.grpc_layer.remote_plugin_pb2.StringResponse" href="#connpy.grpc_layer.remote_plugin_pb2.StringResponse">StringResponse</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.grpc_layer.remote_plugin_pb2.StringResponse.DESCRIPTOR" href="#connpy.grpc_layer.remote_plugin_pb2.StringResponse.DESCRIPTOR">DESCRIPTOR</a></code></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>

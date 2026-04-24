@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.5">
+<meta name="generator" content="pdoc3 0.11.6">
 <title>connpy.services API documentation</title>
 <meta name="description" content="">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
@@ -1234,10 +1234,13 @@ el.replaceWith(d);
 
     def get_node_details(self, unique_id):
         &#34;&#34;&#34;Return full configuration dictionary for a specific node.&#34;&#34;&#34;
-        details = self.config.getitem(unique_id)
-        if not details:
+        try:
+            details = self.config.getitem(unique_id)
+            if not details:
+                raise NodeNotFoundError(f&#34;Node &#39;{unique_id}&#39; not found.&#34;)
+            return details
+        except (KeyError, TypeError):
             raise NodeNotFoundError(f&#34;Node &#39;{unique_id}&#39; not found.&#34;)
-        return details
 
     def explode_unique(self, unique_id):
         &#34;&#34;&#34;Explode a unique ID into a dictionary of its parts.&#34;&#34;&#34;
@@ -1246,6 +1249,14 @@ el.replaceWith(d);
     def generate_cache(self, nodes=None, folders=None, profiles=None):
         &#34;&#34;&#34;Generate and update the internal nodes cache.&#34;&#34;&#34;
         self.config._generate_nodes_cache(nodes=nodes, folders=folders, profiles=profiles)
+
+    def validate_parent_folder(self, unique_id):
+        &#34;&#34;&#34;Check if parent folder exists for a given node unique ID.&#34;&#34;&#34;
+        node_folder = unique_id.partition(&#34;@&#34;)[2]
+        if node_folder:
+            parent_folder = f&#34;@{node_folder}&#34;
+            if parent_folder not in self.config._getallfolders():
+                raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
 
 
     def add_node(self, unique_id, data, is_folder=False):
@@ -1265,9 +1276,7 @@ el.replaceWith(d);
             
             # Check if parent folder exists when creating a subfolder
             if &#34;subfolder&#34; in uniques:
-                parent_folder = f&#34;@{uniques[&#39;folder&#39;]}&#34;
-                if parent_folder not in all_folders:
-                    raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
+                self.validate_parent_folder(unique_id)
                     
             self.config._folder_add(**uniques)
             self.config._saveconfig(self.config.file)
@@ -1276,11 +1285,7 @@ el.replaceWith(d);
                 raise NodeAlreadyExistsError(f&#34;Node &#39;{unique_id}&#39; already exists.&#34;)
                 
             # Check if parent folder exists when creating a node in a folder
-            node_folder = unique_id.partition(&#34;@&#34;)[2]
-            if node_folder:
-                parent_folder = f&#34;@{node_folder}&#34;
-                if parent_folder not in all_folders:
-                    raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
+            self.validate_parent_folder(unique_id)
                     
             # Ensure &#39;id&#39; is in data for config._connections_add
             if &#34;id&#34; not in data:
@@ -1453,9 +1458,7 @@ el.replaceWith(d);
         
         # Check if parent folder exists when creating a subfolder
         if &#34;subfolder&#34; in uniques:
-            parent_folder = f&#34;@{uniques[&#39;folder&#39;]}&#34;
-            if parent_folder not in all_folders:
-                raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
+            self.validate_parent_folder(unique_id)
                 
         self.config._folder_add(**uniques)
         self.config._saveconfig(self.config.file)
@@ -1464,11 +1467,7 @@ el.replaceWith(d);
             raise NodeAlreadyExistsError(f&#34;Node &#39;{unique_id}&#39; already exists.&#34;)
             
         # Check if parent folder exists when creating a node in a folder
-        node_folder = unique_id.partition(&#34;@&#34;)[2]
-        if node_folder:
-            parent_folder = f&#34;@{node_folder}&#34;
-            if parent_folder not in all_folders:
-                raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
+        self.validate_parent_folder(unique_id)
                 
         # Ensure &#39;id&#39; is in data for config._connections_add
         if &#34;id&#34; not in data:
@@ -1651,10 +1650,13 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def get_node_details(self, unique_id):
     &#34;&#34;&#34;Return full configuration dictionary for a specific node.&#34;&#34;&#34;
-    details = self.config.getitem(unique_id)
-    if not details:
-        raise NodeNotFoundError(f&#34;Node &#39;{unique_id}&#39; not found.&#34;)
-    return details</code></pre>
+    try:
+        details = self.config.getitem(unique_id)
+        if not details:
+            raise NodeNotFoundError(f&#34;Node &#39;{unique_id}&#39; not found.&#34;)
+        return details
+    except (KeyError, TypeError):
+        raise NodeNotFoundError(f&#34;Node &#39;{unique_id}&#39; not found.&#34;)</code></pre>
 </details>
 <div class="desc"><p>Return full configuration dictionary for a specific node.</p></div>
 </dd>
@@ -1800,6 +1802,24 @@ el.replaceWith(d);
     self.config._saveconfig(self.config.file)</code></pre>
 </details>
 <div class="desc"><p>Explicitly update an existing node.</p></div>
+</dd>
+<dt id="connpy.services.NodeService.validate_parent_folder"><code class="name flex">
+<span>def <span class="ident">validate_parent_folder</span></span>(<span>self, unique_id)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def validate_parent_folder(self, unique_id):
+    &#34;&#34;&#34;Check if parent folder exists for a given node unique ID.&#34;&#34;&#34;
+    node_folder = unique_id.partition(&#34;@&#34;)[2]
+    if node_folder:
+        parent_folder = f&#34;@{node_folder}&#34;
+        if parent_folder not in self.config._getallfolders():
+            raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)</code></pre>
+</details>
+<div class="desc"><p>Check if parent folder exists for a given node unique ID.</p></div>
 </dd>
 </dl>
 <h3>Inherited members</h3>
@@ -1996,6 +2016,7 @@ el.replaceWith(d);
         from ..services.exceptions import InvalidConfigurationError
         from connpy.plugins import Plugins
         class MockApp:
+            is_mock = True
             def __init__(self, config):
                 from ..core import node, nodes
                 from ..ai import ai
@@ -2007,14 +2028,20 @@ el.replaceWith(d);
                 self.ai = ai
                 
                 self.services = ServiceProvider(config, mode=&#34;local&#34;)
+                
+                # Get settings for CLI behavior
+                settings = self.services.config_svc.get_settings()
+                self.case = settings.get(&#34;case&#34;, False)
+                self.fzf = settings.get(&#34;fzf&#34;, False)
+                
                 try:
                     self.nodes_list = self.services.nodes.list_nodes()
                     self.folders = self.services.nodes.list_folders()
                     self.profiles = self.services.profiles.list_profiles()
                 except Exception:
-                    self.nodes_list = {}
-                    self.folders = {}
-                    self.profiles = {}
+                    self.nodes_list = []
+                    self.folders = []
+                    self.profiles = []
         
         args = Namespace(**args_dict)
         
@@ -2041,26 +2068,26 @@ el.replaceWith(d);
         from .. import printer
         from rich.console import Console
         
+        from rich.console import Console
         buf = io.StringIO()
-        old_console = printer.console
-        old_err_console = printer.err_console
+        old_console = printer._get_console()
+        old_err_console = printer._get_err_console()
         
-        printer.console = Console(file=buf, theme=printer.connpy_theme, force_terminal=True)
-        printer.err_console = Console(file=buf, theme=printer.connpy_theme, force_terminal=True)
-        
-        old_stdout = sys.stdout
-        sys.stdout = buf
+        printer.set_thread_console(Console(file=buf, theme=printer.connpy_theme, force_terminal=True))
+        printer.set_thread_err_console(Console(file=buf, theme=printer.connpy_theme, force_terminal=True))
+        printer.set_thread_stream(buf)
         
         try:
             if hasattr(module, &#34;Entrypoint&#34;):
                 module.Entrypoint(args, parser, app)
-        except Exception as e:
-            import traceback
-            printer.err_console.print(traceback.format_exc())
+        except BaseException as e:
+            if not isinstance(e, SystemExit):
+                import traceback
+                printer.err_console.print(traceback.format_exc())
         finally:
-            sys.stdout = old_stdout
-            printer.console = old_console
-            printer.err_console = old_err_console
+            printer.set_thread_console(old_console)
+            printer.set_thread_err_console(old_err_console)
+            printer.set_thread_stream(None)
             
         for line in buf.getvalue().splitlines(keepends=True):
             yield line</code></pre>
@@ -2265,6 +2292,7 @@ el.replaceWith(d);
     from ..services.exceptions import InvalidConfigurationError
     from connpy.plugins import Plugins
     class MockApp:
+        is_mock = True
         def __init__(self, config):
             from ..core import node, nodes
             from ..ai import ai
@@ -2276,14 +2304,20 @@ el.replaceWith(d);
             self.ai = ai
             
             self.services = ServiceProvider(config, mode=&#34;local&#34;)
+            
+            # Get settings for CLI behavior
+            settings = self.services.config_svc.get_settings()
+            self.case = settings.get(&#34;case&#34;, False)
+            self.fzf = settings.get(&#34;fzf&#34;, False)
+            
             try:
                 self.nodes_list = self.services.nodes.list_nodes()
                 self.folders = self.services.nodes.list_folders()
                 self.profiles = self.services.profiles.list_profiles()
             except Exception:
-                self.nodes_list = {}
-                self.folders = {}
-                self.profiles = {}
+                self.nodes_list = []
+                self.folders = []
+                self.profiles = []
     
     args = Namespace(**args_dict)
     
@@ -2310,26 +2344,26 @@ el.replaceWith(d);
     from .. import printer
     from rich.console import Console
     
+    from rich.console import Console
     buf = io.StringIO()
-    old_console = printer.console
-    old_err_console = printer.err_console
+    old_console = printer._get_console()
+    old_err_console = printer._get_err_console()
     
-    printer.console = Console(file=buf, theme=printer.connpy_theme, force_terminal=True)
-    printer.err_console = Console(file=buf, theme=printer.connpy_theme, force_terminal=True)
-    
-    old_stdout = sys.stdout
-    sys.stdout = buf
+    printer.set_thread_console(Console(file=buf, theme=printer.connpy_theme, force_terminal=True))
+    printer.set_thread_err_console(Console(file=buf, theme=printer.connpy_theme, force_terminal=True))
+    printer.set_thread_stream(buf)
     
     try:
         if hasattr(module, &#34;Entrypoint&#34;):
             module.Entrypoint(args, parser, app)
-    except Exception as e:
-        import traceback
-        printer.err_console.print(traceback.format_exc())
+    except BaseException as e:
+        if not isinstance(e, SystemExit):
+            import traceback
+            printer.err_console.print(traceback.format_exc())
     finally:
-        sys.stdout = old_stdout
-        printer.console = old_console
-        printer.err_console = old_err_console
+        printer.set_thread_console(old_console)
+        printer.set_thread_err_console(old_err_console)
+        printer.set_thread_stream(None)
         
     for line in buf.getvalue().splitlines(keepends=True):
         yield line</code></pre>
@@ -3118,7 +3152,7 @@ el.replaceWith(d);
 </li>
 <li>
 <h4><code><a title="connpy.services.NodeService" href="#connpy.services.NodeService">NodeService</a></code></h4>
-<ul class="two-column">
+<ul class="">
 <li><code><a title="connpy.services.NodeService.add_node" href="#connpy.services.NodeService.add_node">add_node</a></code></li>
 <li><code><a title="connpy.services.NodeService.bulk_add" href="#connpy.services.NodeService.bulk_add">bulk_add</a></code></li>
 <li><code><a title="connpy.services.NodeService.connect_node" href="#connpy.services.NodeService.connect_node">connect_node</a></code></li>
@@ -3132,6 +3166,7 @@ el.replaceWith(d);
 <li><code><a title="connpy.services.NodeService.list_nodes" href="#connpy.services.NodeService.list_nodes">list_nodes</a></code></li>
 <li><code><a title="connpy.services.NodeService.move_node" href="#connpy.services.NodeService.move_node">move_node</a></code></li>
 <li><code><a title="connpy.services.NodeService.update_node" href="#connpy.services.NodeService.update_node">update_node</a></code></li>
+<li><code><a title="connpy.services.NodeService.validate_parent_folder" href="#connpy.services.NodeService.validate_parent_folder">validate_parent_folder</a></code></li>
 </ul>
 </li>
 <li>
@@ -3180,7 +3215,7 @@ el.replaceWith(d);
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
 </footer>
 </body>
 </html>

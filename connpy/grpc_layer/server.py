@@ -12,6 +12,7 @@ from . import connpy_pb2, connpy_pb2_grpc, remote_plugin_pb2, remote_plugin_pb2_
 import json
 from .utils import to_value, from_value, to_struct, from_struct
 from ..services.exceptions import ConnpyError
+from .. import printer
 
 # Import local services
 from ..services.node_service import NodeService
@@ -24,16 +25,34 @@ from ..services.execution_service import ExecutionService
 from ..services.import_export_service import ImportExportService
 
 def handle_errors(func):
-    def wrapper(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except ConnpyError as e:
-            context = kwargs.get("context") or args[-1]
-            context.abort(grpc.StatusCode.INTERNAL, str(e))
-        except Exception as e:
-            context = kwargs.get("context") or args[-1]
-            context.abort(grpc.StatusCode.UNKNOWN, str(e))
-    return wrapper
+    import inspect
+    if inspect.isgeneratorfunction(func):
+        def wrapper(*args, **kwargs):
+            try:
+                for item in func(*args, **kwargs):
+                    yield item
+            except ConnpyError as e:
+                context = kwargs.get("context") or args[-1]
+                context.abort(grpc.StatusCode.INTERNAL, str(e))
+            except Exception as e:
+                context = kwargs.get("context") or args[-1]
+                context.abort(grpc.StatusCode.UNKNOWN, str(e))
+            finally:
+                printer.clear_thread_state()
+        return wrapper
+    else:
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except ConnpyError as e:
+                context = kwargs.get("context") or args[-1]
+                context.abort(grpc.StatusCode.INTERNAL, str(e))
+            except Exception as e:
+                context = kwargs.get("context") or args[-1]
+                context.abort(grpc.StatusCode.UNKNOWN, str(e))
+            finally:
+                printer.clear_thread_state()
+        return wrapper
 
 class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
     def __init__(self, config):
@@ -56,18 +75,72 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
         unique_id = first_req.id
         sftp = first_req.sftp
         debug = first_req.debug
+        printer.console.print(f"[debug][DEBUG][/debug] gRPC interact_node request for: [bold cyan]{unique_id}[/bold cyan]")
 
-        node_data = self.service.config.getitem(unique_id, extract=False)
-        profile_service = ProfileService(self.service.config)
-        resolved_data = profile_service.resolve_node_data(node_data)
-        
-        n = node(unique_id, **resolved_data, config=self.service.config)
-        if sftp:
-            n.protocol = "sftp"
+        if first_req.connection_params_json:
+            import json
+            params = json.loads(first_req.connection_params_json)
+            base_node_id = params.get("base_node")
+            # Valid attributes that a node object accepts
+            valid_attrs = ['host', 'options', 'logs', 'password', 'port', 'protocol', 'user', 'jumphost']
+            
+            fallback_id = f"{unique_id}@remote"
+            if unique_id == "dynamic" and params.get("host"):
+                fallback_id = f"dynamic-{params.get('host')}@remote"
+            
+            if base_node_id:
+                # Look up the base node in config and use its full data
+                nodes = self.service.config._getallnodes(base_node_id)
+                if nodes:
+                    device = self.service.config.getitem(nodes[0])
+                    # Override device properties with any passed in params
+                    for attr in valid_attrs:
+                        if attr in params:
+                            device[attr] = params[attr]
+                    
+                    if "tags" in params:
+                        device_tags = device.get("tags", {})
+                        if not isinstance(device_tags, dict):
+                            device_tags = {}
+                        device_tags.update(params["tags"])
+                        device["tags"] = device_tags
+                        
+                    node_name = params.get("name", base_node_id)
+                    n = node(node_name, **device, config=self.service.config)
+                else:
+                    # base_node not found, fall back to dynamic
+                    node_name = params.get("name", fallback_id)
+                    n = node(node_name, host=params.get("host", ""), config=self.service.config)
+                    for attr in valid_attrs:
+                        if attr in params:
+                            setattr(n, attr, params[attr])
+                    if "tags" in params:
+                        n.tags = params["tags"]
+            else:
+                node_name = params.get("name", fallback_id)
+                n = node(node_name, host=params.get("host", ""), config=self.service.config)
+                for attr in valid_attrs:
+                    if attr in params:
+                        setattr(n, attr, params[attr])
+                if "tags" in params:
+                    n.tags = params["tags"]
+        else:
+            node_data = self.service.config.getitem(unique_id, extract=False)
+            if not node_data:
+                context.abort(grpc.StatusCode.NOT_FOUND, f"Node {unique_id} not found")
+            profile_service = ProfileService(self.service.config)
+            resolved_data = profile_service.resolve_node_data(node_data)
+            n = node(unique_id, **resolved_data, config=self.service.config)
+            if sftp:
+                n.protocol = "sftp"
 
         connect = n._connect(debug=debug)
         if connect != True:
-            context.abort(grpc.StatusCode.INTERNAL, "Failed to connect to node")
+            yield connpy_pb2.InteractResponse(success=False, error_message=str(connect))
+            return
+        
+        # Signal successful connection to the client
+        yield connpy_pb2.InteractResponse(success=True)
 
         import threading
         import queue
@@ -144,6 +217,11 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
     @handle_errors
     def explode_unique(self, request, context):
         return connpy_pb2.ValueResponse(data=to_value(self.service.explode_unique(request.id)))
+
+    @handle_errors
+    def validate_parent_folder(self, request, context):
+        self.service.validate_parent_folder(request.id)
+        return Empty()
 
     @handle_errors
     def generate_cache(self, request, context):
@@ -446,16 +524,18 @@ class ImportExportServicer(connpy_pb2_grpc.ImportExportServiceServicer):
         return Empty()
 
 class StatusBridge:
-    def __init__(self, q, request_queue=None):
+    def __init__(self, q, request_queue=None, is_web=False):
         self.q = q
         self.request_queue = request_queue
         self.on_interrupt = self._force_interrupt
         self.thread = None
+        self.is_web = is_web
 
     def _force_interrupt(self):
         """Forcefully raise KeyboardInterrupt in the target thread."""
         if self.thread and self.thread.ident:
             # Standard Python trick to raise an exception in a specific thread
+            import ctypes
             ctypes.pythonapi.PyThreadState_SetAsyncExc(
                 ctypes.c_long(self.thread.ident), 
                 ctypes.py_object(KeyboardInterrupt)
@@ -477,13 +557,32 @@ class StatusBridge:
 
     def _print_to_queue(self, msg_type, *args, **kwargs):
         from rich.console import Console
+        from rich.panel import Panel
         from io import StringIO
         from ..printer import connpy_theme
+        
+        processed_args = list(args)
+        if self.is_web:
+            # Remove Panels to avoid box characters on web, but preserve Title
+            processed_args = []
+            for arg in args:
+                if isinstance(arg, Panel):
+                    # If it has a title, prepend it to the content to allow detection
+                    content = arg.renderable
+                    if arg.title:
+                        processed_args.append(f"{arg.title}\n")
+                    processed_args.append(content)
+                else:
+                    processed_args.append(arg)
+
         buf = StringIO()
-        # Use a high-quality console for rendering with the app's theme
-        c = Console(file=buf, force_terminal=True, width=100, theme=connpy_theme)
-        c.print(*args, **kwargs)
-        self.q.put((msg_type, buf.getvalue()))
+        # force_terminal=False removes ANSI escape codes for Web
+        c = Console(file=buf, force_terminal=not self.is_web, width=100, theme=connpy_theme)
+        c.print(*processed_args, **kwargs)
+        
+        text_content = buf.getvalue().strip()
+        if text_content:
+            self.q.put((msg_type, text_content))
 
     def confirm(self, prompt, default="n"):
         """Bridge confirmation to the gRPC client."""
@@ -520,94 +619,108 @@ class AIServicer(connpy_pb2_grpc.AIServiceServicer):
     def ask(self, request_iterator, context):
         import queue
         import threading
-        
-        # In bidirectional mode, the first request contains the query
-        try:
-            first_request = next(request_iterator)
-        except StopIteration:
-            return
-
-        history = from_value(first_request.chat_history)
-        
-        overrides = {}
-        if first_request.engineer_model: overrides["engineer_model"] = first_request.engineer_model
-        if first_request.engineer_api_key: overrides["engineer_api_key"] = first_request.engineer_api_key
-        if first_request.architect_model: overrides["architect_model"] = first_request.architect_model
-        if first_request.architect_api_key: overrides["architect_api_key"] = first_request.architect_api_key
 
         chunk_queue = queue.Queue()
         request_queue = queue.Queue()
-        bridge = StatusBridge(chunk_queue, request_queue=request_queue)
+        bridge = None
+        history = []
+        is_web = False
         
-        # Start a thread to pull subsequent requests from the client (confirmations)
-        def pull_requests():
-            try:
-                for req in request_iterator:
-                    if req.interrupt and bridge.on_interrupt:
-                        bridge.on_interrupt()
-                    request_queue.put(req)
-            except Exception:
-                pass
-            finally:
-                request_queue.put(None)
-
-        threading.Thread(target=pull_requests, daemon=True).start()
+        # Dedicated event to signal AI thread to stop
+        ai_thread = None
+        agent_instance = None
 
         def callback(chunk):
             chunk_queue.put(("text", chunk))
 
-        result_container = {}
-
-        def run_ai():
+        def run_ai_task(input_text, session_id, debug, overrides, trust):
+            nonlocal history, bridge, agent_instance
             try:
+                # Run the AI interaction (this blocks this specific thread)
                 res = self.service.ask(
-                    first_request.input_text, 
-                    dryrun=first_request.dryrun, 
+                    input_text,
                     chat_history=history if history else None,
-                    session_id=first_request.session_id if first_request.session_id else None,
-                    debug=first_request.debug,
+                    session_id=session_id,
+                    debug=debug,
                     status=bridge,
                     console=bridge,
                     confirm_handler=bridge.confirm,
                     chunk_callback=callback,
-                    trust=first_request.trust,
+                    trust=trust,
                     **overrides
                 )
-                result_container["res"] = res
+
+                # Update history for next message
+                if "chat_history" in res:
+                    history = res["chat_history"]
+
+                # Send final chunk marker
+                chunk_queue.put(("final_mark", res))
             except Exception as e:
-                chunk_queue.put(("status", f"[bold fail]Error: {str(e)}[/bold fail]"))
-                result_container["error"] = e
+                import traceback
+                print(f"AI Task Error: {e}")
+                traceback.print_exc()
+                chunk_queue.put(("status", f"Error: {str(e)}"))
+
+        def request_listener():
+            nonlocal bridge, is_web, ai_thread, agent_instance
+            try:
+                for req in request_iterator:
+                    if req.interrupt:
+                        if bridge and bridge.on_interrupt:
+                            bridge.on_interrupt()
+                        continue
+
+                    if req.confirmation_answer:
+                        request_queue.put(req)
+                        continue
+
+                    if req.input_text:
+                        is_web = "web" in (req.session_id or "").lower() or (req.session_id or "").lower().startswith("ws-")
+                        if not bridge:
+                            bridge = StatusBridge(chunk_queue, request_queue=request_queue, is_web=is_web)
+
+                        overrides = {}
+                        if req.engineer_model: overrides["engineer_model"] = req.engineer_model
+                        if req.engineer_api_key: overrides["engineer_api_key"] = req.engineer_api_key
+                        
+                        # Start AI in its own thread so we can keep listening for interrupts
+                        ai_thread = threading.Thread(
+                            target=run_ai_task,
+                            args=(req.input_text, req.session_id, req.debug, overrides, req.trust),
+                            daemon=True
+                        )
+                        ai_thread.start()
+            except Exception as e:
+                print(f"Request Listener Error: {e}")
             finally:
-                chunk_queue.put(None) # Sentinel
+                # When client closes stream, send sentinel
+                chunk_queue.put((None, None))
 
-        t = threading.Thread(target=run_ai, daemon=True)
-        bridge.thread = t
-        t.start()
+        # Start listening for client requests/signals
+        threading.Thread(target=request_listener, daemon=True).start()
 
+        # Main response loop (yields to gRPC)
         while True:
             item = chunk_queue.get()
-            if item is None:
+            if item == (None, None):
                 break
-            
+
             msg_type, val = item
             if msg_type == "text":
                 yield connpy_pb2.AIResponse(text_chunk=val, is_final=False)
             elif msg_type == "status":
-                yield connpy_pb2.AIResponse(status_update=val, is_final=False)
+                if is_web and "is thinking" in val.lower(): continue
+                clean_val = val.replace("[ai_status]", "").replace("[/ai_status]", "")
+                yield connpy_pb2.AIResponse(status_update=clean_val, is_final=False)
             elif msg_type == "debug":
                 yield connpy_pb2.AIResponse(debug_message=val, is_final=False)
             elif msg_type == "important":
                 yield connpy_pb2.AIResponse(important_message=val, is_final=False)
             elif msg_type == "confirm":
                 yield connpy_pb2.AIResponse(status_update=val, requires_confirmation=True, is_final=False)
-
-        if "error" in result_container:
-            raise result_container["error"]
-
-        yield connpy_pb2.AIResponse(
-            is_final=True, 
-            full_result=to_struct(result_container.get("res", {}))
-        )
+            elif msg_type == "final_mark":
+                yield connpy_pb2.AIResponse(is_final=True, full_result=to_struct(val))
 
     @handle_errors
     def confirm(self, request, context):
@@ -663,8 +776,8 @@ class SystemServicer(connpy_pb2_grpc.SystemServiceServicer):
 class LoggingInterceptor(grpc.ServerInterceptor):
     def __init__(self):
         from rich.console import Console
-        from ..printer import connpy_theme
-        self.console = Console(theme=connpy_theme)
+        from ..printer import connpy_theme, get_original_stdout
+        self.console = Console(theme=connpy_theme, file=get_original_stdout())
 
     def intercept_service(self, continuation, handler_call_details):
         import time

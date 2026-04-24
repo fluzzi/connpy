@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-from . import connpy_pb2 as connpy__pb2
+import connpy_pb2 as connpy__pb2
 from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 
 GRPC_GENERATED_VERSION = '1.80.0'
@@ -83,6 +83,11 @@ class NodeServiceStub(object):
         self.bulk_add = channel.unary_unary(
                 '/connpy.NodeService/bulk_add',
                 request_serializer=connpy__pb2.BulkRequest.SerializeToString,
+                response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                _registered_method=True)
+        self.validate_parent_folder = channel.unary_unary(
+                '/connpy.NodeService/validate_parent_folder',
+                request_serializer=connpy__pb2.IdRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
         self.set_reserved_names = channel.unary_unary(
@@ -170,6 +175,12 @@ class NodeServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def validate_parent_folder(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def set_reserved_names(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -245,6 +256,11 @@ def add_NodeServiceServicer_to_server(servicer, server):
             'bulk_add': grpc.unary_unary_rpc_method_handler(
                     servicer.bulk_add,
                     request_deserializer=connpy__pb2.BulkRequest.FromString,
+                    response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            ),
+            'validate_parent_folder': grpc.unary_unary_rpc_method_handler(
+                    servicer.validate_parent_folder,
+                    request_deserializer=connpy__pb2.IdRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
             'set_reserved_names': grpc.unary_unary_rpc_method_handler(
@@ -537,6 +553,33 @@ class NodeService(object):
             target,
             '/connpy.NodeService/bulk_add',
             connpy__pb2.BulkRequest.SerializeToString,
+            google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def validate_parent_folder(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/connpy.NodeService/validate_parent_folder',
+            connpy__pb2.IdRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options,
             channel_credentials,

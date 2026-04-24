@@ -73,11 +73,112 @@ class NodeStub:
                     except OSError:
                         break
 
+        # Fetch node details for the connection message
+        try:
+            node_details = self.get_node_details(unique_id)
+            host = node_details.get("host", "unknown")
+            port = str(node_details.get("port", ""))
+            protocol = "sftp" if sftp else node_details.get("protocol", "ssh")
+            port_str = f":{port}" if port and protocol not in ["ssm", "kubectl", "docker"] else ""
+            conn_msg = f"Connected to {unique_id} at {host}{port_str} via: {protocol}"
+        except Exception:
+            conn_msg = f"Connected to {unique_id}"
+
         old_tty = termios.tcgetattr(sys.stdin)
         try:
             tty.setraw(sys.stdin.fileno())
             response_iterator = self.stub.interact_node(request_generator())
             
+            # First response is connection status
+            try:
+                first_res = next(response_iterator)
+                if first_res.success:
+                    # Connection established on server, show success message
+                    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+                    printer.success(conn_msg)
+                    tty.setraw(sys.stdin.fileno())
+                else:
+                    # Connection failed on server
+                    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+                    printer.error(f"Connection failed: {first_res.error_message}")
+                    return
+            except StopIteration:
+                return
+            
+            for res in response_iterator:
+                if res.stdout_data:
+                    os.write(sys.stdout.fileno(), res.stdout_data)
+        finally:
+            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+
+    @handle_errors
+    def connect_dynamic(self, connection_params, debug=False):
+        import sys
+        import select
+        import tty
+        import termios
+        import os
+        import json
+        
+        params_json = json.dumps(connection_params)
+        
+        def request_generator():
+            cols, rows = 80, 24
+            try:
+                size = os.get_terminal_size()
+                cols, rows = size.columns, size.lines
+            except OSError:
+                pass
+                
+            yield connpy_pb2.InteractRequest(
+                id="dynamic", debug=debug, cols=cols, rows=rows,
+                connection_params_json=params_json
+            )
+            
+            while True:
+                r, _, _ = select.select([sys.stdin.fileno()], [], [])
+                if r:
+                    try:
+                        data = os.read(sys.stdin.fileno(), 1024)
+                        if not data:
+                            break
+                        yield connpy_pb2.InteractRequest(stdin_data=data)
+                    except OSError:
+                        break
+
+        # Prepare connection message
+        try:
+            node_name = connection_params.get("name", "dynamic@remote")
+            host = connection_params.get("host", "dynamic")
+            port = str(connection_params.get("port", ""))
+            protocol = connection_params.get("protocol", "ssh")
+            port_str = f":{port}" if port and protocol not in ["ssm", "kubectl", "docker"] else ""
+            conn_msg = f"Connected to {node_name} at {host}{port_str} via: {protocol}"
+        except Exception:
+            node_name = connection_params.get("name", "dynamic@remote") if isinstance(connection_params, dict) else "dynamic@remote"
+            conn_msg = f"Connected to {node_name}"
+
+        old_tty = termios.tcgetattr(sys.stdin)
+        try:
+            tty.setraw(sys.stdin.fileno())
+            response_iterator = self.stub.interact_node(request_generator())
+            
+            # First response is connection status
+            try:
+                first_res = next(response_iterator)
+                if first_res.success:
+                    # Connection established on server, show success message
+                    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+                    printer.success(conn_msg)
+                    tty.setraw(sys.stdin.fileno())
+                else:
+                    # Connection failed on server
+                    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+                    printer.error(f"Connection failed: {first_res.error_message}")
+                    return
+            except StopIteration:
+                return
+                
             for res in response_iterator:
                 if res.stdout_data:
                     os.write(sys.stdout.fileno(), res.stdout_data)
@@ -103,6 +204,10 @@ class NodeStub:
     @handle_errors
     def explode_unique(self, unique_id):
         return from_value(self.stub.explode_unique(connpy_pb2.IdRequest(id=unique_id)).data)
+
+    @handle_errors
+    def validate_parent_folder(self, unique_id):
+        self.stub.validate_parent_folder(connpy_pb2.IdRequest(id=unique_id))
 
     @handle_errors
     def generate_cache(self, nodes=None, folders=None, profiles=None):
@@ -226,6 +331,30 @@ class ProfileStub:
         if self.node_stub:
             self.node_stub._trigger_local_cache_sync()
 
+class ConfigStub:
+    def __init__(self, channel, remote_host):
+        self.stub = connpy_pb2_grpc.ConfigServiceStub(channel)
+        self.remote_host = remote_host
+
+    @handle_errors
+    def get_settings(self):
+        return from_struct(self.stub.get_settings(Empty()).data)
+
+    @handle_errors
+    def update_setting(self, key, value):
+        self.stub.update_setting(connpy_pb2.UpdateRequest(key=key, value=to_value(value)))
+
+    @handle_errors
+    def get_default_dir(self):
+        return self.stub.get_default_dir(Empty()).value
+
+    @handle_errors
+    def set_config_folder(self, folder):
+        self.stub.set_config_folder(connpy_pb2.StringRequest(value=folder))
+
+    @handle_errors
+    def encrypt_password(self, password):
+        return self.stub.encrypt_password(connpy_pb2.StringRequest(value=password)).value
 
 class PluginStub:
     def __init__(self, channel, remote_host):

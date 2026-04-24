@@ -2,10 +2,10 @@
 '''
 ## Connection manager
 
-Connpy is a SSH, SFTP, Telnet, kubectl, and Docker pod connection manager and automation module for Linux, Mac, and Docker.
+Connpy is a SSH, SFTP, Telnet, kubectl, Docker pod, and AWS SSM connection manager and automation module for Linux, Mac, and Docker.
 
 ### Features
-    - Manage connections using SSH, SFTP, Telnet, kubectl, and Docker exec.
+    - Manage connections using SSH, SFTP, Telnet, kubectl, Docker exec, and AWS SSM.
     - Set contexts to manage specific nodes from specific contexts (work/home/clients/etc).
     - You can generate profiles and reference them from nodes using @profilename so you don't
       need to edit multiple nodes when changing passwords or other information.

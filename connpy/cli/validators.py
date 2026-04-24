@@ -14,14 +14,14 @@ class Validators:
                 raise inquirer.errors.ValidationError("", reason="Profile {} don't exist".format(current))
         return True
 
-    def profile_protocol_validation(self, answers, current, regex = "(^ssh$|^telnet$|^kubectl$|^docker$|^$)"):
+    def profile_protocol_validation(self, answers, current, regex = "(^ssh$|^telnet$|^kubectl$|^docker$|^ssm$|^$)"):
         if not re.match(regex, current):
-            raise inquirer.errors.ValidationError("", reason="Pick between ssh, telnet, kubectl, docker or leave empty")
+            raise inquirer.errors.ValidationError("", reason="Pick between ssh, telnet, kubectl, docker, ssm or leave empty")
         return True
 
-    def protocol_validation(self, answers, current, regex = "(^ssh$|^telnet$|^kubectl$|^docker$|^$|^@.+$)"):
+    def protocol_validation(self, answers, current, regex = "(^ssh$|^telnet$|^kubectl$|^docker$|^ssm$|^$|^@.+$)"):
         if not re.match(regex, current):
-            raise inquirer.errors.ValidationError("", reason="Pick between ssh, telnet, kubectl, docker leave empty or @profile")
+            raise inquirer.errors.ValidationError("", reason="Pick between ssh, telnet, kubectl, docker, ssm, leave empty or @profile")
         if current.startswith("@"):
             if current[1:] not in self.app.profiles:
                 raise inquirer.errors.ValidationError("", reason="Profile {} don't exist".format(current))

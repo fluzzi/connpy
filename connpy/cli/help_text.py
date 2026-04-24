@@ -32,6 +32,7 @@ Here are some important instructions and tips for configuring your new node:
    - telnet
    - kubectl (`kubectl exec`)
    - docker (`docker exec`)
+   - ssm (`aws ssm start-session`)
 
 3. **Optional Values**:
    - You can leave any value empty except for the hostname/IP.

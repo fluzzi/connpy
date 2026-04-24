@@ -31,6 +31,8 @@ from . import printer
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.text import Text
+from rich.console import Group
+from rich.rule import Rule
 
 console = printer.console
 
@@ -209,14 +211,20 @@ class ai:
             status_formatter (callable): Function(args_dict) -> status string.
         """
         name = tool_definition["function"]["name"]
+        
+        # Check if already registered to prevent duplicates
         if target in ("engineer", "both"):
-            self.external_engineer_tools.append(tool_definition)
+            if not any(t["function"]["name"] == name for t in self.external_engineer_tools):
+                self.external_engineer_tools.append(tool_definition)
         if target in ("architect", "both"):
-            self.external_architect_tools.append(tool_definition)
+            if not any(t["function"]["name"] == name for t in self.external_architect_tools):
+                self.external_architect_tools.append(tool_definition)
+        
         self.external_tool_handlers[name] = handler
-        if engineer_prompt:
+        
+        if engineer_prompt and engineer_prompt not in self.engineer_prompt_extensions:
             self.engineer_prompt_extensions.append(engineer_prompt)
-        if architect_prompt:
+        if architect_prompt and architect_prompt not in self.architect_prompt_extensions:
             self.architect_prompt_extensions.append(architect_prompt)
         if status_formatter:
             self.tool_status_formatters[name] = status_formatter
@@ -448,11 +456,45 @@ class ai:
 
     def _truncate(self, text, limit=None):
         """Truncate text to specified limit, keeping head (60%) and tail (40%)."""
+        if not isinstance(text, str): return str(text)
         final_limit = limit or self.max_truncate
         if len(text) <= final_limit: return text
         head_limit = int(final_limit * 0.6)
         tail_limit = int(final_limit * 0.4)
         return (text[:head_limit] + f"\n\n[... OUTPUT TRUNCATED ...]\n\n" + text[-tail_limit:])
+
+    def _print_debug_observation(self, fn, obs):
+        """Prints a tool observation in a readable way during debug mode."""
+        # Try to parse as JSON if it's a string
+        if isinstance(obs, str):
+            try:
+                obs_data = json.loads(obs)
+            except Exception:
+                obs_data = obs
+        else:
+            obs_data = obs
+        
+        if isinstance(obs_data, dict):
+            elements = []
+            for k, v in obs_data.items():
+                elements.append(Text(f"• {k}:", style="key"))
+                # Use Text for values to ensure newlines are rendered
+                val = str(v)
+                # If it's a multiline string from a delegation task, keep it clean
+                elements.append(Text(val))
+            
+            if not elements:
+                content = Text("Empty data set")
+            else:
+                # Add a small spacer instead of a Rule for cleaner look
+                content = Group(*elements)
+        elif isinstance(obs_data, list):
+            content = Text("\n".join(f"• {item}" for item in obs_data))
+        else:
+            content = Text(str(obs_data))
+            
+        title = f"[bold]{fn}[/bold]"
+        self.console.print(Panel(content, title=title, border_style="ai_status"))
 
     def manage_memory_tool(self, content, action="append"):
         """Save or update long-term memory. Only use when user explicitly requests it."""
@@ -491,8 +533,8 @@ class ai:
                         ts = data.get("tags")
                         if isinstance(ts, dict): os_tag = ts.get("os", "unknown")
                     res[name] = {"os": os_tag}
-                return json.dumps(res)
-            return json.dumps({"count": len(matched_names), "nodes": matched_names, "note": "Use 'get_node_info' for details."})
+                return res
+            return {"count": len(matched_names), "nodes": matched_names, "note": "Use 'get_node_info' for details."}
         except Exception as e: 
             return f"Error listing nodes: {str(e)}"
 
@@ -566,7 +608,7 @@ class ai:
             if not matched_names: return "No nodes found matching filter."
             thisnodes_dict = self.config.getitems(matched_names, extract=True)
             result = nodes(thisnodes_dict, config=self.config).run(commands)
-            return self._truncate(json.dumps(result))
+            return result
         except Exception as e: 
             return f"Error executing commands: {str(e)}"
 
@@ -575,7 +617,7 @@ class ai:
         try:
             d = self.config.getitem(node_name, extract=True)
             if 'password' in d: d['password'] = '***'
-            return json.dumps(d)
+            return d
         except Exception as e: 
             return f"Error getting node info: {str(e)}"
 
@@ -619,7 +661,7 @@ class ai:
                     self.console.print(f"[warning]  You can press Ctrl+C to interrupt and get a summary.[/warning]")
                     soft_limit_warned = True
                 
-                if status: status.update(f"[ai_status]Engineer: Analyzing mission... (step {iteration})")
+                if status and not chat_history: status.update(f"[ai_status]Engineer: Analyzing mission... (step {iteration})")
                 
                 try:
                     safe_messages = self._sanitize_messages(messages)
@@ -642,8 +684,8 @@ class ai:
                 for tc in resp_msg.tool_calls:
                     fn, args = tc.function.name, json.loads(tc.function.arguments)
                     
-                    # Notificación en tiempo real de la tarea técnica
-                    if status:
+                    # Notificación en tiempo real de la tarea técnica (Only if not in Architect loop)
+                    if status and not chat_history:
                         if fn == "list_nodes": status.update(f"[ai_status]Engineer: [SEARCH] {args.get('filter_pattern','.*')}")
                         elif fn == "run_commands": 
                             cmds = args.get('commands', [])
@@ -652,7 +694,8 @@ class ai:
                         elif fn == "get_node_info": status.update(f"[ai_status]Engineer: [INSPECT] {args.get('node_name','')}")
                         elif fn in self.tool_status_formatters: status.update(self.tool_status_formatters[fn](args))
 
-                    if debug: self.console.print(Panel(Text(json.dumps(args, indent=2)), title=f"[bold engineer]Engineer Tool: {fn}[/bold engineer]", border_style="engineer"))
+                    if debug:
+                        self._print_debug_observation(f"Decision: {fn}", args)
                     
                     if fn == "list_nodes": obs = self.list_nodes_tool(**args)
                     elif fn == "run_commands": obs = self.run_commands_tool(**args, status=status)
@@ -660,8 +703,12 @@ class ai:
                     elif fn in self.external_tool_handlers: obs = self.external_tool_handlers[fn](self, **args)
                     else: obs = f"Error: Unknown tool '{fn}'."
                     
-                    if debug: self.console.print(Panel(Text(str(obs)), title=f"[bold pass]Engineer Observation: {fn}[/bold pass]", border_style="success"))
-                    messages.append({"tool_call_id": tc.id, "role": "tool", "name": fn, "content": obs})
+                    if debug:
+                        self._print_debug_observation(f"Observation: {fn}", obs)
+                    
+                    # Ensure observation is a string and truncated for the LLM
+                    obs_str = obs if isinstance(obs, str) else json.dumps(obs)
+                    messages.append({"tool_call_id": tc.id, "role": "tool", "name": fn, "content": self._truncate(obs_str)})
             
             if iteration >= self.hard_limit_iterations:
                 self.console.print(f"[error]⛔ Engineer reached hard limit ({self.hard_limit_iterations} steps). Forcing stop.[/error]")
@@ -675,30 +722,46 @@ class ai:
 
     def _get_engineer_tools(self):
         """Define tools available to the Engineer."""
-        tools = [
+        base_tools = [
             {"type": "function", "function": {"name": "list_nodes", "description": "Lists available nodes in the inventory.", "parameters": {"type": "object", "properties": {"filter_pattern": {"type": "string", "description": "Regex to filter nodes (e.g. '.*', 'border.*')."}}}}},
             {"type": "function", "function": {"name": "run_commands", "description": "Runs one or more commands on matched nodes. MANDATORY: You MUST call 'list_nodes' first to verify the target list.", "parameters": {"type": "object", "properties": {"nodes_filter": {"type": "string", "description": "Exact node name or verified filter pattern."}, "commands": {"type": "array", "items": {"type": "string"}, "description": "List of commands (e.g. ['show ip route', 'show int desc'])."}}, "required": ["nodes_filter", "commands"]}}},
             {"type": "function", "function": {"name": "get_node_info", "description": "Gets full metadata for a specific node.", "parameters": {"type": "object", "properties": {"node_name": {"type": "string"}}, "required": ["node_name"]}}}
         ]
         
         if self.architect_key:
-            tools.extend([
+            base_tools.extend([
                 {"type": "function", "function": {"name": "consult_architect", "description": "Ask the Strategic Reasoning Engine for advice on complex design, architecture, or troubleshooting decisions. You remain in control and will present the response to the user. Use this for: configuration planning, design validation, complex troubleshooting.", "parameters": {"type": "object", "properties": {"question": {"type": "string", "description": "Strategic question or decision needed."}, "technical_summary": {"type": "string", "description": "Technical findings and context gathered so far."}}, "required": ["question", "technical_summary"]}}},
                 {"type": "function", "function": {"name": "escalate_to_architect", "description": "Transfer full control to the Strategic Reasoning Engine. Use ONLY when the user explicitly requests the Architect or when the problem requires strategic oversight beyond consultation. After escalation, the Architect takes over the conversation.", "parameters": {"type": "object", "properties": {"reason": {"type": "string", "description": "Why you're escalating (e.g. 'User requested Architect', 'Complex multi-site design needed')."}, "context": {"type": "string", "description": "Full context and findings to hand over."}}, "required": ["reason", "context"]}}}
             ])
             
-        tools.extend(self.external_engineer_tools)
-        return tools
+        # Deduplicate by name to prevent Gemini BadRequestError
+        all_tools = base_tools + self.external_engineer_tools
+        seen_names = set()
+        unique_tools = []
+        for t in all_tools:
+            name = t["function"]["name"]
+            if name not in seen_names:
+                unique_tools.append(t)
+                seen_names.add(name)
+        return unique_tools
 
     def _get_architect_tools(self):
         """Define tools available to the Strategic Reasoning Engine."""
-        tools = [
+        base_tools = [
             {"type": "function", "function": {"name": "delegate_to_engineer", "description": "Delegates a technical mission to the Engineer.", "parameters": {"type": "object", "properties": {"task": {"type": "string", "description": "Detailed technical mission or goal."}}, "required": ["task"]}}},
             {"type": "function", "function": {"name": "return_to_engineer", "description": "Return control to the Engineer. Use this when your strategic analysis is complete and the Engineer should handle the rest of the conversation.", "parameters": {"type": "object", "properties": {"summary": {"type": "string", "description": "Brief summary of your analysis to hand over to the Engineer."}}, "required": ["summary"]}}},
             {"type": "function", "function": {"name": "manage_memory_tool", "description": "Saves information to long-term memory. MANDATORY: Only use this if the user explicitly asks to remember or save something.", "parameters": {"type": "object", "properties": {"content": {"type": "string"}, "action": {"type": "string", "enum": ["append", "replace"]}}, "required": ["content"]}}}
         ]
-        tools.extend(self.external_architect_tools)
-        return tools
+        
+        all_tools = base_tools + self.external_architect_tools
+        seen_names = set()
+        unique_tools = []
+        for t in all_tools:
+            name = t["function"]["name"]
+            if name not in seen_names:
+                unique_tools.append(t)
+                seen_names.add(name)
+        return unique_tools
 
     def _get_sessions(self):
         """Returns a list of session metadata sorted by date."""
@@ -902,12 +965,16 @@ class ai:
                     soft_limit_warned = True
                 
                 label = "[architect][bold]Architect[/bold][/architect]" if current_brain == "architect" else "[engineer][bold]Engineer[/bold][/engineer]"
-                if status: status.update(f"{label} is thinking... (step {iteration})")
+                if status: 
+                    # Notify responder identity ONLY for web/remote clients (StatusBridge has is_web)
+                    if getattr(status, "is_web", False):
+                        status.update(f"__RESPONDER__:{current_brain}")
+                    status.update(f"{label} is thinking... (step {iteration})")
                 
                 streamed_response = False
                 try:
                     safe_messages = self._sanitize_messages(messages)
-                    if stream and not debug:
+                    if stream and (not debug or chunk_callback):
                         response, streamed_response = self._stream_completion(
                             model=model, messages=safe_messages, tools=tools, api_key=key,
                             status=status, label=label, debug=debug, num_retries=3,
@@ -947,7 +1014,10 @@ class ai:
                 messages.append(msg_dict)
 
                 if debug and resp_msg.content:
-                    self.console.print(Panel(Markdown(resp_msg.content), title=f"{label} Reasoning", border_style="architect" if current_brain == "architect" else "engineer"))
+                    # In CLI debug mode, only print intermediate reasoning if there are tool calls.
+                    # If there are no tool calls, this content is the final answer and will be printed by the caller.
+                    if resp_msg.tool_calls:
+                        self.console.print(Panel(Markdown(resp_msg.content), title=f"[{current_brain}][bold]{label} Reasoning[/bold][/{current_brain}]", border_style="architect" if current_brain == "architect" else "engineer"))
 
                 if not resp_msg.tool_calls: break
                 
@@ -967,7 +1037,8 @@ class ai:
                         if fn == "delegate_to_engineer": status.update(f"[architect]Architect: [DELEGATING MISSION] {args.get('task','')[:40]}...")
                         elif fn == "manage_memory_tool": status.update(f"[architect]Architect: [UPDATING MEMORY]")
 
-                    if debug: self.console.print(Panel(Text(json.dumps(args, indent=2)), title=f"{label} Decision: {fn}", border_style="debug"))
+                    if debug:
+                        self._print_debug_observation(f"Decision: {fn}", args)
 
                     if fn == "delegate_to_engineer":
                         obs, eng_usage = self._engineer_loop(args["task"], status=status, debug=debug, chat_history=messages[:-1])
@@ -1025,9 +1096,13 @@ class ai:
                     elif fn == "manage_memory_tool": obs = self.manage_memory_tool(**args)
                     elif fn in self.external_tool_handlers: obs = self.external_tool_handlers[fn](self, **args)
                     else: obs = f"Error: {fn} unknown."
-                    
-                    messages.append({"tool_call_id": tc.id, "role": "tool", "name": fn, "content": obs})
-                
+
+                    if debug and fn not in ["delegate_to_engineer", "consult_architect", "escalate_to_architect", "return_to_engineer"]:
+                        self._print_debug_observation(f"Observation: {fn}", obs)
+
+                    # Ensure observation is a string and truncated for the LLM
+                    obs_str = obs if isinstance(obs, str) else json.dumps(obs)
+                    messages.append({"tool_call_id": tc.id, "role": "tool", "name": fn, "content": self._truncate(obs_str)})                
                 # Inject pending user message AFTER all tool responses are added
                 if pending_user_message:
                     messages.append({"role": "user", "content": pending_user_message})
@@ -1053,14 +1128,25 @@ class ai:
             if last_msg.get("tool_calls"):
                 for tc in last_msg["tool_calls"]:
                     messages.append({"tool_call_id": tc.get("id"), "role": "tool", "name": tc.get("function", {}).get("name"), "content": "Operation cancelled by user."})
-            messages.append({"role": "user", "content": "USER INTERRUPTED. Briefly summarize what you were doing and stop."})
+            
+            # Use a fresh list for the summary call to avoid history corruption
+            summary_messages = list(messages)
+            summary_messages.append({"role": "user", "content": "USER INTERRUPTED. Briefly summarize what you were doing and stop."})
             try:
-                safe_messages = self._sanitize_messages(messages)
+                safe_messages = self._sanitize_messages(summary_messages)
                 # Use tools=None to force a text summary during interruption
                 response = completion(model=model, messages=safe_messages, tools=None, api_key=key)
                 resp_msg = response.choices[0].message
                 messages.append(resp_msg.model_dump(exclude_none=True))
-            except Exception: pass
+                
+                # IMPORTANT: Manually trigger callback for the summary so Web UI sees it
+                if chunk_callback and resp_msg.content:
+                    chunk_callback(resp_msg.content)
+            except Exception:
+                error_msg = "Operation interrupted by user. Summary unavailable."
+                messages.append({"role": "assistant", "content": error_msg})
+                if chunk_callback:
+                    chunk_callback(error_msg)
         finally:
             # Auto-save session
             self.save_session(messages, model=model)

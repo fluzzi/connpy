@@ -157,9 +157,9 @@ class SyncService(BaseService):
                 if os.path.exists(self.config.key):
                     zipf.write(self.config.key, ".osk")
 
-            # Manage retention (max 10 backups)
+            # Manage retention (max 100 backups)
             backups = self.list_backups()
-            if len(backups) >= 10:
+            if len(backups) >= 100:
                 oldest = min(backups, key=lambda x: x['timestamp'] or '0')
                 self.delete_backup(oldest['id'])
 
@@ -360,7 +360,7 @@ class SyncService(BaseService):
         
         if not sync_enabled: return
 
-        printer.info("Triggering auto-sync...")
+
         if self.check_login_status() != True: 
             printer.warning("Auto-sync: Not logged in to Google Drive.")
             return

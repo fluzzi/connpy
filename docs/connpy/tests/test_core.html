@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.5">
+<meta name="generator" content="pdoc3 0.11.6">
 <title>connpy.tests.test_core API documentation</title>
 <meta name="description" content="Tests for connpy.core module — node and nodes classes.">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
@@ -92,6 +92,23 @@ el.replaceWith(d);
         cmd = n._get_cmd()
         assert &#34;telnet 10.0.0.1&#34; in cmd
         assert &#34;23&#34; in cmd
+
+    def test_ssm_cmd_basic(self):
+        n = self._make_node(protocol=&#34;ssm&#34;, host=&#34;i-12345&#34;)
+        cmd = n._get_cmd()
+        assert &#34;aws ssm start-session&#34; in cmd
+        assert &#34;--target i-12345&#34; in cmd
+
+    def test_ssm_cmd_tags(self):
+        n = self._make_node(protocol=&#34;ssm&#34;, host=&#34;i-12345&#34;, tags={&#34;region&#34;: &#34;us-west-2&#34;, &#34;profile&#34;: &#34;prod&#34;})
+        cmd = n._get_cmd()
+        assert &#34;--region us-west-2&#34; in cmd
+        assert &#34;--profile prod&#34; in cmd
+
+    def test_ssm_cmd_options(self):
+        n = self._make_node(protocol=&#34;ssm&#34;, host=&#34;i-12345&#34;, options=&#34;--document-name AWS-StartInteractiveCommand&#34;)
+        cmd = n._get_cmd()
+        assert &#34;--document-name AWS-StartInteractiveCommand&#34; in cmd
 
     def test_kubectl_cmd(self):
         n = self._make_node(protocol=&#34;kubectl&#34;, host=&#34;my-pod&#34;, tags={&#34;kube_command&#34;: &#34;/bin/sh&#34;})
@@ -268,6 +285,53 @@ el.replaceWith(d);
     n = self._make_node(port=&#34;2222&#34;)
     cmd = n._get_cmd()
     assert &#34;-p 2222&#34; in cmd</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_core.TestCommandGeneration.test_ssm_cmd_basic"><code class="name flex">
+<span>def <span class="ident">test_ssm_cmd_basic</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_ssm_cmd_basic(self):
+    n = self._make_node(protocol=&#34;ssm&#34;, host=&#34;i-12345&#34;)
+    cmd = n._get_cmd()
+    assert &#34;aws ssm start-session&#34; in cmd
+    assert &#34;--target i-12345&#34; in cmd</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_core.TestCommandGeneration.test_ssm_cmd_options"><code class="name flex">
+<span>def <span class="ident">test_ssm_cmd_options</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_ssm_cmd_options(self):
+    n = self._make_node(protocol=&#34;ssm&#34;, host=&#34;i-12345&#34;, options=&#34;--document-name AWS-StartInteractiveCommand&#34;)
+    cmd = n._get_cmd()
+    assert &#34;--document-name AWS-StartInteractiveCommand&#34; in cmd</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_core.TestCommandGeneration.test_ssm_cmd_tags"><code class="name flex">
+<span>def <span class="ident">test_ssm_cmd_tags</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_ssm_cmd_tags(self):
+    n = self._make_node(protocol=&#34;ssm&#34;, host=&#34;i-12345&#34;, tags={&#34;region&#34;: &#34;us-west-2&#34;, &#34;profile&#34;: &#34;prod&#34;})
+    cmd = n._get_cmd()
+    assert &#34;--region us-west-2&#34; in cmd
+    assert &#34;--profile prod&#34; in cmd</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -1239,6 +1303,9 @@ el.replaceWith(d);
 <li><code><a title="connpy.tests.test_core.TestCommandGeneration.test_ssh_cmd_no_user" href="#connpy.tests.test_core.TestCommandGeneration.test_ssh_cmd_no_user">test_ssh_cmd_no_user</a></code></li>
 <li><code><a title="connpy.tests.test_core.TestCommandGeneration.test_ssh_cmd_options" href="#connpy.tests.test_core.TestCommandGeneration.test_ssh_cmd_options">test_ssh_cmd_options</a></code></li>
 <li><code><a title="connpy.tests.test_core.TestCommandGeneration.test_ssh_cmd_port" href="#connpy.tests.test_core.TestCommandGeneration.test_ssh_cmd_port">test_ssh_cmd_port</a></code></li>
+<li><code><a title="connpy.tests.test_core.TestCommandGeneration.test_ssm_cmd_basic" href="#connpy.tests.test_core.TestCommandGeneration.test_ssm_cmd_basic">test_ssm_cmd_basic</a></code></li>
+<li><code><a title="connpy.tests.test_core.TestCommandGeneration.test_ssm_cmd_options" href="#connpy.tests.test_core.TestCommandGeneration.test_ssm_cmd_options">test_ssm_cmd_options</a></code></li>
+<li><code><a title="connpy.tests.test_core.TestCommandGeneration.test_ssm_cmd_tags" href="#connpy.tests.test_core.TestCommandGeneration.test_ssm_cmd_tags">test_ssm_cmd_tags</a></code></li>
 <li><code><a title="connpy.tests.test_core.TestCommandGeneration.test_telnet_cmd" href="#connpy.tests.test_core.TestCommandGeneration.test_telnet_cmd">test_telnet_cmd</a></code></li>
 </ul>
 </li>
@@ -1302,7 +1369,7 @@ el.replaceWith(d);
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
 </footer>
 </body>
 </html>

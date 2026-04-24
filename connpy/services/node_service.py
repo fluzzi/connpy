@@ -73,10 +73,13 @@ class NodeService(BaseService):
 
     def get_node_details(self, unique_id):
         """Return full configuration dictionary for a specific node."""
-        details = self.config.getitem(unique_id)
-        if not details:
+        try:
+            details = self.config.getitem(unique_id)
+            if not details:
+                raise NodeNotFoundError(f"Node '{unique_id}' not found.")
+            return details
+        except (KeyError, TypeError):
             raise NodeNotFoundError(f"Node '{unique_id}' not found.")
-        return details
 
     def explode_unique(self, unique_id):
         """Explode a unique ID into a dictionary of its parts."""
@@ -85,6 +88,14 @@ class NodeService(BaseService):
     def generate_cache(self, nodes=None, folders=None, profiles=None):
         """Generate and update the internal nodes cache."""
         self.config._generate_nodes_cache(nodes=nodes, folders=folders, profiles=profiles)
+
+    def validate_parent_folder(self, unique_id):
+        """Check if parent folder exists for a given node unique ID."""
+        node_folder = unique_id.partition("@")[2]
+        if node_folder:
+            parent_folder = f"@{node_folder}"
+            if parent_folder not in self.config._getallfolders():
+                raise NodeNotFoundError(f"Folder '{parent_folder}' not found.")
 
 
     def add_node(self, unique_id, data, is_folder=False):
@@ -104,9 +115,7 @@ class NodeService(BaseService):
             
             # Check if parent folder exists when creating a subfolder
             if "subfolder" in uniques:
-                parent_folder = f"@{uniques['folder']}"
-                if parent_folder not in all_folders:
-                    raise NodeNotFoundError(f"Folder '{parent_folder}' not found.")
+                self.validate_parent_folder(unique_id)
                     
             self.config._folder_add(**uniques)
             self.config._saveconfig(self.config.file)
@@ -115,11 +124,7 @@ class NodeService(BaseService):
                 raise NodeAlreadyExistsError(f"Node '{unique_id}' already exists.")
                 
             # Check if parent folder exists when creating a node in a folder
-            node_folder = unique_id.partition("@")[2]
-            if node_folder:
-                parent_folder = f"@{node_folder}"
-                if parent_folder not in all_folders:
-                    raise NodeNotFoundError(f"Folder '{parent_folder}' not found.")
+            self.validate_parent_folder(unique_id)
                     
             # Ensure 'id' is in data for config._connections_add
             if "id" not in data:

@@ -16,6 +16,7 @@ service NodeService {
     rpc delete_node (DeleteRequest) returns (google.protobuf.Empty) {}
     rpc move_node (MoveRequest) returns (google.protobuf.Empty) {}
     rpc bulk_add (BulkRequest) returns (google.protobuf.Empty) {}
+    rpc validate_parent_folder (IdRequest) returns (google.protobuf.Empty) {}
     rpc set_reserved_names (ListRequest) returns (google.protobuf.Empty) {}
     rpc interact_node (stream InteractRequest) returns (stream InteractResponse) {}
     rpc full_replace (FullReplaceRequest) returns (google.protobuf.Empty) {}
@@ -87,10 +88,13 @@ message InteractRequest {
     bytes stdin_data = 4;
     int32 cols = 5;
     int32 rows = 6;
+    string connection_params_json = 7;
 }
 
 message InteractResponse {
     bytes stdout_data = 1;
+    bool success = 2;
+    string error_message = 3;
 }
 
 message FilterRequest {

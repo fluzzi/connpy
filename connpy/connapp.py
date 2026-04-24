@@ -445,8 +445,19 @@ class connapp:
 
         try:
             if args.subcommand in getattr(self.plugins, "remote_plugins", {}):
+                import json as _json
                 for chunk in self.services.plugins.invoke_plugin(args.subcommand, args):
-                    print(chunk, end="", flush=True)
+                    if "__interact__" in chunk:
+                        try:
+                            data = _json.loads(chunk.strip())
+                            params = data.get("__interact__")
+                            if params:
+                                self.services.nodes.connect_dynamic(params, debug=getattr(args, 'debug', False))
+                                break
+                        except (ValueError, KeyError):
+                            print(chunk, end="", flush=True)
+                    else:
+                        print(chunk, end="", flush=True)
             elif args.subcommand in self.plugins.plugins:
                 self.plugins.plugins[args.subcommand].Entrypoint(args, self.plugins.plugin_parsers[args.subcommand].parser, self)
             else:

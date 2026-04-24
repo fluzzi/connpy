@@ -264,7 +264,8 @@ class node:
             size = re.search('columns=([0-9]+).*lines=([0-9]+)',str(os.get_terminal_size()))
             self.child.setwinsize(int(size.group(2)),int(size.group(1)))
             if logger:
-                logger("success", "Connected to " + self.unique + " at " + self.host + (":" if self.port != '' else '') + self.port + " via: " + self.protocol)
+                port_str = f":{self.port}" if self.port and self.protocol not in ["ssm", "kubectl", "docker"] else ""
+                logger("success", f"Connected to {self.unique} at {self.host}{port_str} via: {self.protocol}")
 
             if 'logfile' in dir(self):
                 # Initialize self.mylog
@@ -343,7 +344,8 @@ class node:
         now = datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S')
         if connect == True:
             if logger:
-                logger("success", "Connected to " + self.unique + " at " + self.host + (":" if self.port != '' else '') + self.port + " via: " + self.protocol)
+                port_str = f":{self.port}" if self.port and self.protocol not in ["ssm", "kubectl", "docker"] else ""
+                logger("success", f"Connected to {self.unique} at {self.host}{port_str} via: {self.protocol}")
 
             # Attempt to set the terminal size
             try:
@@ -444,7 +446,8 @@ class node:
         connect = self._connect(timeout = timeout, logger = logger)
         if connect == True:
             if logger:
-                logger("success", "Connected to " + self.unique + " at " + self.host + (":" if self.port != '' else '') + self.port + " via: " + self.protocol)
+                port_str = f":{self.port}" if self.port and self.protocol not in ["ssm", "kubectl", "docker"] else ""
+                logger("success", f"Connected to {self.unique} at {self.host}{port_str} via: {self.protocol}")
 
             # Attempt to set the terminal size
             try:
@@ -550,6 +553,19 @@ class node:
         return cmd
 
     @MethodHook
+    def _generate_ssm_cmd(self):
+        region = self.tags.get("region", "") if isinstance(self.tags, dict) else ""
+        profile = self.tags.get("profile", "") if isinstance(self.tags, dict) else ""
+        cmd = f"aws ssm start-session --target {self.host}"
+        if region:
+            cmd += f" --region {region}"
+        if profile:
+            cmd += f" --profile {profile}"
+        if self.options:
+            cmd += f" {self.options}"
+        return cmd
+
+    @MethodHook
     def _get_cmd(self):
         if self.protocol in ["ssh", "sftp"]:
             return self._generate_ssh_sftp_cmd()
@@ -559,6 +575,8 @@ class node:
             return self._generate_kube_cmd()
         elif self.protocol == "docker":
             return self._generate_docker_cmd()
+        elif self.protocol == "ssm":
+            return self._generate_ssm_cmd()
         else:
             printer.error(f"Invalid protocol: {self.protocol}")
             sys.exit(1)
@@ -579,7 +597,8 @@ class node:
             "sftp": ['yes/no', 'refused', 'supported', 'Invalid|[u|U]sage: sftp', 'ssh-keygen.*\"', 'timeout|timed.out', 'unavailable', 'closed', password_prompt, prompt, 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching", "[b|B]ad (owner|permissions)"],
             "telnet": ['[u|U]sername:', 'refused', 'supported', 'invalid|unrecognized option', 'ssh-keygen.*\"', 'timeout|timed.out', 'unavailable', 'closed', password_prompt, prompt, 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching", "[b|B]ad (owner|permissions)"],
             "kubectl": ['[u|U]sername:', '[r|R]efused', '[E|e]rror', 'DEPRECATED', pexpect.TIMEOUT, password_prompt, prompt, pexpect.EOF, "expired|invalid"],
-            "docker": ['[u|U]sername:', 'Cannot', '[E|e]rror', 'failed', 'not a docker command', 'unknown', 'unable to resolve', pexpect.TIMEOUT, password_prompt, prompt, pexpect.EOF]
+            "docker": ['[u|U]sername:', 'Cannot', '[E|e]rror', 'failed', 'not a docker command', 'unknown', 'unable to resolve', pexpect.TIMEOUT, password_prompt, prompt, pexpect.EOF],
+            "ssm": ['[u|U]sername:', 'Cannot', '[E|e]rror', 'failed', 'SessionManagerPlugin', 'unknown', 'unable to resolve', pexpect.TIMEOUT, password_prompt, prompt, pexpect.EOF]
         }
 
         error_indices = {
@@ -587,7 +606,8 @@ class node:
             "sftp": [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15, 16],
             "telnet": [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15, 16],
             "kubectl": [1, 2, 3, 4, 8],  # Define error indices for kube
-            "docker": [1, 2, 3, 4, 5, 6, 7]  # Define error indices for docker
+            "docker": [1, 2, 3, 4, 5, 6, 7],  # Define error indices for docker
+            "ssm": [1, 2, 3, 4, 5, 6, 7]
         }
 
         eof_indices = {
@@ -595,7 +615,8 @@ class node:
             "sftp": [8, 9, 10, 11],
             "telnet": [8, 9, 10, 11],
             "kubectl": [5, 6, 7],  # Define eof indices for kube
-            "docker": [8, 9, 10]  # Define eof indices for docker
+            "docker": [8, 9, 10],  # Define eof indices for docker
+            "ssm": [8, 9, 10]
         }
 
         initial_indices = {
@@ -603,7 +624,8 @@ class node:
             "sftp": [0],
             "telnet": [0],
             "kubectl": [0],  # Define special indices for kube
-            "docker": [0]  # Define special indices for docker
+            "docker": [0],  # Define special indices for docker
+            "ssm": [0]
         }
 
         attempts = 1
@@ -627,7 +649,7 @@ class node:
                     if results in initial_indices[self.protocol]:
                         if self.protocol in ["ssh", "sftp"]:
                             child.sendline('yes')
-                        elif self.protocol in ["telnet", "kubectl", "docker"]:
+                        elif self.protocol in ["telnet", "kubectl", "docker", "ssm"]:
                             if self.user:
                                 child.sendline(self.user)
                             else:

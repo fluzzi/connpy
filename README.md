@@ -9,7 +9,7 @@
 [![](https://img.shields.io/pypi/l/connpy.svg?style=flat-square)](https://github.com/fluzzi/connpy/blob/main/LICENSE)
 [![](https://img.shields.io/pypi/dm/connpy.svg?style=flat-square)](https://pypi.org/pypi/connpy/)
 
-Connpy is a SSH, SFTP, Telnet, kubectl, and Docker pod connection manager and automation module for Linux, Mac, and Docker.
+Connpy is a SSH, SFTP, Telnet, kubectl, Docker pod, and AWS SSM connection manager and automation module for Linux, Mac, and Docker.
 
 
 ## Installation
@@ -29,7 +29,7 @@ docker compose -f path/to/folder/docker-compose.yml run -it connpy-app
 Connpy is committed to protecting your privacy. Our privacy policy explains how we handle user data:
 
 - **Data Access**: Connpy accesses data necessary for managing remote host connections, including server addresses, usernames, and passwords. This data is stored locally on your machine and is not transmitted or shared with any third parties.
-- **Data Usage**: User data is used solely for the purpose of managing and automating SSH and Telnet connections.
+- **Data Usage**: User data is used solely for the purpose of managing and automating SSH, Telnet, and SSM connections.
 - **Data Storage**: All connection details are stored locally and securely on your device. We do not store or process this data on our servers.
 - **Data Sharing**: We do not share any user data with third parties.
 
@@ -46,7 +46,7 @@ For more detailed information, please read our [Privacy Policy](https://connpy.g
 
 
 ### Features
-    - Manage connections using SSH, SFTP, Telnet, kubectl, and Docker exec.
+    - Manage connections using SSH, SFTP, Telnet, kubectl, Docker exec, and AWS SSM.
     - Set contexts to manage specific nodes from specific contexts (work/home/clients/etc).
     - You can generate profiles and reference them from nodes using @profilename so you don't
       need to edit multiple nodes when changing passwords or other information.

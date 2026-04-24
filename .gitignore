@@ -150,3 +150,13 @@ testremote/
 *.db
 *.patch
 scratch.py
+
+# Internal planning and implementation docs
+PLAN_CAPA_SERVICIOS.md
+implementation_plan.md
+remote-plugin-implementation-plan.md
+NETWORK_COMMAND_CENTER_PLAN.md
+ssm_implemmetaiton_plan.md
+async_interact_plan.md
+repo_consolidado_limpio.md
+connpy_roadmap.md

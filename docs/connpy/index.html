@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.5">
+<meta name="generator" content="pdoc3 0.11.6">
 <title>connpy API documentation</title>
 <meta name="description" content="Connection manager …">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
@@ -37,9 +37,9 @@ el.replaceWith(d);
 </header>
 <section id="section-intro">
 <h2 id="connection-manager">Connection manager</h2>
-<p>Connpy is a SSH, SFTP, Telnet, kubectl, and Docker pod connection manager and automation module for Linux, Mac, and Docker.</p>
+<p>Connpy is a SSH, SFTP, Telnet, kubectl, Docker pod, and AWS SSM connection manager and automation module for Linux, Mac, and Docker.</p>
 <h3 id="features">Features</h3>
-<pre><code>- Manage connections using SSH, SFTP, Telnet, kubectl, and Docker exec.
+<pre><code>- Manage connections using SSH, SFTP, Telnet, kubectl, Docker exec, and AWS SSM.
 - Set contexts to manage specific nodes from specific contexts (work/home/clients/etc).
 - You can generate profiles and reference them from nodes using @profilename so you don't
   need to edit multiple nodes when changing passwords or other information.
@@ -516,7 +516,7 @@ class Preload:
 <dd>
 <div class="desc"></div>
 </dd>
-<dt><code class="name"><a title="connpy.grpc" href="grpc/index.html">connpy.grpc</a></code></dt>
+<dt><code class="name"><a title="connpy.grpc_layer" href="grpc_layer/index.html">connpy.grpc_layer</a></code></dt>
 <dd>
 <div class="desc"></div>
 </dd>
@@ -1116,14 +1116,20 @@ class ai:
             status_formatter (callable): Function(args_dict) -&gt; status string.
         &#34;&#34;&#34;
         name = tool_definition[&#34;function&#34;][&#34;name&#34;]
+        
+        # Check if already registered to prevent duplicates
         if target in (&#34;engineer&#34;, &#34;both&#34;):
-            self.external_engineer_tools.append(tool_definition)
+            if not any(t[&#34;function&#34;][&#34;name&#34;] == name for t in self.external_engineer_tools):
+                self.external_engineer_tools.append(tool_definition)
         if target in (&#34;architect&#34;, &#34;both&#34;):
-            self.external_architect_tools.append(tool_definition)
+            if not any(t[&#34;function&#34;][&#34;name&#34;] == name for t in self.external_architect_tools):
+                self.external_architect_tools.append(tool_definition)
+        
         self.external_tool_handlers[name] = handler
-        if engineer_prompt:
+        
+        if engineer_prompt and engineer_prompt not in self.engineer_prompt_extensions:
             self.engineer_prompt_extensions.append(engineer_prompt)
-        if architect_prompt:
+        if architect_prompt and architect_prompt not in self.architect_prompt_extensions:
             self.architect_prompt_extensions.append(architect_prompt)
         if status_formatter:
             self.tool_status_formatters[name] = status_formatter
@@ -1355,11 +1361,45 @@ class ai:
 
     def _truncate(self, text, limit=None):
         &#34;&#34;&#34;Truncate text to specified limit, keeping head (60%) and tail (40%).&#34;&#34;&#34;
+        if not isinstance(text, str): return str(text)
         final_limit = limit or self.max_truncate
         if len(text) &lt;= final_limit: return text
         head_limit = int(final_limit * 0.6)
         tail_limit = int(final_limit * 0.4)
         return (text[:head_limit] + f&#34;\n\n[... OUTPUT TRUNCATED ...]\n\n&#34; + text[-tail_limit:])
+
+    def _print_debug_observation(self, fn, obs):
+        &#34;&#34;&#34;Prints a tool observation in a readable way during debug mode.&#34;&#34;&#34;
+        # Try to parse as JSON if it&#39;s a string
+        if isinstance(obs, str):
+            try:
+                obs_data = json.loads(obs)
+            except Exception:
+                obs_data = obs
+        else:
+            obs_data = obs
+        
+        if isinstance(obs_data, dict):
+            elements = []
+            for k, v in obs_data.items():
+                elements.append(Text(f&#34;• {k}:&#34;, style=&#34;key&#34;))
+                # Use Text for values to ensure newlines are rendered
+                val = str(v)
+                # If it&#39;s a multiline string from a delegation task, keep it clean
+                elements.append(Text(val))
+            
+            if not elements:
+                content = Text(&#34;Empty data set&#34;)
+            else:
+                # Add a small spacer instead of a Rule for cleaner look
+                content = Group(*elements)
+        elif isinstance(obs_data, list):
+            content = Text(&#34;\n&#34;.join(f&#34;• {item}&#34; for item in obs_data))
+        else:
+            content = Text(str(obs_data))
+            
+        title = f&#34;[bold]{fn}[/bold]&#34;
+        self.console.print(Panel(content, title=title, border_style=&#34;ai_status&#34;))
 
     def manage_memory_tool(self, content, action=&#34;append&#34;):
         &#34;&#34;&#34;Save or update long-term memory. Only use when user explicitly requests it.&#34;&#34;&#34;
@@ -1398,8 +1438,8 @@ class ai:
                         ts = data.get(&#34;tags&#34;)
                         if isinstance(ts, dict): os_tag = ts.get(&#34;os&#34;, &#34;unknown&#34;)
                     res[name] = {&#34;os&#34;: os_tag}
-                return json.dumps(res)
-            return json.dumps({&#34;count&#34;: len(matched_names), &#34;nodes&#34;: matched_names, &#34;note&#34;: &#34;Use &#39;get_node_info&#39; for details.&#34;})
+                return res
+            return {&#34;count&#34;: len(matched_names), &#34;nodes&#34;: matched_names, &#34;note&#34;: &#34;Use &#39;get_node_info&#39; for details.&#34;}
         except Exception as e: 
             return f&#34;Error listing nodes: {str(e)}&#34;
 
@@ -1473,7 +1513,7 @@ class ai:
             if not matched_names: return &#34;No nodes found matching filter.&#34;
             thisnodes_dict = self.config.getitems(matched_names, extract=True)
             result = nodes(thisnodes_dict, config=self.config).run(commands)
-            return self._truncate(json.dumps(result))
+            return result
         except Exception as e: 
             return f&#34;Error executing commands: {str(e)}&#34;
 
@@ -1482,7 +1522,7 @@ class ai:
         try:
             d = self.config.getitem(node_name, extract=True)
             if &#39;password&#39; in d: d[&#39;password&#39;] = &#39;***&#39;
-            return json.dumps(d)
+            return d
         except Exception as e: 
             return f&#34;Error getting node info: {str(e)}&#34;
 
@@ -1526,7 +1566,7 @@ class ai:
                     self.console.print(f&#34;[warning]  You can press Ctrl+C to interrupt and get a summary.[/warning]&#34;)
                     soft_limit_warned = True
                 
-                if status: status.update(f&#34;[ai_status]Engineer: Analyzing mission... (step {iteration})&#34;)
+                if status and not chat_history: status.update(f&#34;[ai_status]Engineer: Analyzing mission... (step {iteration})&#34;)
                 
                 try:
                     safe_messages = self._sanitize_messages(messages)
@@ -1549,8 +1589,8 @@ class ai:
                 for tc in resp_msg.tool_calls:
                     fn, args = tc.function.name, json.loads(tc.function.arguments)
                     
-                    # Notificación en tiempo real de la tarea técnica
-                    if status:
+                    # Notificación en tiempo real de la tarea técnica (Only if not in Architect loop)
+                    if status and not chat_history:
                         if fn == &#34;list_nodes&#34;: status.update(f&#34;[ai_status]Engineer: [SEARCH] {args.get(&#39;filter_pattern&#39;,&#39;.*&#39;)}&#34;)
                         elif fn == &#34;run_commands&#34;: 
                             cmds = args.get(&#39;commands&#39;, [])
@@ -1559,7 +1599,8 @@ class ai:
                         elif fn == &#34;get_node_info&#34;: status.update(f&#34;[ai_status]Engineer: [INSPECT] {args.get(&#39;node_name&#39;,&#39;&#39;)}&#34;)
                         elif fn in self.tool_status_formatters: status.update(self.tool_status_formatters[fn](args))
 
-                    if debug: self.console.print(Panel(Text(json.dumps(args, indent=2)), title=f&#34;[bold engineer]Engineer Tool: {fn}[/bold engineer]&#34;, border_style=&#34;engineer&#34;))
+                    if debug:
+                        self._print_debug_observation(f&#34;Decision: {fn}&#34;, args)
                     
                     if fn == &#34;list_nodes&#34;: obs = self.list_nodes_tool(**args)
                     elif fn == &#34;run_commands&#34;: obs = self.run_commands_tool(**args, status=status)
@@ -1567,8 +1608,12 @@ class ai:
                     elif fn in self.external_tool_handlers: obs = self.external_tool_handlers[fn](self, **args)
                     else: obs = f&#34;Error: Unknown tool &#39;{fn}&#39;.&#34;
                     
-                    if debug: self.console.print(Panel(Text(str(obs)), title=f&#34;[bold pass]Engineer Observation: {fn}[/bold pass]&#34;, border_style=&#34;success&#34;))
-                    messages.append({&#34;tool_call_id&#34;: tc.id, &#34;role&#34;: &#34;tool&#34;, &#34;name&#34;: fn, &#34;content&#34;: obs})
+                    if debug:
+                        self._print_debug_observation(f&#34;Observation: {fn}&#34;, obs)
+                    
+                    # Ensure observation is a string and truncated for the LLM
+                    obs_str = obs if isinstance(obs, str) else json.dumps(obs)
+                    messages.append({&#34;tool_call_id&#34;: tc.id, &#34;role&#34;: &#34;tool&#34;, &#34;name&#34;: fn, &#34;content&#34;: self._truncate(obs_str)})
             
             if iteration &gt;= self.hard_limit_iterations:
                 self.console.print(f&#34;[error]⛔ Engineer reached hard limit ({self.hard_limit_iterations} steps). Forcing stop.[/error]&#34;)
@@ -1582,30 +1627,46 @@ class ai:
 
     def _get_engineer_tools(self):
         &#34;&#34;&#34;Define tools available to the Engineer.&#34;&#34;&#34;
-        tools = [
+        base_tools = [
             {&#34;type&#34;: &#34;function&#34;, &#34;function&#34;: {&#34;name&#34;: &#34;list_nodes&#34;, &#34;description&#34;: &#34;Lists available nodes in the inventory.&#34;, &#34;parameters&#34;: {&#34;type&#34;: &#34;object&#34;, &#34;properties&#34;: {&#34;filter_pattern&#34;: {&#34;type&#34;: &#34;string&#34;, &#34;description&#34;: &#34;Regex to filter nodes (e.g. &#39;.*&#39;, &#39;border.*&#39;).&#34;}}}}},
             {&#34;type&#34;: &#34;function&#34;, &#34;function&#34;: {&#34;name&#34;: &#34;run_commands&#34;, &#34;description&#34;: &#34;Runs one or more commands on matched nodes. MANDATORY: You MUST call &#39;list_nodes&#39; first to verify the target list.&#34;, &#34;parameters&#34;: {&#34;type&#34;: &#34;object&#34;, &#34;properties&#34;: {&#34;nodes_filter&#34;: {&#34;type&#34;: &#34;string&#34;, &#34;description&#34;: &#34;Exact node name or verified filter pattern.&#34;}, &#34;commands&#34;: {&#34;type&#34;: &#34;array&#34;, &#34;items&#34;: {&#34;type&#34;: &#34;string&#34;}, &#34;description&#34;: &#34;List of commands (e.g. [&#39;show ip route&#39;, &#39;show int desc&#39;]).&#34;}}, &#34;required&#34;: [&#34;nodes_filter&#34;, &#34;commands&#34;]}}},
             {&#34;type&#34;: &#34;function&#34;, &#34;function&#34;: {&#34;name&#34;: &#34;get_node_info&#34;, &#34;description&#34;: &#34;Gets full metadata for a specific node.&#34;, &#34;parameters&#34;: {&#34;type&#34;: &#34;object&#34;, &#34;properties&#34;: {&#34;node_name&#34;: {&#34;type&#34;: &#34;string&#34;}}, &#34;required&#34;: [&#34;node_name&#34;]}}}
         ]
         
         if self.architect_key:
-            tools.extend([
+            base_tools.extend([
                 {&#34;type&#34;: &#34;function&#34;, &#34;function&#34;: {&#34;name&#34;: &#34;consult_architect&#34;, &#34;description&#34;: &#34;Ask the Strategic Reasoning Engine for advice on complex design, architecture, or troubleshooting decisions. You remain in control and will present the response to the user. Use this for: configuration planning, design validation, complex troubleshooting.&#34;, &#34;parameters&#34;: {&#34;type&#34;: &#34;object&#34;, &#34;properties&#34;: {&#34;question&#34;: {&#34;type&#34;: &#34;string&#34;, &#34;description&#34;: &#34;Strategic question or decision needed.&#34;}, &#34;technical_summary&#34;: {&#34;type&#34;: &#34;string&#34;, &#34;description&#34;: &#34;Technical findings and context gathered so far.&#34;}}, &#34;required&#34;: [&#34;question&#34;, &#34;technical_summary&#34;]}}},
                 {&#34;type&#34;: &#34;function&#34;, &#34;function&#34;: {&#34;name&#34;: &#34;escalate_to_architect&#34;, &#34;description&#34;: &#34;Transfer full control to the Strategic Reasoning Engine. Use ONLY when the user explicitly requests the Architect or when the problem requires strategic oversight beyond consultation. After escalation, the Architect takes over the conversation.&#34;, &#34;parameters&#34;: {&#34;type&#34;: &#34;object&#34;, &#34;properties&#34;: {&#34;reason&#34;: {&#34;type&#34;: &#34;string&#34;, &#34;description&#34;: &#34;Why you&#39;re escalating (e.g. &#39;User requested Architect&#39;, &#39;Complex multi-site design needed&#39;).&#34;}, &#34;context&#34;: {&#34;type&#34;: &#34;string&#34;, &#34;description&#34;: &#34;Full context and findings to hand over.&#34;}}, &#34;required&#34;: [&#34;reason&#34;, &#34;context&#34;]}}}
             ])
             
-        tools.extend(self.external_engineer_tools)
-        return tools
+        # Deduplicate by name to prevent Gemini BadRequestError
+        all_tools = base_tools + self.external_engineer_tools
+        seen_names = set()
+        unique_tools = []
+        for t in all_tools:
+            name = t[&#34;function&#34;][&#34;name&#34;]
+            if name not in seen_names:
+                unique_tools.append(t)
+                seen_names.add(name)
+        return unique_tools
 
     def _get_architect_tools(self):
         &#34;&#34;&#34;Define tools available to the Strategic Reasoning Engine.&#34;&#34;&#34;
-        tools = [
+        base_tools = [
             {&#34;type&#34;: &#34;function&#34;, &#34;function&#34;: {&#34;name&#34;: &#34;delegate_to_engineer&#34;, &#34;description&#34;: &#34;Delegates a technical mission to the Engineer.&#34;, &#34;parameters&#34;: {&#34;type&#34;: &#34;object&#34;, &#34;properties&#34;: {&#34;task&#34;: {&#34;type&#34;: &#34;string&#34;, &#34;description&#34;: &#34;Detailed technical mission or goal.&#34;}}, &#34;required&#34;: [&#34;task&#34;]}}},
             {&#34;type&#34;: &#34;function&#34;, &#34;function&#34;: {&#34;name&#34;: &#34;return_to_engineer&#34;, &#34;description&#34;: &#34;Return control to the Engineer. Use this when your strategic analysis is complete and the Engineer should handle the rest of the conversation.&#34;, &#34;parameters&#34;: {&#34;type&#34;: &#34;object&#34;, &#34;properties&#34;: {&#34;summary&#34;: {&#34;type&#34;: &#34;string&#34;, &#34;description&#34;: &#34;Brief summary of your analysis to hand over to the Engineer.&#34;}}, &#34;required&#34;: [&#34;summary&#34;]}}},
             {&#34;type&#34;: &#34;function&#34;, &#34;function&#34;: {&#34;name&#34;: &#34;manage_memory_tool&#34;, &#34;description&#34;: &#34;Saves information to long-term memory. MANDATORY: Only use this if the user explicitly asks to remember or save something.&#34;, &#34;parameters&#34;: {&#34;type&#34;: &#34;object&#34;, &#34;properties&#34;: {&#34;content&#34;: {&#34;type&#34;: &#34;string&#34;}, &#34;action&#34;: {&#34;type&#34;: &#34;string&#34;, &#34;enum&#34;: [&#34;append&#34;, &#34;replace&#34;]}}, &#34;required&#34;: [&#34;content&#34;]}}}
         ]
-        tools.extend(self.external_architect_tools)
-        return tools
+        
+        all_tools = base_tools + self.external_architect_tools
+        seen_names = set()
+        unique_tools = []
+        for t in all_tools:
+            name = t[&#34;function&#34;][&#34;name&#34;]
+            if name not in seen_names:
+                unique_tools.append(t)
+                seen_names.add(name)
+        return unique_tools
 
     def _get_sessions(self):
         &#34;&#34;&#34;Returns a list of session metadata sorted by date.&#34;&#34;&#34;
@@ -1809,12 +1870,16 @@ class ai:
                     soft_limit_warned = True
                 
                 label = &#34;[architect][bold]Architect[/bold][/architect]&#34; if current_brain == &#34;architect&#34; else &#34;[engineer][bold]Engineer[/bold][/engineer]&#34;
-                if status: status.update(f&#34;{label} is thinking... (step {iteration})&#34;)
+                if status: 
+                    # Notify responder identity ONLY for web/remote clients (StatusBridge has is_web)
+                    if getattr(status, &#34;is_web&#34;, False):
+                        status.update(f&#34;__RESPONDER__:{current_brain}&#34;)
+                    status.update(f&#34;{label} is thinking... (step {iteration})&#34;)
                 
                 streamed_response = False
                 try:
                     safe_messages = self._sanitize_messages(messages)
-                    if stream and not debug:
+                    if stream and (not debug or chunk_callback):
                         response, streamed_response = self._stream_completion(
                             model=model, messages=safe_messages, tools=tools, api_key=key,
                             status=status, label=label, debug=debug, num_retries=3,
@@ -1854,7 +1919,10 @@ class ai:
                 messages.append(msg_dict)
 
                 if debug and resp_msg.content:
-                    self.console.print(Panel(Markdown(resp_msg.content), title=f&#34;{label} Reasoning&#34;, border_style=&#34;architect&#34; if current_brain == &#34;architect&#34; else &#34;engineer&#34;))
+                    # In CLI debug mode, only print intermediate reasoning if there are tool calls.
+                    # If there are no tool calls, this content is the final answer and will be printed by the caller.
+                    if resp_msg.tool_calls:
+                        self.console.print(Panel(Markdown(resp_msg.content), title=f&#34;[{current_brain}][bold]{label} Reasoning[/bold][/{current_brain}]&#34;, border_style=&#34;architect&#34; if current_brain == &#34;architect&#34; else &#34;engineer&#34;))
 
                 if not resp_msg.tool_calls: break
                 
@@ -1874,7 +1942,8 @@ class ai:
                         if fn == &#34;delegate_to_engineer&#34;: status.update(f&#34;[architect]Architect: [DELEGATING MISSION] {args.get(&#39;task&#39;,&#39;&#39;)[:40]}...&#34;)
                         elif fn == &#34;manage_memory_tool&#34;: status.update(f&#34;[architect]Architect: [UPDATING MEMORY]&#34;)
 
-                    if debug: self.console.print(Panel(Text(json.dumps(args, indent=2)), title=f&#34;{label} Decision: {fn}&#34;, border_style=&#34;debug&#34;))
+                    if debug:
+                        self._print_debug_observation(f&#34;Decision: {fn}&#34;, args)
 
                     if fn == &#34;delegate_to_engineer&#34;:
                         obs, eng_usage = self._engineer_loop(args[&#34;task&#34;], status=status, debug=debug, chat_history=messages[:-1])
@@ -1932,9 +2001,13 @@ class ai:
                     elif fn == &#34;manage_memory_tool&#34;: obs = self.manage_memory_tool(**args)
                     elif fn in self.external_tool_handlers: obs = self.external_tool_handlers[fn](self, **args)
                     else: obs = f&#34;Error: {fn} unknown.&#34;
-                    
-                    messages.append({&#34;tool_call_id&#34;: tc.id, &#34;role&#34;: &#34;tool&#34;, &#34;name&#34;: fn, &#34;content&#34;: obs})
-                
+
+                    if debug and fn not in [&#34;delegate_to_engineer&#34;, &#34;consult_architect&#34;, &#34;escalate_to_architect&#34;, &#34;return_to_engineer&#34;]:
+                        self._print_debug_observation(f&#34;Observation: {fn}&#34;, obs)
+
+                    # Ensure observation is a string and truncated for the LLM
+                    obs_str = obs if isinstance(obs, str) else json.dumps(obs)
+                    messages.append({&#34;tool_call_id&#34;: tc.id, &#34;role&#34;: &#34;tool&#34;, &#34;name&#34;: fn, &#34;content&#34;: self._truncate(obs_str)})                
                 # Inject pending user message AFTER all tool responses are added
                 if pending_user_message:
                     messages.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: pending_user_message})
@@ -1960,14 +2033,25 @@ class ai:
             if last_msg.get(&#34;tool_calls&#34;):
                 for tc in last_msg[&#34;tool_calls&#34;]:
                     messages.append({&#34;tool_call_id&#34;: tc.get(&#34;id&#34;), &#34;role&#34;: &#34;tool&#34;, &#34;name&#34;: tc.get(&#34;function&#34;, {}).get(&#34;name&#34;), &#34;content&#34;: &#34;Operation cancelled by user.&#34;})
-            messages.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;USER INTERRUPTED. Briefly summarize what you were doing and stop.&#34;})
+            
+            # Use a fresh list for the summary call to avoid history corruption
+            summary_messages = list(messages)
+            summary_messages.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;USER INTERRUPTED. Briefly summarize what you were doing and stop.&#34;})
             try:
-                safe_messages = self._sanitize_messages(messages)
+                safe_messages = self._sanitize_messages(summary_messages)
                 # Use tools=None to force a text summary during interruption
                 response = completion(model=model, messages=safe_messages, tools=None, api_key=key)
                 resp_msg = response.choices[0].message
                 messages.append(resp_msg.model_dump(exclude_none=True))
-            except Exception: pass
+                
+                # IMPORTANT: Manually trigger callback for the summary so Web UI sees it
+                if chunk_callback and resp_msg.content:
+                    chunk_callback(resp_msg.content)
+            except Exception:
+                error_msg = &#34;Operation interrupted by user. Summary unavailable.&#34;
+                messages.append({&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: error_msg})
+                if chunk_callback:
+                    chunk_callback(error_msg)
         finally:
             # Auto-save session
             self.save_session(messages, model=model)
@@ -1989,7 +2073,7 @@ class ai:
 <dl>
 <dt id="connpy.ai.SAFE_COMMANDS"><code class="name">var <span class="ident">SAFE_COMMANDS</span></code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>The type of the None singleton.</p></div>
 </dd>
 </dl>
 <h3>Instance variables</h3>
@@ -2132,12 +2216,16 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
                 soft_limit_warned = True
             
             label = &#34;[architect][bold]Architect[/bold][/architect]&#34; if current_brain == &#34;architect&#34; else &#34;[engineer][bold]Engineer[/bold][/engineer]&#34;
-            if status: status.update(f&#34;{label} is thinking... (step {iteration})&#34;)
+            if status: 
+                # Notify responder identity ONLY for web/remote clients (StatusBridge has is_web)
+                if getattr(status, &#34;is_web&#34;, False):
+                    status.update(f&#34;__RESPONDER__:{current_brain}&#34;)
+                status.update(f&#34;{label} is thinking... (step {iteration})&#34;)
             
             streamed_response = False
             try:
                 safe_messages = self._sanitize_messages(messages)
-                if stream and not debug:
+                if stream and (not debug or chunk_callback):
                     response, streamed_response = self._stream_completion(
                         model=model, messages=safe_messages, tools=tools, api_key=key,
                         status=status, label=label, debug=debug, num_retries=3,
@@ -2177,7 +2265,10 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
             messages.append(msg_dict)
 
             if debug and resp_msg.content:
-                self.console.print(Panel(Markdown(resp_msg.content), title=f&#34;{label} Reasoning&#34;, border_style=&#34;architect&#34; if current_brain == &#34;architect&#34; else &#34;engineer&#34;))
+                # In CLI debug mode, only print intermediate reasoning if there are tool calls.
+                # If there are no tool calls, this content is the final answer and will be printed by the caller.
+                if resp_msg.tool_calls:
+                    self.console.print(Panel(Markdown(resp_msg.content), title=f&#34;[{current_brain}][bold]{label} Reasoning[/bold][/{current_brain}]&#34;, border_style=&#34;architect&#34; if current_brain == &#34;architect&#34; else &#34;engineer&#34;))
 
             if not resp_msg.tool_calls: break
             
@@ -2197,7 +2288,8 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
                     if fn == &#34;delegate_to_engineer&#34;: status.update(f&#34;[architect]Architect: [DELEGATING MISSION] {args.get(&#39;task&#39;,&#39;&#39;)[:40]}...&#34;)
                     elif fn == &#34;manage_memory_tool&#34;: status.update(f&#34;[architect]Architect: [UPDATING MEMORY]&#34;)
 
-                if debug: self.console.print(Panel(Text(json.dumps(args, indent=2)), title=f&#34;{label} Decision: {fn}&#34;, border_style=&#34;debug&#34;))
+                if debug:
+                    self._print_debug_observation(f&#34;Decision: {fn}&#34;, args)
 
                 if fn == &#34;delegate_to_engineer&#34;:
                     obs, eng_usage = self._engineer_loop(args[&#34;task&#34;], status=status, debug=debug, chat_history=messages[:-1])
@@ -2255,9 +2347,13 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
                 elif fn == &#34;manage_memory_tool&#34;: obs = self.manage_memory_tool(**args)
                 elif fn in self.external_tool_handlers: obs = self.external_tool_handlers[fn](self, **args)
                 else: obs = f&#34;Error: {fn} unknown.&#34;
-                
-                messages.append({&#34;tool_call_id&#34;: tc.id, &#34;role&#34;: &#34;tool&#34;, &#34;name&#34;: fn, &#34;content&#34;: obs})
-            
+
+                if debug and fn not in [&#34;delegate_to_engineer&#34;, &#34;consult_architect&#34;, &#34;escalate_to_architect&#34;, &#34;return_to_engineer&#34;]:
+                    self._print_debug_observation(f&#34;Observation: {fn}&#34;, obs)
+
+                # Ensure observation is a string and truncated for the LLM
+                obs_str = obs if isinstance(obs, str) else json.dumps(obs)
+                messages.append({&#34;tool_call_id&#34;: tc.id, &#34;role&#34;: &#34;tool&#34;, &#34;name&#34;: fn, &#34;content&#34;: self._truncate(obs_str)})                
             # Inject pending user message AFTER all tool responses are added
             if pending_user_message:
                 messages.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: pending_user_message})
@@ -2283,14 +2379,25 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
         if last_msg.get(&#34;tool_calls&#34;):
             for tc in last_msg[&#34;tool_calls&#34;]:
                 messages.append({&#34;tool_call_id&#34;: tc.get(&#34;id&#34;), &#34;role&#34;: &#34;tool&#34;, &#34;name&#34;: tc.get(&#34;function&#34;, {}).get(&#34;name&#34;), &#34;content&#34;: &#34;Operation cancelled by user.&#34;})
-        messages.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;USER INTERRUPTED. Briefly summarize what you were doing and stop.&#34;})
+        
+        # Use a fresh list for the summary call to avoid history corruption
+        summary_messages = list(messages)
+        summary_messages.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;USER INTERRUPTED. Briefly summarize what you were doing and stop.&#34;})
         try:
-            safe_messages = self._sanitize_messages(messages)
+            safe_messages = self._sanitize_messages(summary_messages)
             # Use tools=None to force a text summary during interruption
             response = completion(model=model, messages=safe_messages, tools=None, api_key=key)
             resp_msg = response.choices[0].message
             messages.append(resp_msg.model_dump(exclude_none=True))
-        except Exception: pass
+            
+            # IMPORTANT: Manually trigger callback for the summary so Web UI sees it
+            if chunk_callback and resp_msg.content:
+                chunk_callback(resp_msg.content)
+        except Exception:
+            error_msg = &#34;Operation interrupted by user. Summary unavailable.&#34;
+            messages.append({&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: error_msg})
+            if chunk_callback:
+                chunk_callback(error_msg)
     finally:
         # Auto-save session
         self.save_session(messages, model=model)
@@ -2366,7 +2473,7 @@ def confirm(self, user_input): return True</code></pre>
     try:
         d = self.config.getitem(node_name, extract=True)
         if &#39;password&#39; in d: d[&#39;password&#39;] = &#39;***&#39;
-        return json.dumps(d)
+        return d
     except Exception as e: 
         return f&#34;Error getting node info: {str(e)}&#34;</code></pre>
 </details>
@@ -2394,8 +2501,8 @@ def confirm(self, user_input): return True</code></pre>
                     ts = data.get(&#34;tags&#34;)
                     if isinstance(ts, dict): os_tag = ts.get(&#34;os&#34;, &#34;unknown&#34;)
                 res[name] = {&#34;os&#34;: os_tag}
-            return json.dumps(res)
-        return json.dumps({&#34;count&#34;: len(matched_names), &#34;nodes&#34;: matched_names, &#34;note&#34;: &#34;Use &#39;get_node_info&#39; for details.&#34;})
+            return res
+        return {&#34;count&#34;: len(matched_names), &#34;nodes&#34;: matched_names, &#34;note&#34;: &#34;Use &#39;get_node_info&#39; for details.&#34;}
     except Exception as e: 
         return f&#34;Error listing nodes: {str(e)}&#34;</code></pre>
 </details>
@@ -2498,14 +2605,20 @@ def confirm(self, user_input): return True</code></pre>
         status_formatter (callable): Function(args_dict) -&gt; status string.
     &#34;&#34;&#34;
     name = tool_definition[&#34;function&#34;][&#34;name&#34;]
+    
+    # Check if already registered to prevent duplicates
     if target in (&#34;engineer&#34;, &#34;both&#34;):
-        self.external_engineer_tools.append(tool_definition)
+        if not any(t[&#34;function&#34;][&#34;name&#34;] == name for t in self.external_engineer_tools):
+            self.external_engineer_tools.append(tool_definition)
     if target in (&#34;architect&#34;, &#34;both&#34;):
-        self.external_architect_tools.append(tool_definition)
+        if not any(t[&#34;function&#34;][&#34;name&#34;] == name for t in self.external_architect_tools):
+            self.external_architect_tools.append(tool_definition)
+    
     self.external_tool_handlers[name] = handler
-    if engineer_prompt:
+    
+    if engineer_prompt and engineer_prompt not in self.engineer_prompt_extensions:
         self.engineer_prompt_extensions.append(engineer_prompt)
-    if architect_prompt:
+    if architect_prompt and architect_prompt not in self.architect_prompt_extensions:
         self.architect_prompt_extensions.append(architect_prompt)
     if status_formatter:
         self.tool_status_formatters[name] = status_formatter</code></pre>
@@ -2601,7 +2714,7 @@ def confirm(self, user_input): return True</code></pre>
         if not matched_names: return &#34;No nodes found matching filter.&#34;
         thisnodes_dict = self.config.getitems(matched_names, extract=True)
         result = nodes(thisnodes_dict, config=self.config).run(commands)
-        return self._truncate(json.dumps(result))
+        return result
     except Exception as e: 
         return f&#34;Error executing commands: {str(e)}&#34;</code></pre>
 </details>
@@ -3761,7 +3874,8 @@ class node:
             size = re.search(&#39;columns=([0-9]+).*lines=([0-9]+)&#39;,str(os.get_terminal_size()))
             self.child.setwinsize(int(size.group(2)),int(size.group(1)))
             if logger:
-                logger(&#34;success&#34;, &#34;Connected to &#34; + self.unique + &#34; at &#34; + self.host + (&#34;:&#34; if self.port != &#39;&#39; else &#39;&#39;) + self.port + &#34; via: &#34; + self.protocol)
+                port_str = f&#34;:{self.port}&#34; if self.port and self.protocol not in [&#34;ssm&#34;, &#34;kubectl&#34;, &#34;docker&#34;] else &#34;&#34;
+                logger(&#34;success&#34;, f&#34;Connected to {self.unique} at {self.host}{port_str} via: {self.protocol}&#34;)
 
             if &#39;logfile&#39; in dir(self):
                 # Initialize self.mylog
@@ -3840,7 +3954,8 @@ class node:
         now = datetime.datetime.now().strftime(&#39;%Y-%m-%d_%H%M%S&#39;)
         if connect == True:
             if logger:
-                logger(&#34;success&#34;, &#34;Connected to &#34; + self.unique + &#34; at &#34; + self.host + (&#34;:&#34; if self.port != &#39;&#39; else &#39;&#39;) + self.port + &#34; via: &#34; + self.protocol)
+                port_str = f&#34;:{self.port}&#34; if self.port and self.protocol not in [&#34;ssm&#34;, &#34;kubectl&#34;, &#34;docker&#34;] else &#34;&#34;
+                logger(&#34;success&#34;, f&#34;Connected to {self.unique} at {self.host}{port_str} via: {self.protocol}&#34;)
 
             # Attempt to set the terminal size
             try:
@@ -3941,7 +4056,8 @@ class node:
         connect = self._connect(timeout = timeout, logger = logger)
         if connect == True:
             if logger:
-                logger(&#34;success&#34;, &#34;Connected to &#34; + self.unique + &#34; at &#34; + self.host + (&#34;:&#34; if self.port != &#39;&#39; else &#39;&#39;) + self.port + &#34; via: &#34; + self.protocol)
+                port_str = f&#34;:{self.port}&#34; if self.port and self.protocol not in [&#34;ssm&#34;, &#34;kubectl&#34;, &#34;docker&#34;] else &#34;&#34;
+                logger(&#34;success&#34;, f&#34;Connected to {self.unique} at {self.host}{port_str} via: {self.protocol}&#34;)
 
             # Attempt to set the terminal size
             try:
@@ -4047,6 +4163,19 @@ class node:
         return cmd
 
     @MethodHook
+    def _generate_ssm_cmd(self):
+        region = self.tags.get(&#34;region&#34;, &#34;&#34;) if isinstance(self.tags, dict) else &#34;&#34;
+        profile = self.tags.get(&#34;profile&#34;, &#34;&#34;) if isinstance(self.tags, dict) else &#34;&#34;
+        cmd = f&#34;aws ssm start-session --target {self.host}&#34;
+        if region:
+            cmd += f&#34; --region {region}&#34;
+        if profile:
+            cmd += f&#34; --profile {profile}&#34;
+        if self.options:
+            cmd += f&#34; {self.options}&#34;
+        return cmd
+
+    @MethodHook
     def _get_cmd(self):
         if self.protocol in [&#34;ssh&#34;, &#34;sftp&#34;]:
             return self._generate_ssh_sftp_cmd()
@@ -4056,6 +4185,8 @@ class node:
             return self._generate_kube_cmd()
         elif self.protocol == &#34;docker&#34;:
             return self._generate_docker_cmd()
+        elif self.protocol == &#34;ssm&#34;:
+            return self._generate_ssm_cmd()
         else:
             printer.error(f&#34;Invalid protocol: {self.protocol}&#34;)
             sys.exit(1)
@@ -4076,7 +4207,8 @@ class node:
             &#34;sftp&#34;: [&#39;yes/no&#39;, &#39;refused&#39;, &#39;supported&#39;, &#39;Invalid|[u|U]sage: sftp&#39;, &#39;ssh-keygen.*\&#34;&#39;, &#39;timeout|timed.out&#39;, &#39;unavailable&#39;, &#39;closed&#39;, password_prompt, prompt, &#39;suspend&#39;, pexpect.EOF, pexpect.TIMEOUT, &#34;No route to host&#34;, &#34;resolve hostname&#34;, &#34;no matching&#34;, &#34;[b|B]ad (owner|permissions)&#34;],
             &#34;telnet&#34;: [&#39;[u|U]sername:&#39;, &#39;refused&#39;, &#39;supported&#39;, &#39;invalid|unrecognized option&#39;, &#39;ssh-keygen.*\&#34;&#39;, &#39;timeout|timed.out&#39;, &#39;unavailable&#39;, &#39;closed&#39;, password_prompt, prompt, &#39;suspend&#39;, pexpect.EOF, pexpect.TIMEOUT, &#34;No route to host&#34;, &#34;resolve hostname&#34;, &#34;no matching&#34;, &#34;[b|B]ad (owner|permissions)&#34;],
             &#34;kubectl&#34;: [&#39;[u|U]sername:&#39;, &#39;[r|R]efused&#39;, &#39;[E|e]rror&#39;, &#39;DEPRECATED&#39;, pexpect.TIMEOUT, password_prompt, prompt, pexpect.EOF, &#34;expired|invalid&#34;],
-            &#34;docker&#34;: [&#39;[u|U]sername:&#39;, &#39;Cannot&#39;, &#39;[E|e]rror&#39;, &#39;failed&#39;, &#39;not a docker command&#39;, &#39;unknown&#39;, &#39;unable to resolve&#39;, pexpect.TIMEOUT, password_prompt, prompt, pexpect.EOF]
+            &#34;docker&#34;: [&#39;[u|U]sername:&#39;, &#39;Cannot&#39;, &#39;[E|e]rror&#39;, &#39;failed&#39;, &#39;not a docker command&#39;, &#39;unknown&#39;, &#39;unable to resolve&#39;, pexpect.TIMEOUT, password_prompt, prompt, pexpect.EOF],
+            &#34;ssm&#34;: [&#39;[u|U]sername:&#39;, &#39;Cannot&#39;, &#39;[E|e]rror&#39;, &#39;failed&#39;, &#39;SessionManagerPlugin&#39;, &#39;unknown&#39;, &#39;unable to resolve&#39;, pexpect.TIMEOUT, password_prompt, prompt, pexpect.EOF]
         }
 
         error_indices = {
@@ -4084,7 +4216,8 @@ class node:
             &#34;sftp&#34;: [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15, 16],
             &#34;telnet&#34;: [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15, 16],
             &#34;kubectl&#34;: [1, 2, 3, 4, 8],  # Define error indices for kube
-            &#34;docker&#34;: [1, 2, 3, 4, 5, 6, 7]  # Define error indices for docker
+            &#34;docker&#34;: [1, 2, 3, 4, 5, 6, 7],  # Define error indices for docker
+            &#34;ssm&#34;: [1, 2, 3, 4, 5, 6, 7]
         }
 
         eof_indices = {
@@ -4092,7 +4225,8 @@ class node:
             &#34;sftp&#34;: [8, 9, 10, 11],
             &#34;telnet&#34;: [8, 9, 10, 11],
             &#34;kubectl&#34;: [5, 6, 7],  # Define eof indices for kube
-            &#34;docker&#34;: [8, 9, 10]  # Define eof indices for docker
+            &#34;docker&#34;: [8, 9, 10],  # Define eof indices for docker
+            &#34;ssm&#34;: [8, 9, 10]
         }
 
         initial_indices = {
@@ -4100,7 +4234,8 @@ class node:
             &#34;sftp&#34;: [0],
             &#34;telnet&#34;: [0],
             &#34;kubectl&#34;: [0],  # Define special indices for kube
-            &#34;docker&#34;: [0]  # Define special indices for docker
+            &#34;docker&#34;: [0],  # Define special indices for docker
+            &#34;ssm&#34;: [0]
         }
 
         attempts = 1
@@ -4124,7 +4259,7 @@ class node:
                     if results in initial_indices[self.protocol]:
                         if self.protocol in [&#34;ssh&#34;, &#34;sftp&#34;]:
                             child.sendline(&#39;yes&#39;)
-                        elif self.protocol in [&#34;telnet&#34;, &#34;kubectl&#34;, &#34;docker&#34;]:
+                        elif self.protocol in [&#34;telnet&#34;, &#34;kubectl&#34;, &#34;docker&#34;, &#34;ssm&#34;]:
                             if self.user:
                                 child.sendline(self.user)
                             else:
@@ -4244,7 +4379,8 @@ def interact(self, debug = False, logger = None):
         size = re.search(&#39;columns=([0-9]+).*lines=([0-9]+)&#39;,str(os.get_terminal_size()))
         self.child.setwinsize(int(size.group(2)),int(size.group(1)))
         if logger:
-            logger(&#34;success&#34;, &#34;Connected to &#34; + self.unique + &#34; at &#34; + self.host + (&#34;:&#34; if self.port != &#39;&#39; else &#39;&#39;) + self.port + &#34; via: &#34; + self.protocol)
+            port_str = f&#34;:{self.port}&#34; if self.port and self.protocol not in [&#34;ssm&#34;, &#34;kubectl&#34;, &#34;docker&#34;] else &#34;&#34;
+            logger(&#34;success&#34;, f&#34;Connected to {self.unique} at {self.host}{port_str} via: {self.protocol}&#34;)
 
         if &#39;logfile&#39; in dir(self):
             # Initialize self.mylog
@@ -4337,7 +4473,8 @@ def run(self, commands, vars = None,*, folder = &#39;&#39;, prompt = r&#39;&gt;$
     now = datetime.datetime.now().strftime(&#39;%Y-%m-%d_%H%M%S&#39;)
     if connect == True:
         if logger:
-            logger(&#34;success&#34;, &#34;Connected to &#34; + self.unique + &#34; at &#34; + self.host + (&#34;:&#34; if self.port != &#39;&#39; else &#39;&#39;) + self.port + &#34; via: &#34; + self.protocol)
+            port_str = f&#34;:{self.port}&#34; if self.port and self.protocol not in [&#34;ssm&#34;, &#34;kubectl&#34;, &#34;docker&#34;] else &#34;&#34;
+            logger(&#34;success&#34;, f&#34;Connected to {self.unique} at {self.host}{port_str} via: {self.protocol}&#34;)
 
         # Attempt to set the terminal size
         try:
@@ -4479,7 +4616,8 @@ def test(self, commands, expected, vars = None,*, prompt = r&#39;&gt;$|#$|\$$|&g
     connect = self._connect(timeout = timeout, logger = logger)
     if connect == True:
         if logger:
-            logger(&#34;success&#34;, &#34;Connected to &#34; + self.unique + &#34; at &#34; + self.host + (&#34;:&#34; if self.port != &#39;&#39; else &#39;&#39;) + self.port + &#34; via: &#34; + self.protocol)
+            port_str = f&#34;:{self.port}&#34; if self.port and self.protocol not in [&#34;ssm&#34;, &#34;kubectl&#34;, &#34;docker&#34;] else &#34;&#34;
+            logger(&#34;success&#34;, f&#34;Connected to {self.unique} at {self.host}{port_str} via: {self.protocol}&#34;)
 
         # Attempt to set the terminal size
         try:
@@ -5268,7 +5406,7 @@ def test(self, commands, expected, vars = None,*, prompt = None, parallel = 10, 
 <li><h3><a href="#header-submodules">Sub-modules</a></h3>
 <ul>
 <li><code><a title="connpy.cli" href="cli/index.html">connpy.cli</a></code></li>
-<li><code><a title="connpy.grpc" href="grpc/index.html">connpy.grpc</a></code></li>
+<li><code><a title="connpy.grpc_layer" href="grpc_layer/index.html">connpy.grpc_layer</a></code></li>
 <li><code><a title="connpy.proto" href="proto/index.html">connpy.proto</a></code></li>
 <li><code><a title="connpy.services" href="services/index.html">connpy.services</a></code></li>
 <li><code><a title="connpy.tests" href="tests/index.html">connpy.tests</a></code></li>
@@ -5331,7 +5469,7 @@ def test(self, commands, expected, vars = None,*, prompt = None, parallel = 10, 
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
 </footer>
 </body>
 </html>

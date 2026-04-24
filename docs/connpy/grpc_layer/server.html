@@ -1,0 +1,1336 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<meta name="generator" content="pdoc3 0.11.6">
+<title>connpy.grpc_layer.server API documentation</title>
+<meta name="description" content="">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:1.5em;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:2em 0 .50em 0}h3{font-size:1.4em;margin:1.6em 0 .7em 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .2s ease-in-out}a:visited{color:#503}a:hover{color:#b62}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900;font-weight:bold}pre code{font-size:.8em;line-height:1.4em;padding:1em;display:block}code{background:#f3f3f3;font-family:"DejaVu Sans Mono",monospace;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source > summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible;min-width:max-content}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em 1em;margin:1em 0}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul ul{padding-left:1em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha512-D9gUyxqja7hBtkWpPWGt9wfbfaMGVt9gnyCvYa+jojwwPHLCzUm5i8rpk7vD7wNee9bA35eYIjobYPaQuKS1MQ==" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => {
+hljs.configure({languages: ['bash', 'css', 'diff', 'graphql', 'ini', 'javascript', 'json', 'plaintext', 'python', 'python-repl', 'rust', 'shell', 'sql', 'typescript', 'xml', 'yaml']});
+hljs.highlightAll();
+/* Collapse source docstrings */
+setTimeout(() => {
+[...document.querySelectorAll('.hljs.language-python > .hljs-string')]
+.filter(el => el.innerHTML.length > 200 && ['"""', "'''"].includes(el.innerHTML.substring(0, 3)))
+.forEach(el => {
+let d = document.createElement('details');
+d.classList.add('hljs-string');
+d.innerHTML = '<summary>"""</summary>' + el.innerHTML.substring(3);
+el.replaceWith(d);
+});
+}, 100);
+})</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>connpy.grpc_layer.server</code></h1>
+</header>
+<section id="section-intro">
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-functions">Functions</h2>
+<dl>
+<dt id="connpy.grpc_layer.server.handle_errors"><code class="name flex">
+<span>def <span class="ident">handle_errors</span></span>(<span>func)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def handle_errors(func):
+    import inspect
+    if inspect.isgeneratorfunction(func):
+        def wrapper(*args, **kwargs):
+            try:
+                for item in func(*args, **kwargs):
+                    yield item
+            except ConnpyError as e:
+                context = kwargs.get(&#34;context&#34;) or args[-1]
+                context.abort(grpc.StatusCode.INTERNAL, str(e))
+            except Exception as e:
+                context = kwargs.get(&#34;context&#34;) or args[-1]
+                context.abort(grpc.StatusCode.UNKNOWN, str(e))
+            finally:
+                printer.clear_thread_state()
+        return wrapper
+    else:
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except ConnpyError as e:
+                context = kwargs.get(&#34;context&#34;) or args[-1]
+                context.abort(grpc.StatusCode.INTERNAL, str(e))
+            except Exception as e:
+                context = kwargs.get(&#34;context&#34;) or args[-1]
+                context.abort(grpc.StatusCode.UNKNOWN, str(e))
+            finally:
+                printer.clear_thread_state()
+        return wrapper</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.server.serve"><code class="name flex">
+<span>def <span class="ident">serve</span></span>(<span>config, port=8048, debug=False)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def serve(config, port=8048, debug=False):
+    interceptors = [LoggingInterceptor()] if debug else []
+    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10), interceptors=interceptors)
+    
+    connpy_pb2_grpc.add_NodeServiceServicer_to_server(NodeServicer(config), server)
+    connpy_pb2_grpc.add_ProfileServiceServicer_to_server(ProfileServicer(config), server)
+    connpy_pb2_grpc.add_ConfigServiceServicer_to_server(ConfigServicer(config), server)
+    plugin_servicer = PluginServicer(config)
+    connpy_pb2_grpc.add_PluginServiceServicer_to_server(plugin_servicer, server)
+    remote_plugin_pb2_grpc.add_RemotePluginServiceServicer_to_server(plugin_servicer, server)
+    connpy_pb2_grpc.add_ExecutionServiceServicer_to_server(ExecutionServicer(config), server)
+    connpy_pb2_grpc.add_ImportExportServiceServicer_to_server(ImportExportServicer(config), server)
+    connpy_pb2_grpc.add_AIServiceServicer_to_server(AIServicer(config), server)
+    connpy_pb2_grpc.add_SystemServiceServicer_to_server(SystemServicer(config), server)
+    
+    server.add_insecure_port(f&#39;[::]:{port}&#39;)
+    server.start()
+    return server</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="connpy.grpc_layer.server.AIServicer"><code class="flex name class">
+<span>class <span class="ident">AIServicer</span></span>
+<span>(</span><span>config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class AIServicer(connpy_pb2_grpc.AIServiceServicer):
+    def __init__(self, config):
+        self.service = AIService(config)
+
+    @handle_errors
+    def ask(self, request_iterator, context):
+        import queue
+        import threading
+
+        chunk_queue = queue.Queue()
+        request_queue = queue.Queue()
+        bridge = None
+        history = []
+        is_web = False
+        
+        # Dedicated event to signal AI thread to stop
+        ai_thread = None
+        agent_instance = None
+
+        def callback(chunk):
+            chunk_queue.put((&#34;text&#34;, chunk))
+
+        def run_ai_task(input_text, session_id, debug, overrides, trust):
+            nonlocal history, bridge, agent_instance
+            try:
+                # Run the AI interaction (this blocks this specific thread)
+                res = self.service.ask(
+                    input_text,
+                    chat_history=history if history else None,
+                    session_id=session_id,
+                    debug=debug,
+                    status=bridge,
+                    console=bridge,
+                    confirm_handler=bridge.confirm,
+                    chunk_callback=callback,
+                    trust=trust,
+                    **overrides
+                )
+
+                # Update history for next message
+                if &#34;chat_history&#34; in res:
+                    history = res[&#34;chat_history&#34;]
+
+                # Send final chunk marker
+                chunk_queue.put((&#34;final_mark&#34;, res))
+            except Exception as e:
+                import traceback
+                print(f&#34;AI Task Error: {e}&#34;)
+                traceback.print_exc()
+                chunk_queue.put((&#34;status&#34;, f&#34;Error: {str(e)}&#34;))
+
+        def request_listener():
+            nonlocal bridge, is_web, ai_thread, agent_instance
+            try:
+                for req in request_iterator:
+                    if req.interrupt:
+                        if bridge and bridge.on_interrupt:
+                            bridge.on_interrupt()
+                        continue
+
+                    if req.confirmation_answer:
+                        request_queue.put(req)
+                        continue
+
+                    if req.input_text:
+                        is_web = &#34;web&#34; in (req.session_id or &#34;&#34;).lower() or (req.session_id or &#34;&#34;).lower().startswith(&#34;ws-&#34;)
+                        if not bridge:
+                            bridge = StatusBridge(chunk_queue, request_queue=request_queue, is_web=is_web)
+
+                        overrides = {}
+                        if req.engineer_model: overrides[&#34;engineer_model&#34;] = req.engineer_model
+                        if req.engineer_api_key: overrides[&#34;engineer_api_key&#34;] = req.engineer_api_key
+                        
+                        # Start AI in its own thread so we can keep listening for interrupts
+                        ai_thread = threading.Thread(
+                            target=run_ai_task,
+                            args=(req.input_text, req.session_id, req.debug, overrides, req.trust),
+                            daemon=True
+                        )
+                        ai_thread.start()
+            except Exception as e:
+                print(f&#34;Request Listener Error: {e}&#34;)
+            finally:
+                # When client closes stream, send sentinel
+                chunk_queue.put((None, None))
+
+        # Start listening for client requests/signals
+        threading.Thread(target=request_listener, daemon=True).start()
+
+        # Main response loop (yields to gRPC)
+        while True:
+            item = chunk_queue.get()
+            if item == (None, None):
+                break
+
+            msg_type, val = item
+            if msg_type == &#34;text&#34;:
+                yield connpy_pb2.AIResponse(text_chunk=val, is_final=False)
+            elif msg_type == &#34;status&#34;:
+                if is_web and &#34;is thinking&#34; in val.lower(): continue
+                clean_val = val.replace(&#34;[ai_status]&#34;, &#34;&#34;).replace(&#34;[/ai_status]&#34;, &#34;&#34;)
+                yield connpy_pb2.AIResponse(status_update=clean_val, is_final=False)
+            elif msg_type == &#34;debug&#34;:
+                yield connpy_pb2.AIResponse(debug_message=val, is_final=False)
+            elif msg_type == &#34;important&#34;:
+                yield connpy_pb2.AIResponse(important_message=val, is_final=False)
+            elif msg_type == &#34;confirm&#34;:
+                yield connpy_pb2.AIResponse(status_update=val, requires_confirmation=True, is_final=False)
+            elif msg_type == &#34;final_mark&#34;:
+                yield connpy_pb2.AIResponse(is_final=True, full_result=to_struct(val))
+
+    @handle_errors
+    def confirm(self, request, context):
+        res = self.service.confirm(request.value)
+        return connpy_pb2.BoolResponse(value=res)
+
+    @handle_errors
+    def list_sessions(self, request, context):
+        return connpy_pb2.ValueResponse(data=to_value(self.service.list_sessions()))
+
+    @handle_errors
+    def delete_session(self, request, context):
+        self.service.delete_session(request.value)
+        return Empty()
+
+    @handle_errors
+    def configure_provider(self, request, context):
+        self.service.configure_provider(request.provider, request.model, request.api_key)
+        return Empty()
+
+    @handle_errors
+    def load_session_data(self, request, context):
+        return connpy_pb2.StructResponse(data=to_struct(self.service.load_session_data(request.value)))</code></pre>
+</details>
+<div class="desc"><p>Missing associated documentation comment in .proto file.</p></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer">AIServiceServicer</a></li>
+</ul>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer">AIServiceServicer</a></b></code>:
+<ul class="hlist">
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.ask" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.ask">ask</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.configure_provider" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.configure_provider">configure_provider</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.confirm" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.confirm">confirm</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.delete_session" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.delete_session">delete_session</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.list_sessions" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.list_sessions">list_sessions</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.load_session_data" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.load_session_data">load_session_data</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="connpy.grpc_layer.server.ConfigServicer"><code class="flex name class">
+<span>class <span class="ident">ConfigServicer</span></span>
+<span>(</span><span>config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class ConfigServicer(connpy_pb2_grpc.ConfigServiceServicer):
+    def __init__(self, config):
+        self.service = ConfigService(config)
+
+    @handle_errors
+    def get_settings(self, request, context):
+        return connpy_pb2.StructResponse(data=to_struct(self.service.get_settings()))
+
+    @handle_errors
+    def get_default_dir(self, request, context):
+        return connpy_pb2.StringResponse(value=self.service.get_default_dir())
+
+    @handle_errors
+    def set_config_folder(self, request, context):
+        self.service.set_config_folder(request.value)
+        return Empty()
+
+    @handle_errors
+    def update_setting(self, request, context):
+        self.service.update_setting(request.key, from_value(request.value))
+        return Empty()
+
+    @handle_errors
+    def encrypt_password(self, request, context):
+        return connpy_pb2.StringResponse(value=self.service.encrypt_password(request.value))
+
+    @handle_errors
+    def apply_theme_from_file(self, request, context):
+        return connpy_pb2.StructResponse(data=to_struct(self.service.apply_theme_from_file(request.value)))</code></pre>
+</details>
+<div class="desc"><p>Missing associated documentation comment in .proto file.</p></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="connpy.grpc_layer.connpy_pb2_grpc.ConfigServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ConfigServiceServicer">ConfigServiceServicer</a></li>
+</ul>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="connpy.grpc_layer.connpy_pb2_grpc.ConfigServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ConfigServiceServicer">ConfigServiceServicer</a></b></code>:
+<ul class="hlist">
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.ConfigServiceServicer.apply_theme_from_file" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ConfigServiceServicer.apply_theme_from_file">apply_theme_from_file</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.ConfigServiceServicer.encrypt_password" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ConfigServiceServicer.encrypt_password">encrypt_password</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.ConfigServiceServicer.get_default_dir" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ConfigServiceServicer.get_default_dir">get_default_dir</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.ConfigServiceServicer.get_settings" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ConfigServiceServicer.get_settings">get_settings</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.ConfigServiceServicer.set_config_folder" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ConfigServiceServicer.set_config_folder">set_config_folder</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.ConfigServiceServicer.update_setting" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ConfigServiceServicer.update_setting">update_setting</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="connpy.grpc_layer.server.ExecutionServicer"><code class="flex name class">
+<span>class <span class="ident">ExecutionServicer</span></span>
+<span>(</span><span>config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class ExecutionServicer(connpy_pb2_grpc.ExecutionServiceServicer):
+    def __init__(self, config):
+        self.service = ExecutionService(config)
+
+    @handle_errors
+    def run_commands(self, request, context):
+        import queue
+        import threading
+        
+        nodes_filter = request.nodes[0] if len(request.nodes) == 1 else list(request.nodes)
+        
+        q = queue.Queue()
+        
+        def _on_complete(unique, output, status):
+            q.put({&#34;unique_id&#34;: unique, &#34;output&#34;: output, &#34;status&#34;: status})
+            
+        def _worker():
+            try:
+                self.service.run_commands(
+                    nodes_filter=nodes_filter,
+                    commands=list(request.commands),
+                    folder=request.folder if request.folder else None,
+                    prompt=request.prompt if request.prompt else None,
+                    parallel=request.parallel,
+                    variables=from_struct(request.vars) if request.HasField(&#34;vars&#34;) else None,
+                    on_node_complete=_on_complete
+                )
+            except Exception as e:
+                # Optionally pass error to stream, but handle_errors decorator covers top-level.
+                # However, thread exceptions won&#39;t reach context.abort directly.
+                q.put(e)
+            finally:
+                q.put(None)
+                
+        threading.Thread(target=_worker, daemon=True).start()
+        
+        while True:
+            item = q.get()
+            if item is None:
+                break
+            if isinstance(item, Exception):
+                raise item
+                
+            yield connpy_pb2.NodeRunResult(
+                unique_id=item[&#34;unique_id&#34;],
+                output=item[&#34;output&#34;],
+                status=item[&#34;status&#34;]
+            )
+
+    @handle_errors
+    def test_commands(self, request, context):
+        import queue
+        import threading
+        
+        nodes_filter = request.nodes[0] if len(request.nodes) == 1 else list(request.nodes)
+
+        q = queue.Queue()
+        
+        def _on_complete(unique, output, status, result):
+            q.put({&#34;unique_id&#34;: unique, &#34;output&#34;: output, &#34;status&#34;: status, &#34;result&#34;: result})
+            
+        def _worker():
+            try:
+                self.service.test_commands(
+                    nodes_filter=nodes_filter,
+                    commands=list(request.commands),
+                    expected=request.expected,
+                    folder=request.folder if request.folder else None,
+                    prompt=request.prompt if request.prompt else None,
+                    parallel=request.parallel,
+                    variables=from_struct(request.vars) if request.HasField(&#34;vars&#34;) else None,
+                    on_node_complete=_on_complete
+                )
+            except Exception as e:
+                q.put(e)
+            finally:
+                q.put(None)
+                
+        threading.Thread(target=_worker, daemon=True).start()
+        
+        while True:
+            item = q.get()
+            if item is None:
+                break
+            if isinstance(item, Exception):
+                raise item
+                
+            res = connpy_pb2.NodeRunResult(
+                unique_id=item[&#34;unique_id&#34;],
+                output=item[&#34;output&#34;],
+                status=item[&#34;status&#34;]
+            )
+            if item[&#34;result&#34;] is not None:
+                res.test_result.CopyFrom(to_struct(item[&#34;result&#34;]))
+            yield res
+
+    @handle_errors
+    def run_cli_script(self, request, context):
+        res = self.service.run_cli_script(request.param1, request.param2, request.parallel)
+        return connpy_pb2.StructResponse(data=to_struct(res))
+
+    @handle_errors
+    def run_yaml_playbook(self, request, context):
+        res = self.service.run_yaml_playbook(request.param1, request.parallel)
+        return connpy_pb2.StructResponse(data=to_struct(res))</code></pre>
+</details>
+<div class="desc"><p>Missing associated documentation comment in .proto file.</p></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="connpy.grpc_layer.connpy_pb2_grpc.ExecutionServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ExecutionServiceServicer">ExecutionServiceServicer</a></li>
+</ul>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="connpy.grpc_layer.connpy_pb2_grpc.ExecutionServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ExecutionServiceServicer">ExecutionServiceServicer</a></b></code>:
+<ul class="hlist">
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.ExecutionServiceServicer.run_cli_script" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ExecutionServiceServicer.run_cli_script">run_cli_script</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.ExecutionServiceServicer.run_commands" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ExecutionServiceServicer.run_commands">run_commands</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.ExecutionServiceServicer.run_yaml_playbook" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ExecutionServiceServicer.run_yaml_playbook">run_yaml_playbook</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.ExecutionServiceServicer.test_commands" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ExecutionServiceServicer.test_commands">test_commands</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="connpy.grpc_layer.server.ImportExportServicer"><code class="flex name class">
+<span>class <span class="ident">ImportExportServicer</span></span>
+<span>(</span><span>config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class ImportExportServicer(connpy_pb2_grpc.ImportExportServiceServicer):
+    def __init__(self, config):
+        self.service = ImportExportService(config)
+        self.node_service = NodeService(config)
+
+    @handle_errors
+    def export_to_file(self, request, context):
+        self.service.export_to_file(request.file_path, list(request.folders) if request.folders else None)
+        return Empty()
+
+    @handle_errors
+    def import_from_file(self, request, context):
+        if request.value.startswith(&#34;---YAML---\n&#34;):
+            import yaml
+            content = request.value[len(&#34;---YAML---\n&#34;):]
+            data = yaml.load(content, Loader=yaml.FullLoader)
+            self.service.import_from_dict(data)
+        else:
+            self.service.import_from_file(request.value)
+        self.node_service.generate_cache()
+        return Empty()
+
+    @handle_errors
+    def set_reserved_names(self, request, context):
+        self.service.set_reserved_names(list(request.items))
+        self.node_service.generate_cache()
+        return Empty()</code></pre>
+</details>
+<div class="desc"><p>Missing associated documentation comment in .proto file.</p></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="connpy.grpc_layer.connpy_pb2_grpc.ImportExportServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ImportExportServiceServicer">ImportExportServiceServicer</a></li>
+</ul>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="connpy.grpc_layer.connpy_pb2_grpc.ImportExportServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ImportExportServiceServicer">ImportExportServiceServicer</a></b></code>:
+<ul class="hlist">
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.ImportExportServiceServicer.export_to_file" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ImportExportServiceServicer.export_to_file">export_to_file</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.ImportExportServiceServicer.import_from_file" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ImportExportServiceServicer.import_from_file">import_from_file</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.ImportExportServiceServicer.set_reserved_names" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ImportExportServiceServicer.set_reserved_names">set_reserved_names</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="connpy.grpc_layer.server.LoggingInterceptor"><code class="flex name class">
+<span>class <span class="ident">LoggingInterceptor</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class LoggingInterceptor(grpc.ServerInterceptor):
+    def __init__(self):
+        from rich.console import Console
+        from ..printer import connpy_theme, get_original_stdout
+        self.console = Console(theme=connpy_theme, file=get_original_stdout())
+
+    def intercept_service(self, continuation, handler_call_details):
+        import time
+        method = handler_call_details.method
+        self.console.print(f&#34;[debug][DEBUG][/debug] gRPC Incoming Request: [bold cyan]{method}[/bold cyan]&#34;)
+        
+        start_time = time.time()
+        try:
+            result = continuation(handler_call_details)
+        except Exception as e:
+            self.console.print(f&#34;[debug][DEBUG][/debug] [bold red]ERROR[/bold red] in {method}: {e}&#34;)
+            raise e
+        finally:
+            duration = (time.time() - start_time) * 1000
+            self.console.print(f&#34;[debug][DEBUG][/debug] Completed [bold cyan]{method}[/bold cyan] in {duration:.2f}ms&#34;)
+            
+        return result</code></pre>
+</details>
+<div class="desc"><p>Affords intercepting incoming RPCs on the service-side.</p></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>grpc.ServerInterceptor</li>
+<li>abc.ABC</li>
+</ul>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.grpc_layer.server.LoggingInterceptor.intercept_service"><code class="name flex">
+<span>def <span class="ident">intercept_service</span></span>(<span>self, continuation, handler_call_details)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def intercept_service(self, continuation, handler_call_details):
+    import time
+    method = handler_call_details.method
+    self.console.print(f&#34;[debug][DEBUG][/debug] gRPC Incoming Request: [bold cyan]{method}[/bold cyan]&#34;)
+    
+    start_time = time.time()
+    try:
+        result = continuation(handler_call_details)
+    except Exception as e:
+        self.console.print(f&#34;[debug][DEBUG][/debug] [bold red]ERROR[/bold red] in {method}: {e}&#34;)
+        raise e
+    finally:
+        duration = (time.time() - start_time) * 1000
+        self.console.print(f&#34;[debug][DEBUG][/debug] Completed [bold cyan]{method}[/bold cyan] in {duration:.2f}ms&#34;)
+        
+    return result</code></pre>
+</details>
+<div class="desc"><p>Intercepts incoming RPCs before handing them over to a handler.</p>
+<p>State can be passed from an interceptor to downstream interceptors
+via contextvars. The first interceptor is called from an empty
+contextvars.Context, and the same Context is used for downstream
+interceptors and for the final handler call. Note that there are no
+guarantees that interceptors and handlers will be called from the
+same thread.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>continuation</code></strong></dt>
+<dd>A function that takes a HandlerCallDetails and
+proceeds to invoke the next interceptor in the chain, if any,
+or the RPC handler lookup logic, with the call details passed
+as an argument, and returns an RpcMethodHandler instance if
+the RPC is considered serviced, or None otherwise.</dd>
+<dt><strong><code>handler_call_details</code></strong></dt>
+<dd>A HandlerCallDetails describing the RPC.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>An RpcMethodHandler with which the RPC may be serviced if the
+interceptor chooses to service this RPC, or None otherwise.</p></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.grpc_layer.server.NodeServicer"><code class="flex name class">
+<span>class <span class="ident">NodeServicer</span></span>
+<span>(</span><span>config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
+    def __init__(self, config):
+        self.service = NodeService(config)
+
+    @handle_errors
+    def interact_node(self, request_iterator, context):
+        import sys
+        import select
+        import os
+        from connpy.core import node
+        from ..services.profile_service import ProfileService
+
+        # Fetch first setup packet
+        try:
+            first_req = next(request_iterator)
+        except StopIteration:
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT, &#34;No setup request received&#34;)
+
+        unique_id = first_req.id
+        sftp = first_req.sftp
+        debug = first_req.debug
+        printer.console.print(f&#34;[debug][DEBUG][/debug] gRPC interact_node request for: [bold cyan]{unique_id}[/bold cyan]&#34;)
+
+        if first_req.connection_params_json:
+            import json
+            params = json.loads(first_req.connection_params_json)
+            base_node_id = params.get(&#34;base_node&#34;)
+            # Valid attributes that a node object accepts
+            valid_attrs = [&#39;host&#39;, &#39;options&#39;, &#39;logs&#39;, &#39;password&#39;, &#39;port&#39;, &#39;protocol&#39;, &#39;user&#39;, &#39;jumphost&#39;]
+            
+            fallback_id = f&#34;{unique_id}@remote&#34;
+            if unique_id == &#34;dynamic&#34; and params.get(&#34;host&#34;):
+                fallback_id = f&#34;dynamic-{params.get(&#39;host&#39;)}@remote&#34;
+            
+            if base_node_id:
+                # Look up the base node in config and use its full data
+                nodes = self.service.config._getallnodes(base_node_id)
+                if nodes:
+                    device = self.service.config.getitem(nodes[0])
+                    # Override device properties with any passed in params
+                    for attr in valid_attrs:
+                        if attr in params:
+                            device[attr] = params[attr]
+                    
+                    if &#34;tags&#34; in params:
+                        device_tags = device.get(&#34;tags&#34;, {})
+                        if not isinstance(device_tags, dict):
+                            device_tags = {}
+                        device_tags.update(params[&#34;tags&#34;])
+                        device[&#34;tags&#34;] = device_tags
+                        
+                    node_name = params.get(&#34;name&#34;, base_node_id)
+                    n = node(node_name, **device, config=self.service.config)
+                else:
+                    # base_node not found, fall back to dynamic
+                    node_name = params.get(&#34;name&#34;, fallback_id)
+                    n = node(node_name, host=params.get(&#34;host&#34;, &#34;&#34;), config=self.service.config)
+                    for attr in valid_attrs:
+                        if attr in params:
+                            setattr(n, attr, params[attr])
+                    if &#34;tags&#34; in params:
+                        n.tags = params[&#34;tags&#34;]
+            else:
+                node_name = params.get(&#34;name&#34;, fallback_id)
+                n = node(node_name, host=params.get(&#34;host&#34;, &#34;&#34;), config=self.service.config)
+                for attr in valid_attrs:
+                    if attr in params:
+                        setattr(n, attr, params[attr])
+                if &#34;tags&#34; in params:
+                    n.tags = params[&#34;tags&#34;]
+        else:
+            node_data = self.service.config.getitem(unique_id, extract=False)
+            if not node_data:
+                context.abort(grpc.StatusCode.NOT_FOUND, f&#34;Node {unique_id} not found&#34;)
+            profile_service = ProfileService(self.service.config)
+            resolved_data = profile_service.resolve_node_data(node_data)
+            n = node(unique_id, **resolved_data, config=self.service.config)
+            if sftp:
+                n.protocol = &#34;sftp&#34;
+
+        connect = n._connect(debug=debug)
+        if connect != True:
+            yield connpy_pb2.InteractResponse(success=False, error_message=str(connect))
+            return
+        
+        # Signal successful connection to the client
+        yield connpy_pb2.InteractResponse(success=True)
+
+        import threading
+        import queue
+
+        stdin_queue = queue.Queue()
+        running = True
+
+        def read_requests():
+            try:
+                for req in request_iterator:
+                    if not running:
+                        break
+                    if req.cols &gt; 0 and req.rows &gt; 0:
+                        try:
+                            n.child.setwinsize(req.rows, req.cols)
+                        except Exception:
+                            pass
+                    if req.stdin_data:
+                        stdin_queue.put(req.stdin_data)
+            except grpc.RpcError:
+                pass
+
+        t = threading.Thread(target=read_requests, daemon=True)
+        t.start()
+
+        # Set initial window size if provided
+        if first_req.cols &gt; 0 and first_req.rows &gt; 0:
+            try:
+                n.child.setwinsize(first_req.rows, first_req.cols)
+            except Exception:
+                pass
+
+        try:
+            while n.child.isalive() and running:
+                r, _, _ = select.select([n.child.child_fd], [], [], 0.05)
+                if r:
+                    try:
+                        data = os.read(n.child.child_fd, 4096)
+                        if not data:
+                            break
+                        yield connpy_pb2.InteractResponse(stdout_data=data)
+                    except OSError:
+                        break
+                
+                while not stdin_queue.empty():
+                    data = stdin_queue.get_nowait()
+                    try:
+                        os.write(n.child.child_fd, data)
+                    except OSError:
+                        running = False
+                        break
+        finally:
+            running = False
+            try:
+                n.child.terminate(force=True)
+            except Exception:
+                pass
+
+    @handle_errors
+    def list_nodes(self, request, context):
+        f = request.filter_str if request.filter_str else None
+        fmt = request.format_str if request.format_str else None
+        return connpy_pb2.ValueResponse(data=to_value(self.service.list_nodes(f, fmt)))
+
+    @handle_errors
+    def list_folders(self, request, context):
+        f = request.filter_str if request.filter_str else None
+        return connpy_pb2.ValueResponse(data=to_value(self.service.list_folders(f)))
+
+    @handle_errors
+    def get_node_details(self, request, context):
+        return connpy_pb2.StructResponse(data=to_struct(self.service.get_node_details(request.id)))
+
+    @handle_errors
+    def explode_unique(self, request, context):
+        return connpy_pb2.ValueResponse(data=to_value(self.service.explode_unique(request.id)))
+
+    @handle_errors
+    def validate_parent_folder(self, request, context):
+        self.service.validate_parent_folder(request.id)
+        return Empty()
+
+    @handle_errors
+    def generate_cache(self, request, context):
+        self.service.generate_cache()
+        return Empty()
+
+    @handle_errors
+    def add_node(self, request, context):
+        self.service.add_node(request.id, from_struct(request.data), request.is_folder)
+        self.service.generate_cache()
+        return Empty()
+
+    @handle_errors
+    def update_node(self, request, context):
+        self.service.update_node(request.id, from_struct(request.data))
+        self.service.generate_cache()
+        return Empty()
+
+    @handle_errors
+    def delete_node(self, request, context):
+        self.service.delete_node(request.id, request.is_folder)
+        self.service.generate_cache()
+        return Empty()
+
+    @handle_errors
+    def move_node(self, request, context):
+        self.service.move_node(request.src_id, request.dst_id, request.copy)
+        self.service.generate_cache()
+        return Empty()
+
+    @handle_errors
+    def bulk_add(self, request, context):
+        self.service.bulk_add(list(request.ids), list(request.hosts), from_struct(request.common_data))
+        self.service.generate_cache()
+        return Empty()
+
+    @handle_errors
+    def set_reserved_names(self, request, context):
+        self.service.set_reserved_names(list(request.items))
+        self.service.generate_cache()
+        return Empty()
+
+    @handle_errors
+    def full_replace(self, request, context):
+        connections = from_struct(request.connections)
+        profiles = from_struct(request.profiles)
+        self.service.full_replace(connections, profiles)
+        self.service.generate_cache()
+        return Empty()
+
+    @handle_errors
+    def get_inventory(self, request, context):
+        data = self.service.get_inventory()
+        return connpy_pb2.FullReplaceRequest(
+            connections=to_struct(data[&#34;connections&#34;]),
+            profiles=to_struct(data[&#34;profiles&#34;])
+        )</code></pre>
+</details>
+<div class="desc"><p>Missing associated documentation comment in .proto file.</p></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer">NodeServiceServicer</a></li>
+</ul>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer">NodeServiceServicer</a></b></code>:
+<ul class="hlist">
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer.add_node" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer.add_node">add_node</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer.bulk_add" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer.bulk_add">bulk_add</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer.delete_node" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer.delete_node">delete_node</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer.explode_unique" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer.explode_unique">explode_unique</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer.full_replace" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer.full_replace">full_replace</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer.generate_cache" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer.generate_cache">generate_cache</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer.get_inventory" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer.get_inventory">get_inventory</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer.get_node_details" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer.get_node_details">get_node_details</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer.interact_node" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer.interact_node">interact_node</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer.list_folders" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer.list_folders">list_folders</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer.list_nodes" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer.list_nodes">list_nodes</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer.move_node" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer.move_node">move_node</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer.set_reserved_names" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer.set_reserved_names">set_reserved_names</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer.update_node" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer.update_node">update_node</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer.validate_parent_folder" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer.validate_parent_folder">validate_parent_folder</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="connpy.grpc_layer.server.PluginServicer"><code class="flex name class">
+<span>class <span class="ident">PluginServicer</span></span>
+<span>(</span><span>config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class PluginServicer(connpy_pb2_grpc.PluginServiceServicer, remote_plugin_pb2_grpc.RemotePluginServiceServicer):
+    def __init__(self, config):
+        self.service = PluginService(config)
+
+    @handle_errors
+    def list_plugins(self, request, context):
+        return connpy_pb2.ValueResponse(data=to_value(self.service.list_plugins()))
+
+    @handle_errors
+    def add_plugin(self, request, context):
+        if request.source_file.startswith(&#34;---CONTENT---\n&#34;):
+            content = request.source_file[len(&#34;---CONTENT---\n&#34;):].encode()
+            self.service.add_plugin_from_bytes(request.name, content, request.update)
+        else:
+            self.service.add_plugin(request.name, request.source_file, request.update)
+        return Empty()
+
+    @handle_errors
+    def delete_plugin(self, request, context):
+        self.service.delete_plugin(request.id)
+        return Empty()
+
+    @handle_errors
+    def enable_plugin(self, request, context):
+        self.service.enable_plugin(request.id)
+        return Empty()
+
+    @handle_errors
+    def disable_plugin(self, request, context):
+        self.service.disable_plugin(request.id)
+        return Empty()
+
+    @handle_errors
+    def get_plugin_source(self, request, context):
+        source = self.service.get_plugin_source(request.id)
+        return remote_plugin_pb2.StringResponse(value=source)
+
+    @handle_errors
+    def invoke_plugin(self, request, context):
+        args_dict = json.loads(request.args_json)
+        for chunk in self.service.invoke_plugin(request.name, args_dict):
+            yield remote_plugin_pb2.OutputChunk(text=chunk)</code></pre>
+</details>
+<div class="desc"><p>Missing associated documentation comment in .proto file.</p></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="connpy.grpc_layer.connpy_pb2_grpc.PluginServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.PluginServiceServicer">PluginServiceServicer</a></li>
+<li><a title="connpy.grpc_layer.remote_plugin_pb2_grpc.RemotePluginServiceServicer" href="remote_plugin_pb2_grpc.html#connpy.grpc_layer.remote_plugin_pb2_grpc.RemotePluginServiceServicer">RemotePluginServiceServicer</a></li>
+</ul>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="connpy.grpc_layer.connpy_pb2_grpc.PluginServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.PluginServiceServicer">PluginServiceServicer</a></b></code>:
+<ul class="hlist">
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.PluginServiceServicer.add_plugin" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.PluginServiceServicer.add_plugin">add_plugin</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.PluginServiceServicer.delete_plugin" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.PluginServiceServicer.delete_plugin">delete_plugin</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.PluginServiceServicer.disable_plugin" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.PluginServiceServicer.disable_plugin">disable_plugin</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.PluginServiceServicer.enable_plugin" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.PluginServiceServicer.enable_plugin">enable_plugin</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.PluginServiceServicer.list_plugins" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.PluginServiceServicer.list_plugins">list_plugins</a></code></li>
+</ul>
+</li>
+<li><code><b><a title="connpy.grpc_layer.remote_plugin_pb2_grpc.RemotePluginServiceServicer" href="remote_plugin_pb2_grpc.html#connpy.grpc_layer.remote_plugin_pb2_grpc.RemotePluginServiceServicer">RemotePluginServiceServicer</a></b></code>:
+<ul class="hlist">
+<li><code><a title="connpy.grpc_layer.remote_plugin_pb2_grpc.RemotePluginServiceServicer.get_plugin_source" href="remote_plugin_pb2_grpc.html#connpy.grpc_layer.remote_plugin_pb2_grpc.RemotePluginServiceServicer.get_plugin_source">get_plugin_source</a></code></li>
+<li><code><a title="connpy.grpc_layer.remote_plugin_pb2_grpc.RemotePluginServiceServicer.invoke_plugin" href="remote_plugin_pb2_grpc.html#connpy.grpc_layer.remote_plugin_pb2_grpc.RemotePluginServiceServicer.invoke_plugin">invoke_plugin</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="connpy.grpc_layer.server.ProfileServicer"><code class="flex name class">
+<span>class <span class="ident">ProfileServicer</span></span>
+<span>(</span><span>config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class ProfileServicer(connpy_pb2_grpc.ProfileServiceServicer):
+    def __init__(self, config):
+        self.service = ProfileService(config)
+        self.node_service = NodeService(config)
+
+    @handle_errors
+    def list_profiles(self, request, context):
+        f = request.filter_str if request.filter_str else None
+        return connpy_pb2.ValueResponse(data=to_value(self.service.list_profiles(f)))
+
+    @handle_errors
+    def get_profile(self, request, context):
+        return connpy_pb2.StructResponse(data=to_struct(self.service.get_profile(request.name, request.resolve)))
+
+    @handle_errors
+    def add_profile(self, request, context):
+        self.service.add_profile(request.id, from_struct(request.data))
+        self.node_service.generate_cache()
+        return Empty()
+
+    @handle_errors
+    def resolve_node_data(self, request, context):
+        return connpy_pb2.StructResponse(data=to_struct(self.service.resolve_node_data(from_struct(request.data))))
+
+    @handle_errors
+    def delete_profile(self, request, context):
+        self.service.delete_profile(request.id)
+        self.node_service.generate_cache()
+        return Empty()
+
+    @handle_errors
+    def update_profile(self, request, context):
+        self.service.update_profile(request.id, from_struct(request.data))
+        self.node_service.generate_cache()
+        return Empty()</code></pre>
+</details>
+<div class="desc"><p>Missing associated documentation comment in .proto file.</p></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="connpy.grpc_layer.connpy_pb2_grpc.ProfileServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ProfileServiceServicer">ProfileServiceServicer</a></li>
+</ul>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="connpy.grpc_layer.connpy_pb2_grpc.ProfileServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ProfileServiceServicer">ProfileServiceServicer</a></b></code>:
+<ul class="hlist">
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.ProfileServiceServicer.add_profile" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ProfileServiceServicer.add_profile">add_profile</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.ProfileServiceServicer.delete_profile" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ProfileServiceServicer.delete_profile">delete_profile</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.ProfileServiceServicer.get_profile" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ProfileServiceServicer.get_profile">get_profile</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.ProfileServiceServicer.list_profiles" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ProfileServiceServicer.list_profiles">list_profiles</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.ProfileServiceServicer.resolve_node_data" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ProfileServiceServicer.resolve_node_data">resolve_node_data</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.ProfileServiceServicer.update_profile" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ProfileServiceServicer.update_profile">update_profile</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="connpy.grpc_layer.server.StatusBridge"><code class="flex name class">
+<span>class <span class="ident">StatusBridge</span></span>
+<span>(</span><span>q, request_queue=None, is_web=False)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class StatusBridge:
+    def __init__(self, q, request_queue=None, is_web=False):
+        self.q = q
+        self.request_queue = request_queue
+        self.on_interrupt = self._force_interrupt
+        self.thread = None
+        self.is_web = is_web
+
+    def _force_interrupt(self):
+        &#34;&#34;&#34;Forcefully raise KeyboardInterrupt in the target thread.&#34;&#34;&#34;
+        if self.thread and self.thread.ident:
+            # Standard Python trick to raise an exception in a specific thread
+            import ctypes
+            ctypes.pythonapi.PyThreadState_SetAsyncExc(
+                ctypes.c_long(self.thread.ident), 
+                ctypes.py_object(KeyboardInterrupt)
+            )
+
+    def update(self, msg):
+        self.q.put((&#34;status&#34;, msg))
+    
+    def stop(self):
+        pass
+
+    def print(self, *args, **kwargs):
+        # Capture Rich output and send as debug message
+        self._print_to_queue(&#34;debug&#34;, *args, **kwargs)
+
+    def print_important(self, *args, **kwargs):
+        # Capture Rich output and send as important message (always show)
+        self._print_to_queue(&#34;important&#34;, *args, **kwargs)
+
+    def _print_to_queue(self, msg_type, *args, **kwargs):
+        from rich.console import Console
+        from rich.panel import Panel
+        from io import StringIO
+        from ..printer import connpy_theme
+        
+        processed_args = list(args)
+        if self.is_web:
+            # Remove Panels to avoid box characters on web, but preserve Title
+            processed_args = []
+            for arg in args:
+                if isinstance(arg, Panel):
+                    # If it has a title, prepend it to the content to allow detection
+                    content = arg.renderable
+                    if arg.title:
+                        processed_args.append(f&#34;{arg.title}\n&#34;)
+                    processed_args.append(content)
+                else:
+                    processed_args.append(arg)
+
+        buf = StringIO()
+        # force_terminal=False removes ANSI escape codes for Web
+        c = Console(file=buf, force_terminal=not self.is_web, width=100, theme=connpy_theme)
+        c.print(*processed_args, **kwargs)
+        
+        text_content = buf.getvalue().strip()
+        if text_content:
+            self.q.put((msg_type, text_content))
+
+    def confirm(self, prompt, default=&#34;n&#34;):
+        &#34;&#34;&#34;Bridge confirmation to the gRPC client.&#34;&#34;&#34;
+        if not self.request_queue:
+            return default
+        
+        # Render markup to ANSI for the client
+        from rich.console import Console
+        from io import StringIO
+        from ..printer import connpy_theme
+        buf = StringIO()
+        c = Console(file=buf, force_terminal=True, theme=connpy_theme)
+        c.print(prompt, end=&#34;&#34;)
+        ansi_prompt = buf.getvalue()
+        
+        # Send confirmation request to client
+        self.q.put((&#34;confirm&#34;, ansi_prompt))
+        
+        # Wait for the client to send back the answer via the request stream
+        try:
+            # Block until we get the next request from the client
+            req = self.request_queue.get()
+            if req and req.confirmation_answer:
+                return req.confirmation_answer
+        except Exception:
+            pass
+        return default</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.grpc_layer.server.StatusBridge.confirm"><code class="name flex">
+<span>def <span class="ident">confirm</span></span>(<span>self, prompt, default='n')</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def confirm(self, prompt, default=&#34;n&#34;):
+    &#34;&#34;&#34;Bridge confirmation to the gRPC client.&#34;&#34;&#34;
+    if not self.request_queue:
+        return default
+    
+    # Render markup to ANSI for the client
+    from rich.console import Console
+    from io import StringIO
+    from ..printer import connpy_theme
+    buf = StringIO()
+    c = Console(file=buf, force_terminal=True, theme=connpy_theme)
+    c.print(prompt, end=&#34;&#34;)
+    ansi_prompt = buf.getvalue()
+    
+    # Send confirmation request to client
+    self.q.put((&#34;confirm&#34;, ansi_prompt))
+    
+    # Wait for the client to send back the answer via the request stream
+    try:
+        # Block until we get the next request from the client
+        req = self.request_queue.get()
+        if req and req.confirmation_answer:
+            return req.confirmation_answer
+    except Exception:
+        pass
+    return default</code></pre>
+</details>
+<div class="desc"><p>Bridge confirmation to the gRPC client.</p></div>
+</dd>
+<dt id="connpy.grpc_layer.server.StatusBridge.print"><code class="name flex">
+<span>def <span class="ident">print</span></span>(<span>self, *args, **kwargs)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def print(self, *args, **kwargs):
+    # Capture Rich output and send as debug message
+    self._print_to_queue(&#34;debug&#34;, *args, **kwargs)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.server.StatusBridge.print_important"><code class="name flex">
+<span>def <span class="ident">print_important</span></span>(<span>self, *args, **kwargs)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def print_important(self, *args, **kwargs):
+    # Capture Rich output and send as important message (always show)
+    self._print_to_queue(&#34;important&#34;, *args, **kwargs)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.server.StatusBridge.stop"><code class="name flex">
+<span>def <span class="ident">stop</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def stop(self):
+    pass</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.server.StatusBridge.update"><code class="name flex">
+<span>def <span class="ident">update</span></span>(<span>self, msg)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def update(self, msg):
+    self.q.put((&#34;status&#34;, msg))</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.grpc_layer.server.SystemServicer"><code class="flex name class">
+<span>class <span class="ident">SystemServicer</span></span>
+<span>(</span><span>config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class SystemServicer(connpy_pb2_grpc.SystemServiceServicer):
+    def __init__(self, config):
+        self.service = SystemService(config)
+
+    @handle_errors
+    def start_api(self, request, context):
+        self.service.start_api(request.value)
+        return Empty()
+
+    @handle_errors
+    def debug_api(self, request, context):
+        self.service.debug_api(request.value)
+        return Empty()
+
+    @handle_errors
+    def stop_api(self, request, context):
+        self.service.stop_api()
+        return Empty()
+
+    @handle_errors
+    def restart_api(self, request, context):
+        self.service.restart_api(request.value)
+        return Empty()
+
+    @handle_errors
+    def get_api_status(self, request, context):
+        return connpy_pb2.BoolResponse(value=self.service.get_api_status())</code></pre>
+</details>
+<div class="desc"><p>Missing associated documentation comment in .proto file.</p></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="connpy.grpc_layer.connpy_pb2_grpc.SystemServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.SystemServiceServicer">SystemServiceServicer</a></li>
+</ul>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="connpy.grpc_layer.connpy_pb2_grpc.SystemServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.SystemServiceServicer">SystemServiceServicer</a></b></code>:
+<ul class="hlist">
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.SystemServiceServicer.debug_api" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.SystemServiceServicer.debug_api">debug_api</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.SystemServiceServicer.get_api_status" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.SystemServiceServicer.get_api_status">get_api_status</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.SystemServiceServicer.restart_api" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.SystemServiceServicer.restart_api">restart_api</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.SystemServiceServicer.start_api" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.SystemServiceServicer.start_api">start_api</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.SystemServiceServicer.stop_api" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.SystemServiceServicer.stop_api">stop_api</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="connpy.grpc_layer" href="index.html">connpy.grpc_layer</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-functions">Functions</a></h3>
+<ul class="">
+<li><code><a title="connpy.grpc_layer.server.handle_errors" href="#connpy.grpc_layer.server.handle_errors">handle_errors</a></code></li>
+<li><code><a title="connpy.grpc_layer.server.serve" href="#connpy.grpc_layer.server.serve">serve</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="connpy.grpc_layer.server.AIServicer" href="#connpy.grpc_layer.server.AIServicer">AIServicer</a></code></h4>
+</li>
+<li>
+<h4><code><a title="connpy.grpc_layer.server.ConfigServicer" href="#connpy.grpc_layer.server.ConfigServicer">ConfigServicer</a></code></h4>
+</li>
+<li>
+<h4><code><a title="connpy.grpc_layer.server.ExecutionServicer" href="#connpy.grpc_layer.server.ExecutionServicer">ExecutionServicer</a></code></h4>
+</li>
+<li>
+<h4><code><a title="connpy.grpc_layer.server.ImportExportServicer" href="#connpy.grpc_layer.server.ImportExportServicer">ImportExportServicer</a></code></h4>
+</li>
+<li>
+<h4><code><a title="connpy.grpc_layer.server.LoggingInterceptor" href="#connpy.grpc_layer.server.LoggingInterceptor">LoggingInterceptor</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.grpc_layer.server.LoggingInterceptor.intercept_service" href="#connpy.grpc_layer.server.LoggingInterceptor.intercept_service">intercept_service</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.grpc_layer.server.NodeServicer" href="#connpy.grpc_layer.server.NodeServicer">NodeServicer</a></code></h4>
+</li>
+<li>
+<h4><code><a title="connpy.grpc_layer.server.PluginServicer" href="#connpy.grpc_layer.server.PluginServicer">PluginServicer</a></code></h4>
+</li>
+<li>
+<h4><code><a title="connpy.grpc_layer.server.ProfileServicer" href="#connpy.grpc_layer.server.ProfileServicer">ProfileServicer</a></code></h4>
+</li>
+<li>
+<h4><code><a title="connpy.grpc_layer.server.StatusBridge" href="#connpy.grpc_layer.server.StatusBridge">StatusBridge</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.grpc_layer.server.StatusBridge.confirm" href="#connpy.grpc_layer.server.StatusBridge.confirm">confirm</a></code></li>
+<li><code><a title="connpy.grpc_layer.server.StatusBridge.print" href="#connpy.grpc_layer.server.StatusBridge.print">print</a></code></li>
+<li><code><a title="connpy.grpc_layer.server.StatusBridge.print_important" href="#connpy.grpc_layer.server.StatusBridge.print_important">print_important</a></code></li>
+<li><code><a title="connpy.grpc_layer.server.StatusBridge.stop" href="#connpy.grpc_layer.server.StatusBridge.stop">stop</a></code></li>
+<li><code><a title="connpy.grpc_layer.server.StatusBridge.update" href="#connpy.grpc_layer.server.StatusBridge.update">update</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.grpc_layer.server.SystemServicer" href="#connpy.grpc_layer.server.SystemServicer">SystemServicer</a></code></h4>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+</footer>
+</body>
+</html>

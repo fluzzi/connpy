@@ -1,7 +1,71 @@
-# Lazy-loaded printer module to speed up CLI startup
-_console = None
-_err_console = None
-_theme = None
+import sys
+import threading
+import io
+
+_local = threading.local()
+
+class ThreadLocalStream:
+    def __init__(self, original):
+        self._original = original
+    
+    def _get_stream(self):
+        s = getattr(_local, 'stream', None)
+        return s if s is not None else self._original
+    
+    def write(self, data):
+        stream = self._get_stream()
+        if stream:
+            stream.write(data)
+    
+    def flush(self):
+        stream = self._get_stream()
+        if stream:
+            stream.flush()
+    
+    def isatty(self):
+        stream = self._get_stream()
+        return stream.isatty() if stream else False
+
+    def __getattr__(self, name):
+        # Avoid recursion during initialization or if _original is not yet set
+        if name in ('_original', '_get_stream'):
+            raise AttributeError(name)
+        stream = self._get_stream()
+        if stream:
+            return getattr(stream, name)
+        raise AttributeError(f"'NoneType' object has no attribute '{name}'")
+
+# Patch stdout/stderr only once at module level
+if not isinstance(sys.stdout, ThreadLocalStream):
+    sys.stdout = ThreadLocalStream(sys.stdout)
+if not isinstance(sys.stderr, ThreadLocalStream):
+    sys.stderr = ThreadLocalStream(sys.stderr)
+
+def _get_local():
+    if not hasattr(_local, 'console'):
+        _local.console = None
+    if not hasattr(_local, 'err_console'):
+        _local.err_console = None
+    if not hasattr(_local, 'theme'):
+        _local.theme = None
+    return _local
+
+def set_thread_stream(stream):
+    if stream is None:
+        if hasattr(_local, 'stream'):
+            del _local.stream
+    else:
+        _local.stream = stream
+
+def get_original_stdout():
+    if isinstance(sys.stdout, ThreadLocalStream):
+        return sys.stdout._original
+    return sys.stdout
+
+def get_original_stderr():
+    if isinstance(sys.stderr, ThreadLocalStream):
+        return sys.stderr._original
+    return sys.stderr
 
 # Centralized design system
 STYLES = {
@@ -23,24 +87,76 @@ STYLES = {
 }
 
 def _get_console():
-    global _console, _theme
-    if _console is None:
+    local = _get_local()
+    
+    # Self-healing patch: if sys.stdout was replaced (e.g. by pytest), re-wrap it.
+    if not isinstance(sys.stdout, ThreadLocalStream):
+        sys.stdout = ThreadLocalStream(sys.stdout)
+        
+    current_out = sys.stdout
+    
+    # Detect if we need to recreate the console (stream changed or closed)
+    needs_recreate = (local.console is None or 
+                     getattr(local, '_last_stdout', None) is not current_out)
+    
+    # Extra check for closed files in test environments
+    if not needs_recreate and local.console is not None:
+        try:
+            if hasattr(local.console.file, 'closed') and local.console.file.closed:
+                needs_recreate = True
+        except Exception:
+            pass
+
+    if needs_recreate:
         from rich.console import Console
         from rich.theme import Theme
-        if _theme is None:
-            _theme = Theme(STYLES)
-        _console = Console(theme=_theme)
-    return _console
+        if local.theme is None:
+            local.theme = Theme(STYLES)
+        local.console = Console(theme=local.theme, file=current_out)
+        local._last_stdout = current_out
+        
+    return local.console
 
 def _get_err_console():
-    global _err_console, _theme
-    if _err_console is None:
+    local = _get_local()
+    
+    # Self-healing patch for stderr
+    if not isinstance(sys.stderr, ThreadLocalStream):
+        sys.stderr = ThreadLocalStream(sys.stderr)
+        
+    current_err = sys.stderr
+    
+    needs_recreate = (local.err_console is None or 
+                     getattr(local, '_last_stderr', None) is not current_err)
+                     
+    if not needs_recreate and local.err_console is not None:
+        try:
+            if hasattr(local.err_console.file, 'closed') and local.err_console.file.closed:
+                needs_recreate = True
+        except Exception:
+            pass
+
+    if needs_recreate:
         from rich.console import Console
         from rich.theme import Theme
-        if _theme is None:
-            _theme = Theme(STYLES)
-        _err_console = Console(stderr=True, theme=_theme)
-    return _err_console
+        if local.theme is None:
+            local.theme = Theme(STYLES)
+        local.err_console = Console(stderr=True, theme=local.theme, file=current_err)
+        local._last_stderr = current_err
+        
+    return local.err_console
+
+def set_thread_console(console):
+    _get_local().console = console
+
+def set_thread_err_console(console):
+    _get_local().err_console = console
+
+def clear_thread_state():
+    """Removes all thread-local printer state. Useful for gRPC thread reuse."""
+    for attr in ["stream", "console", "err_console", "theme", "_last_stdout", "_last_stderr"]:
+        if hasattr(_local, attr):
+            delattr(_local, attr)
 
 @property
 def console():
@@ -52,18 +168,18 @@ def err_console():
 
 @property
 def connpy_theme():
-    global _theme
-    if _theme is None:
+    local = _get_local()
+    if local.theme is None:
         from rich.theme import Theme
-        _theme = Theme(STYLES)
-    return _theme
+        local.theme = Theme(STYLES)
+    return local.theme
 
 def apply_theme(user_styles=None):
     """
     Updates the global console themes with user-defined styles.
     If a style is missing in user_styles, it falls back to the default in STYLES.
     """
-    global _theme, _console, _err_console
+    local = _get_local()
     from rich.theme import Theme
     
     # Start with a copy of defaults
@@ -74,11 +190,11 @@ def apply_theme(user_styles=None):
             if key in active_styles:
                 active_styles[key] = value
                 
-    _theme = Theme(active_styles)
-    if _console:
-        _console.push_theme(_theme)
-    if _err_console:
-        _err_console.push_theme(_theme)
+    local.theme = Theme(active_styles)
+    if local.console:
+        local.console.push_theme(local.theme)
+    if local.err_console:
+        local.err_console.push_theme(local.theme)
     return active_styles
 
 
@@ -273,10 +389,10 @@ err_console = _ErrConsoleProxy()
 # theme also needs to be lazy
 class _ThemeProxy:
     def __getattr__(self, name):
-        global _theme
-        if _theme is None:
+        local = _get_local()
+        if local.theme is None:
             from rich.theme import Theme
-            _theme = Theme(STYLES)
-        return getattr(_theme, name)
+            local.theme = Theme(STYLES)
+        return getattr(local.theme, name)
 
 connpy_theme = _ThemeProxy()

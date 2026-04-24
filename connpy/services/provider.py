@@ -58,7 +58,7 @@ class ServiceProvider:
             raise InvalidConfigurationError("Remote host must be specified in remote mode")
 
         import grpc
-        from ..grpc.stubs import NodeStub, ProfileStub, PluginStub, AIStub, ExecutionStub, ImportExportStub, SystemStub
+        from ..grpc_layer.stubs import NodeStub, ProfileStub, PluginStub, AIStub, ExecutionStub, ImportExportStub, SystemStub
         
         channel = grpc.insecure_channel(self.remote_host)
         

@@ -1,0 +1,715 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<meta name="generator" content="pdoc3 0.11.6">
+<title>connpy.tests.test_grpc_layer API documentation</title>
+<meta name="description" content="">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:1.5em;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:2em 0 .50em 0}h3{font-size:1.4em;margin:1.6em 0 .7em 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .2s ease-in-out}a:visited{color:#503}a:hover{color:#b62}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900;font-weight:bold}pre code{font-size:.8em;line-height:1.4em;padding:1em;display:block}code{background:#f3f3f3;font-family:"DejaVu Sans Mono",monospace;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source > summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible;min-width:max-content}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em 1em;margin:1em 0}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul ul{padding-left:1em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha512-D9gUyxqja7hBtkWpPWGt9wfbfaMGVt9gnyCvYa+jojwwPHLCzUm5i8rpk7vD7wNee9bA35eYIjobYPaQuKS1MQ==" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => {
+hljs.configure({languages: ['bash', 'css', 'diff', 'graphql', 'ini', 'javascript', 'json', 'plaintext', 'python', 'python-repl', 'rust', 'shell', 'sql', 'typescript', 'xml', 'yaml']});
+hljs.highlightAll();
+/* Collapse source docstrings */
+setTimeout(() => {
+[...document.querySelectorAll('.hljs.language-python > .hljs-string')]
+.filter(el => el.innerHTML.length > 200 && ['"""', "'''"].includes(el.innerHTML.substring(0, 3)))
+.forEach(el => {
+let d = document.createElement('details');
+d.classList.add('hljs-string');
+d.innerHTML = '<summary>"""</summary>' + el.innerHTML.substring(3);
+el.replaceWith(d);
+});
+}, 100);
+})</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>connpy.tests.test_grpc_layer</code></h1>
+</header>
+<section id="section-intro">
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="connpy.tests.test_grpc_layer.MockContext"><code class="flex name class">
+<span>class <span class="ident">MockContext</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class MockContext:
+    def abort(self, code, details):
+        raise Exception(f&#34;gRPC Abort: {code} - {details}&#34;)</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_grpc_layer.MockContext.abort"><code class="name flex">
+<span>def <span class="ident">abort</span></span>(<span>self, code, details)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def abort(self, code, details):
+    raise Exception(f&#34;gRPC Abort: {code} - {details}&#34;)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.tests.test_grpc_layer.TestGRPCIntegration"><code class="flex name class">
+<span>class <span class="ident">TestGRPCIntegration</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestGRPCIntegration:
+    @pytest.fixture
+    def grpc_server(self, populated_config):
+        &#34;&#34;&#34;Starts a local gRPC server for integration testing.&#34;&#34;&#34;
+        srv = grpc.server(futures.ThreadPoolExecutor(max_workers=5))
+        
+        # Register services
+        connpy_pb2_grpc.add_NodeServiceServicer_to_server(server.NodeServicer(populated_config), srv)
+        connpy_pb2_grpc.add_ProfileServiceServicer_to_server(server.ProfileServicer(populated_config), srv)
+        connpy_pb2_grpc.add_ConfigServiceServicer_to_server(server.ConfigServicer(populated_config), srv)
+        connpy_pb2_grpc.add_ExecutionServiceServicer_to_server(server.ExecutionServicer(populated_config), srv)
+        connpy_pb2_grpc.add_ImportExportServiceServicer_to_server(server.ImportExportServicer(populated_config), srv)
+        
+        port = srv.add_insecure_port(&#39;127.0.0.1:0&#39;)
+        srv.start()
+        yield f&#34;127.0.0.1:{port}&#34;
+        srv.stop(0)
+
+    @pytest.fixture
+    def channel(self, grpc_server):
+        with grpc.insecure_channel(grpc_server) as channel:
+            yield channel
+
+    @pytest.fixture
+    def node_stub(self, channel):
+        return stubs.NodeStub(channel, &#34;localhost&#34;)
+
+    @pytest.fixture
+    def profile_stub(self, channel):
+        return stubs.ProfileStub(channel, &#34;localhost&#34;)
+
+    @pytest.fixture
+    def config_stub(self, channel):
+        return stubs.ConfigStub(channel, &#34;localhost&#34;)
+
+    def test_list_nodes_integration(self, node_stub):
+        nodes = node_stub.list_nodes()
+        assert &#34;router1&#34; in nodes
+        assert &#34;server1@office&#34; in nodes
+
+    def test_get_node_details_integration(self, node_stub):
+        details = node_stub.get_node_details(&#34;router1&#34;)
+        assert details[&#34;host&#34;] == &#34;10.0.0.1&#34;
+
+    def test_node_not_found_integration(self, node_stub):
+        with pytest.raises(ConnpyError) as exc:
+            node_stub.get_node_details(&#34;non-existent&#34;)
+        assert &#34;Node &#39;non-existent&#39; not found.&#34; in str(exc.value)
+
+    def test_list_profiles_integration(self, profile_stub):
+        profiles = profile_stub.list_profiles()
+        assert &#34;office-user&#34; in profiles
+
+    def test_get_settings_integration(self, config_stub):
+        settings = config_stub.get_settings()
+        assert &#34;idletime&#34; in settings
+
+    def test_update_setting_integration(self, config_stub):
+        config_stub.update_setting(&#34;idletime&#34;, 99)
+        settings = config_stub.get_settings()
+        assert settings[&#34;idletime&#34;] == 99
+
+    def test_add_delete_node_integration(self, node_stub):
+        node_stub.add_node(&#34;integration-test-node&#34;, {&#34;host&#34;: &#34;9.9.9.9&#34;})
+        assert &#34;integration-test-node&#34; in node_stub.list_nodes()
+        node_stub.delete_node(&#34;integration-test-node&#34;)
+        assert &#34;integration-test-node&#34; not in node_stub.list_nodes()
+
+    def test_import_yaml_integration(self, channel, node_stub):
+        import yaml
+        from connpy.grpc_layer import stubs
+        stub = stubs.ImportExportStub(channel, &#34;localhost&#34;)
+        
+        # ImportExportService expects a flat dict of nodes, not a full config structure
+        inventory = {
+            &#34;imported-node&#34;: {&#34;host&#34;: &#34;8.8.8.8&#34;, &#34;protocol&#34;: &#34;ssh&#34;, &#34;type&#34;: &#34;connection&#34;}
+        }
+        yaml_content = yaml.dump(inventory)
+        
+        import tempfile
+        with tempfile.NamedTemporaryFile(mode=&#34;w&#34;, suffix=&#34;.yaml&#34;, delete=False) as f:
+            f.write(yaml_content)
+            temp_path = f.name
+            
+        try:
+            stub.import_from_file(temp_path)
+            # Verify the node was imported and is visible via NodeStub
+            nodes = node_stub.list_nodes()
+            assert &#34;imported-node&#34; in nodes
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_grpc_layer.TestGRPCIntegration.channel"><code class="name flex">
+<span>def <span class="ident">channel</span></span>(<span>self, grpc_server)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@pytest.fixture
+def channel(self, grpc_server):
+    with grpc.insecure_channel(grpc_server) as channel:
+        yield channel</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_grpc_layer.TestGRPCIntegration.config_stub"><code class="name flex">
+<span>def <span class="ident">config_stub</span></span>(<span>self, channel)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@pytest.fixture
+def config_stub(self, channel):
+    return stubs.ConfigStub(channel, &#34;localhost&#34;)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_grpc_layer.TestGRPCIntegration.grpc_server"><code class="name flex">
+<span>def <span class="ident">grpc_server</span></span>(<span>self, populated_config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@pytest.fixture
+def grpc_server(self, populated_config):
+    &#34;&#34;&#34;Starts a local gRPC server for integration testing.&#34;&#34;&#34;
+    srv = grpc.server(futures.ThreadPoolExecutor(max_workers=5))
+    
+    # Register services
+    connpy_pb2_grpc.add_NodeServiceServicer_to_server(server.NodeServicer(populated_config), srv)
+    connpy_pb2_grpc.add_ProfileServiceServicer_to_server(server.ProfileServicer(populated_config), srv)
+    connpy_pb2_grpc.add_ConfigServiceServicer_to_server(server.ConfigServicer(populated_config), srv)
+    connpy_pb2_grpc.add_ExecutionServiceServicer_to_server(server.ExecutionServicer(populated_config), srv)
+    connpy_pb2_grpc.add_ImportExportServiceServicer_to_server(server.ImportExportServicer(populated_config), srv)
+    
+    port = srv.add_insecure_port(&#39;127.0.0.1:0&#39;)
+    srv.start()
+    yield f&#34;127.0.0.1:{port}&#34;
+    srv.stop(0)</code></pre>
+</details>
+<div class="desc"><p>Starts a local gRPC server for integration testing.</p></div>
+</dd>
+<dt id="connpy.tests.test_grpc_layer.TestGRPCIntegration.node_stub"><code class="name flex">
+<span>def <span class="ident">node_stub</span></span>(<span>self, channel)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@pytest.fixture
+def node_stub(self, channel):
+    return stubs.NodeStub(channel, &#34;localhost&#34;)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_grpc_layer.TestGRPCIntegration.profile_stub"><code class="name flex">
+<span>def <span class="ident">profile_stub</span></span>(<span>self, channel)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@pytest.fixture
+def profile_stub(self, channel):
+    return stubs.ProfileStub(channel, &#34;localhost&#34;)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_grpc_layer.TestGRPCIntegration.test_add_delete_node_integration"><code class="name flex">
+<span>def <span class="ident">test_add_delete_node_integration</span></span>(<span>self, node_stub)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_add_delete_node_integration(self, node_stub):
+    node_stub.add_node(&#34;integration-test-node&#34;, {&#34;host&#34;: &#34;9.9.9.9&#34;})
+    assert &#34;integration-test-node&#34; in node_stub.list_nodes()
+    node_stub.delete_node(&#34;integration-test-node&#34;)
+    assert &#34;integration-test-node&#34; not in node_stub.list_nodes()</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_grpc_layer.TestGRPCIntegration.test_get_node_details_integration"><code class="name flex">
+<span>def <span class="ident">test_get_node_details_integration</span></span>(<span>self, node_stub)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_get_node_details_integration(self, node_stub):
+    details = node_stub.get_node_details(&#34;router1&#34;)
+    assert details[&#34;host&#34;] == &#34;10.0.0.1&#34;</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_grpc_layer.TestGRPCIntegration.test_get_settings_integration"><code class="name flex">
+<span>def <span class="ident">test_get_settings_integration</span></span>(<span>self, config_stub)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_get_settings_integration(self, config_stub):
+    settings = config_stub.get_settings()
+    assert &#34;idletime&#34; in settings</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_grpc_layer.TestGRPCIntegration.test_import_yaml_integration"><code class="name flex">
+<span>def <span class="ident">test_import_yaml_integration</span></span>(<span>self, channel, node_stub)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_import_yaml_integration(self, channel, node_stub):
+    import yaml
+    from connpy.grpc_layer import stubs
+    stub = stubs.ImportExportStub(channel, &#34;localhost&#34;)
+    
+    # ImportExportService expects a flat dict of nodes, not a full config structure
+    inventory = {
+        &#34;imported-node&#34;: {&#34;host&#34;: &#34;8.8.8.8&#34;, &#34;protocol&#34;: &#34;ssh&#34;, &#34;type&#34;: &#34;connection&#34;}
+    }
+    yaml_content = yaml.dump(inventory)
+    
+    import tempfile
+    with tempfile.NamedTemporaryFile(mode=&#34;w&#34;, suffix=&#34;.yaml&#34;, delete=False) as f:
+        f.write(yaml_content)
+        temp_path = f.name
+        
+    try:
+        stub.import_from_file(temp_path)
+        # Verify the node was imported and is visible via NodeStub
+        nodes = node_stub.list_nodes()
+        assert &#34;imported-node&#34; in nodes
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_grpc_layer.TestGRPCIntegration.test_list_nodes_integration"><code class="name flex">
+<span>def <span class="ident">test_list_nodes_integration</span></span>(<span>self, node_stub)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_list_nodes_integration(self, node_stub):
+    nodes = node_stub.list_nodes()
+    assert &#34;router1&#34; in nodes
+    assert &#34;server1@office&#34; in nodes</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_grpc_layer.TestGRPCIntegration.test_list_profiles_integration"><code class="name flex">
+<span>def <span class="ident">test_list_profiles_integration</span></span>(<span>self, profile_stub)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_list_profiles_integration(self, profile_stub):
+    profiles = profile_stub.list_profiles()
+    assert &#34;office-user&#34; in profiles</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_grpc_layer.TestGRPCIntegration.test_node_not_found_integration"><code class="name flex">
+<span>def <span class="ident">test_node_not_found_integration</span></span>(<span>self, node_stub)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_node_not_found_integration(self, node_stub):
+    with pytest.raises(ConnpyError) as exc:
+        node_stub.get_node_details(&#34;non-existent&#34;)
+    assert &#34;Node &#39;non-existent&#39; not found.&#34; in str(exc.value)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_grpc_layer.TestGRPCIntegration.test_update_setting_integration"><code class="name flex">
+<span>def <span class="ident">test_update_setting_integration</span></span>(<span>self, config_stub)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_update_setting_integration(self, config_stub):
+    config_stub.update_setting(&#34;idletime&#34;, 99)
+    settings = config_stub.get_settings()
+    assert settings[&#34;idletime&#34;] == 99</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.tests.test_grpc_layer.TestNodeServicerNaming"><code class="flex name class">
+<span>class <span class="ident">TestNodeServicerNaming</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestNodeServicerNaming:
+    @pytest.fixture
+    def servicer(self, populated_config):
+        return server.NodeServicer(populated_config)
+
+    @patch(&#34;connpy.core.node&#34;)
+    def test_interact_node_uses_passed_name(self, mock_node, servicer):
+        # Setup request with custom name
+        params = {&#34;name&#34;: &#34;custom-node-name@test&#34;, &#34;host&#34;: &#34;1.2.3.4&#34;, &#34;protocol&#34;: &#34;ssh&#34;}
+        request = connpy_pb2.InteractRequest(
+            id=&#34;dynamic&#34;,
+            connection_params_json=json.dumps(params)
+        )
+        
+        # Mock node to allow _connect
+        mock_node_instance = MagicMock()
+        mock_node_instance._connect.return_value = True
+        mock_node.return_value = mock_node_instance
+
+        # We only need the first iteration of the generator to check naming
+        gen = servicer.interact_node(iter([request]), MockContext())
+        next(gen) # Skip the success response
+
+        # Verify that node() was called with the custom name
+        mock_node.assert_called()
+        found = False
+        for call in mock_node.call_args_list:
+            if call.args[0] == &#34;custom-node-name@test&#34;:
+                found = True
+                break
+        assert found
+
+    @patch(&#34;connpy.core.node&#34;)
+    def test_interact_node_fallback_naming(self, mock_node, servicer):
+        # Setup request without custom name but with host
+        params = {&#34;host&#34;: &#34;my-instance&#34;, &#34;protocol&#34;: &#34;ssm&#34;}
+        request = connpy_pb2.InteractRequest(
+            id=&#34;dynamic&#34;,
+            connection_params_json=json.dumps(params)
+        )
+        
+        mock_node_instance = MagicMock()
+        mock_node_instance._connect.return_value = True
+        mock_node.return_value = mock_node_instance
+
+        gen = servicer.interact_node(iter([request]), MockContext())
+        next(gen)
+
+        # Verify fallback name: dynamic-{host}@remote
+        found = False
+        for call in mock_node.call_args_list:
+            if call.args[0] == &#34;dynamic-my-instance@remote&#34;:
+                found = True
+                break
+        assert found</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_grpc_layer.TestNodeServicerNaming.servicer"><code class="name flex">
+<span>def <span class="ident">servicer</span></span>(<span>self, populated_config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@pytest.fixture
+def servicer(self, populated_config):
+    return server.NodeServicer(populated_config)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_grpc_layer.TestNodeServicerNaming.test_interact_node_fallback_naming"><code class="name flex">
+<span>def <span class="ident">test_interact_node_fallback_naming</span></span>(<span>self, mock_node, servicer)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.core.node&#34;)
+def test_interact_node_fallback_naming(self, mock_node, servicer):
+    # Setup request without custom name but with host
+    params = {&#34;host&#34;: &#34;my-instance&#34;, &#34;protocol&#34;: &#34;ssm&#34;}
+    request = connpy_pb2.InteractRequest(
+        id=&#34;dynamic&#34;,
+        connection_params_json=json.dumps(params)
+    )
+    
+    mock_node_instance = MagicMock()
+    mock_node_instance._connect.return_value = True
+    mock_node.return_value = mock_node_instance
+
+    gen = servicer.interact_node(iter([request]), MockContext())
+    next(gen)
+
+    # Verify fallback name: dynamic-{host}@remote
+    found = False
+    for call in mock_node.call_args_list:
+        if call.args[0] == &#34;dynamic-my-instance@remote&#34;:
+            found = True
+            break
+    assert found</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.tests.test_grpc_layer.TestNodeServicerNaming.test_interact_node_uses_passed_name"><code class="name flex">
+<span>def <span class="ident">test_interact_node_uses_passed_name</span></span>(<span>self, mock_node, servicer)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;connpy.core.node&#34;)
+def test_interact_node_uses_passed_name(self, mock_node, servicer):
+    # Setup request with custom name
+    params = {&#34;name&#34;: &#34;custom-node-name@test&#34;, &#34;host&#34;: &#34;1.2.3.4&#34;, &#34;protocol&#34;: &#34;ssh&#34;}
+    request = connpy_pb2.InteractRequest(
+        id=&#34;dynamic&#34;,
+        connection_params_json=json.dumps(params)
+    )
+    
+    # Mock node to allow _connect
+    mock_node_instance = MagicMock()
+    mock_node_instance._connect.return_value = True
+    mock_node.return_value = mock_node_instance
+
+    # We only need the first iteration of the generator to check naming
+    gen = servicer.interact_node(iter([request]), MockContext())
+    next(gen) # Skip the success response
+
+    # Verify that node() was called with the custom name
+    mock_node.assert_called()
+    found = False
+    for call in mock_node.call_args_list:
+        if call.args[0] == &#34;custom-node-name@test&#34;:
+            found = True
+            break
+    assert found</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.tests.test_grpc_layer.TestStubsMessageFormatting"><code class="flex name class">
+<span>class <span class="ident">TestStubsMessageFormatting</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TestStubsMessageFormatting:
+    @patch(&#34;termios.tcsetattr&#34;)
+    @patch(&#34;termios.tcgetattr&#34;)
+    @patch(&#34;tty.setraw&#34;)
+    @patch(&#34;os.read&#34;)
+    @patch(&#34;select.select&#34;)
+    def test_connect_dynamic_msg_formatting_ssm(self, mock_select, mock_read, mock_setraw, mock_getattr, mock_setattr):
+        from connpy.grpc_layer.stubs import NodeStub
+        
+        mock_getattr.return_value = [0, 0, 0, 0, 0, 0, [0] * 32]
+        mock_channel = MagicMock()
+        stub = NodeStub(mock_channel, &#34;localhost:8048&#34;)
+        
+        mock_resp = MagicMock()
+        mock_resp.success = True
+        stub.stub.interact_node.return_value = iter([mock_resp])
+        
+        with patch(&#34;connpy.printer.success&#34;) as mock_success:
+            with patch(&#34;sys.stdin.fileno&#34;, return_value=0):
+                mock_select.return_value = ([], [], [])
+                params = {&#34;protocol&#34;: &#34;ssm&#34;, &#34;host&#34;: &#34;i-12345&#34;, &#34;name&#34;: &#34;my-ssm-node@aws&#34;}
+                
+                with patch(&#34;select.select&#34;, side_effect=KeyboardInterrupt):
+                    try:
+                        stub.connect_dynamic(params)
+                    except KeyboardInterrupt:
+                        pass
+                
+                mock_success.assert_called()
+                msg = mock_success.call_args[0][0]
+                assert &#34;Connected to my-ssm-node@aws&#34; in msg
+                assert &#34;at i-12345&#34; in msg
+                assert &#34;:22&#34; not in msg
+                assert &#34;via: ssm&#34; in msg</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.tests.test_grpc_layer.TestStubsMessageFormatting.test_connect_dynamic_msg_formatting_ssm"><code class="name flex">
+<span>def <span class="ident">test_connect_dynamic_msg_formatting_ssm</span></span>(<span>self, mock_select, mock_read, mock_setraw, mock_getattr, mock_setattr)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@patch(&#34;termios.tcsetattr&#34;)
+@patch(&#34;termios.tcgetattr&#34;)
+@patch(&#34;tty.setraw&#34;)
+@patch(&#34;os.read&#34;)
+@patch(&#34;select.select&#34;)
+def test_connect_dynamic_msg_formatting_ssm(self, mock_select, mock_read, mock_setraw, mock_getattr, mock_setattr):
+    from connpy.grpc_layer.stubs import NodeStub
+    
+    mock_getattr.return_value = [0, 0, 0, 0, 0, 0, [0] * 32]
+    mock_channel = MagicMock()
+    stub = NodeStub(mock_channel, &#34;localhost:8048&#34;)
+    
+    mock_resp = MagicMock()
+    mock_resp.success = True
+    stub.stub.interact_node.return_value = iter([mock_resp])
+    
+    with patch(&#34;connpy.printer.success&#34;) as mock_success:
+        with patch(&#34;sys.stdin.fileno&#34;, return_value=0):
+            mock_select.return_value = ([], [], [])
+            params = {&#34;protocol&#34;: &#34;ssm&#34;, &#34;host&#34;: &#34;i-12345&#34;, &#34;name&#34;: &#34;my-ssm-node@aws&#34;}
+            
+            with patch(&#34;select.select&#34;, side_effect=KeyboardInterrupt):
+                try:
+                    stub.connect_dynamic(params)
+                except KeyboardInterrupt:
+                    pass
+            
+            mock_success.assert_called()
+            msg = mock_success.call_args[0][0]
+            assert &#34;Connected to my-ssm-node@aws&#34; in msg
+            assert &#34;at i-12345&#34; in msg
+            assert &#34;:22&#34; not in msg
+            assert &#34;via: ssm&#34; in msg</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="connpy.tests" href="index.html">connpy.tests</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="connpy.tests.test_grpc_layer.MockContext" href="#connpy.tests.test_grpc_layer.MockContext">MockContext</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_grpc_layer.MockContext.abort" href="#connpy.tests.test_grpc_layer.MockContext.abort">abort</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.tests.test_grpc_layer.TestGRPCIntegration" href="#connpy.tests.test_grpc_layer.TestGRPCIntegration">TestGRPCIntegration</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_grpc_layer.TestGRPCIntegration.channel" href="#connpy.tests.test_grpc_layer.TestGRPCIntegration.channel">channel</a></code></li>
+<li><code><a title="connpy.tests.test_grpc_layer.TestGRPCIntegration.config_stub" href="#connpy.tests.test_grpc_layer.TestGRPCIntegration.config_stub">config_stub</a></code></li>
+<li><code><a title="connpy.tests.test_grpc_layer.TestGRPCIntegration.grpc_server" href="#connpy.tests.test_grpc_layer.TestGRPCIntegration.grpc_server">grpc_server</a></code></li>
+<li><code><a title="connpy.tests.test_grpc_layer.TestGRPCIntegration.node_stub" href="#connpy.tests.test_grpc_layer.TestGRPCIntegration.node_stub">node_stub</a></code></li>
+<li><code><a title="connpy.tests.test_grpc_layer.TestGRPCIntegration.profile_stub" href="#connpy.tests.test_grpc_layer.TestGRPCIntegration.profile_stub">profile_stub</a></code></li>
+<li><code><a title="connpy.tests.test_grpc_layer.TestGRPCIntegration.test_add_delete_node_integration" href="#connpy.tests.test_grpc_layer.TestGRPCIntegration.test_add_delete_node_integration">test_add_delete_node_integration</a></code></li>
+<li><code><a title="connpy.tests.test_grpc_layer.TestGRPCIntegration.test_get_node_details_integration" href="#connpy.tests.test_grpc_layer.TestGRPCIntegration.test_get_node_details_integration">test_get_node_details_integration</a></code></li>
+<li><code><a title="connpy.tests.test_grpc_layer.TestGRPCIntegration.test_get_settings_integration" href="#connpy.tests.test_grpc_layer.TestGRPCIntegration.test_get_settings_integration">test_get_settings_integration</a></code></li>
+<li><code><a title="connpy.tests.test_grpc_layer.TestGRPCIntegration.test_import_yaml_integration" href="#connpy.tests.test_grpc_layer.TestGRPCIntegration.test_import_yaml_integration">test_import_yaml_integration</a></code></li>
+<li><code><a title="connpy.tests.test_grpc_layer.TestGRPCIntegration.test_list_nodes_integration" href="#connpy.tests.test_grpc_layer.TestGRPCIntegration.test_list_nodes_integration">test_list_nodes_integration</a></code></li>
+<li><code><a title="connpy.tests.test_grpc_layer.TestGRPCIntegration.test_list_profiles_integration" href="#connpy.tests.test_grpc_layer.TestGRPCIntegration.test_list_profiles_integration">test_list_profiles_integration</a></code></li>
+<li><code><a title="connpy.tests.test_grpc_layer.TestGRPCIntegration.test_node_not_found_integration" href="#connpy.tests.test_grpc_layer.TestGRPCIntegration.test_node_not_found_integration">test_node_not_found_integration</a></code></li>
+<li><code><a title="connpy.tests.test_grpc_layer.TestGRPCIntegration.test_update_setting_integration" href="#connpy.tests.test_grpc_layer.TestGRPCIntegration.test_update_setting_integration">test_update_setting_integration</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.tests.test_grpc_layer.TestNodeServicerNaming" href="#connpy.tests.test_grpc_layer.TestNodeServicerNaming">TestNodeServicerNaming</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_grpc_layer.TestNodeServicerNaming.servicer" href="#connpy.tests.test_grpc_layer.TestNodeServicerNaming.servicer">servicer</a></code></li>
+<li><code><a title="connpy.tests.test_grpc_layer.TestNodeServicerNaming.test_interact_node_fallback_naming" href="#connpy.tests.test_grpc_layer.TestNodeServicerNaming.test_interact_node_fallback_naming">test_interact_node_fallback_naming</a></code></li>
+<li><code><a title="connpy.tests.test_grpc_layer.TestNodeServicerNaming.test_interact_node_uses_passed_name" href="#connpy.tests.test_grpc_layer.TestNodeServicerNaming.test_interact_node_uses_passed_name">test_interact_node_uses_passed_name</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.tests.test_grpc_layer.TestStubsMessageFormatting" href="#connpy.tests.test_grpc_layer.TestStubsMessageFormatting">TestStubsMessageFormatting</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.tests.test_grpc_layer.TestStubsMessageFormatting.test_connect_dynamic_msg_formatting_ssm" href="#connpy.tests.test_grpc_layer.TestStubsMessageFormatting.test_connect_dynamic_msg_formatting_ssm">test_connect_dynamic_msg_formatting_ssm</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+</footer>
+</body>
+</html>

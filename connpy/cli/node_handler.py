@@ -122,6 +122,10 @@ class NodeHandler:
                     printer.error(f"Node '{args.data}' already exists.")
                     sys.exit(1)
                 uniques = self.app.services.nodes.explode_unique(args.data)
+                
+                # Fast fail if parent folder does not exist
+                self.app.services.nodes.validate_parent_folder(args.data)
+
                 printer.console.print(Markdown(get_instructions()))
 
                 new_node_data = self.forms.questions_nodes(args.data, uniques)

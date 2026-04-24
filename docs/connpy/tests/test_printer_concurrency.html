@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
 <meta name="generator" content="pdoc3 0.11.6">
-<title>connpy.cli.helpers API documentation</title>
+<title>connpy.tests.test_printer_concurrency API documentation</title>
 <meta name="description" content="">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
@@ -33,7 +33,7 @@ el.replaceWith(d);
 <main>
 <article id="content">
 <header>
-<h1 class="title">Module <code>connpy.cli.helpers</code></h1>
+<h1 class="title">Module <code>connpy.tests.test_printer_concurrency</code></h1>
 </header>
 <section id="section-intro">
 </section>
@@ -44,139 +44,84 @@ el.replaceWith(d);
 <section>
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
-<dt id="connpy.cli.helpers.choose"><code class="name flex">
-<span>def <span class="ident">choose</span></span>(<span>app, list_, name, action)</span>
+<dt id="connpy.tests.test_printer_concurrency.test_printer_manual_stream"><code class="name flex">
+<span>def <span class="ident">test_printer_manual_stream</span></span>(<span>)</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def choose(app, list_, name, action):
-    # Generates an inquirer list to pick
-    # Safeguard: Never prompt if running in autocomplete shell
-    if os.environ.get(&#34;_ARGCOMPLETE&#34;) or os.environ.get(&#34;COMP_LINE&#34;):
-        return None
-
-    if FzfPrompt and app.fzf and os.environ.get(&#34;_ARGCOMPLETE&#34;) is None and os.environ.get(&#34;COMP_LINE&#34;) is None:
-        fzf_prompt = FzfPrompt(executable_path=&#34;fzf-tmux&#34;)
-        if not app.case:
-            fzf_prompt = FzfPrompt(executable_path=&#34;fzf-tmux -i&#34;)
-        answer = fzf_prompt.prompt(list_, fzf_options=&#34;-d 25%&#34;)
-        if len(answer) == 0:
-            return None
-        else:
-            return answer[0]
-    else:
-        questions = [inquirer.List(name, message=&#34;Pick {} to {}:&#34;.format(name,action), choices=list_, carousel=True)]
-        answer = inquirer.prompt(questions)
-        if answer == None:
-            return None
-        else:
-            return answer[name]</code></pre>
-</details>
-<div class="desc"></div>
-</dd>
-<dt id="connpy.cli.helpers.folders_completer"><code class="name flex">
-<span>def <span class="ident">folders_completer</span></span>(<span>prefix, parsed_args, **kwargs)</span>
-</code></dt>
-<dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def folders_completer(prefix, parsed_args, **kwargs):
-    configdir = get_config_dir()
-    cache_file = os.path.join(configdir, &#39;.folders_cache.txt&#39;)
-    if os.path.exists(cache_file):
-        with open(cache_file, &#34;r&#34;) as f:
-            return [line.strip() for line in f if line.startswith(prefix)]
-    return []</code></pre>
-</details>
-<div class="desc"></div>
-</dd>
-<dt id="connpy.cli.helpers.get_config_dir"><code class="name flex">
-<span>def <span class="ident">get_config_dir</span></span>(<span>)</span>
-</code></dt>
-<dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def get_config_dir():
-    home = os.path.expanduser(&#34;~&#34;)
-    defaultdir = os.path.join(home, &#39;.config/conn&#39;)
-    pathfile = os.path.join(defaultdir, &#39;.folder&#39;)
-    try:
-        with open(pathfile, &#34;r&#34;) as f:
-            return f.read().strip()
-    except:
-        return defaultdir</code></pre>
-</details>
-<div class="desc"></div>
-</dd>
-<dt id="connpy.cli.helpers.nodes_completer"><code class="name flex">
-<span>def <span class="ident">nodes_completer</span></span>(<span>prefix, parsed_args, **kwargs)</span>
-</code></dt>
-<dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def nodes_completer(prefix, parsed_args, **kwargs):
-    configdir = get_config_dir()
-    cache_file = os.path.join(configdir, &#39;.fzf_nodes_cache.txt&#39;)
-    if os.path.exists(cache_file):
-        with open(cache_file, &#34;r&#34;) as f:
-            return [line.strip() for line in f if line.startswith(prefix)]
-    return []</code></pre>
-</details>
-<div class="desc"></div>
-</dd>
-<dt id="connpy.cli.helpers.profiles_completer"><code class="name flex">
-<span>def <span class="ident">profiles_completer</span></span>(<span>prefix, parsed_args, **kwargs)</span>
-</code></dt>
-<dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def profiles_completer(prefix, parsed_args, **kwargs):
-    configdir = get_config_dir()
-    cache_file = os.path.join(configdir, &#39;.profiles_cache.txt&#39;)
-    if os.path.exists(cache_file):
-        with open(cache_file, &#34;r&#34;) as f:
-            return [line.strip() for line in f if line.startswith(prefix)]
-    return []</code></pre>
-</details>
-<div class="desc"></div>
-</dd>
-<dt id="connpy.cli.helpers.toplevel_completer"><code class="name flex">
-<span>def <span class="ident">toplevel_completer</span></span>(<span>prefix, parsed_args, **kwargs)</span>
-</code></dt>
-<dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def toplevel_completer(prefix, parsed_args, **kwargs):
-    commands = [&#34;node&#34;, &#34;profile&#34;, &#34;move&#34;, &#34;mv&#34;, &#34;copy&#34;, &#34;cp&#34;, &#34;list&#34;, &#34;ls&#34;, &#34;bulk&#34;, &#34;export&#34;, &#34;import&#34;, &#34;ai&#34;, &#34;run&#34;, &#34;api&#34;, &#34;context&#34;, &#34;plugin&#34;, &#34;config&#34;, &#34;sync&#34;]
+<pre><code class="python">def test_printer_manual_stream():
+    &#34;&#34;&#34;Verify that setting a thread stream correctly captures printer output in the current thread.&#34;&#34;&#34;
+    buf = io.StringIO()
     
-    configdir = get_config_dir()
-    cache_file = os.path.join(configdir, &#39;.fzf_nodes_cache.txt&#39;)
-    nodes = []
-    if os.path.exists(cache_file):
-        with open(cache_file, &#34;r&#34;) as f:
-            nodes = [line.strip() for line in f if line.startswith(prefix)]
-            
-    cache_folders = os.path.join(configdir, &#39;.folders_cache.txt&#39;)
-    if os.path.exists(cache_folders):
-        with open(cache_folders, &#34;r&#34;) as f:
-            nodes += [line.strip() for line in f if line.startswith(prefix)]
-            
-    return [c for c in commands + nodes if c.startswith(prefix)]</code></pre>
+    # We must clear the thread-local console to force it to pick up the new sys.stdout proxy
+    printer.set_thread_console(None)
+    printer.set_thread_stream(buf)
+    
+    printer.info(&#34;Captured-Message&#34;)
+    
+    output = buf.getvalue()
+    printer.set_thread_stream(None)
+    printer.set_thread_console(None)
+    
+    assert &#34;Captured-Message&#34; in output</code></pre>
 </details>
-<div class="desc"></div>
+<div class="desc"><p>Verify that setting a thread stream correctly captures printer output in the current thread.</p></div>
+</dd>
+<dt id="connpy.tests.test_printer_concurrency.test_printer_thread_isolation"><code class="name flex">
+<span>def <span class="ident">test_printer_thread_isolation</span></span>(<span>)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_printer_thread_isolation():
+    &#34;&#34;&#34;Verify that printer output is isolated per thread when using set_thread_stream.&#34;&#34;&#34;
+    num_threads = 5
+    iterations = 20
+    results = {}
+    
+    def worker(thread_id):
+        # Create a private buffer for this thread
+        buf = io.StringIO()
+        printer.set_thread_stream(buf)
+        
+        # Ensure we have a clean console for this thread
+        # In a real gRPC request, this happens automatically as it&#39;s a new thread
+        printer.set_thread_console(None) 
+        
+        # Each thread prints its own ID
+        expected_msg = f&#34;Thread-{thread_id}&#34;
+        for _ in range(iterations):
+            printer.info(expected_msg)
+            time.sleep(0.01)
+            
+        results[thread_id] = buf.getvalue()
+        printer.set_thread_stream(None)
+
+    threads = []
+    for i in range(num_threads):
+        t = threading.Thread(target=worker, args=(i,))
+        threads.append(t)
+        t.start()
+        
+    for t in threads:
+        t.join()
+        
+    # Validation
+    for thread_id, output in results.items():
+        expected_msg = f&#34;Thread-{thread_id}&#34;
+        assert expected_msg in output
+        
+        # Ensure no leaks
+        for other_id in range(num_threads):
+            if other_id == thread_id: continue
+            assert f&#34;Thread-{other_id}&#34; not in output</code></pre>
+</details>
+<div class="desc"><p>Verify that printer output is isolated per thread when using set_thread_stream.</p></div>
 </dd>
 </dl>
 </section>
@@ -190,17 +135,13 @@ el.replaceWith(d);
 <ul id="index">
 <li><h3>Super-module</h3>
 <ul>
-<li><code><a title="connpy.cli" href="index.html">connpy.cli</a></code></li>
+<li><code><a title="connpy.tests" href="index.html">connpy.tests</a></code></li>
 </ul>
 </li>
 <li><h3><a href="#header-functions">Functions</a></h3>
-<ul class="two-column">
-<li><code><a title="connpy.cli.helpers.choose" href="#connpy.cli.helpers.choose">choose</a></code></li>
-<li><code><a title="connpy.cli.helpers.folders_completer" href="#connpy.cli.helpers.folders_completer">folders_completer</a></code></li>
-<li><code><a title="connpy.cli.helpers.get_config_dir" href="#connpy.cli.helpers.get_config_dir">get_config_dir</a></code></li>
-<li><code><a title="connpy.cli.helpers.nodes_completer" href="#connpy.cli.helpers.nodes_completer">nodes_completer</a></code></li>
-<li><code><a title="connpy.cli.helpers.profiles_completer" href="#connpy.cli.helpers.profiles_completer">profiles_completer</a></code></li>
-<li><code><a title="connpy.cli.helpers.toplevel_completer" href="#connpy.cli.helpers.toplevel_completer">toplevel_completer</a></code></li>
+<ul class="">
+<li><code><a title="connpy.tests.test_printer_concurrency.test_printer_manual_stream" href="#connpy.tests.test_printer_concurrency.test_printer_manual_stream">test_printer_manual_stream</a></code></li>
+<li><code><a title="connpy.tests.test_printer_concurrency.test_printer_thread_isolation" href="#connpy.tests.test_printer_concurrency.test_printer_thread_isolation">test_printer_thread_isolation</a></code></li>
 </ul>
 </li>
 </ul>

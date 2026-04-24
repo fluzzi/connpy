@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.5">
+<meta name="generator" content="pdoc3 0.11.6">
 <title>connpy.services.plugin_service API documentation</title>
 <meta name="description" content="">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
@@ -231,6 +231,7 @@ el.replaceWith(d);
         from ..services.exceptions import InvalidConfigurationError
         from connpy.plugins import Plugins
         class MockApp:
+            is_mock = True
             def __init__(self, config):
                 from ..core import node, nodes
                 from ..ai import ai
@@ -242,14 +243,20 @@ el.replaceWith(d);
                 self.ai = ai
                 
                 self.services = ServiceProvider(config, mode=&#34;local&#34;)
+                
+                # Get settings for CLI behavior
+                settings = self.services.config_svc.get_settings()
+                self.case = settings.get(&#34;case&#34;, False)
+                self.fzf = settings.get(&#34;fzf&#34;, False)
+                
                 try:
                     self.nodes_list = self.services.nodes.list_nodes()
                     self.folders = self.services.nodes.list_folders()
                     self.profiles = self.services.profiles.list_profiles()
                 except Exception:
-                    self.nodes_list = {}
-                    self.folders = {}
-                    self.profiles = {}
+                    self.nodes_list = []
+                    self.folders = []
+                    self.profiles = []
         
         args = Namespace(**args_dict)
         
@@ -276,26 +283,26 @@ el.replaceWith(d);
         from .. import printer
         from rich.console import Console
         
+        from rich.console import Console
         buf = io.StringIO()
-        old_console = printer.console
-        old_err_console = printer.err_console
+        old_console = printer._get_console()
+        old_err_console = printer._get_err_console()
         
-        printer.console = Console(file=buf, theme=printer.connpy_theme, force_terminal=True)
-        printer.err_console = Console(file=buf, theme=printer.connpy_theme, force_terminal=True)
-        
-        old_stdout = sys.stdout
-        sys.stdout = buf
+        printer.set_thread_console(Console(file=buf, theme=printer.connpy_theme, force_terminal=True))
+        printer.set_thread_err_console(Console(file=buf, theme=printer.connpy_theme, force_terminal=True))
+        printer.set_thread_stream(buf)
         
         try:
             if hasattr(module, &#34;Entrypoint&#34;):
                 module.Entrypoint(args, parser, app)
-        except Exception as e:
-            import traceback
-            printer.err_console.print(traceback.format_exc())
+        except BaseException as e:
+            if not isinstance(e, SystemExit):
+                import traceback
+                printer.err_console.print(traceback.format_exc())
         finally:
-            sys.stdout = old_stdout
-            printer.console = old_console
-            printer.err_console = old_err_console
+            printer.set_thread_console(old_console)
+            printer.set_thread_err_console(old_err_console)
+            printer.set_thread_stream(None)
             
         for line in buf.getvalue().splitlines(keepends=True):
             yield line</code></pre>
@@ -500,6 +507,7 @@ el.replaceWith(d);
     from ..services.exceptions import InvalidConfigurationError
     from connpy.plugins import Plugins
     class MockApp:
+        is_mock = True
         def __init__(self, config):
             from ..core import node, nodes
             from ..ai import ai
@@ -511,14 +519,20 @@ el.replaceWith(d);
             self.ai = ai
             
             self.services = ServiceProvider(config, mode=&#34;local&#34;)
+            
+            # Get settings for CLI behavior
+            settings = self.services.config_svc.get_settings()
+            self.case = settings.get(&#34;case&#34;, False)
+            self.fzf = settings.get(&#34;fzf&#34;, False)
+            
             try:
                 self.nodes_list = self.services.nodes.list_nodes()
                 self.folders = self.services.nodes.list_folders()
                 self.profiles = self.services.profiles.list_profiles()
             except Exception:
-                self.nodes_list = {}
-                self.folders = {}
-                self.profiles = {}
+                self.nodes_list = []
+                self.folders = []
+                self.profiles = []
     
     args = Namespace(**args_dict)
     
@@ -545,26 +559,26 @@ el.replaceWith(d);
     from .. import printer
     from rich.console import Console
     
+    from rich.console import Console
     buf = io.StringIO()
-    old_console = printer.console
-    old_err_console = printer.err_console
+    old_console = printer._get_console()
+    old_err_console = printer._get_err_console()
     
-    printer.console = Console(file=buf, theme=printer.connpy_theme, force_terminal=True)
-    printer.err_console = Console(file=buf, theme=printer.connpy_theme, force_terminal=True)
-    
-    old_stdout = sys.stdout
-    sys.stdout = buf
+    printer.set_thread_console(Console(file=buf, theme=printer.connpy_theme, force_terminal=True))
+    printer.set_thread_err_console(Console(file=buf, theme=printer.connpy_theme, force_terminal=True))
+    printer.set_thread_stream(buf)
     
     try:
         if hasattr(module, &#34;Entrypoint&#34;):
             module.Entrypoint(args, parser, app)
-    except Exception as e:
-        import traceback
-        printer.err_console.print(traceback.format_exc())
+    except BaseException as e:
+        if not isinstance(e, SystemExit):
+            import traceback
+            printer.err_console.print(traceback.format_exc())
     finally:
-        sys.stdout = old_stdout
-        printer.console = old_console
-        printer.err_console = old_err_console
+        printer.set_thread_console(old_console)
+        printer.set_thread_err_console(old_err_console)
+        printer.set_thread_stream(None)
         
     for line in buf.getvalue().splitlines(keepends=True):
         yield line</code></pre>
@@ -657,7 +671,7 @@ el.replaceWith(d);
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
 </footer>
 </body>
 </html>

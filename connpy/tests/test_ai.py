@@ -269,16 +269,16 @@ class TestToolMethods:
 
     def test_list_nodes_tool_found(self, myai):
         result = myai.list_nodes_tool("router.*")
-        parsed = json.loads(result)
+        parsed = json.loads(result) if isinstance(result, str) else result
         assert "router1" in str(parsed)
 
     def test_list_nodes_tool_not_found(self, myai):
         result = myai.list_nodes_tool("nonexistent_pattern_xyz")
-        assert "No nodes found" in result
+        assert "No nodes found" in str(result)
 
     def test_get_node_info_masks_password(self, myai):
         result = myai.get_node_info_tool("router1")
-        parsed = json.loads(result)
+        parsed = json.loads(result) if isinstance(result, str) else result
         assert parsed["password"] == "***"
 
     def test_is_safe_command_show(self, myai):

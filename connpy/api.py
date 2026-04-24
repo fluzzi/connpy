@@ -48,7 +48,7 @@ def stop_api():
     return port
 
 def debug_api(port=8048, config=None):
-    from .grpc.server import serve
+    from .grpc_layer.server import serve
     conf = config or configfile()
     server = serve(conf, port=port, debug=True)
     printer.info(f"gRPC Server running in debug mode on port {port}...")
@@ -63,7 +63,7 @@ def start_server(port=8048, config=None):
         if base_dir not in sys.path:
             sys.path.insert(0, base_dir)
             
-        from connpy.grpc.server import serve
+        from connpy.grpc_layer.server import serve
         conf = config or configfile()
         server = serve(conf, port=port, debug=False)
         _wait_for_termination()

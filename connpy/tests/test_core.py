@@ -99,6 +99,23 @@ class TestCommandGeneration:
         assert "telnet 10.0.0.1" in cmd
         assert "23" in cmd
 
+    def test_ssm_cmd_basic(self):
+        n = self._make_node(protocol="ssm", host="i-12345")
+        cmd = n._get_cmd()
+        assert "aws ssm start-session" in cmd
+        assert "--target i-12345" in cmd
+
+    def test_ssm_cmd_tags(self):
+        n = self._make_node(protocol="ssm", host="i-12345", tags={"region": "us-west-2", "profile": "prod"})
+        cmd = n._get_cmd()
+        assert "--region us-west-2" in cmd
+        assert "--profile prod" in cmd
+
+    def test_ssm_cmd_options(self):
+        n = self._make_node(protocol="ssm", host="i-12345", options="--document-name AWS-StartInteractiveCommand")
+        cmd = n._get_cmd()
+        assert "--document-name AWS-StartInteractiveCommand" in cmd
+
     def test_kubectl_cmd(self):
         n = self._make_node(protocol="kubectl", host="my-pod", tags={"kube_command": "/bin/sh"})
         cmd = n._get_cmd()

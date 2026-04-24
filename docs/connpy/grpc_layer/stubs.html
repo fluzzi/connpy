@@ -1,0 +1,2108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<meta name="generator" content="pdoc3 0.11.6">
+<title>connpy.grpc_layer.stubs API documentation</title>
+<meta name="description" content="">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:1.5em;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:2em 0 .50em 0}h3{font-size:1.4em;margin:1.6em 0 .7em 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .2s ease-in-out}a:visited{color:#503}a:hover{color:#b62}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900;font-weight:bold}pre code{font-size:.8em;line-height:1.4em;padding:1em;display:block}code{background:#f3f3f3;font-family:"DejaVu Sans Mono",monospace;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source > summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible;min-width:max-content}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em 1em;margin:1em 0}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul ul{padding-left:1em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha512-D9gUyxqja7hBtkWpPWGt9wfbfaMGVt9gnyCvYa+jojwwPHLCzUm5i8rpk7vD7wNee9bA35eYIjobYPaQuKS1MQ==" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => {
+hljs.configure({languages: ['bash', 'css', 'diff', 'graphql', 'ini', 'javascript', 'json', 'plaintext', 'python', 'python-repl', 'rust', 'shell', 'sql', 'typescript', 'xml', 'yaml']});
+hljs.highlightAll();
+/* Collapse source docstrings */
+setTimeout(() => {
+[...document.querySelectorAll('.hljs.language-python > .hljs-string')]
+.filter(el => el.innerHTML.length > 200 && ['"""', "'''"].includes(el.innerHTML.substring(0, 3)))
+.forEach(el => {
+let d = document.createElement('details');
+d.classList.add('hljs-string');
+d.innerHTML = '<summary>"""</summary>' + el.innerHTML.substring(3);
+el.replaceWith(d);
+});
+}, 100);
+})</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>connpy.grpc_layer.stubs</code></h1>
+</header>
+<section id="section-intro">
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-functions">Functions</h2>
+<dl>
+<dt id="connpy.grpc_layer.stubs.handle_errors"><code class="name flex">
+<span>def <span class="ident">handle_errors</span></span>(<span>func)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def handle_errors(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except grpc.RpcError as e:
+            # Re-raise gRPC errors as native ConnpyError to keep CLI handlers agnostic
+            details = e.details()
+
+            # Identify the host if available on the instance
+            instance = args[0] if args else None
+            host = getattr(instance, &#34;remote_host&#34;, &#34;remote host&#34;)
+
+            # Make common gRPC errors more readable
+            if &#34;failed to connect to all addresses&#34; in details:
+                simplified = f&#34;Failed to connect to remote host at {host} (Connection refused)&#34;
+            elif &#34;Method not found&#34; in details:
+                simplified = f&#34;Remote server at {host} is using an incompatible version&#34;
+            elif &#34;Deadline Exceeded&#34; in details:
+                simplified = f&#34;Request to {host} timed out&#34;
+            else:
+                simplified = details
+
+            raise ConnpyError(simplified)
+    return wrapper</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="connpy.grpc_layer.stubs.AIStub"><code class="flex name class">
+<span>class <span class="ident">AIStub</span></span>
+<span>(</span><span>channel, remote_host)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class AIStub:
+    def __init__(self, channel, remote_host):
+        self.stub = connpy_pb2_grpc.AIServiceStub(channel)
+        self.remote_host = remote_host
+
+    @handle_errors
+    def ask(self, input_text, dryrun=False, chat_history=None, session_id=None, debug=False, status=None, **overrides):
+        import queue
+        from rich.prompt import Prompt
+        from rich.text import Text
+        from rich.live import Live
+        from rich.panel import Panel
+        from rich.markdown import Markdown
+        
+        req_queue = queue.Queue()
+        
+        initial_req = connpy_pb2.AskRequest(
+            input_text=input_text,
+            dryrun=dryrun,
+            session_id=session_id or &#34;&#34;,
+            debug=debug,
+            engineer_model=overrides.get(&#34;engineer_model&#34;, &#34;&#34;),
+            engineer_api_key=overrides.get(&#34;engineer_api_key&#34;, &#34;&#34;),
+            architect_model=overrides.get(&#34;architect_model&#34;, &#34;&#34;),
+            architect_api_key=overrides.get(&#34;architect_api_key&#34;, &#34;&#34;),
+            trust=overrides.get(&#34;trust&#34;, False)
+        )
+        if chat_history is not None:
+            initial_req.chat_history.CopyFrom(to_value(chat_history))
+            
+        req_queue.put(initial_req)
+
+        def request_generator():
+            while True:
+                req = req_queue.get()
+                if req is None: break
+                yield req
+
+        responses = self.stub.ask(request_generator())
+        
+        full_content = &#34;&#34;
+        live_display = None
+        final_result = {&#34;response&#34;: &#34;&#34;, &#34;chat_history&#34;: []}
+
+        # Background thread to pull responses from gRPC into a local queue
+        # This prevents KeyboardInterrupt from corrupting the gRPC iterator state
+        response_queue = queue.Queue()
+        
+        def pull_responses():
+            try:
+                for response in responses:
+                    response_queue.put((&#34;data&#34;, response))
+            except Exception as e:
+                response_queue.put((&#34;error&#34;, e))
+            finally:
+                response_queue.put((None, None))
+
+        threading.Thread(target=pull_responses, daemon=True).start()
+
+        try:
+            while True:
+                try:
+                    # BLOCKING GET from local queue (interruptible by signal)
+                    msg_type, response = response_queue.get()
+                except KeyboardInterrupt:
+                    # Signal interruption to the server
+                    if status:
+                        status.update(&#34;[error]Interrupted! Closing pending tasks...&#34;)
+                    
+                    # Send the interrupt signal to the server
+                    req_queue.put(connpy_pb2.AskRequest(interrupt=True))
+                    
+                    # CONTINUE the loop to receive remaining data and summary from the queue
+                    continue
+                
+                if msg_type is None: # Sentinel
+                    break
+                
+                if msg_type == &#34;error&#34;:
+                    # Re-raise or handle gRPC error from background thread
+                    if isinstance(response, grpc.RpcError):
+                        raise response
+                    printer.warning(f&#34;Stream interrupted: {response}&#34;)
+                    break
+
+                if response.status_update:
+                    if response.requires_confirmation:
+                        if status: status.stop()
+                        if live_display: live_display.stop()
+                        
+                        # Show prompt and wait for answer
+                        prompt_text = Text.from_ansi(response.status_update)
+                        ans = Prompt.ask(prompt_text)
+                        
+                        if status: 
+                            status.update(&#34;[ai_status]Agent: Resuming...&#34;)
+                            status.start()
+                        if live_display: live_display.start()
+                        
+                        req_queue.put(connpy_pb2.AskRequest(confirmation_answer=ans))
+                        continue
+                        
+                    if status:
+                        status.update(response.status_update)
+                    continue
+                
+                if response.debug_message:
+                    if debug:
+                        printer.console.print(Text.from_ansi(response.debug_message))
+                    continue
+                
+                if response.important_message:
+                    printer.console.print(Text.from_ansi(response.important_message))
+                    continue
+
+                if not response.is_final:
+                    full_content += response.text_chunk
+                    
+                    if not live_display and not debug:
+                        if status: status.stop()
+                        live_display = Live(
+                            Panel(Markdown(full_content), title=&#34;AI Assistant&#34;, expand=False),
+                            console=printer.console,
+                            refresh_per_second=8,
+                            transient=False
+                        )
+                        live_display.start()
+                    elif live_display:
+                        live_display.update(Panel(Markdown(full_content), title=&#34;AI Assistant&#34;, expand=False))
+                    continue
+                
+                if response.is_final:
+                    final_result = from_struct(response.full_result)
+                    responder = final_result.get(&#34;responder&#34;, &#34;engineer&#34;)
+                    alias = &#34;architect&#34; if responder == &#34;architect&#34; else &#34;engineer&#34;
+                    role_label = &#34;Network Architect&#34; if responder == &#34;architect&#34; else &#34;Network Engineer&#34;
+                    title = f&#34;[bold {alias}]{role_label}[/bold {alias}]&#34;
+                    
+                    if live_display:
+                        live_display.update(Panel(Markdown(full_content), title=title, border_style=alias, expand=False))
+                        live_display.stop()
+                    elif full_content:
+                        printer.console.print(Panel(Markdown(full_content), title=title, border_style=alias, expand=False))
+                    break
+        except Exception as e:
+            # Check if it was a gRPC error that we should let handle_errors catch
+            if isinstance(e, grpc.RpcError):
+                raise
+            printer.warning(f&#34;Stream interrupted: {e}&#34;)
+        finally:
+            req_queue.put(None)
+        
+        if full_content:
+            final_result[&#34;streamed&#34;] = True
+            
+        return final_result
+
+    @handle_errors
+    def confirm(self, input_text, console=None):
+        return self.stub.confirm(connpy_pb2.StringRequest(value=input_text)).value
+
+    @handle_errors
+    def list_sessions(self):
+        return from_value(self.stub.list_sessions(Empty()).data)
+
+    @handle_errors
+    def delete_session(self, session_id):
+        self.stub.delete_session(connpy_pb2.StringRequest(value=session_id))
+
+    @handle_errors
+    def configure_provider(self, provider, model=None, api_key=None):
+        req = connpy_pb2.ProviderRequest(provider=provider, model=model or &#34;&#34;, api_key=api_key or &#34;&#34;)
+        self.stub.configure_provider(req)
+
+    @handle_errors
+    def load_session_data(self, session_id):
+        return from_struct(self.stub.load_session_data(connpy_pb2.StringRequest(value=session_id)).data)</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.grpc_layer.stubs.AIStub.ask"><code class="name flex">
+<span>def <span class="ident">ask</span></span>(<span>self,<br>input_text,<br>dryrun=False,<br>chat_history=None,<br>session_id=None,<br>debug=False,<br>status=None,<br>**overrides)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def ask(self, input_text, dryrun=False, chat_history=None, session_id=None, debug=False, status=None, **overrides):
+    import queue
+    from rich.prompt import Prompt
+    from rich.text import Text
+    from rich.live import Live
+    from rich.panel import Panel
+    from rich.markdown import Markdown
+    
+    req_queue = queue.Queue()
+    
+    initial_req = connpy_pb2.AskRequest(
+        input_text=input_text,
+        dryrun=dryrun,
+        session_id=session_id or &#34;&#34;,
+        debug=debug,
+        engineer_model=overrides.get(&#34;engineer_model&#34;, &#34;&#34;),
+        engineer_api_key=overrides.get(&#34;engineer_api_key&#34;, &#34;&#34;),
+        architect_model=overrides.get(&#34;architect_model&#34;, &#34;&#34;),
+        architect_api_key=overrides.get(&#34;architect_api_key&#34;, &#34;&#34;),
+        trust=overrides.get(&#34;trust&#34;, False)
+    )
+    if chat_history is not None:
+        initial_req.chat_history.CopyFrom(to_value(chat_history))
+        
+    req_queue.put(initial_req)
+
+    def request_generator():
+        while True:
+            req = req_queue.get()
+            if req is None: break
+            yield req
+
+    responses = self.stub.ask(request_generator())
+    
+    full_content = &#34;&#34;
+    live_display = None
+    final_result = {&#34;response&#34;: &#34;&#34;, &#34;chat_history&#34;: []}
+
+    # Background thread to pull responses from gRPC into a local queue
+    # This prevents KeyboardInterrupt from corrupting the gRPC iterator state
+    response_queue = queue.Queue()
+    
+    def pull_responses():
+        try:
+            for response in responses:
+                response_queue.put((&#34;data&#34;, response))
+        except Exception as e:
+            response_queue.put((&#34;error&#34;, e))
+        finally:
+            response_queue.put((None, None))
+
+    threading.Thread(target=pull_responses, daemon=True).start()
+
+    try:
+        while True:
+            try:
+                # BLOCKING GET from local queue (interruptible by signal)
+                msg_type, response = response_queue.get()
+            except KeyboardInterrupt:
+                # Signal interruption to the server
+                if status:
+                    status.update(&#34;[error]Interrupted! Closing pending tasks...&#34;)
+                
+                # Send the interrupt signal to the server
+                req_queue.put(connpy_pb2.AskRequest(interrupt=True))
+                
+                # CONTINUE the loop to receive remaining data and summary from the queue
+                continue
+            
+            if msg_type is None: # Sentinel
+                break
+            
+            if msg_type == &#34;error&#34;:
+                # Re-raise or handle gRPC error from background thread
+                if isinstance(response, grpc.RpcError):
+                    raise response
+                printer.warning(f&#34;Stream interrupted: {response}&#34;)
+                break
+
+            if response.status_update:
+                if response.requires_confirmation:
+                    if status: status.stop()
+                    if live_display: live_display.stop()
+                    
+                    # Show prompt and wait for answer
+                    prompt_text = Text.from_ansi(response.status_update)
+                    ans = Prompt.ask(prompt_text)
+                    
+                    if status: 
+                        status.update(&#34;[ai_status]Agent: Resuming...&#34;)
+                        status.start()
+                    if live_display: live_display.start()
+                    
+                    req_queue.put(connpy_pb2.AskRequest(confirmation_answer=ans))
+                    continue
+                    
+                if status:
+                    status.update(response.status_update)
+                continue
+            
+            if response.debug_message:
+                if debug:
+                    printer.console.print(Text.from_ansi(response.debug_message))
+                continue
+            
+            if response.important_message:
+                printer.console.print(Text.from_ansi(response.important_message))
+                continue
+
+            if not response.is_final:
+                full_content += response.text_chunk
+                
+                if not live_display and not debug:
+                    if status: status.stop()
+                    live_display = Live(
+                        Panel(Markdown(full_content), title=&#34;AI Assistant&#34;, expand=False),
+                        console=printer.console,
+                        refresh_per_second=8,
+                        transient=False
+                    )
+                    live_display.start()
+                elif live_display:
+                    live_display.update(Panel(Markdown(full_content), title=&#34;AI Assistant&#34;, expand=False))
+                continue
+            
+            if response.is_final:
+                final_result = from_struct(response.full_result)
+                responder = final_result.get(&#34;responder&#34;, &#34;engineer&#34;)
+                alias = &#34;architect&#34; if responder == &#34;architect&#34; else &#34;engineer&#34;
+                role_label = &#34;Network Architect&#34; if responder == &#34;architect&#34; else &#34;Network Engineer&#34;
+                title = f&#34;[bold {alias}]{role_label}[/bold {alias}]&#34;
+                
+                if live_display:
+                    live_display.update(Panel(Markdown(full_content), title=title, border_style=alias, expand=False))
+                    live_display.stop()
+                elif full_content:
+                    printer.console.print(Panel(Markdown(full_content), title=title, border_style=alias, expand=False))
+                break
+    except Exception as e:
+        # Check if it was a gRPC error that we should let handle_errors catch
+        if isinstance(e, grpc.RpcError):
+            raise
+        printer.warning(f&#34;Stream interrupted: {e}&#34;)
+    finally:
+        req_queue.put(None)
+    
+    if full_content:
+        final_result[&#34;streamed&#34;] = True
+        
+    return final_result</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.AIStub.configure_provider"><code class="name flex">
+<span>def <span class="ident">configure_provider</span></span>(<span>self, provider, model=None, api_key=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def configure_provider(self, provider, model=None, api_key=None):
+    req = connpy_pb2.ProviderRequest(provider=provider, model=model or &#34;&#34;, api_key=api_key or &#34;&#34;)
+    self.stub.configure_provider(req)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.AIStub.confirm"><code class="name flex">
+<span>def <span class="ident">confirm</span></span>(<span>self, input_text, console=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def confirm(self, input_text, console=None):
+    return self.stub.confirm(connpy_pb2.StringRequest(value=input_text)).value</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.AIStub.delete_session"><code class="name flex">
+<span>def <span class="ident">delete_session</span></span>(<span>self, session_id)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def delete_session(self, session_id):
+    self.stub.delete_session(connpy_pb2.StringRequest(value=session_id))</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.AIStub.list_sessions"><code class="name flex">
+<span>def <span class="ident">list_sessions</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def list_sessions(self):
+    return from_value(self.stub.list_sessions(Empty()).data)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.AIStub.load_session_data"><code class="name flex">
+<span>def <span class="ident">load_session_data</span></span>(<span>self, session_id)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def load_session_data(self, session_id):
+    return from_struct(self.stub.load_session_data(connpy_pb2.StringRequest(value=session_id)).data)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.grpc_layer.stubs.ConfigStub"><code class="flex name class">
+<span>class <span class="ident">ConfigStub</span></span>
+<span>(</span><span>channel, remote_host)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class ConfigStub:
+    def __init__(self, channel, remote_host):
+        self.stub = connpy_pb2_grpc.ConfigServiceStub(channel)
+        self.remote_host = remote_host
+
+    @handle_errors
+    def get_settings(self):
+        return from_struct(self.stub.get_settings(Empty()).data)
+
+    @handle_errors
+    def update_setting(self, key, value):
+        self.stub.update_setting(connpy_pb2.UpdateRequest(key=key, value=to_value(value)))
+
+    @handle_errors
+    def get_default_dir(self):
+        return self.stub.get_default_dir(Empty()).value
+
+    @handle_errors
+    def set_config_folder(self, folder):
+        self.stub.set_config_folder(connpy_pb2.StringRequest(value=folder))
+
+    @handle_errors
+    def encrypt_password(self, password):
+        return self.stub.encrypt_password(connpy_pb2.StringRequest(value=password)).value</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.grpc_layer.stubs.ConfigStub.encrypt_password"><code class="name flex">
+<span>def <span class="ident">encrypt_password</span></span>(<span>self, password)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def encrypt_password(self, password):
+    return self.stub.encrypt_password(connpy_pb2.StringRequest(value=password)).value</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.ConfigStub.get_default_dir"><code class="name flex">
+<span>def <span class="ident">get_default_dir</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def get_default_dir(self):
+    return self.stub.get_default_dir(Empty()).value</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.ConfigStub.get_settings"><code class="name flex">
+<span>def <span class="ident">get_settings</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def get_settings(self):
+    return from_struct(self.stub.get_settings(Empty()).data)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.ConfigStub.set_config_folder"><code class="name flex">
+<span>def <span class="ident">set_config_folder</span></span>(<span>self, folder)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def set_config_folder(self, folder):
+    self.stub.set_config_folder(connpy_pb2.StringRequest(value=folder))</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.ConfigStub.update_setting"><code class="name flex">
+<span>def <span class="ident">update_setting</span></span>(<span>self, key, value)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def update_setting(self, key, value):
+    self.stub.update_setting(connpy_pb2.UpdateRequest(key=key, value=to_value(value)))</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.grpc_layer.stubs.ExecutionStub"><code class="flex name class">
+<span>class <span class="ident">ExecutionStub</span></span>
+<span>(</span><span>channel, remote_host)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class ExecutionStub:
+    def __init__(self, channel, remote_host):
+        self.stub = connpy_pb2_grpc.ExecutionServiceStub(channel)
+        self.remote_host = remote_host
+
+    @handle_errors
+    def run_commands(self, nodes_filter, commands, variables=None, parallel=10, timeout=10, folder=None, prompt=None, **kwargs):
+        nodes_list = [nodes_filter] if isinstance(nodes_filter, str) else list(nodes_filter)
+        req = connpy_pb2.RunRequest(
+            nodes=nodes_list,
+            commands=commands,
+            folder=folder or &#34;&#34;,
+            prompt=prompt or &#34;&#34;,
+            parallel=parallel,
+        )
+        # Note: &#39;timeout&#39;, &#39;on_node_complete&#39;, and &#39;logger&#39; are currently not 
+        # sent over gRPC in the current proto definition. 
+        if variables is not None:
+            req.vars.CopyFrom(to_struct(variables))
+            
+        final_results = {}
+        on_complete = kwargs.get(&#34;on_node_complete&#34;)
+        
+        for response in self.stub.run_commands(req):
+            if on_complete:
+                on_complete(response.unique_id, response.output, response.status)
+            final_results[response.unique_id] = response.output
+                
+        return final_results
+
+    @handle_errors
+    def test_commands(self, nodes_filter, commands, expected, variables=None, parallel=10, timeout=10, prompt=None, **kwargs):
+        nodes_list = [nodes_filter] if isinstance(nodes_filter, str) else list(nodes_filter)
+        req = connpy_pb2.TestRequest(
+            nodes=nodes_list,
+            commands=commands,
+            expected=expected,
+            folder=kwargs.get(&#34;folder&#34;, &#34;&#34;),
+            prompt=prompt or &#34;&#34;,
+            parallel=parallel,
+        )
+        if variables is not None:
+            req.vars.CopyFrom(to_struct(variables))
+            
+        final_results = {}
+        on_complete = kwargs.get(&#34;on_node_complete&#34;)
+        
+        for response in self.stub.test_commands(req):
+            result_dict = from_struct(response.test_result) if response.HasField(&#34;test_result&#34;) else {}
+            if on_complete:
+                on_complete(response.unique_id, response.output, response.status, result_dict)
+            final_results[response.unique_id] = result_dict
+                
+        return final_results
+
+    @handle_errors
+    def run_cli_script(self, nodes_filter, script_path, parallel=10):
+        req = connpy_pb2.ScriptRequest(param1=nodes_filter, param2=script_path, parallel=parallel)
+        return from_struct(self.stub.run_cli_script(req).data)
+
+    @handle_errors
+    def run_yaml_playbook(self, playbook_path, parallel=10):
+        req = connpy_pb2.ScriptRequest(param1=playbook_path, parallel=parallel)
+        return from_struct(self.stub.run_yaml_playbook(req).data)</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.grpc_layer.stubs.ExecutionStub.run_cli_script"><code class="name flex">
+<span>def <span class="ident">run_cli_script</span></span>(<span>self, nodes_filter, script_path, parallel=10)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def run_cli_script(self, nodes_filter, script_path, parallel=10):
+    req = connpy_pb2.ScriptRequest(param1=nodes_filter, param2=script_path, parallel=parallel)
+    return from_struct(self.stub.run_cli_script(req).data)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.ExecutionStub.run_commands"><code class="name flex">
+<span>def <span class="ident">run_commands</span></span>(<span>self,<br>nodes_filter,<br>commands,<br>variables=None,<br>parallel=10,<br>timeout=10,<br>folder=None,<br>prompt=None,<br>**kwargs)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def run_commands(self, nodes_filter, commands, variables=None, parallel=10, timeout=10, folder=None, prompt=None, **kwargs):
+    nodes_list = [nodes_filter] if isinstance(nodes_filter, str) else list(nodes_filter)
+    req = connpy_pb2.RunRequest(
+        nodes=nodes_list,
+        commands=commands,
+        folder=folder or &#34;&#34;,
+        prompt=prompt or &#34;&#34;,
+        parallel=parallel,
+    )
+    # Note: &#39;timeout&#39;, &#39;on_node_complete&#39;, and &#39;logger&#39; are currently not 
+    # sent over gRPC in the current proto definition. 
+    if variables is not None:
+        req.vars.CopyFrom(to_struct(variables))
+        
+    final_results = {}
+    on_complete = kwargs.get(&#34;on_node_complete&#34;)
+    
+    for response in self.stub.run_commands(req):
+        if on_complete:
+            on_complete(response.unique_id, response.output, response.status)
+        final_results[response.unique_id] = response.output
+            
+    return final_results</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.ExecutionStub.run_yaml_playbook"><code class="name flex">
+<span>def <span class="ident">run_yaml_playbook</span></span>(<span>self, playbook_path, parallel=10)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def run_yaml_playbook(self, playbook_path, parallel=10):
+    req = connpy_pb2.ScriptRequest(param1=playbook_path, parallel=parallel)
+    return from_struct(self.stub.run_yaml_playbook(req).data)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.ExecutionStub.test_commands"><code class="name flex">
+<span>def <span class="ident">test_commands</span></span>(<span>self,<br>nodes_filter,<br>commands,<br>expected,<br>variables=None,<br>parallel=10,<br>timeout=10,<br>prompt=None,<br>**kwargs)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def test_commands(self, nodes_filter, commands, expected, variables=None, parallel=10, timeout=10, prompt=None, **kwargs):
+    nodes_list = [nodes_filter] if isinstance(nodes_filter, str) else list(nodes_filter)
+    req = connpy_pb2.TestRequest(
+        nodes=nodes_list,
+        commands=commands,
+        expected=expected,
+        folder=kwargs.get(&#34;folder&#34;, &#34;&#34;),
+        prompt=prompt or &#34;&#34;,
+        parallel=parallel,
+    )
+    if variables is not None:
+        req.vars.CopyFrom(to_struct(variables))
+        
+    final_results = {}
+    on_complete = kwargs.get(&#34;on_node_complete&#34;)
+    
+    for response in self.stub.test_commands(req):
+        result_dict = from_struct(response.test_result) if response.HasField(&#34;test_result&#34;) else {}
+        if on_complete:
+            on_complete(response.unique_id, response.output, response.status, result_dict)
+        final_results[response.unique_id] = result_dict
+            
+    return final_results</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.grpc_layer.stubs.ImportExportStub"><code class="flex name class">
+<span>class <span class="ident">ImportExportStub</span></span>
+<span>(</span><span>channel, remote_host)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class ImportExportStub:
+    def __init__(self, channel, remote_host):
+        self.stub = connpy_pb2_grpc.ImportExportServiceStub(channel)
+        self.remote_host = remote_host
+
+    @handle_errors
+    def export_to_file(self, file_path, folders=None):
+        req = connpy_pb2.ExportRequest(file_path=file_path, folders=folders or [])
+        self.stub.export_to_file(req)
+
+    @handle_errors
+    def import_from_file(self, file_path):
+        with open(file_path, &#34;r&#34;) as f:
+            content = f.read()
+        # Marker to tell the server this is content, not a path
+        marker_content = f&#34;---YAML---\n{content}&#34;
+        self.stub.import_from_file(connpy_pb2.StringRequest(value=marker_content))
+
+    @handle_errors
+    def set_reserved_names(self, names):
+        self.stub.set_reserved_names(connpy_pb2.ListRequest(items=names))</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.grpc_layer.stubs.ImportExportStub.export_to_file"><code class="name flex">
+<span>def <span class="ident">export_to_file</span></span>(<span>self, file_path, folders=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def export_to_file(self, file_path, folders=None):
+    req = connpy_pb2.ExportRequest(file_path=file_path, folders=folders or [])
+    self.stub.export_to_file(req)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.ImportExportStub.import_from_file"><code class="name flex">
+<span>def <span class="ident">import_from_file</span></span>(<span>self, file_path)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def import_from_file(self, file_path):
+    with open(file_path, &#34;r&#34;) as f:
+        content = f.read()
+    # Marker to tell the server this is content, not a path
+    marker_content = f&#34;---YAML---\n{content}&#34;
+    self.stub.import_from_file(connpy_pb2.StringRequest(value=marker_content))</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.ImportExportStub.set_reserved_names"><code class="name flex">
+<span>def <span class="ident">set_reserved_names</span></span>(<span>self, names)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def set_reserved_names(self, names):
+    self.stub.set_reserved_names(connpy_pb2.ListRequest(items=names))</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.grpc_layer.stubs.NodeStub"><code class="flex name class">
+<span>class <span class="ident">NodeStub</span></span>
+<span>(</span><span>channel, remote_host, config=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class NodeStub:
+    def __init__(self, channel, remote_host, config=None):
+        self.stub = connpy_pb2_grpc.NodeServiceStub(channel)
+        self.remote_host = remote_host
+        self.config = config
+
+    @handle_errors
+    def connect_node(self, unique_id, sftp=False, debug=False, logger=None):
+        import sys
+        import select
+        import tty
+        import termios
+        import os
+        import threading
+        
+        def request_generator():
+            cols, rows = 80, 24
+            try:
+                size = os.get_terminal_size()
+                cols, rows = size.columns, size.lines
+            except OSError:
+                pass
+                
+            yield connpy_pb2.InteractRequest(
+                id=unique_id, sftp=sftp, debug=debug, cols=cols, rows=rows
+            )
+            
+            while True:
+                r, _, _ = select.select([sys.stdin.fileno()], [], [])
+                if r:
+                    try:
+                        data = os.read(sys.stdin.fileno(), 1024)
+                        if not data:
+                            break
+                        yield connpy_pb2.InteractRequest(stdin_data=data)
+                    except OSError:
+                        break
+
+        # Fetch node details for the connection message
+        try:
+            node_details = self.get_node_details(unique_id)
+            host = node_details.get(&#34;host&#34;, &#34;unknown&#34;)
+            port = str(node_details.get(&#34;port&#34;, &#34;&#34;))
+            protocol = &#34;sftp&#34; if sftp else node_details.get(&#34;protocol&#34;, &#34;ssh&#34;)
+            port_str = f&#34;:{port}&#34; if port and protocol not in [&#34;ssm&#34;, &#34;kubectl&#34;, &#34;docker&#34;] else &#34;&#34;
+            conn_msg = f&#34;Connected to {unique_id} at {host}{port_str} via: {protocol}&#34;
+        except Exception:
+            conn_msg = f&#34;Connected to {unique_id}&#34;
+
+        old_tty = termios.tcgetattr(sys.stdin)
+        try:
+            tty.setraw(sys.stdin.fileno())
+            response_iterator = self.stub.interact_node(request_generator())
+            
+            # First response is connection status
+            try:
+                first_res = next(response_iterator)
+                if first_res.success:
+                    # Connection established on server, show success message
+                    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+                    printer.success(conn_msg)
+                    tty.setraw(sys.stdin.fileno())
+                else:
+                    # Connection failed on server
+                    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+                    printer.error(f&#34;Connection failed: {first_res.error_message}&#34;)
+                    return
+            except StopIteration:
+                return
+            
+            for res in response_iterator:
+                if res.stdout_data:
+                    os.write(sys.stdout.fileno(), res.stdout_data)
+        finally:
+            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+
+    @handle_errors
+    def connect_dynamic(self, connection_params, debug=False):
+        import sys
+        import select
+        import tty
+        import termios
+        import os
+        import json
+        
+        params_json = json.dumps(connection_params)
+        
+        def request_generator():
+            cols, rows = 80, 24
+            try:
+                size = os.get_terminal_size()
+                cols, rows = size.columns, size.lines
+            except OSError:
+                pass
+                
+            yield connpy_pb2.InteractRequest(
+                id=&#34;dynamic&#34;, debug=debug, cols=cols, rows=rows,
+                connection_params_json=params_json
+            )
+            
+            while True:
+                r, _, _ = select.select([sys.stdin.fileno()], [], [])
+                if r:
+                    try:
+                        data = os.read(sys.stdin.fileno(), 1024)
+                        if not data:
+                            break
+                        yield connpy_pb2.InteractRequest(stdin_data=data)
+                    except OSError:
+                        break
+
+        # Prepare connection message
+        try:
+            node_name = connection_params.get(&#34;name&#34;, &#34;dynamic@remote&#34;)
+            host = connection_params.get(&#34;host&#34;, &#34;dynamic&#34;)
+            port = str(connection_params.get(&#34;port&#34;, &#34;&#34;))
+            protocol = connection_params.get(&#34;protocol&#34;, &#34;ssh&#34;)
+            port_str = f&#34;:{port}&#34; if port and protocol not in [&#34;ssm&#34;, &#34;kubectl&#34;, &#34;docker&#34;] else &#34;&#34;
+            conn_msg = f&#34;Connected to {node_name} at {host}{port_str} via: {protocol}&#34;
+        except Exception:
+            node_name = connection_params.get(&#34;name&#34;, &#34;dynamic@remote&#34;) if isinstance(connection_params, dict) else &#34;dynamic@remote&#34;
+            conn_msg = f&#34;Connected to {node_name}&#34;
+
+        old_tty = termios.tcgetattr(sys.stdin)
+        try:
+            tty.setraw(sys.stdin.fileno())
+            response_iterator = self.stub.interact_node(request_generator())
+            
+            # First response is connection status
+            try:
+                first_res = next(response_iterator)
+                if first_res.success:
+                    # Connection established on server, show success message
+                    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+                    printer.success(conn_msg)
+                    tty.setraw(sys.stdin.fileno())
+                else:
+                    # Connection failed on server
+                    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+                    printer.error(f&#34;Connection failed: {first_res.error_message}&#34;)
+                    return
+            except StopIteration:
+                return
+                
+            for res in response_iterator:
+                if res.stdout_data:
+                    os.write(sys.stdout.fileno(), res.stdout_data)
+        finally:
+            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+
+    @MethodHook
+    @handle_errors
+    def list_nodes(self, filter_str=None, format_str=None):
+        req = connpy_pb2.FilterRequest(filter_str=filter_str or &#34;&#34;, format_str=format_str or &#34;&#34;)
+        return from_value(self.stub.list_nodes(req).data) or []
+
+    @MethodHook
+    @handle_errors
+    def list_folders(self, filter_str=None):
+        req = connpy_pb2.FilterRequest(filter_str=filter_str or &#34;&#34;)
+        return from_value(self.stub.list_folders(req).data) or []
+
+    @handle_errors
+    def get_node_details(self, unique_id):
+        return from_struct(self.stub.get_node_details(connpy_pb2.IdRequest(id=unique_id)).data)
+
+    @handle_errors
+    def explode_unique(self, unique_id):
+        return from_value(self.stub.explode_unique(connpy_pb2.IdRequest(id=unique_id)).data)
+
+    @handle_errors
+    def validate_parent_folder(self, unique_id):
+        self.stub.validate_parent_folder(connpy_pb2.IdRequest(id=unique_id))
+
+    @handle_errors
+    def generate_cache(self, nodes=None, folders=None, profiles=None):
+        # 1. Update remote cache on server
+        self.stub.generate_cache(Empty())
+        
+        # 2. Update local fzf/text cache files
+        # If no data provided, we fetch it all from remote to sync local files
+        if nodes is None and folders is None and profiles is None:
+            nodes = self.list_nodes()
+            folders = self.list_folders()
+            # We don&#39;t have direct access to ProfileStub here, but usually 
+            # node cache is what matters for fzf. We&#39;ll fetch profiles if we can.
+            # For now, let&#39;s sync what we have.
+            
+        if nodes is not None or folders is not None or profiles is not None:
+            self.config._generate_nodes_cache(nodes=nodes, folders=folders, profiles=profiles)
+
+    def _trigger_local_cache_sync(self):
+        &#34;&#34;&#34;Helper to fetch remote data and update local fzf cache files after a change.&#34;&#34;&#34;
+        try:
+            nodes = self.list_nodes()
+            folders = self.list_folders()
+            self.generate_cache(nodes=nodes, folders=folders)
+        except Exception:
+            # Failure to sync cache shouldn&#39;t break the main operation&#39;s success feedback
+            pass
+
+    @handle_errors
+    def add_node(self, unique_id, data, is_folder=False):
+        req = connpy_pb2.NodeRequest(id=unique_id, data=to_struct(data), is_folder=is_folder)
+        self.stub.add_node(req)
+        self._trigger_local_cache_sync()
+
+    @handle_errors
+    def update_node(self, unique_id, data):
+        req = connpy_pb2.NodeRequest(id=unique_id, data=to_struct(data), is_folder=False)
+        self.stub.update_node(req)
+        self._trigger_local_cache_sync()
+
+    @handle_errors
+    def delete_node(self, unique_id, is_folder=False):
+        req = connpy_pb2.DeleteRequest(id=unique_id, is_folder=is_folder)
+        self.stub.delete_node(req)
+        self._trigger_local_cache_sync()
+
+    @handle_errors
+    def move_node(self, src_id, dst_id, copy=False):
+        req = connpy_pb2.MoveRequest(src_id=src_id, dst_id=dst_id, copy=copy)
+        self.stub.move_node(req)
+        self._trigger_local_cache_sync()
+
+    @handle_errors
+    def bulk_add(self, ids, hosts, common_data):
+        req = connpy_pb2.BulkRequest(ids=ids, hosts=hosts, common_data=to_struct(common_data))
+        self.stub.bulk_add(req)
+        self._trigger_local_cache_sync()
+
+    @handle_errors
+    def set_reserved_names(self, names):
+        self.stub.set_reserved_names(connpy_pb2.ListRequest(items=names))
+        self._trigger_local_cache_sync()
+
+    @handle_errors
+    def full_replace(self, connections, profiles):
+        req = connpy_pb2.FullReplaceRequest(
+            connections=to_struct(connections),
+            profiles=to_struct(profiles)
+        )
+        self.stub.full_replace(req)
+        self._trigger_local_cache_sync()
+
+    @handle_errors
+    def get_inventory(self):
+        resp = self.stub.get_inventory(Empty())
+        return {
+            &#34;connections&#34;: from_struct(resp.connections),
+            &#34;profiles&#34;: from_struct(resp.profiles)
+        }</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.grpc_layer.stubs.NodeStub.add_node"><code class="name flex">
+<span>def <span class="ident">add_node</span></span>(<span>self, unique_id, data, is_folder=False)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def add_node(self, unique_id, data, is_folder=False):
+    req = connpy_pb2.NodeRequest(id=unique_id, data=to_struct(data), is_folder=is_folder)
+    self.stub.add_node(req)
+    self._trigger_local_cache_sync()</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.NodeStub.bulk_add"><code class="name flex">
+<span>def <span class="ident">bulk_add</span></span>(<span>self, ids, hosts, common_data)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def bulk_add(self, ids, hosts, common_data):
+    req = connpy_pb2.BulkRequest(ids=ids, hosts=hosts, common_data=to_struct(common_data))
+    self.stub.bulk_add(req)
+    self._trigger_local_cache_sync()</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.NodeStub.connect_dynamic"><code class="name flex">
+<span>def <span class="ident">connect_dynamic</span></span>(<span>self, connection_params, debug=False)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def connect_dynamic(self, connection_params, debug=False):
+    import sys
+    import select
+    import tty
+    import termios
+    import os
+    import json
+    
+    params_json = json.dumps(connection_params)
+    
+    def request_generator():
+        cols, rows = 80, 24
+        try:
+            size = os.get_terminal_size()
+            cols, rows = size.columns, size.lines
+        except OSError:
+            pass
+            
+        yield connpy_pb2.InteractRequest(
+            id=&#34;dynamic&#34;, debug=debug, cols=cols, rows=rows,
+            connection_params_json=params_json
+        )
+        
+        while True:
+            r, _, _ = select.select([sys.stdin.fileno()], [], [])
+            if r:
+                try:
+                    data = os.read(sys.stdin.fileno(), 1024)
+                    if not data:
+                        break
+                    yield connpy_pb2.InteractRequest(stdin_data=data)
+                except OSError:
+                    break
+
+    # Prepare connection message
+    try:
+        node_name = connection_params.get(&#34;name&#34;, &#34;dynamic@remote&#34;)
+        host = connection_params.get(&#34;host&#34;, &#34;dynamic&#34;)
+        port = str(connection_params.get(&#34;port&#34;, &#34;&#34;))
+        protocol = connection_params.get(&#34;protocol&#34;, &#34;ssh&#34;)
+        port_str = f&#34;:{port}&#34; if port and protocol not in [&#34;ssm&#34;, &#34;kubectl&#34;, &#34;docker&#34;] else &#34;&#34;
+        conn_msg = f&#34;Connected to {node_name} at {host}{port_str} via: {protocol}&#34;
+    except Exception:
+        node_name = connection_params.get(&#34;name&#34;, &#34;dynamic@remote&#34;) if isinstance(connection_params, dict) else &#34;dynamic@remote&#34;
+        conn_msg = f&#34;Connected to {node_name}&#34;
+
+    old_tty = termios.tcgetattr(sys.stdin)
+    try:
+        tty.setraw(sys.stdin.fileno())
+        response_iterator = self.stub.interact_node(request_generator())
+        
+        # First response is connection status
+        try:
+            first_res = next(response_iterator)
+            if first_res.success:
+                # Connection established on server, show success message
+                termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+                printer.success(conn_msg)
+                tty.setraw(sys.stdin.fileno())
+            else:
+                # Connection failed on server
+                termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+                printer.error(f&#34;Connection failed: {first_res.error_message}&#34;)
+                return
+        except StopIteration:
+            return
+            
+        for res in response_iterator:
+            if res.stdout_data:
+                os.write(sys.stdout.fileno(), res.stdout_data)
+    finally:
+        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.NodeStub.connect_node"><code class="name flex">
+<span>def <span class="ident">connect_node</span></span>(<span>self, unique_id, sftp=False, debug=False, logger=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def connect_node(self, unique_id, sftp=False, debug=False, logger=None):
+    import sys
+    import select
+    import tty
+    import termios
+    import os
+    import threading
+    
+    def request_generator():
+        cols, rows = 80, 24
+        try:
+            size = os.get_terminal_size()
+            cols, rows = size.columns, size.lines
+        except OSError:
+            pass
+            
+        yield connpy_pb2.InteractRequest(
+            id=unique_id, sftp=sftp, debug=debug, cols=cols, rows=rows
+        )
+        
+        while True:
+            r, _, _ = select.select([sys.stdin.fileno()], [], [])
+            if r:
+                try:
+                    data = os.read(sys.stdin.fileno(), 1024)
+                    if not data:
+                        break
+                    yield connpy_pb2.InteractRequest(stdin_data=data)
+                except OSError:
+                    break
+
+    # Fetch node details for the connection message
+    try:
+        node_details = self.get_node_details(unique_id)
+        host = node_details.get(&#34;host&#34;, &#34;unknown&#34;)
+        port = str(node_details.get(&#34;port&#34;, &#34;&#34;))
+        protocol = &#34;sftp&#34; if sftp else node_details.get(&#34;protocol&#34;, &#34;ssh&#34;)
+        port_str = f&#34;:{port}&#34; if port and protocol not in [&#34;ssm&#34;, &#34;kubectl&#34;, &#34;docker&#34;] else &#34;&#34;
+        conn_msg = f&#34;Connected to {unique_id} at {host}{port_str} via: {protocol}&#34;
+    except Exception:
+        conn_msg = f&#34;Connected to {unique_id}&#34;
+
+    old_tty = termios.tcgetattr(sys.stdin)
+    try:
+        tty.setraw(sys.stdin.fileno())
+        response_iterator = self.stub.interact_node(request_generator())
+        
+        # First response is connection status
+        try:
+            first_res = next(response_iterator)
+            if first_res.success:
+                # Connection established on server, show success message
+                termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+                printer.success(conn_msg)
+                tty.setraw(sys.stdin.fileno())
+            else:
+                # Connection failed on server
+                termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+                printer.error(f&#34;Connection failed: {first_res.error_message}&#34;)
+                return
+        except StopIteration:
+            return
+        
+        for res in response_iterator:
+            if res.stdout_data:
+                os.write(sys.stdout.fileno(), res.stdout_data)
+    finally:
+        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.NodeStub.delete_node"><code class="name flex">
+<span>def <span class="ident">delete_node</span></span>(<span>self, unique_id, is_folder=False)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def delete_node(self, unique_id, is_folder=False):
+    req = connpy_pb2.DeleteRequest(id=unique_id, is_folder=is_folder)
+    self.stub.delete_node(req)
+    self._trigger_local_cache_sync()</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.NodeStub.explode_unique"><code class="name flex">
+<span>def <span class="ident">explode_unique</span></span>(<span>self, unique_id)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def explode_unique(self, unique_id):
+    return from_value(self.stub.explode_unique(connpy_pb2.IdRequest(id=unique_id)).data)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.NodeStub.full_replace"><code class="name flex">
+<span>def <span class="ident">full_replace</span></span>(<span>self, connections, profiles)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def full_replace(self, connections, profiles):
+    req = connpy_pb2.FullReplaceRequest(
+        connections=to_struct(connections),
+        profiles=to_struct(profiles)
+    )
+    self.stub.full_replace(req)
+    self._trigger_local_cache_sync()</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.NodeStub.generate_cache"><code class="name flex">
+<span>def <span class="ident">generate_cache</span></span>(<span>self, nodes=None, folders=None, profiles=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def generate_cache(self, nodes=None, folders=None, profiles=None):
+    # 1. Update remote cache on server
+    self.stub.generate_cache(Empty())
+    
+    # 2. Update local fzf/text cache files
+    # If no data provided, we fetch it all from remote to sync local files
+    if nodes is None and folders is None and profiles is None:
+        nodes = self.list_nodes()
+        folders = self.list_folders()
+        # We don&#39;t have direct access to ProfileStub here, but usually 
+        # node cache is what matters for fzf. We&#39;ll fetch profiles if we can.
+        # For now, let&#39;s sync what we have.
+        
+    if nodes is not None or folders is not None or profiles is not None:
+        self.config._generate_nodes_cache(nodes=nodes, folders=folders, profiles=profiles)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.NodeStub.get_inventory"><code class="name flex">
+<span>def <span class="ident">get_inventory</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def get_inventory(self):
+    resp = self.stub.get_inventory(Empty())
+    return {
+        &#34;connections&#34;: from_struct(resp.connections),
+        &#34;profiles&#34;: from_struct(resp.profiles)
+    }</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.NodeStub.get_node_details"><code class="name flex">
+<span>def <span class="ident">get_node_details</span></span>(<span>self, unique_id)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def get_node_details(self, unique_id):
+    return from_struct(self.stub.get_node_details(connpy_pb2.IdRequest(id=unique_id)).data)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.NodeStub.list_folders"><code class="name flex">
+<span>def <span class="ident">list_folders</span></span>(<span>self, filter_str=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@MethodHook
+@handle_errors
+def list_folders(self, filter_str=None):
+    req = connpy_pb2.FilterRequest(filter_str=filter_str or &#34;&#34;)
+    return from_value(self.stub.list_folders(req).data) or []</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.NodeStub.list_nodes"><code class="name flex">
+<span>def <span class="ident">list_nodes</span></span>(<span>self, filter_str=None, format_str=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@MethodHook
+@handle_errors
+def list_nodes(self, filter_str=None, format_str=None):
+    req = connpy_pb2.FilterRequest(filter_str=filter_str or &#34;&#34;, format_str=format_str or &#34;&#34;)
+    return from_value(self.stub.list_nodes(req).data) or []</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.NodeStub.move_node"><code class="name flex">
+<span>def <span class="ident">move_node</span></span>(<span>self, src_id, dst_id, copy=False)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def move_node(self, src_id, dst_id, copy=False):
+    req = connpy_pb2.MoveRequest(src_id=src_id, dst_id=dst_id, copy=copy)
+    self.stub.move_node(req)
+    self._trigger_local_cache_sync()</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.NodeStub.set_reserved_names"><code class="name flex">
+<span>def <span class="ident">set_reserved_names</span></span>(<span>self, names)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def set_reserved_names(self, names):
+    self.stub.set_reserved_names(connpy_pb2.ListRequest(items=names))
+    self._trigger_local_cache_sync()</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.NodeStub.update_node"><code class="name flex">
+<span>def <span class="ident">update_node</span></span>(<span>self, unique_id, data)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def update_node(self, unique_id, data):
+    req = connpy_pb2.NodeRequest(id=unique_id, data=to_struct(data), is_folder=False)
+    self.stub.update_node(req)
+    self._trigger_local_cache_sync()</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.NodeStub.validate_parent_folder"><code class="name flex">
+<span>def <span class="ident">validate_parent_folder</span></span>(<span>self, unique_id)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def validate_parent_folder(self, unique_id):
+    self.stub.validate_parent_folder(connpy_pb2.IdRequest(id=unique_id))</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.grpc_layer.stubs.PluginStub"><code class="flex name class">
+<span>class <span class="ident">PluginStub</span></span>
+<span>(</span><span>channel, remote_host)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class PluginStub:
+    def __init__(self, channel, remote_host):
+        self.stub = connpy_pb2_grpc.PluginServiceStub(channel)
+        self.remote_stub = remote_plugin_pb2_grpc.RemotePluginServiceStub(channel)
+        self.remote_host = remote_host
+
+    @handle_errors
+    def list_plugins(self):
+        return from_value(self.stub.list_plugins(Empty()).data)
+
+    @handle_errors
+    def add_plugin(self, name, source_file, update=False):
+        # Read the local file content to send it to the server
+        with open(source_file, &#34;r&#34;) as f:
+            content = f.read()
+        
+        # Use source_file as a marker for &#34;content-inside&#34;
+        marker_content = f&#34;---CONTENT---\n{content}&#34;
+        req = connpy_pb2.PluginRequest(name=name, source_file=marker_content, update=update)
+        self.stub.add_plugin(req)
+
+    @handle_errors
+    def delete_plugin(self, name):
+        self.stub.delete_plugin(connpy_pb2.IdRequest(id=name))
+
+    @handle_errors
+    def enable_plugin(self, name):
+        self.stub.enable_plugin(connpy_pb2.IdRequest(id=name))
+
+    @handle_errors
+    def disable_plugin(self, name):
+        self.stub.disable_plugin(connpy_pb2.IdRequest(id=name))
+
+    @handle_errors
+    def get_plugin_source(self, name):
+        resp = self.remote_stub.get_plugin_source(remote_plugin_pb2.IdRequest(id=name))
+        return resp.value
+
+    @handle_errors
+    def invoke_plugin(self, name, args_namespace):
+        import json
+        args_dict = {k: v for k, v in vars(args_namespace).items()
+                     if isinstance(v, (str, int, float, bool, list, type(None)))}
+        if hasattr(args_namespace, &#34;func&#34;) and hasattr(args_namespace.func, &#34;__name__&#34;):
+            args_dict[&#34;__func_name__&#34;] = args_namespace.func.__name__
+            
+        req = remote_plugin_pb2.PluginInvokeRequest(name=name, args_json=json.dumps(args_dict))
+        for chunk in self.remote_stub.invoke_plugin(req):
+            yield chunk.text</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.grpc_layer.stubs.PluginStub.add_plugin"><code class="name flex">
+<span>def <span class="ident">add_plugin</span></span>(<span>self, name, source_file, update=False)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def add_plugin(self, name, source_file, update=False):
+    # Read the local file content to send it to the server
+    with open(source_file, &#34;r&#34;) as f:
+        content = f.read()
+    
+    # Use source_file as a marker for &#34;content-inside&#34;
+    marker_content = f&#34;---CONTENT---\n{content}&#34;
+    req = connpy_pb2.PluginRequest(name=name, source_file=marker_content, update=update)
+    self.stub.add_plugin(req)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.PluginStub.delete_plugin"><code class="name flex">
+<span>def <span class="ident">delete_plugin</span></span>(<span>self, name)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def delete_plugin(self, name):
+    self.stub.delete_plugin(connpy_pb2.IdRequest(id=name))</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.PluginStub.disable_plugin"><code class="name flex">
+<span>def <span class="ident">disable_plugin</span></span>(<span>self, name)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def disable_plugin(self, name):
+    self.stub.disable_plugin(connpy_pb2.IdRequest(id=name))</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.PluginStub.enable_plugin"><code class="name flex">
+<span>def <span class="ident">enable_plugin</span></span>(<span>self, name)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def enable_plugin(self, name):
+    self.stub.enable_plugin(connpy_pb2.IdRequest(id=name))</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.PluginStub.get_plugin_source"><code class="name flex">
+<span>def <span class="ident">get_plugin_source</span></span>(<span>self, name)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def get_plugin_source(self, name):
+    resp = self.remote_stub.get_plugin_source(remote_plugin_pb2.IdRequest(id=name))
+    return resp.value</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.PluginStub.invoke_plugin"><code class="name flex">
+<span>def <span class="ident">invoke_plugin</span></span>(<span>self, name, args_namespace)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def invoke_plugin(self, name, args_namespace):
+    import json
+    args_dict = {k: v for k, v in vars(args_namespace).items()
+                 if isinstance(v, (str, int, float, bool, list, type(None)))}
+    if hasattr(args_namespace, &#34;func&#34;) and hasattr(args_namespace.func, &#34;__name__&#34;):
+        args_dict[&#34;__func_name__&#34;] = args_namespace.func.__name__
+        
+    req = remote_plugin_pb2.PluginInvokeRequest(name=name, args_json=json.dumps(args_dict))
+    for chunk in self.remote_stub.invoke_plugin(req):
+        yield chunk.text</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.PluginStub.list_plugins"><code class="name flex">
+<span>def <span class="ident">list_plugins</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def list_plugins(self):
+    return from_value(self.stub.list_plugins(Empty()).data)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.grpc_layer.stubs.ProfileStub"><code class="flex name class">
+<span>class <span class="ident">ProfileStub</span></span>
+<span>(</span><span>channel, remote_host, node_stub=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class ProfileStub:
+    def __init__(self, channel, remote_host, node_stub=None):
+        self.stub = connpy_pb2_grpc.ProfileServiceStub(channel)
+        self.remote_host = remote_host
+        self.node_stub = node_stub
+
+    @handle_errors
+    def list_profiles(self, filter_str=None):
+        req = connpy_pb2.FilterRequest(filter_str=filter_str or &#34;&#34;)
+        return from_value(self.stub.list_profiles(req).data) or []
+
+    @handle_errors
+    def get_profile(self, name, resolve=True):
+        req = connpy_pb2.ProfileRequest(name=name, resolve=resolve)
+        return from_struct(self.stub.get_profile(req).data)
+
+    @handle_errors
+    def add_profile(self, name, data):
+        req = connpy_pb2.NodeRequest(id=name, data=to_struct(data))
+        self.stub.add_profile(req)
+        if self.node_stub:
+            self.node_stub._trigger_local_cache_sync()
+
+    @handle_errors
+    def resolve_node_data(self, node_data):
+        req = connpy_pb2.StructRequest(data=to_struct(node_data))
+        return from_struct(self.stub.resolve_node_data(req).data)
+
+    @handle_errors
+    def delete_profile(self, name):
+        req = connpy_pb2.IdRequest(id=name)
+        self.stub.delete_profile(req)
+        if self.node_stub:
+            self.node_stub._trigger_local_cache_sync()
+
+    @handle_errors
+    def update_profile(self, name, data):
+        req = connpy_pb2.NodeRequest(id=name, data=to_struct(data))
+        self.stub.update_profile(req)
+        if self.node_stub:
+            self.node_stub._trigger_local_cache_sync()</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.grpc_layer.stubs.ProfileStub.add_profile"><code class="name flex">
+<span>def <span class="ident">add_profile</span></span>(<span>self, name, data)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def add_profile(self, name, data):
+    req = connpy_pb2.NodeRequest(id=name, data=to_struct(data))
+    self.stub.add_profile(req)
+    if self.node_stub:
+        self.node_stub._trigger_local_cache_sync()</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.ProfileStub.delete_profile"><code class="name flex">
+<span>def <span class="ident">delete_profile</span></span>(<span>self, name)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def delete_profile(self, name):
+    req = connpy_pb2.IdRequest(id=name)
+    self.stub.delete_profile(req)
+    if self.node_stub:
+        self.node_stub._trigger_local_cache_sync()</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.ProfileStub.get_profile"><code class="name flex">
+<span>def <span class="ident">get_profile</span></span>(<span>self, name, resolve=True)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def get_profile(self, name, resolve=True):
+    req = connpy_pb2.ProfileRequest(name=name, resolve=resolve)
+    return from_struct(self.stub.get_profile(req).data)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.ProfileStub.list_profiles"><code class="name flex">
+<span>def <span class="ident">list_profiles</span></span>(<span>self, filter_str=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def list_profiles(self, filter_str=None):
+    req = connpy_pb2.FilterRequest(filter_str=filter_str or &#34;&#34;)
+    return from_value(self.stub.list_profiles(req).data) or []</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.ProfileStub.resolve_node_data"><code class="name flex">
+<span>def <span class="ident">resolve_node_data</span></span>(<span>self, node_data)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def resolve_node_data(self, node_data):
+    req = connpy_pb2.StructRequest(data=to_struct(node_data))
+    return from_struct(self.stub.resolve_node_data(req).data)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.ProfileStub.update_profile"><code class="name flex">
+<span>def <span class="ident">update_profile</span></span>(<span>self, name, data)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def update_profile(self, name, data):
+    req = connpy_pb2.NodeRequest(id=name, data=to_struct(data))
+    self.stub.update_profile(req)
+    if self.node_stub:
+        self.node_stub._trigger_local_cache_sync()</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.grpc_layer.stubs.SystemStub"><code class="flex name class">
+<span>class <span class="ident">SystemStub</span></span>
+<span>(</span><span>channel, remote_host)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class SystemStub:
+    def __init__(self, channel, remote_host):
+        self.stub = connpy_pb2_grpc.SystemServiceStub(channel)
+        self.remote_host = remote_host
+
+    @handle_errors
+    def start_api(self, port=None):
+        self.stub.start_api(connpy_pb2.IntRequest(value=port or 8048))
+
+    @handle_errors
+    def debug_api(self, port=None):
+        self.stub.debug_api(connpy_pb2.IntRequest(value=port or 8048))
+
+    @handle_errors
+    def stop_api(self):
+        self.stub.stop_api(Empty())
+
+    @handle_errors
+    def restart_api(self, port=None):
+        self.stub.restart_api(connpy_pb2.IntRequest(value=port or 8048))
+
+    @handle_errors
+    def get_api_status(self):
+        return self.stub.get_api_status(Empty()).value</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.grpc_layer.stubs.SystemStub.debug_api"><code class="name flex">
+<span>def <span class="ident">debug_api</span></span>(<span>self, port=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def debug_api(self, port=None):
+    self.stub.debug_api(connpy_pb2.IntRequest(value=port or 8048))</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.SystemStub.get_api_status"><code class="name flex">
+<span>def <span class="ident">get_api_status</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def get_api_status(self):
+    return self.stub.get_api_status(Empty()).value</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.SystemStub.restart_api"><code class="name flex">
+<span>def <span class="ident">restart_api</span></span>(<span>self, port=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def restart_api(self, port=None):
+    self.stub.restart_api(connpy_pb2.IntRequest(value=port or 8048))</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.SystemStub.start_api"><code class="name flex">
+<span>def <span class="ident">start_api</span></span>(<span>self, port=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def start_api(self, port=None):
+    self.stub.start_api(connpy_pb2.IntRequest(value=port or 8048))</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.SystemStub.stop_api"><code class="name flex">
+<span>def <span class="ident">stop_api</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def stop_api(self):
+    self.stub.stop_api(Empty())</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="connpy.grpc_layer" href="index.html">connpy.grpc_layer</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-functions">Functions</a></h3>
+<ul class="">
+<li><code><a title="connpy.grpc_layer.stubs.handle_errors" href="#connpy.grpc_layer.stubs.handle_errors">handle_errors</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="connpy.grpc_layer.stubs.AIStub" href="#connpy.grpc_layer.stubs.AIStub">AIStub</a></code></h4>
+<ul class="two-column">
+<li><code><a title="connpy.grpc_layer.stubs.AIStub.ask" href="#connpy.grpc_layer.stubs.AIStub.ask">ask</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.AIStub.configure_provider" href="#connpy.grpc_layer.stubs.AIStub.configure_provider">configure_provider</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.AIStub.confirm" href="#connpy.grpc_layer.stubs.AIStub.confirm">confirm</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.AIStub.delete_session" href="#connpy.grpc_layer.stubs.AIStub.delete_session">delete_session</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.AIStub.list_sessions" href="#connpy.grpc_layer.stubs.AIStub.list_sessions">list_sessions</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.AIStub.load_session_data" href="#connpy.grpc_layer.stubs.AIStub.load_session_data">load_session_data</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.grpc_layer.stubs.ConfigStub" href="#connpy.grpc_layer.stubs.ConfigStub">ConfigStub</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.grpc_layer.stubs.ConfigStub.encrypt_password" href="#connpy.grpc_layer.stubs.ConfigStub.encrypt_password">encrypt_password</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.ConfigStub.get_default_dir" href="#connpy.grpc_layer.stubs.ConfigStub.get_default_dir">get_default_dir</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.ConfigStub.get_settings" href="#connpy.grpc_layer.stubs.ConfigStub.get_settings">get_settings</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.ConfigStub.set_config_folder" href="#connpy.grpc_layer.stubs.ConfigStub.set_config_folder">set_config_folder</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.ConfigStub.update_setting" href="#connpy.grpc_layer.stubs.ConfigStub.update_setting">update_setting</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.grpc_layer.stubs.ExecutionStub" href="#connpy.grpc_layer.stubs.ExecutionStub">ExecutionStub</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.grpc_layer.stubs.ExecutionStub.run_cli_script" href="#connpy.grpc_layer.stubs.ExecutionStub.run_cli_script">run_cli_script</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.ExecutionStub.run_commands" href="#connpy.grpc_layer.stubs.ExecutionStub.run_commands">run_commands</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.ExecutionStub.run_yaml_playbook" href="#connpy.grpc_layer.stubs.ExecutionStub.run_yaml_playbook">run_yaml_playbook</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.ExecutionStub.test_commands" href="#connpy.grpc_layer.stubs.ExecutionStub.test_commands">test_commands</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.grpc_layer.stubs.ImportExportStub" href="#connpy.grpc_layer.stubs.ImportExportStub">ImportExportStub</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.grpc_layer.stubs.ImportExportStub.export_to_file" href="#connpy.grpc_layer.stubs.ImportExportStub.export_to_file">export_to_file</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.ImportExportStub.import_from_file" href="#connpy.grpc_layer.stubs.ImportExportStub.import_from_file">import_from_file</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.ImportExportStub.set_reserved_names" href="#connpy.grpc_layer.stubs.ImportExportStub.set_reserved_names">set_reserved_names</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.grpc_layer.stubs.NodeStub" href="#connpy.grpc_layer.stubs.NodeStub">NodeStub</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.grpc_layer.stubs.NodeStub.add_node" href="#connpy.grpc_layer.stubs.NodeStub.add_node">add_node</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.NodeStub.bulk_add" href="#connpy.grpc_layer.stubs.NodeStub.bulk_add">bulk_add</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.NodeStub.connect_dynamic" href="#connpy.grpc_layer.stubs.NodeStub.connect_dynamic">connect_dynamic</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.NodeStub.connect_node" href="#connpy.grpc_layer.stubs.NodeStub.connect_node">connect_node</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.NodeStub.delete_node" href="#connpy.grpc_layer.stubs.NodeStub.delete_node">delete_node</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.NodeStub.explode_unique" href="#connpy.grpc_layer.stubs.NodeStub.explode_unique">explode_unique</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.NodeStub.full_replace" href="#connpy.grpc_layer.stubs.NodeStub.full_replace">full_replace</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.NodeStub.generate_cache" href="#connpy.grpc_layer.stubs.NodeStub.generate_cache">generate_cache</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.NodeStub.get_inventory" href="#connpy.grpc_layer.stubs.NodeStub.get_inventory">get_inventory</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.NodeStub.get_node_details" href="#connpy.grpc_layer.stubs.NodeStub.get_node_details">get_node_details</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.NodeStub.list_folders" href="#connpy.grpc_layer.stubs.NodeStub.list_folders">list_folders</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.NodeStub.list_nodes" href="#connpy.grpc_layer.stubs.NodeStub.list_nodes">list_nodes</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.NodeStub.move_node" href="#connpy.grpc_layer.stubs.NodeStub.move_node">move_node</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.NodeStub.set_reserved_names" href="#connpy.grpc_layer.stubs.NodeStub.set_reserved_names">set_reserved_names</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.NodeStub.update_node" href="#connpy.grpc_layer.stubs.NodeStub.update_node">update_node</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.NodeStub.validate_parent_folder" href="#connpy.grpc_layer.stubs.NodeStub.validate_parent_folder">validate_parent_folder</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.grpc_layer.stubs.PluginStub" href="#connpy.grpc_layer.stubs.PluginStub">PluginStub</a></code></h4>
+<ul class="two-column">
+<li><code><a title="connpy.grpc_layer.stubs.PluginStub.add_plugin" href="#connpy.grpc_layer.stubs.PluginStub.add_plugin">add_plugin</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.PluginStub.delete_plugin" href="#connpy.grpc_layer.stubs.PluginStub.delete_plugin">delete_plugin</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.PluginStub.disable_plugin" href="#connpy.grpc_layer.stubs.PluginStub.disable_plugin">disable_plugin</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.PluginStub.enable_plugin" href="#connpy.grpc_layer.stubs.PluginStub.enable_plugin">enable_plugin</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.PluginStub.get_plugin_source" href="#connpy.grpc_layer.stubs.PluginStub.get_plugin_source">get_plugin_source</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.PluginStub.invoke_plugin" href="#connpy.grpc_layer.stubs.PluginStub.invoke_plugin">invoke_plugin</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.PluginStub.list_plugins" href="#connpy.grpc_layer.stubs.PluginStub.list_plugins">list_plugins</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.grpc_layer.stubs.ProfileStub" href="#connpy.grpc_layer.stubs.ProfileStub">ProfileStub</a></code></h4>
+<ul class="two-column">
+<li><code><a title="connpy.grpc_layer.stubs.ProfileStub.add_profile" href="#connpy.grpc_layer.stubs.ProfileStub.add_profile">add_profile</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.ProfileStub.delete_profile" href="#connpy.grpc_layer.stubs.ProfileStub.delete_profile">delete_profile</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.ProfileStub.get_profile" href="#connpy.grpc_layer.stubs.ProfileStub.get_profile">get_profile</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.ProfileStub.list_profiles" href="#connpy.grpc_layer.stubs.ProfileStub.list_profiles">list_profiles</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.ProfileStub.resolve_node_data" href="#connpy.grpc_layer.stubs.ProfileStub.resolve_node_data">resolve_node_data</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.ProfileStub.update_profile" href="#connpy.grpc_layer.stubs.ProfileStub.update_profile">update_profile</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.grpc_layer.stubs.SystemStub" href="#connpy.grpc_layer.stubs.SystemStub">SystemStub</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.grpc_layer.stubs.SystemStub.debug_api" href="#connpy.grpc_layer.stubs.SystemStub.debug_api">debug_api</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.SystemStub.get_api_status" href="#connpy.grpc_layer.stubs.SystemStub.get_api_status">get_api_status</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.SystemStub.restart_api" href="#connpy.grpc_layer.stubs.SystemStub.restart_api">restart_api</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.SystemStub.start_api" href="#connpy.grpc_layer.stubs.SystemStub.start_api">start_api</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.SystemStub.stop_api" href="#connpy.grpc_layer.stubs.SystemStub.stop_api">stop_api</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+</footer>
+</body>
+</html>
