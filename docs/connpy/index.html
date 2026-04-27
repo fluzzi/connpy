@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.6">
+<meta name="generator" content="pdoc3 0.11.5">
 <title>connpy API documentation</title>
 <meta name="description" content="Connection manager …">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
@@ -529,6 +529,10 @@ class Preload:
 <div class="desc"></div>
 </dd>
 <dt><code class="name"><a title="connpy.tests" href="tests/index.html">connpy.tests</a></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt><code class="name"><a title="connpy.tunnels" href="tunnels.html">connpy.tunnels</a></code></dt>
 <dd>
 <div class="desc"></div>
 </dd>
@@ -2073,7 +2077,7 @@ class ai:
 <dl>
 <dt id="connpy.ai.SAFE_COMMANDS"><code class="name">var <span class="ident">SAFE_COMMANDS</span></code></dt>
 <dd>
-<div class="desc"><p>The type of the None singleton.</p></div>
+<div class="desc"></div>
 </dd>
 </dl>
 <h3>Instance variables</h3>
@@ -3799,23 +3803,54 @@ class node:
 
     @MethodHook
     def _logclean(self, logfile, var = False):
-        #Remove special ascii characters and other stuff from logfile.
+        # Remove special ascii characters and process terminal cursor movements to clean logs.
         if var == False:
             t = open(logfile, &#34;r&#34;).read()
         else:
             t = logfile
-        while t.find(&#34;\b&#34;) != -1:
-            t = re.sub(&#39;[^\b]\b&#39;, &#39;&#39;, t)
-        t = t.replace(&#34;\n&#34;,&#34;&#34;,1)
-        t = t.replace(&#34;\a&#34;,&#34;&#34;)
-        t = t.replace(&#39;\n\n&#39;, &#39;\n&#39;)
-        t = re.sub(r&#39;.\[K&#39;, &#39;&#39;, t)
-        ansi_escape = re.compile(r&#39;\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/ ]*[@-~])&#39;)
-        t = ansi_escape.sub(&#39;&#39;, t)
-        t = t.lstrip(&#34; \n\r&#34;)
-        t = t.replace(&#34;\r&#34;,&#34;&#34;)
-        t = t.replace(&#34;\x0E&#34;,&#34;&#34;)
-        t = t.replace(&#34;\x0F&#34;,&#34;&#34;)
+            
+        lines = t.split(&#39;\n&#39;)
+        cleaned_lines = []
+        
+        # Regex to capture: ANSI sequences, control characters (\r, \b, etc), and plain text chunks
+        token_re = re.compile(r&#39;(\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/ ]*[@-~])|\r|\b|\x7f|[\x00-\x1F]|[^\x1B\r\b\x7f\x00-\x1F]+)&#39;)
+        
+        for line in lines:
+            buffer = []
+            cursor = 0
+            
+            for token in token_re.findall(line):
+                if token == &#39;\r&#39;:
+                    cursor = 0
+                elif token in (&#39;\b&#39;, &#39;\x7f&#39;):
+                    if cursor &gt; 0:
+                        cursor -= 1
+                elif token == &#39;\x1B[D&#39;: # Left Arrow
+                    if cursor &gt; 0:
+                        cursor -= 1
+                elif token == &#39;\x1B[C&#39;: # Right Arrow
+                    if cursor &lt; len(buffer):
+                        cursor += 1
+                elif token == &#39;\x1B[K&#39;: # Clear to end of line
+                    buffer = buffer[:cursor]
+                elif token.startswith(&#39;\x1B&#39;):
+                    # Ignore other ANSI sequences (colors, etc)
+                    continue
+                elif len(token) == 1 and ord(token) &lt; 32:
+                    # Ignore other non-printable control chars
+                    continue
+                else:
+                    # Regular printable text
+                    for char in token:
+                        if cursor == len(buffer):
+                            buffer.append(char)
+                        else:
+                            buffer[cursor] = char
+                        cursor += 1
+            cleaned_lines.append(&#34;&#34;.join(buffer))
+            
+        t = &#34;\n&#34;.join(cleaned_lines).replace(&#39;\n\n&#39;, &#39;\n&#39;).strip()
+
         if var == False:
             d = open(logfile, &#34;w&#34;)
             d.write(t)
@@ -3858,48 +3893,193 @@ class node:
             sleep(1)
 
 
-    @MethodHook
-    def interact(self, debug = False, logger = None):
-        &#39;&#39;&#39;
-        Allow user to interact with the node directly, mostly used by connection manager.
+    def _setup_interact_environment(self, debug=False, logger=None, async_mode=False):
+        size = re.search(&#39;columns=([0-9]+).*lines=([0-9]+)&#39;,str(os.get_terminal_size()))
+        self.child.setwinsize(int(size.group(2)),int(size.group(1)))
+        if logger:
+            port_str = f&#34;:{self.port}&#34; if self.port and self.protocol not in [&#34;ssm&#34;, &#34;kubectl&#34;, &#34;docker&#34;] else &#34;&#34;
+            logger(&#34;success&#34;, f&#34;Connected to {self.unique} at {self.host}{port_str} via: {self.protocol}&#34;)
 
-        ### Optional Parameters:  
-
-            - debug (bool): If True, display all the connecting information 
-                            before interact. Default False.  
-            - logger (callable): Optional callback for status reporting.
-        &#39;&#39;&#39;
-        connect = self._connect(debug = debug, logger = logger)
-        if connect == True:
-            size = re.search(&#39;columns=([0-9]+).*lines=([0-9]+)&#39;,str(os.get_terminal_size()))
-            self.child.setwinsize(int(size.group(2)),int(size.group(1)))
-            if logger:
-                port_str = f&#34;:{self.port}&#34; if self.port and self.protocol not in [&#34;ssm&#34;, &#34;kubectl&#34;, &#34;docker&#34;] else &#34;&#34;
-                logger(&#34;success&#34;, f&#34;Connected to {self.unique} at {self.host}{port_str} via: {self.protocol}&#34;)
-
-            if &#39;logfile&#39; in dir(self):
-                # Initialize self.mylog
-                if not &#39;mylog&#39; in dir(self):
-                    self.mylog = io.BytesIO()
+        if &#39;logfile&#39; in dir(self):
+            # Initialize self.mylog
+            if not &#39;mylog&#39; in dir(self):
+                self.mylog = io.BytesIO()
+            if not async_mode:
                 self.child.logfile_read = self.mylog
                 
                 # Start the _savelog thread
                 log_thread = threading.Thread(target=self._savelog)
                 log_thread.daemon = True
                 log_thread.start()
-            if &#39;missingtext&#39; in dir(self):
-                print(self.child.after.decode(), end=&#39;&#39;)
-            if self.idletime &gt; 0:
-                x = threading.Thread(target=self._keepalive)
-                x.daemon = True
-                x.start()
-            if debug:
+        if &#39;missingtext&#39; in dir(self):
+            print(self.child.after.decode(), end=&#39;&#39;)
+        if self.idletime &gt; 0 and not async_mode:
+            x = threading.Thread(target=self._keepalive)
+            x.daemon = True
+            x.start()
+        if debug:
+            if &#39;mylog&#39; in dir(self):
                 print(self.mylog.getvalue().decode())
-            self.child.interact(input_filter=self._filter)
-            if &#39;logfile&#39; in dir(self):
-                with open(self.logfile, &#34;w&#34;) as f:
-                    f.write(self._logclean(self.mylog.getvalue().decode(), True))
 
+    def _teardown_interact_environment(self):
+        if &#39;logfile&#39; in dir(self) and hasattr(self, &#39;mylog&#39;):
+            with open(self.logfile, &#34;w&#34;) as f:
+                f.write(self._logclean(self.mylog.getvalue().decode(), True))
+
+    async def _async_interact_loop(self, local_stream, resize_callback):
+        local_stream.setup(resize_callback=resize_callback)
+        try:
+            child_fd = self.child.child_fd
+            
+            # 1. Flush ghost buffer (Clean UX)
+            ghost_buffer = b&#39;&#39;
+            if getattr(self, &#39;missingtext&#39;, False):
+                # If we are missing the password, we MUST show the password prompt
+                ghost_buffer = (self.child.after or b&#39;&#39;) + (self.child.buffer or b&#39;&#39;)
+            else:
+                # We auto-logged in. Hide the messy password negotiation and just keep any pending live stream.
+                ghost_buffer = self.child.buffer or b&#39;&#39;
+
+            # Fix user&#39;s pet peeve: Strip leading newlines to avoid the empty lines 
+            # the router echoes after receiving the password or blank line.
+            if not getattr(self, &#39;missingtext&#39;, False):
+                ghost_buffer = ghost_buffer.lstrip(b&#39;\r\n &#39;)
+
+            if ghost_buffer:
+                # Add a single clean newline so it doesn&#39;t merge with the Connected message
+                await local_stream.write(b&#39;\r\n&#39; + ghost_buffer)
+                if hasattr(self, &#39;mylog&#39;):
+                    self.mylog.write(b&#39;\n&#39; + ghost_buffer)
+                    
+            self.child.buffer = b&#39;&#39;
+            self.child.before = b&#39;&#39;
+            
+            # 2. Set child fd non-blocking
+            flags = fcntl.fcntl(child_fd, fcntl.F_GETFL)
+            fcntl.fcntl(child_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+            
+            loop = asyncio.get_running_loop()
+            child_reader_queue = asyncio.Queue()
+            
+            def _child_read_ready():
+                try:
+                    data = os.read(child_fd, 4096)
+                    if data:
+                        child_reader_queue.put_nowait(data)
+                    else:
+                        child_reader_queue.put_nowait(b&#39;&#39;)
+                except BlockingIOError:
+                    pass
+                except OSError:
+                    child_reader_queue.put_nowait(b&#39;&#39;)
+                    
+            loop.add_reader(child_fd, _child_read_ready)
+            self.lastinput = time()
+            
+            async def ingress_task():
+                while True:
+                    data = await local_stream.read()
+                    if not data:
+                        break
+                    try:
+                        os.write(child_fd, data)
+                    except OSError:
+                        break
+                    self.lastinput = time()
+                    
+            async def egress_task():
+                # Continue stripping newlines from the live stream until we hit real text
+                skip_newlines = not getattr(self, &#39;missingtext&#39;, False) and not ghost_buffer
+                while True:
+                    data = await child_reader_queue.get()
+                    if not data:
+                        break
+                        
+                    if skip_newlines:
+                        stripped = data.lstrip(b&#39;\r\n&#39;)
+                        if stripped:
+                            skip_newlines = False
+                            data = stripped
+                        else:
+                            continue
+                            
+                    await local_stream.write(data)
+                    if hasattr(self, &#39;mylog&#39;):
+                        self.mylog.write(data)
+                        
+            async def keepalive_task():
+                if self.idletime &lt;= 0:
+                    return
+                while True:
+                    await asyncio.sleep(1)
+                    if time() - self.lastinput &gt;= self.idletime:
+                        try:
+                            self.child.sendcontrol(&#34;e&#34;)
+                            self.lastinput = time()
+                        except Exception:
+                            pass
+                            
+            async def savelog_task():
+                if not hasattr(self, &#39;logfile&#39;) or not hasattr(self, &#39;mylog&#39;):
+                    return
+                prev_size = 0
+                while True:
+                    await asyncio.sleep(5)
+                    current_size = self.mylog.tell()
+                    if current_size != prev_size:
+                        try:
+                            with open(self.logfile, &#34;w&#34;) as f:
+                                f.write(self._logclean(self.mylog.getvalue().decode(), True))
+                            prev_size = current_size
+                        except Exception:
+                            pass
+
+            try:
+                # gather runs until any task completes (or we just let them run until EOF breaks them)
+                # Ingress breaks on user EOF. Egress breaks on child EOF. 
+                # We want to exit if either happens, so return_exceptions=False, but we need to cancel the others.
+                tasks = [
+                    asyncio.create_task(ingress_task()),
+                    asyncio.create_task(egress_task()),
+                    asyncio.create_task(keepalive_task()),
+                    asyncio.create_task(savelog_task())
+                ]
+                done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+                for p in pending:
+                    p.cancel()
+            finally:
+                loop.remove_reader(child_fd)
+                try:
+                    flags = fcntl.fcntl(child_fd, fcntl.F_GETFL)
+                    fcntl.fcntl(child_fd, fcntl.F_SETFL, flags &amp; ~os.O_NONBLOCK)
+                except Exception:
+                    pass
+        finally:
+            local_stream.teardown()
+
+
+    @MethodHook
+    def interact(self, debug=False, logger=None):
+        &#39;&#39;&#39;
+        Asynchronous interactive session using Smart Tunnel architecture.
+        Allows multiplexing I/O and handling SIGWINCH events locally without blocking.
+        &#39;&#39;&#39;
+        connect = self._connect(debug=debug, logger=logger)
+        if connect == True:
+            try:
+                self._setup_interact_environment(debug=debug, logger=logger, async_mode=True)
+                
+                local_stream = LocalStream()
+                
+                def resize_callback(rows, cols):
+                    try:
+                        self.child.setwinsize(rows, cols)
+                    except Exception:
+                        pass
+                
+                asyncio.run(self._async_interact_loop(local_stream, resize_callback))
+            finally:
+                self._teardown_interact_environment()
         else:
             if logger:
                 logger(&#34;error&#34;, str(connect))
@@ -4364,47 +4544,27 @@ class node:
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@MethodHook
-def interact(self, debug = False, logger = None):
+def interact(self, debug=False, logger=None):
     &#39;&#39;&#39;
-    Allow user to interact with the node directly, mostly used by connection manager.
-
-    ### Optional Parameters:  
-
-        - debug (bool): If True, display all the connecting information 
-                        before interact. Default False.  
-        - logger (callable): Optional callback for status reporting.
+    Asynchronous interactive session using Smart Tunnel architecture.
+    Allows multiplexing I/O and handling SIGWINCH events locally without blocking.
     &#39;&#39;&#39;
-    connect = self._connect(debug = debug, logger = logger)
+    connect = self._connect(debug=debug, logger=logger)
     if connect == True:
-        size = re.search(&#39;columns=([0-9]+).*lines=([0-9]+)&#39;,str(os.get_terminal_size()))
-        self.child.setwinsize(int(size.group(2)),int(size.group(1)))
-        if logger:
-            port_str = f&#34;:{self.port}&#34; if self.port and self.protocol not in [&#34;ssm&#34;, &#34;kubectl&#34;, &#34;docker&#34;] else &#34;&#34;
-            logger(&#34;success&#34;, f&#34;Connected to {self.unique} at {self.host}{port_str} via: {self.protocol}&#34;)
-
-        if &#39;logfile&#39; in dir(self):
-            # Initialize self.mylog
-            if not &#39;mylog&#39; in dir(self):
-                self.mylog = io.BytesIO()
-            self.child.logfile_read = self.mylog
+        try:
+            self._setup_interact_environment(debug=debug, logger=logger, async_mode=True)
             
-            # Start the _savelog thread
-            log_thread = threading.Thread(target=self._savelog)
-            log_thread.daemon = True
-            log_thread.start()
-        if &#39;missingtext&#39; in dir(self):
-            print(self.child.after.decode(), end=&#39;&#39;)
-        if self.idletime &gt; 0:
-            x = threading.Thread(target=self._keepalive)
-            x.daemon = True
-            x.start()
-        if debug:
-            print(self.mylog.getvalue().decode())
-        self.child.interact(input_filter=self._filter)
-        if &#39;logfile&#39; in dir(self):
-            with open(self.logfile, &#34;w&#34;) as f:
-                f.write(self._logclean(self.mylog.getvalue().decode(), True))
-
+            local_stream = LocalStream()
+            
+            def resize_callback(rows, cols):
+                try:
+                    self.child.setwinsize(rows, cols)
+                except Exception:
+                    pass
+            
+            asyncio.run(self._async_interact_loop(local_stream, resize_callback))
+        finally:
+            self._teardown_interact_environment()
     else:
         if logger:
             logger(&#34;error&#34;, str(connect))
@@ -4412,12 +4572,8 @@ def interact(self, debug = False, logger = None):
             printer.error(f&#34;Connection failed: {str(connect)}&#34;)
         sys.exit(1)</code></pre>
 </details>
-<div class="desc"><p>Allow user to interact with the node directly, mostly used by connection manager.</p>
-<h3 id="optional-parameters">Optional Parameters:</h3>
-<pre><code>- debug (bool): If True, display all the connecting information 
-                before interact. Default False.  
-- logger (callable): Optional callback for status reporting.
-</code></pre></div>
+<div class="desc"><p>Asynchronous interactive session using Smart Tunnel architecture.
+Allows multiplexing I/O and handling SIGWINCH events locally without blocking.</p></div>
 </dd>
 <dt id="connpy.node.run"><code class="name flex">
 <span>def <span class="ident">run</span></span>(<span>self,<br>commands,<br>vars=None,<br>*,<br>folder='',<br>prompt=&#x27;&gt;$|#$|\\$$|&gt;.$|#.$|\\$.$&#x27;,<br>stdout=False,<br>timeout=10,<br>logger=None)</span>
@@ -5410,6 +5566,7 @@ def test(self, commands, expected, vars = None,*, prompt = None, parallel = 10, 
 <li><code><a title="connpy.proto" href="proto/index.html">connpy.proto</a></code></li>
 <li><code><a title="connpy.services" href="services/index.html">connpy.services</a></code></li>
 <li><code><a title="connpy.tests" href="tests/index.html">connpy.tests</a></code></li>
+<li><code><a title="connpy.tunnels" href="tunnels.html">connpy.tunnels</a></code></li>
 </ul>
 </li>
 <li><h3><a href="#header-classes">Classes</a></h3>
@@ -5469,7 +5626,7 @@ def test(self, commands, expected, vars = None,*, prompt = None, parallel = 10, 
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
 </footer>
 </body>
 </html>

@@ -182,7 +182,7 @@ class NodeService(BaseService):
         n = node(unique_id, **resolved_data, config=self.config)
         if sftp:
             n.protocol = "sftp"
-            
+
         n.interact(debug=debug, logger=logger)
 
     def move_node(self, src_id, dst_id, copy=False):

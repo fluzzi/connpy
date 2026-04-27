@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.6">
+<meta name="generator" content="pdoc3 0.11.5">
 <title>connpy.grpc_layer.server API documentation</title>
 <meta name="description" content="">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
@@ -207,6 +207,8 @@ el.replaceWith(d);
                             daemon=True
                         )
                         ai_thread.start()
+            except grpc.RpcError:
+                pass
             except Exception as e:
                 print(f&#34;Request Listener Error: {e}&#34;)
             finally:
@@ -627,10 +629,13 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
     @handle_errors
     def interact_node(self, request_iterator, context):
         import sys
-        import select
         import os
+        import asyncio
         from connpy.core import node
         from ..services.profile_service import ProfileService
+        from connpy.tunnels import RemoteStream
+        import queue
+        import threading
 
         # Fetch first setup packet
         try:
@@ -649,11 +654,11 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
             base_node_id = params.get(&#34;base_node&#34;)
             # Valid attributes that a node object accepts
             valid_attrs = [&#39;host&#39;, &#39;options&#39;, &#39;logs&#39;, &#39;password&#39;, &#39;port&#39;, &#39;protocol&#39;, &#39;user&#39;, &#39;jumphost&#39;]
-            
+
             fallback_id = f&#34;{unique_id}@remote&#34;
             if unique_id == &#34;dynamic&#34; and params.get(&#34;host&#34;):
                 fallback_id = f&#34;dynamic-{params.get(&#39;host&#39;)}@remote&#34;
-            
+
             if base_node_id:
                 # Look up the base node in config and use its full data
                 nodes = self.service.config._getallnodes(base_node_id)
@@ -663,14 +668,14 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
                     for attr in valid_attrs:
                         if attr in params:
                             device[attr] = params[attr]
-                    
+
                     if &#34;tags&#34; in params:
                         device_tags = device.get(&#34;tags&#34;, {})
                         if not isinstance(device_tags, dict):
                             device_tags = {}
                         device_tags.update(params[&#34;tags&#34;])
                         device[&#34;tags&#34;] = device_tags
-                        
+
                     node_name = params.get(&#34;name&#34;, base_node_id)
                     n = node(node_name, **device, config=self.service.config)
                 else:
@@ -704,33 +709,9 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
         if connect != True:
             yield connpy_pb2.InteractResponse(success=False, error_message=str(connect))
             return
-        
+
         # Signal successful connection to the client
         yield connpy_pb2.InteractResponse(success=True)
-
-        import threading
-        import queue
-
-        stdin_queue = queue.Queue()
-        running = True
-
-        def read_requests():
-            try:
-                for req in request_iterator:
-                    if not running:
-                        break
-                    if req.cols &gt; 0 and req.rows &gt; 0:
-                        try:
-                            n.child.setwinsize(req.rows, req.cols)
-                        except Exception:
-                            pass
-                    if req.stdin_data:
-                        stdin_queue.put(req.stdin_data)
-            except grpc.RpcError:
-                pass
-
-        t = threading.Thread(target=read_requests, daemon=True)
-        t.start()
 
         # Set initial window size if provided
         if first_req.cols &gt; 0 and first_req.rows &gt; 0:
@@ -739,32 +720,34 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
             except Exception:
                 pass
 
-        try:
-            while n.child.isalive() and running:
-                r, _, _ = select.select([n.child.child_fd], [], [], 0.05)
-                if r:
-                    try:
-                        data = os.read(n.child.child_fd, 4096)
-                        if not data:
-                            break
-                        yield connpy_pb2.InteractResponse(stdout_data=data)
-                    except OSError:
-                        break
-                
-                while not stdin_queue.empty():
-                    data = stdin_queue.get_nowait()
-                    try:
-                        os.write(n.child.child_fd, data)
-                    except OSError:
-                        running = False
-                        break
-        finally:
-            running = False
-            try:
-                n.child.terminate(force=True)
-            except Exception:
-                pass
+        response_queue = queue.Queue()
+        remote_stream = RemoteStream(request_iterator, response_queue)
 
+        def run_async_loop():
+            try:
+                n._setup_interact_environment(debug=debug, logger=None, async_mode=True)
+                def resize_callback(rows, cols):
+                    try:
+                        n.child.setwinsize(rows, cols)
+                    except Exception:
+                        pass
+
+                asyncio.run(n._async_interact_loop(remote_stream, resize_callback))
+            except Exception as e:
+                pass
+            finally:
+                n._teardown_interact_environment()
+                response_queue.put(None)  # Signal EOF
+
+        t_loop = threading.Thread(target=run_async_loop, daemon=True)
+        t_loop.start()
+
+        while True:
+            data = response_queue.get()
+            if data is None:
+                printer.console.print(f&#34;[debug][DEBUG][/debug] gRPC interact_node session closed for: [bold cyan]{unique_id}[/bold cyan]&#34;)
+                break
+            yield connpy_pb2.InteractResponse(stdout_data=data)
     @handle_errors
     def list_nodes(self, request, context):
         f = request.filter_str if request.filter_str else None
@@ -1330,7 +1313,7 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
 </footer>
 </body>
 </html>

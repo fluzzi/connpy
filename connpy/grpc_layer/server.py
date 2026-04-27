@@ -61,10 +61,13 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
     @handle_errors
     def interact_node(self, request_iterator, context):
         import sys
-        import select
         import os
+        import asyncio
         from connpy.core import node
         from ..services.profile_service import ProfileService
+        from connpy.tunnels import RemoteStream
+        import queue
+        import threading
 
         # Fetch first setup packet
         try:
@@ -83,11 +86,11 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
             base_node_id = params.get("base_node")
             # Valid attributes that a node object accepts
             valid_attrs = ['host', 'options', 'logs', 'password', 'port', 'protocol', 'user', 'jumphost']
-            
+
             fallback_id = f"{unique_id}@remote"
             if unique_id == "dynamic" and params.get("host"):
                 fallback_id = f"dynamic-{params.get('host')}@remote"
-            
+
             if base_node_id:
                 # Look up the base node in config and use its full data
                 nodes = self.service.config._getallnodes(base_node_id)
@@ -97,14 +100,14 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
                     for attr in valid_attrs:
                         if attr in params:
                             device[attr] = params[attr]
-                    
+
                     if "tags" in params:
                         device_tags = device.get("tags", {})
                         if not isinstance(device_tags, dict):
                             device_tags = {}
                         device_tags.update(params["tags"])
                         device["tags"] = device_tags
-                        
+
                     node_name = params.get("name", base_node_id)
                     n = node(node_name, **device, config=self.service.config)
                 else:
@@ -138,33 +141,9 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
         if connect != True:
             yield connpy_pb2.InteractResponse(success=False, error_message=str(connect))
             return
-        
+
         # Signal successful connection to the client
         yield connpy_pb2.InteractResponse(success=True)
-
-        import threading
-        import queue
-
-        stdin_queue = queue.Queue()
-        running = True
-
-        def read_requests():
-            try:
-                for req in request_iterator:
-                    if not running:
-                        break
-                    if req.cols > 0 and req.rows > 0:
-                        try:
-                            n.child.setwinsize(req.rows, req.cols)
-                        except Exception:
-                            pass
-                    if req.stdin_data:
-                        stdin_queue.put(req.stdin_data)
-            except grpc.RpcError:
-                pass
-
-        t = threading.Thread(target=read_requests, daemon=True)
-        t.start()
 
         # Set initial window size if provided
         if first_req.cols > 0 and first_req.rows > 0:
@@ -173,32 +152,34 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
             except Exception:
                 pass
 
-        try:
-            while n.child.isalive() and running:
-                r, _, _ = select.select([n.child.child_fd], [], [], 0.05)
-                if r:
-                    try:
-                        data = os.read(n.child.child_fd, 4096)
-                        if not data:
-                            break
-                        yield connpy_pb2.InteractResponse(stdout_data=data)
-                    except OSError:
-                        break
-                
-                while not stdin_queue.empty():
-                    data = stdin_queue.get_nowait()
-                    try:
-                        os.write(n.child.child_fd, data)
-                    except OSError:
-                        running = False
-                        break
-        finally:
-            running = False
-            try:
-                n.child.terminate(force=True)
-            except Exception:
-                pass
+        response_queue = queue.Queue()
+        remote_stream = RemoteStream(request_iterator, response_queue)
 
+        def run_async_loop():
+            try:
+                n._setup_interact_environment(debug=debug, logger=None, async_mode=True)
+                def resize_callback(rows, cols):
+                    try:
+                        n.child.setwinsize(rows, cols)
+                    except Exception:
+                        pass
+
+                asyncio.run(n._async_interact_loop(remote_stream, resize_callback))
+            except Exception as e:
+                pass
+            finally:
+                n._teardown_interact_environment()
+                response_queue.put(None)  # Signal EOF
+
+        t_loop = threading.Thread(target=run_async_loop, daemon=True)
+        t_loop.start()
+
+        while True:
+            data = response_queue.get()
+            if data is None:
+                printer.console.print(f"[debug][DEBUG][/debug] gRPC interact_node session closed for: [bold cyan]{unique_id}[/bold cyan]")
+                break
+            yield connpy_pb2.InteractResponse(stdout_data=data)
     @handle_errors
     def list_nodes(self, request, context):
         f = request.filter_str if request.filter_str else None
@@ -691,6 +672,8 @@ class AIServicer(connpy_pb2_grpc.AIServiceServicer):
                             daemon=True
                         )
                         ai_thread.start()
+            except grpc.RpcError:
+                pass
             except Exception as e:
                 print(f"Request Listener Error: {e}")
             finally:
