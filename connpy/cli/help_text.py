@@ -55,6 +55,10 @@ Here are some important instructions and tips for configuring your new node:
    - `prompt`: Replaces default app prompt to identify the end of output or where the user can start inputting commands.
    - `kube_command`: Replaces the default command (`/bin/bash`) for `kubectl exec`.
    - `docker_command`: Replaces the default command for `docker exec`.
+   - `region`: AWS Region used for `aws ssm start-session`.
+   - `profile`: AWS Profile used for `aws ssm start-session`.
+   - `ssh_options`: Additional SSH options injected when an SSM node is used as a jumphost (e.g., `-i ~/.ssh/key.pem`).
+   - `nc_command`: Replaces the default `nc` command used when bridging connections through Docker or Kubernetes (e.g., `ip netns exec global-vrf nc`).
 """
     if type == "bashcompletion":
         return '''

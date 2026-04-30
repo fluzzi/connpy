@@ -89,13 +89,20 @@ class NodeService(BaseService):
         """Generate and update the internal nodes cache."""
         self.config._generate_nodes_cache(nodes=nodes, folders=folders, profiles=profiles)
 
-    def validate_parent_folder(self, unique_id):
+    def validate_parent_folder(self, unique_id, is_folder=False):
         """Check if parent folder exists for a given node unique ID."""
-        node_folder = unique_id.partition("@")[2]
-        if node_folder:
-            parent_folder = f"@{node_folder}"
-            if parent_folder not in self.config._getallfolders():
-                raise NodeNotFoundError(f"Folder '{parent_folder}' not found.")
+        if is_folder:
+            uniques = self.config._explode_unique(unique_id)
+            if uniques and "subfolder" in uniques and "folder" in uniques:
+                parent_folder = f"@{uniques['folder']}"
+                if parent_folder not in self.config._getallfolders():
+                    raise NodeNotFoundError(f"Folder '{parent_folder}' not found.")
+        else:
+            node_folder = unique_id.partition("@")[2]
+            if node_folder:
+                parent_folder = f"@{node_folder}"
+                if parent_folder not in self.config._getallfolders():
+                    raise NodeNotFoundError(f"Folder '{parent_folder}' not found.")
 
 
     def add_node(self, unique_id, data, is_folder=False):
@@ -115,7 +122,7 @@ class NodeService(BaseService):
             
             # Check if parent folder exists when creating a subfolder
             if "subfolder" in uniques:
-                self.validate_parent_folder(unique_id)
+                self.validate_parent_folder(unique_id, is_folder=True)
                     
             self.config._folder_add(**uniques)
             self.config._saveconfig(self.config.file)

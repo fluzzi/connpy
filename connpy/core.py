@@ -146,6 +146,42 @@ class node:
                 else:
                     jumphost_cmd = jumphost_cmd + " {}".format("@".join([self.jumphost["user"],self.jumphost["host"]]))
                 self.jumphost = f"-o ProxyCommand=\"{jumphost_cmd}\""
+            elif self.jumphost["protocol"] == "ssm":
+                ssm_target = self.jumphost["host"]
+                ssm_cmd = f"aws ssm start-session --target {ssm_target} --document-name AWS-StartSSHSession --parameters 'portNumber=22'"
+                if isinstance(self.jumphost.get("tags"), dict):
+                    if "profile" in self.jumphost["tags"]:
+                        ssm_cmd += f" --profile {self.jumphost['tags']['profile']}"
+                    if "region" in self.jumphost["tags"]:
+                        ssm_cmd += f" --region {self.jumphost['tags']['region']}"
+                if self.jumphost["options"] != '':
+                    ssm_cmd += f" {self.jumphost['options']}"
+                
+                bastion_user_part = f"{self.jumphost['user']}@{ssm_target}" if self.jumphost['user'] else ssm_target
+                
+                ssh_opts = ""
+                if isinstance(self.jumphost.get("tags"), dict) and "ssh_options" in self.jumphost["tags"]:
+                    ssh_opts = f" {self.jumphost['tags']['ssh_options']}"
+                
+                inner_ssh = f"ssh{ssh_opts} -o ProxyCommand='{ssm_cmd}' -W %h:%p {bastion_user_part}"
+                self.jumphost = f"-o ProxyCommand=\"{inner_ssh}\""
+            elif self.jumphost["protocol"] in ["kubectl", "docker"]:
+                nc_cmd = "nc"
+                if isinstance(self.jumphost.get("tags"), dict) and "nc_command" in self.jumphost["tags"]:
+                    nc_cmd = self.jumphost["tags"]["nc_command"]
+                    
+                if self.jumphost["protocol"] == "kubectl":
+                    proxy_cmd = f"kubectl exec "
+                    if self.jumphost["options"] != '':
+                        proxy_cmd += f"{self.jumphost['options']} "
+                    proxy_cmd += f"{self.jumphost['host']} -i -- {nc_cmd} %h %p"
+                else:
+                    proxy_cmd = f"docker "
+                    if self.jumphost["options"] != '':
+                        proxy_cmd += f"{self.jumphost['options']} "
+                    proxy_cmd += f"exec -i {self.jumphost['host']} {nc_cmd} %h %p"
+                    
+                self.jumphost = f"-o ProxyCommand=\"{proxy_cmd}\""
             else:
                 self.jumphost = ""
         
@@ -401,8 +437,6 @@ class node:
                         self.mylog.write(data)
                         
             async def keepalive_task():
-                if self.idletime <= 0:
-                    return
                 while True:
                     await asyncio.sleep(1)
                     if time() - self.lastinput >= self.idletime:
@@ -413,8 +447,6 @@ class node:
                             pass
                             
             async def savelog_task():
-                if not hasattr(self, 'logfile') or not hasattr(self, 'mylog'):
-                    return
                 prev_size = 0
                 while True:
                     await asyncio.sleep(5)
@@ -433,10 +465,12 @@ class node:
                 # We want to exit if either happens, so return_exceptions=False, but we need to cancel the others.
                 tasks = [
                     asyncio.create_task(ingress_task()),
-                    asyncio.create_task(egress_task()),
-                    asyncio.create_task(keepalive_task()),
-                    asyncio.create_task(savelog_task())
+                    asyncio.create_task(egress_task())
                 ]
+                if self.idletime > 0:
+                    tasks.append(asyncio.create_task(keepalive_task()))
+                if hasattr(self, 'logfile') and hasattr(self, 'mylog'):
+                    tasks.append(asyncio.create_task(savelog_task()))
                 done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
                 for p in pending:
                     p.cancel()
@@ -802,7 +836,7 @@ class node:
             "telnet": ['[u|U]sername:', 'refused', 'supported', 'invalid|unrecognized option', 'ssh-keygen.*\"', 'timeout|timed.out', 'unavailable', 'closed', password_prompt, prompt, 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching", "[b|B]ad (owner|permissions)"],
             "kubectl": ['[u|U]sername:', '[r|R]efused', '[E|e]rror', 'DEPRECATED', pexpect.TIMEOUT, password_prompt, prompt, pexpect.EOF, "expired|invalid"],
             "docker": ['[u|U]sername:', 'Cannot', '[E|e]rror', 'failed', 'not a docker command', 'unknown', 'unable to resolve', pexpect.TIMEOUT, password_prompt, prompt, pexpect.EOF],
-            "ssm": ['[u|U]sername:', 'Cannot', '[E|e]rror', 'failed', 'SessionManagerPlugin', 'unknown', 'unable to resolve', pexpect.TIMEOUT, password_prompt, prompt, pexpect.EOF]
+            "ssm": ['[u|U]sername:', 'Cannot', '[E|e]rror', 'failed', 'SessionManagerPlugin', '[u|U]nknown', 'unable to resolve', pexpect.TIMEOUT, password_prompt, prompt, pexpect.EOF]
         }
 
         error_indices = {
