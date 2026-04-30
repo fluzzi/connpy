@@ -420,9 +420,9 @@ class ExecutionStub:
             folder=folder or "",
             prompt=prompt or "",
             parallel=parallel,
+            timeout=timeout,
+            name=kwargs.get("name", "")
         )
-        # Note: 'timeout', 'on_node_complete', and 'logger' are currently not 
-        # sent over gRPC in the current proto definition. 
         if variables is not None:
             req.vars.CopyFrom(to_struct(variables))
             
@@ -432,7 +432,10 @@ class ExecutionStub:
         for response in self.stub.run_commands(req):
             if on_complete:
                 on_complete(response.unique_id, response.output, response.status)
-            final_results[response.unique_id] = response.output
+            final_results[response.unique_id] = {
+                "output": response.output,
+                "status": response.status
+            }
                 
         return final_results
 
@@ -442,10 +445,12 @@ class ExecutionStub:
         req = connpy_pb2.TestRequest(
             nodes=nodes_list,
             commands=commands,
-            expected=expected,
+            expected=expected if isinstance(expected, list) else [expected],
             folder=kwargs.get("folder", ""),
             prompt=prompt or "",
             parallel=parallel,
+            timeout=timeout,
+            name=kwargs.get("name", "")
         )
         if variables is not None:
             req.vars.CopyFrom(to_struct(variables))

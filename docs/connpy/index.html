@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.5">
+<meta name="generator" content="pdoc3 0.11.6">
 <title>connpy API documentation</title>
 <meta name="description" content="Connection manager …">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
@@ -2077,7 +2077,7 @@ class ai:
 <dl>
 <dt id="connpy.ai.SAFE_COMMANDS"><code class="name">var <span class="ident">SAFE_COMMANDS</span></code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>The type of the None singleton.</p></div>
 </dd>
 </dl>
 <h3>Instance variables</h3>
@@ -3170,15 +3170,7 @@ class configfile:
         if isinstance(uniques, str):
             uniques = [uniques]
         for i in uniques:
-            if isinstance(i, dict):
-                name = list(i.keys())[0]
-                mylist = i[name]
-                if not self.config[&#34;case&#34;]:
-                    name = name.lower()
-                    mylist = [item.lower() for item in mylist]
-                this = self.getitem(name, mylist, extract = extract)
-                nodes.update(this)
-            elif i.startswith(&#34;@&#34;):
+            if i.startswith(&#34;@&#34;):
                 if not self.config[&#34;case&#34;]:
                     i = i.lower()
                 this = self.getitem(i, extract = extract)
@@ -3257,13 +3249,17 @@ class configfile:
                 layer3 = [k + &#34;@&#34; + s + &#34;@&#34; + f for k,v in self.connections[f][s].items() if isinstance(v, dict) and v.get(&#34;type&#34;) == &#34;connection&#34;]
                 nodes.extend(layer3)
         if filter:
+            flat_filter = []
             if isinstance(filter, str):
-                nodes = [item for item in nodes if re.search(filter, item)]
+                flat_filter = [filter]
             elif isinstance(filter, list):
-                nodes = [item for item in nodes if any(re.search(pattern, item) for pattern in filter)]
+                for item in filter:
+                    if isinstance(item, str):
+                        flat_filter.append(item)
             else:
-                printer.error(&#34;Invalid filter: must be a string or a list of strings.&#34;)
+                printer.error(&#34;Filter must be a string or a list of strings&#34;)
                 sys.exit(1)
+            nodes = [item for item in nodes if any(re.search(pattern, item) for pattern in flat_filter)]
         return nodes
 
     @MethodHook
@@ -3281,15 +3277,18 @@ class configfile:
                 layer3 = {k + &#34;@&#34; + s + &#34;@&#34; + f:v for k,v in self.connections[f][s].items() if isinstance(v, dict) and v.get(&#34;type&#34;) == &#34;connection&#34;}
                 nodes.update(layer3)
         if filter:
+            flat_filter = []
             if isinstance(filter, str):
-                filter = &#34;^(?!.*@).+$&#34; if filter == &#34;@&#34; else filter
-                nodes = {k: v for k, v in nodes.items() if re.search(filter, k)}
+                flat_filter = [filter]
             elif isinstance(filter, list):
-                filter = [&#34;^(?!.*@).+$&#34; if item == &#34;@&#34; else item for item in filter]
-                nodes = {k: v for k, v in nodes.items() if any(re.search(pattern, k) for pattern in filter)}
+                for item in filter:
+                    if isinstance(item, str):
+                        flat_filter.append(item)
             else:
-                printer.error(&#34;Invalid filter: must be a string or a list of strings.&#34;)
+                printer.error(&#34;Filter must be a string or a list of strings&#34;)
                 sys.exit(1)
+            flat_filter = [&#34;^(?!.*@).+$&#34; if item == &#34;@&#34; else item for item in flat_filter]
+            nodes = {k: v for k, v in nodes.items() if any(re.search(pattern, k) for pattern in flat_filter)}
         if extract:
             for node, keys in nodes.items():
                 for key, value in keys.items():
@@ -3586,15 +3585,7 @@ def getitems(self, uniques, extract = False):
     if isinstance(uniques, str):
         uniques = [uniques]
     for i in uniques:
-        if isinstance(i, dict):
-            name = list(i.keys())[0]
-            mylist = i[name]
-            if not self.config[&#34;case&#34;]:
-                name = name.lower()
-                mylist = [item.lower() for item in mylist]
-            this = self.getitem(name, mylist, extract = extract)
-            nodes.update(this)
-        elif i.startswith(&#34;@&#34;):
+        if i.startswith(&#34;@&#34;):
             if not self.config[&#34;case&#34;]:
                 i = i.lower()
             this = self.getitem(i, extract = extract)
@@ -3759,6 +3750,10 @@ class node:
                 self.jumphost = f&#34;-o ProxyCommand=\&#34;{jumphost_cmd}\&#34;&#34;
             else:
                 self.jumphost = &#34;&#34;
+        
+        self.output = &#34;&#34;
+        self.status = 1
+        self.result = {}
 
     @MethodHook
     def _passtx(self, passwords, *, keyfile=None):
@@ -4159,7 +4154,12 @@ class node:
             self.child.logfile_read = self.mylog
             for c in commands:
                 if vars is not None:
-                    c = c.format(**vars)
+                    try:
+                        c = c.format(**vars)
+                    except KeyError as e:
+                        self.output = f&#34;Error: Variable {e} not defined in task or inventory&#34;
+                        self.status = 1
+                        return self.output
                 result = self.child.expect(expects, timeout = timeout)
                 self.child.sendline(c)
                 if result == 2:
@@ -4193,7 +4193,7 @@ class node:
             return connect
 
     @MethodHook
-    def test(self, commands, expected, vars = None,*, prompt = r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, timeout = 10, logger = None):
+    def test(self, commands, expected, vars = None,*, folder = &#39;&#39;, prompt = r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, timeout = 10, logger = None):
         &#39;&#39;&#39;
         Run a command or list of commands on the node, then check if expected value appears on the output after the last command.
 
@@ -4219,6 +4219,9 @@ class node:
 
         ### Optional Named Parameters: 
 
+            - folder (str): Path where output log should be stored, leave 
+                            empty to not store logs.
+
             - prompt (str): Prompt to be expected after a command is finished
                             running. Usually linux uses  &#34;&gt;&#34; or EOF while 
                             routers use &#34;&gt;&#34; or &#34;#&#34;. The default value should 
@@ -4233,6 +4236,7 @@ class node:
                   false if prompt is found before.
 
         &#39;&#39;&#39;
+        now = datetime.datetime.now().strftime(&#34;%Y-%m-%d_%H-%M-%S&#34;)
         connect = self._connect(timeout = timeout, logger = logger)
         if connect == True:
             if logger:
@@ -4250,6 +4254,7 @@ class node:
             if &#34;prompt&#34; in self.tags:
                 prompt = self.tags[&#34;prompt&#34;]
             expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
+
             output = &#39;&#39;
             if not isinstance(commands, list):
                 commands = [commands]
@@ -4261,7 +4266,12 @@ class node:
             self.child.logfile_read = self.mylog
             for c in commands:
                 if vars is not None:
-                    c = c.format(**vars)
+                    try:
+                        c = c.format(**vars)
+                    except KeyError as e:
+                        self.output = f&#34;Error: Variable {e} not defined in task or inventory&#34;
+                        self.status = 1
+                        return self.output
                 result = self.child.expect(expects, timeout = timeout)
                 self.child.sendline(c)
                 if result == 2:
@@ -4270,6 +4280,12 @@ class node:
                 result = self.child.expect(expects, timeout = timeout)
             self.child.close()
             output = self._logclean(self.mylog.getvalue().decode(), True)
+            if logger:
+                logger(&#34;output&#34;, output)
+            if folder != &#39;&#39;:
+                with open(folder + &#34;/&#34; + self.unique + &#34;_&#34; + now + &#34;.txt&#34;, &#34;w&#34;) as f:
+                    f.write(output)
+                    f.close()
             self.output = output
             if result in [0, 1]:
                 # lastcommand = commands[-1]
@@ -4654,7 +4670,12 @@ def run(self, commands, vars = None,*, folder = &#39;&#39;, prompt = r&#39;&gt;$
         self.child.logfile_read = self.mylog
         for c in commands:
             if vars is not None:
-                c = c.format(**vars)
+                try:
+                    c = c.format(**vars)
+                except KeyError as e:
+                    self.output = f&#34;Error: Variable {e} not defined in task or inventory&#34;
+                    self.status = 1
+                    return self.output
             result = self.child.expect(expects, timeout = timeout)
             self.child.sendline(c)
             if result == 2:
@@ -4721,7 +4742,7 @@ def run(self, commands, vars = None,*, folder = &#39;&#39;, prompt = r&#39;&gt;$
 </code></pre></div>
 </dd>
 <dt id="connpy.node.test"><code class="name flex">
-<span>def <span class="ident">test</span></span>(<span>self,<br>commands,<br>expected,<br>vars=None,<br>*,<br>prompt=&#x27;&gt;$|#$|\\$$|&gt;.$|#.$|\\$.$&#x27;,<br>timeout=10,<br>logger=None)</span>
+<span>def <span class="ident">test</span></span>(<span>self,<br>commands,<br>expected,<br>vars=None,<br>*,<br>folder='',<br>prompt=&#x27;&gt;$|#$|\\$$|&gt;.$|#.$|\\$.$&#x27;,<br>timeout=10,<br>logger=None)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -4729,7 +4750,7 @@ def run(self, commands, vars = None,*, folder = &#39;&#39;, prompt = r&#39;&gt;$
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@MethodHook
-def test(self, commands, expected, vars = None,*, prompt = r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, timeout = 10, logger = None):
+def test(self, commands, expected, vars = None,*, folder = &#39;&#39;, prompt = r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, timeout = 10, logger = None):
     &#39;&#39;&#39;
     Run a command or list of commands on the node, then check if expected value appears on the output after the last command.
 
@@ -4755,6 +4776,9 @@ def test(self, commands, expected, vars = None,*, prompt = r&#39;&gt;$|#$|\$$|&g
 
     ### Optional Named Parameters: 
 
+        - folder (str): Path where output log should be stored, leave 
+                        empty to not store logs.
+
         - prompt (str): Prompt to be expected after a command is finished
                         running. Usually linux uses  &#34;&gt;&#34; or EOF while 
                         routers use &#34;&gt;&#34; or &#34;#&#34;. The default value should 
@@ -4769,6 +4793,7 @@ def test(self, commands, expected, vars = None,*, prompt = r&#39;&gt;$|#$|\$$|&g
               false if prompt is found before.
 
     &#39;&#39;&#39;
+    now = datetime.datetime.now().strftime(&#34;%Y-%m-%d_%H-%M-%S&#34;)
     connect = self._connect(timeout = timeout, logger = logger)
     if connect == True:
         if logger:
@@ -4786,6 +4811,7 @@ def test(self, commands, expected, vars = None,*, prompt = r&#39;&gt;$|#$|\$$|&g
         if &#34;prompt&#34; in self.tags:
             prompt = self.tags[&#34;prompt&#34;]
         expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
+
         output = &#39;&#39;
         if not isinstance(commands, list):
             commands = [commands]
@@ -4797,7 +4823,12 @@ def test(self, commands, expected, vars = None,*, prompt = r&#39;&gt;$|#$|\$$|&g
         self.child.logfile_read = self.mylog
         for c in commands:
             if vars is not None:
-                c = c.format(**vars)
+                try:
+                    c = c.format(**vars)
+                except KeyError as e:
+                    self.output = f&#34;Error: Variable {e} not defined in task or inventory&#34;
+                    self.status = 1
+                    return self.output
             result = self.child.expect(expects, timeout = timeout)
             self.child.sendline(c)
             if result == 2:
@@ -4806,6 +4837,12 @@ def test(self, commands, expected, vars = None,*, prompt = r&#39;&gt;$|#$|\$$|&g
             result = self.child.expect(expects, timeout = timeout)
         self.child.close()
         output = self._logclean(self.mylog.getvalue().decode(), True)
+        if logger:
+            logger(&#34;output&#34;, output)
+        if folder != &#39;&#39;:
+            with open(folder + &#34;/&#34; + self.unique + &#34;_&#34; + now + &#34;.txt&#34;, &#34;w&#34;) as f:
+                f.write(output)
+                f.close()
         self.output = output
         if result in [0, 1]:
             # lastcommand = commands[-1]
@@ -4856,7 +4893,10 @@ def test(self, commands, expected, vars = None,*, prompt = r&#39;&gt;$|#$|\$$|&g
                 Values: strings.
 </code></pre>
 <h3 id="optional-named-parameters">Optional Named Parameters:</h3>
-<pre><code>- prompt (str): Prompt to be expected after a command is finished
+<pre><code>- folder (str): Path where output log should be stored, leave 
+                empty to not store logs.
+
+- prompt (str): Prompt to be expected after a command is finished
                 running. Usually linux uses  "&gt;" or EOF while 
                 routers use "&gt;" or "#". The default value should 
                 work for most nodes. Change it if your connection 
@@ -5022,8 +5062,15 @@ class nodes:
                 nodesargs[n.unique][&#34;vars&#34;] = {}
                 if &#34;__global__&#34; in vars.keys():
                     nodesargs[n.unique][&#34;vars&#34;].update(vars[&#34;__global__&#34;])
-                if n.unique in vars.keys():
-                    nodesargs[n.unique][&#34;vars&#34;].update(vars[n.unique])
+                for var_key, var_val in vars.items():
+                    if var_key == &#34;__global__&#34;:
+                        continue
+                    try:
+                        if re.search(var_key, n.unique, re.IGNORECASE):
+                            nodesargs[n.unique][&#34;vars&#34;].update(var_val)
+                    except re.error:
+                        if var_key == n.unique:
+                            nodesargs[n.unique][&#34;vars&#34;].update(var_val)
             
             # Pass the logger to the node
             nodesargs[n.unique][&#34;logger&#34;] = logger
@@ -5048,7 +5095,7 @@ class nodes:
         return output
 
     @MethodHook
-    def test(self, commands, expected, vars = None,*, prompt = None, parallel = 10, timeout = None, on_complete = None, logger = None):
+    def test(self, commands, expected, vars = None,*, folder = None, prompt = None, parallel = 10, timeout = None, on_complete = None, logger = None):
         &#39;&#39;&#39;
         Run a command or list of commands on all the nodes in nodelist, then check if expected value appears on the output after the last command.
 
@@ -5103,6 +5150,9 @@ class nodes:
         nodesargs = {}
         args[&#34;commands&#34;] = commands
         args[&#34;expected&#34;] = expected
+        if folder != None:
+            args[&#34;folder&#34;] = folder
+            Path(folder).mkdir(parents=True, exist_ok=True)
         if prompt != None:
             args[&#34;prompt&#34;] = prompt
         if timeout != None:
@@ -5124,8 +5174,15 @@ class nodes:
                 nodesargs[n.unique][&#34;vars&#34;] = {}
                 if &#34;__global__&#34; in vars.keys():
                     nodesargs[n.unique][&#34;vars&#34;].update(vars[&#34;__global__&#34;])
-                if n.unique in vars.keys():
-                    nodesargs[n.unique][&#34;vars&#34;].update(vars[n.unique])
+                for var_key, var_val in vars.items():
+                    if var_key == &#34;__global__&#34;:
+                        continue
+                    try:
+                        if re.search(var_key, n.unique, re.IGNORECASE):
+                            nodesargs[n.unique][&#34;vars&#34;].update(var_val)
+                    except re.error:
+                        if var_key == n.unique:
+                            nodesargs[n.unique][&#34;vars&#34;].update(var_val)
             nodesargs[n.unique][&#34;logger&#34;] = logger
             
             if on_complete:
@@ -5275,8 +5332,15 @@ def run(self, commands, vars = None,*, folder = None, prompt = None, stdout = No
             nodesargs[n.unique][&#34;vars&#34;] = {}
             if &#34;__global__&#34; in vars.keys():
                 nodesargs[n.unique][&#34;vars&#34;].update(vars[&#34;__global__&#34;])
-            if n.unique in vars.keys():
-                nodesargs[n.unique][&#34;vars&#34;].update(vars[n.unique])
+            for var_key, var_val in vars.items():
+                if var_key == &#34;__global__&#34;:
+                    continue
+                try:
+                    if re.search(var_key, n.unique, re.IGNORECASE):
+                        nodesargs[n.unique][&#34;vars&#34;].update(var_val)
+                except re.error:
+                    if var_key == n.unique:
+                        nodesargs[n.unique][&#34;vars&#34;].update(var_val)
         
         # Pass the logger to the node
         nodesargs[n.unique][&#34;logger&#34;] = logger
@@ -5346,7 +5410,7 @@ def run(self, commands, vars = None,*, folder = None, prompt = None, stdout = No
 </code></pre></div>
 </dd>
 <dt id="connpy.nodes.test"><code class="name flex">
-<span>def <span class="ident">test</span></span>(<span>self,<br>commands,<br>expected,<br>vars=None,<br>*,<br>prompt=None,<br>parallel=10,<br>timeout=None,<br>on_complete=None,<br>logger=None)</span>
+<span>def <span class="ident">test</span></span>(<span>self,<br>commands,<br>expected,<br>vars=None,<br>*,<br>folder=None,<br>prompt=None,<br>parallel=10,<br>timeout=None,<br>on_complete=None,<br>logger=None)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -5354,7 +5418,7 @@ def run(self, commands, vars = None,*, folder = None, prompt = None, stdout = No
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@MethodHook
-def test(self, commands, expected, vars = None,*, prompt = None, parallel = 10, timeout = None, on_complete = None, logger = None):
+def test(self, commands, expected, vars = None,*, folder = None, prompt = None, parallel = 10, timeout = None, on_complete = None, logger = None):
     &#39;&#39;&#39;
     Run a command or list of commands on all the nodes in nodelist, then check if expected value appears on the output after the last command.
 
@@ -5409,6 +5473,9 @@ def test(self, commands, expected, vars = None,*, prompt = None, parallel = 10, 
     nodesargs = {}
     args[&#34;commands&#34;] = commands
     args[&#34;expected&#34;] = expected
+    if folder != None:
+        args[&#34;folder&#34;] = folder
+        Path(folder).mkdir(parents=True, exist_ok=True)
     if prompt != None:
         args[&#34;prompt&#34;] = prompt
     if timeout != None:
@@ -5430,8 +5497,15 @@ def test(self, commands, expected, vars = None,*, prompt = None, parallel = 10, 
             nodesargs[n.unique][&#34;vars&#34;] = {}
             if &#34;__global__&#34; in vars.keys():
                 nodesargs[n.unique][&#34;vars&#34;].update(vars[&#34;__global__&#34;])
-            if n.unique in vars.keys():
-                nodesargs[n.unique][&#34;vars&#34;].update(vars[n.unique])
+            for var_key, var_val in vars.items():
+                if var_key == &#34;__global__&#34;:
+                    continue
+                try:
+                    if re.search(var_key, n.unique, re.IGNORECASE):
+                        nodesargs[n.unique][&#34;vars&#34;].update(var_val)
+                except re.error:
+                    if var_key == n.unique:
+                        nodesargs[n.unique][&#34;vars&#34;].update(var_val)
         nodesargs[n.unique][&#34;logger&#34;] = logger
         
         if on_complete:
@@ -5626,7 +5700,7 @@ def test(self, commands, expected, vars = None,*, prompt = None, parallel = 10, 
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
 </footer>
 </body>
 </html>

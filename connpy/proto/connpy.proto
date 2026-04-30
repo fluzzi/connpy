@@ -176,16 +176,20 @@ message RunRequest {
     string prompt = 4;
     int32 parallel = 5;
     google.protobuf.Struct vars = 6;
+    int32 timeout = 7;
+    string name = 8;
 }
 
 message TestRequest {
     repeated string nodes = 1;
     repeated string commands = 2;
-    string expected = 3;
+    repeated string expected = 3;
     string folder = 4;
     string prompt = 5;
     int32 parallel = 6;
     google.protobuf.Struct vars = 7;
+    int32 timeout = 8;
+    string name = 9;
 }
 
 message ScriptRequest {

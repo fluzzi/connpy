@@ -400,15 +400,7 @@ class configfile:
         if isinstance(uniques, str):
             uniques = [uniques]
         for i in uniques:
-            if isinstance(i, dict):
-                name = list(i.keys())[0]
-                mylist = i[name]
-                if not self.config["case"]:
-                    name = name.lower()
-                    mylist = [item.lower() for item in mylist]
-                this = self.getitem(name, mylist, extract = extract)
-                nodes.update(this)
-            elif i.startswith("@"):
+            if i.startswith("@"):
                 if not self.config["case"]:
                     i = i.lower()
                 this = self.getitem(i, extract = extract)
@@ -487,13 +479,17 @@ class configfile:
                 layer3 = [k + "@" + s + "@" + f for k,v in self.connections[f][s].items() if isinstance(v, dict) and v.get("type") == "connection"]
                 nodes.extend(layer3)
         if filter:
+            flat_filter = []
             if isinstance(filter, str):
-                nodes = [item for item in nodes if re.search(filter, item)]
+                flat_filter = [filter]
             elif isinstance(filter, list):
-                nodes = [item for item in nodes if any(re.search(pattern, item) for pattern in filter)]
+                for item in filter:
+                    if isinstance(item, str):
+                        flat_filter.append(item)
             else:
-                printer.error("Invalid filter: must be a string or a list of strings.")
+                printer.error("Filter must be a string or a list of strings")
                 sys.exit(1)
+            nodes = [item for item in nodes if any(re.search(pattern, item) for pattern in flat_filter)]
         return nodes
 
     @MethodHook
@@ -511,15 +507,18 @@ class configfile:
                 layer3 = {k + "@" + s + "@" + f:v for k,v in self.connections[f][s].items() if isinstance(v, dict) and v.get("type") == "connection"}
                 nodes.update(layer3)
         if filter:
+            flat_filter = []
             if isinstance(filter, str):
-                filter = "^(?!.*@).+$" if filter == "@" else filter
-                nodes = {k: v for k, v in nodes.items() if re.search(filter, k)}
+                flat_filter = [filter]
             elif isinstance(filter, list):
-                filter = ["^(?!.*@).+$" if item == "@" else item for item in filter]
-                nodes = {k: v for k, v in nodes.items() if any(re.search(pattern, k) for pattern in filter)}
+                for item in filter:
+                    if isinstance(item, str):
+                        flat_filter.append(item)
             else:
-                printer.error("Invalid filter: must be a string or a list of strings.")
+                printer.error("Filter must be a string or a list of strings")
                 sys.exit(1)
+            flat_filter = ["^(?!.*@).+$" if item == "@" else item for item in flat_filter]
+            nodes = {k: v for k, v in nodes.items() if any(re.search(pattern, k) for pattern in flat_filter)}
         if extract:
             for node, keys in nodes.items():
                 for key, value in keys.items():

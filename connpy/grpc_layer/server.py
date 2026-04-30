@@ -388,14 +388,20 @@ class ExecutionServicer(connpy_pb2_grpc.ExecutionServiceServicer):
             
         def _worker():
             try:
+                # Set task name in thread state for printer if available
+                if request.name:
+                    printer.console.print(f"[debug][DEBUG][/debug] Executing task: [bold cyan]{request.name}[/bold cyan]")
+
                 self.service.run_commands(
                     nodes_filter=nodes_filter,
                     commands=list(request.commands),
                     folder=request.folder if request.folder else None,
                     prompt=request.prompt if request.prompt else None,
                     parallel=request.parallel,
+                    timeout=request.timeout if request.timeout > 0 else 10,
                     variables=from_struct(request.vars) if request.HasField("vars") else None,
-                    on_node_complete=_on_complete
+                    on_node_complete=_on_complete,
+                    name=request.name if request.name else None
                 )
             except Exception as e:
                 # Optionally pass error to stream, but handle_errors decorator covers top-level.
@@ -428,20 +434,26 @@ class ExecutionServicer(connpy_pb2_grpc.ExecutionServiceServicer):
 
         q = queue.Queue()
         
-        def _on_complete(unique, output, status, result):
-            q.put({"unique_id": unique, "output": output, "status": status, "result": result})
+        def _on_complete(unique, node_output, node_status, node_result):
+            q.put({"unique_id": unique, "output": node_output, "status": node_status, "result": node_result})
             
         def _worker():
             try:
+                # Set task name in thread state for printer if available
+                if request.name:
+                    printer.console.print(f"[debug][DEBUG][/debug] Executing task: [bold cyan]{request.name}[/bold cyan]")
+
                 self.service.test_commands(
                     nodes_filter=nodes_filter,
                     commands=list(request.commands),
-                    expected=request.expected,
+                    expected=list(request.expected),
                     folder=request.folder if request.folder else None,
                     prompt=request.prompt if request.prompt else None,
                     parallel=request.parallel,
+                    timeout=request.timeout if request.timeout > 0 else 10,
                     variables=from_struct(request.vars) if request.HasField("vars") else None,
-                    on_node_complete=_on_complete
+                    on_node_complete=_on_complete,
+                    name=request.name if request.name else None
                 )
             except Exception as e:
                 q.put(e)

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.5">
+<meta name="generator" content="pdoc3 0.11.6">
 <title>connpy.cli.run_handler API documentation</title>
 <meta name="description" content="">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
@@ -58,6 +58,7 @@ el.replaceWith(d);
 <pre><code class="python">class RunHandler:
     def __init__(self, app):
         self.app = app
+        self.print_lock = threading.Lock()
 
     def dispatch(self, args):
         if len(args.data) &gt; 1:
@@ -68,22 +69,43 @@ el.replaceWith(d);
     def node_run(self, args):
         nodes_filter = args.data[0]
         commands = [&#34; &#34;.join(args.data[1:])]
-        
+
         try:
             header_printed = False
-            # Inline execution with streaming results
-            def _on_node_complete(unique, node_output, node_status):
-                nonlocal header_printed
-                if not header_printed:
-                    printer.console.print(Rule(&#34;OUTPUT&#34;, style=&#34;header&#34;))
-                    header_printed = True
-                printer.node_panel(unique, node_output, node_status)
-                
-            self.app.services.execution.run_commands(
-                nodes_filter=nodes_filter,
-                commands=commands,
-                on_node_complete=_on_node_complete
-            )
+
+            if hasattr(args, &#39;test_expected&#39;) and args.test_expected:
+                # Mode: Test
+                def _on_node_complete(unique, node_output, node_status, node_result):
+                    nonlocal header_printed
+                    with self.print_lock:
+                        if not header_printed:
+                            printer.console.print(Rule(&#34;OUTPUT&#34;, style=&#34;header&#34;))
+                            header_printed = True
+                    printer.test_panel(unique, node_output, node_status, node_result)
+
+                results = self.app.services.execution.test_commands(
+                    nodes_filter=nodes_filter,
+                    commands=commands,
+                    expected=args.test_expected,
+                    on_node_complete=_on_node_complete
+                )
+                printer.test_summary(results)
+            else:
+                # Mode: Normal Run
+                def _on_node_complete(unique, node_output, node_status):
+                    nonlocal header_printed
+                    with self.print_lock:
+                        if not header_printed:
+                            printer.console.print(Rule(&#34;OUTPUT&#34;, style=&#34;header&#34;))
+                            header_printed = True
+                    printer.node_panel(unique, node_output, node_status)
+
+                results = self.app.services.execution.run_commands(
+                    nodes_filter=nodes_filter,
+                    commands=commands,
+                    on_node_complete=_on_node_complete
+                )
+                printer.run_summary(results)
 
         except ConnpyError as e:
             printer.error(str(e))
@@ -104,36 +126,44 @@ el.replaceWith(d);
         try:
             with open(path, &#34;r&#34;) as f:
                 playbook = yaml.load(f, Loader=yaml.FullLoader)
-                
+
             for task in playbook.get(&#34;tasks&#34;, []):
                 self.cli_run(task)
-                
+
         except Exception as e:
             printer.error(f&#34;Failed to run playbook {path}: {e}&#34;)
             sys.exit(10)
 
     def cli_run(self, script):
+        name = script.get(&#34;name&#34;, &#34;Task&#34;)
         try:
             action = script[&#34;action&#34;]
             nodelist = script[&#34;nodes&#34;]
             commands = script[&#34;commands&#34;]
             variables = script.get(&#34;variables&#34;)
             output_cfg = script[&#34;output&#34;]
-            name = script.get(&#34;name&#34;, &#34;Task&#34;)
             options = script.get(&#34;options&#34;, {})
         except KeyError as e:
-            printer.error(f&#34;&#39;{e.args[0]}&#39; is mandatory in script&#34;)
+            printer.error(f&#34;[{name}] &#39;{e.args[0]}&#39; is mandatory in script&#34;)
             sys.exit(11)
 
         stdout = (output_cfg == &#34;stdout&#34;)
         folder = output_cfg if output_cfg not in [None, &#34;stdout&#34;] else None
         prompt = options.get(&#34;prompt&#34;)
-        printer.header(name.upper())
-        
+
         try:
+            header_printed = False
             if action == &#34;run&#34;:
                 # If stdout is true, we stream results as they arrive
-                on_complete = printer.node_panel if stdout else None
+                def _on_run_complete(unique, node_output, node_status):
+                    nonlocal header_printed
+                    if stdout:
+                        with self.print_lock:
+                            if not header_printed:
+                                printer.console.print(Rule(name.upper(), style=&#34;header&#34;))
+                                header_printed = True
+                        printer.node_panel(unique, node_output, node_status)
+
                 results = self.app.services.execution.run_commands(
                     nodes_filter=nodelist,
                     commands=commands,
@@ -142,16 +172,31 @@ el.replaceWith(d);
                     timeout=options.get(&#34;timeout&#34;, 10),
                     folder=folder,
                     prompt=prompt,
-                    on_node_complete=on_complete
+                    on_node_complete=_on_run_complete
                 )
-                # If not streaming, we could print a summary table here if needed
-                if not stdout:
-                    for unique, output in results.items():
+                # Final Summary
+                if not stdout and not folder:
+                    with self.print_lock:
+                        printer.console.print(Rule(name.upper(), style=&#34;header&#34;))
+                    for unique, data in results.items():
+                        output = data[&#34;output&#34;] if isinstance(data, dict) else data
                         printer.node_panel(unique, output, 0)
-                        
+                
+                # ALWAYS show the aggregate execution summary at the end
+                printer.run_summary(results)
+
             elif action == &#34;test&#34;:
                 expected = script.get(&#34;expected&#34;, [])
-                on_complete = printer.test_panel if stdout else None
+                # Show test_panel per node ONLY if stdout is True
+                def _on_test_complete(unique, node_output, node_status, node_result):
+                    nonlocal header_printed
+                    if stdout:
+                        with self.print_lock:
+                            if not header_printed:
+                                printer.console.print(Rule(name.upper(), style=&#34;header&#34;))
+                                header_printed = True
+                        printer.test_panel(unique, node_output, node_status, node_result)
+
                 results = self.app.services.execution.test_commands(
                     nodes_filter=nodelist,
                     commands=commands,
@@ -159,12 +204,13 @@ el.replaceWith(d);
                     variables=variables,
                     parallel=options.get(&#34;parallel&#34;, 10),
                     timeout=options.get(&#34;timeout&#34;, 10),
+                    folder=folder,
                     prompt=prompt,
-                    on_node_complete=on_complete
+                    on_node_complete=_on_test_complete
                 )
-                if not stdout:
-                    printer.test_summary(results)
-                
+                # ALWAYS show the aggregate summary at the end
+                printer.test_summary(results)
+
         except ConnpyError as e:
             printer.error(str(e))</code></pre>
 </details>
@@ -180,27 +226,35 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def cli_run(self, script):
+    name = script.get(&#34;name&#34;, &#34;Task&#34;)
     try:
         action = script[&#34;action&#34;]
         nodelist = script[&#34;nodes&#34;]
         commands = script[&#34;commands&#34;]
         variables = script.get(&#34;variables&#34;)
         output_cfg = script[&#34;output&#34;]
-        name = script.get(&#34;name&#34;, &#34;Task&#34;)
         options = script.get(&#34;options&#34;, {})
     except KeyError as e:
-        printer.error(f&#34;&#39;{e.args[0]}&#39; is mandatory in script&#34;)
+        printer.error(f&#34;[{name}] &#39;{e.args[0]}&#39; is mandatory in script&#34;)
         sys.exit(11)
 
     stdout = (output_cfg == &#34;stdout&#34;)
     folder = output_cfg if output_cfg not in [None, &#34;stdout&#34;] else None
     prompt = options.get(&#34;prompt&#34;)
-    printer.header(name.upper())
-    
+
     try:
+        header_printed = False
         if action == &#34;run&#34;:
             # If stdout is true, we stream results as they arrive
-            on_complete = printer.node_panel if stdout else None
+            def _on_run_complete(unique, node_output, node_status):
+                nonlocal header_printed
+                if stdout:
+                    with self.print_lock:
+                        if not header_printed:
+                            printer.console.print(Rule(name.upper(), style=&#34;header&#34;))
+                            header_printed = True
+                    printer.node_panel(unique, node_output, node_status)
+
             results = self.app.services.execution.run_commands(
                 nodes_filter=nodelist,
                 commands=commands,
@@ -209,16 +263,31 @@ el.replaceWith(d);
                 timeout=options.get(&#34;timeout&#34;, 10),
                 folder=folder,
                 prompt=prompt,
-                on_node_complete=on_complete
+                on_node_complete=_on_run_complete
             )
-            # If not streaming, we could print a summary table here if needed
-            if not stdout:
-                for unique, output in results.items():
+            # Final Summary
+            if not stdout and not folder:
+                with self.print_lock:
+                    printer.console.print(Rule(name.upper(), style=&#34;header&#34;))
+                for unique, data in results.items():
+                    output = data[&#34;output&#34;] if isinstance(data, dict) else data
                     printer.node_panel(unique, output, 0)
-                    
+            
+            # ALWAYS show the aggregate execution summary at the end
+            printer.run_summary(results)
+
         elif action == &#34;test&#34;:
             expected = script.get(&#34;expected&#34;, [])
-            on_complete = printer.test_panel if stdout else None
+            # Show test_panel per node ONLY if stdout is True
+            def _on_test_complete(unique, node_output, node_status, node_result):
+                nonlocal header_printed
+                if stdout:
+                    with self.print_lock:
+                        if not header_printed:
+                            printer.console.print(Rule(name.upper(), style=&#34;header&#34;))
+                            header_printed = True
+                    printer.test_panel(unique, node_output, node_status, node_result)
+
             results = self.app.services.execution.test_commands(
                 nodes_filter=nodelist,
                 commands=commands,
@@ -226,12 +295,13 @@ el.replaceWith(d);
                 variables=variables,
                 parallel=options.get(&#34;parallel&#34;, 10),
                 timeout=options.get(&#34;timeout&#34;, 10),
+                folder=folder,
                 prompt=prompt,
-                on_node_complete=on_complete
+                on_node_complete=_on_test_complete
             )
-            if not stdout:
-                printer.test_summary(results)
-            
+            # ALWAYS show the aggregate summary at the end
+            printer.test_summary(results)
+
     except ConnpyError as e:
         printer.error(str(e))</code></pre>
 </details>
@@ -264,22 +334,43 @@ el.replaceWith(d);
 <pre><code class="python">def node_run(self, args):
     nodes_filter = args.data[0]
     commands = [&#34; &#34;.join(args.data[1:])]
-    
+
     try:
         header_printed = False
-        # Inline execution with streaming results
-        def _on_node_complete(unique, node_output, node_status):
-            nonlocal header_printed
-            if not header_printed:
-                printer.console.print(Rule(&#34;OUTPUT&#34;, style=&#34;header&#34;))
-                header_printed = True
-            printer.node_panel(unique, node_output, node_status)
-            
-        self.app.services.execution.run_commands(
-            nodes_filter=nodes_filter,
-            commands=commands,
-            on_node_complete=_on_node_complete
-        )
+
+        if hasattr(args, &#39;test_expected&#39;) and args.test_expected:
+            # Mode: Test
+            def _on_node_complete(unique, node_output, node_status, node_result):
+                nonlocal header_printed
+                with self.print_lock:
+                    if not header_printed:
+                        printer.console.print(Rule(&#34;OUTPUT&#34;, style=&#34;header&#34;))
+                        header_printed = True
+                printer.test_panel(unique, node_output, node_status, node_result)
+
+            results = self.app.services.execution.test_commands(
+                nodes_filter=nodes_filter,
+                commands=commands,
+                expected=args.test_expected,
+                on_node_complete=_on_node_complete
+            )
+            printer.test_summary(results)
+        else:
+            # Mode: Normal Run
+            def _on_node_complete(unique, node_output, node_status):
+                nonlocal header_printed
+                with self.print_lock:
+                    if not header_printed:
+                        printer.console.print(Rule(&#34;OUTPUT&#34;, style=&#34;header&#34;))
+                        header_printed = True
+                printer.node_panel(unique, node_output, node_status)
+
+            results = self.app.services.execution.run_commands(
+                nodes_filter=nodes_filter,
+                commands=commands,
+                on_node_complete=_on_node_complete
+            )
+            printer.run_summary(results)
 
     except ConnpyError as e:
         printer.error(str(e))
@@ -320,10 +411,10 @@ el.replaceWith(d);
     try:
         with open(path, &#34;r&#34;) as f:
             playbook = yaml.load(f, Loader=yaml.FullLoader)
-            
+
         for task in playbook.get(&#34;tasks&#34;, []):
             self.cli_run(task)
-            
+
     except Exception as e:
         printer.error(f&#34;Failed to run playbook {path}: {e}&#34;)
         sys.exit(10)</code></pre>
@@ -363,7 +454,7 @@ el.replaceWith(d);
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
 </footer>
 </body>
 </html>

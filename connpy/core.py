@@ -148,6 +148,10 @@ class node:
                 self.jumphost = f"-o ProxyCommand=\"{jumphost_cmd}\""
             else:
                 self.jumphost = ""
+        
+        self.output = ""
+        self.status = 1
+        self.result = {}
 
     @MethodHook
     def _passtx(self, passwords, *, keyfile=None):
@@ -548,7 +552,12 @@ class node:
             self.child.logfile_read = self.mylog
             for c in commands:
                 if vars is not None:
-                    c = c.format(**vars)
+                    try:
+                        c = c.format(**vars)
+                    except KeyError as e:
+                        self.output = f"Error: Variable {e} not defined in task or inventory"
+                        self.status = 1
+                        return self.output
                 result = self.child.expect(expects, timeout = timeout)
                 self.child.sendline(c)
                 if result == 2:
@@ -582,7 +591,7 @@ class node:
             return connect
 
     @MethodHook
-    def test(self, commands, expected, vars = None,*, prompt = r'>$|#$|\$$|>.$|#.$|\$.$', timeout = 10, logger = None):
+    def test(self, commands, expected, vars = None,*, folder = '', prompt = r'>$|#$|\$$|>.$|#.$|\$.$', timeout = 10, logger = None):
         '''
         Run a command or list of commands on the node, then check if expected value appears on the output after the last command.
 
@@ -608,6 +617,9 @@ class node:
 
         ### Optional Named Parameters: 
 
+            - folder (str): Path where output log should be stored, leave 
+                            empty to not store logs.
+
             - prompt (str): Prompt to be expected after a command is finished
                             running. Usually linux uses  ">" or EOF while 
                             routers use ">" or "#". The default value should 
@@ -622,6 +634,7 @@ class node:
                   false if prompt is found before.
 
         '''
+        now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         connect = self._connect(timeout = timeout, logger = logger)
         if connect == True:
             if logger:
@@ -639,6 +652,7 @@ class node:
             if "prompt" in self.tags:
                 prompt = self.tags["prompt"]
             expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
+
             output = ''
             if not isinstance(commands, list):
                 commands = [commands]
@@ -650,7 +664,12 @@ class node:
             self.child.logfile_read = self.mylog
             for c in commands:
                 if vars is not None:
-                    c = c.format(**vars)
+                    try:
+                        c = c.format(**vars)
+                    except KeyError as e:
+                        self.output = f"Error: Variable {e} not defined in task or inventory"
+                        self.status = 1
+                        return self.output
                 result = self.child.expect(expects, timeout = timeout)
                 self.child.sendline(c)
                 if result == 2:
@@ -659,6 +678,12 @@ class node:
                 result = self.child.expect(expects, timeout = timeout)
             self.child.close()
             output = self._logclean(self.mylog.getvalue().decode(), True)
+            if logger:
+                logger("output", output)
+            if folder != '':
+                with open(folder + "/" + self.unique + "_" + now + ".txt", "w") as f:
+                    f.write(output)
+                    f.close()
             self.output = output
             if result in [0, 1]:
                 # lastcommand = commands[-1]
@@ -1020,8 +1045,15 @@ class nodes:
                 nodesargs[n.unique]["vars"] = {}
                 if "__global__" in vars.keys():
                     nodesargs[n.unique]["vars"].update(vars["__global__"])
-                if n.unique in vars.keys():
-                    nodesargs[n.unique]["vars"].update(vars[n.unique])
+                for var_key, var_val in vars.items():
+                    if var_key == "__global__":
+                        continue
+                    try:
+                        if re.search(var_key, n.unique, re.IGNORECASE):
+                            nodesargs[n.unique]["vars"].update(var_val)
+                    except re.error:
+                        if var_key == n.unique:
+                            nodesargs[n.unique]["vars"].update(var_val)
             
             # Pass the logger to the node
             nodesargs[n.unique]["logger"] = logger
@@ -1046,7 +1078,7 @@ class nodes:
         return output
 
     @MethodHook
-    def test(self, commands, expected, vars = None,*, prompt = None, parallel = 10, timeout = None, on_complete = None, logger = None):
+    def test(self, commands, expected, vars = None,*, folder = None, prompt = None, parallel = 10, timeout = None, on_complete = None, logger = None):
         '''
         Run a command or list of commands on all the nodes in nodelist, then check if expected value appears on the output after the last command.
 
@@ -1101,6 +1133,9 @@ class nodes:
         nodesargs = {}
         args["commands"] = commands
         args["expected"] = expected
+        if folder != None:
+            args["folder"] = folder
+            Path(folder).mkdir(parents=True, exist_ok=True)
         if prompt != None:
             args["prompt"] = prompt
         if timeout != None:
@@ -1122,8 +1157,15 @@ class nodes:
                 nodesargs[n.unique]["vars"] = {}
                 if "__global__" in vars.keys():
                     nodesargs[n.unique]["vars"].update(vars["__global__"])
-                if n.unique in vars.keys():
-                    nodesargs[n.unique]["vars"].update(vars[n.unique])
+                for var_key, var_val in vars.items():
+                    if var_key == "__global__":
+                        continue
+                    try:
+                        if re.search(var_key, n.unique, re.IGNORECASE):
+                            nodesargs[n.unique]["vars"].update(var_val)
+                    except re.error:
+                        if var_key == n.unique:
+                            nodesargs[n.unique]["vars"].update(var_val)
             nodesargs[n.unique]["logger"] = logger
             
             if on_complete:

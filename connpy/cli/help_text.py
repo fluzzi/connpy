@@ -153,9 +153,7 @@ tasks:
   nodes: #List of nodes to work on. Mandatory
   - 'router1@office' #You can add specific nodes
   - '@aws'  #entire folders or subfolders
-  - '@office':   #or filter inside a folder or subfolder
-    - 'router2'
-    - 'router7'
+  - 'router.*@office' #or use regex to filter inside a folder
 
   commands: #List of commands to send, use {name} to pass variables
   - 'term len 0'
@@ -181,7 +179,7 @@ tasks:
     vrouterN@aws:
       id: 5
   
-  output: /home/user/logs #Type of output, if null you only get Connection and test result. Choices are: null,stdout,/path/to/folder. Folder path only works on 'run' action.
+  output: /home/user/logs #Type of output, if null you only get Connection and test result. Choices are: null,stdout,/path/to/folder. Folder path works on both 'run' and 'test' actions.
   
   options:
     prompt: r'>$|#$|\$$|>.$|#.$|\$.$' #Optional prompt to check on your devices, default should work on most devices.
@@ -193,9 +191,6 @@ tasks:
   nodes:
   - 'router1@office'
   - '@aws'
-  - '@office':
-    - 'router2'
-    - 'router7'
   commands:
   - 'ping 10.100.100.{id}'
   expected: '!' #Expected text to find when running test action. Mandatory for 'test'

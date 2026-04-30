@@ -147,11 +147,26 @@ def _build_tree(nodes, folders, profiles, plugins, configdir):
         "__extra__": lambda w: get_cwd(w, "import")
     })
 
-    run_dict = {"--generate": None, "--help": None, "-g": None, "-h": None}
-    run_dict.update({
-        "*": run_dict,
-        "__extra__": lambda w: get_cwd(w, "run") + list(nodes)
+    # --- Run Loop ---
+    # After the first positional argument (Node filter or YAML file), 
+    # we stop suggesting nodes and only allow flags or commands.
+    run_after_node = {"--help": None, "-h": None}
+    run_after_node.update({
+        "--test": {"*": run_after_node},
+        "-t": {"*": run_after_node},
+        "*": run_after_node  # Consume commands
     })
+
+    run_dict = {
+        "--generate": {"__extra__": lambda w: get_cwd(w, "--generate")},
+        "-g": {"__extra__": lambda w: get_cwd(w, "-g")},
+        "--test": {"*": None},
+        "-t": {"*": None},
+        "--help": None,
+        "-h": None,
+        "__extra__": lambda w: get_cwd(w, "run") + list(nodes),
+        "*": run_after_node
+    }
 
     # State Machine Definitions
     ai_dict = {"__exclude_used__": True, "--help": None, "-h": None}

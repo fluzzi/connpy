@@ -317,7 +317,7 @@ def test_panel(unique, output, status, result):
     _get_console().print(Panel(Group(Text(), code_block, test_results), title=title_line, width=cols, border_style=border))
 
 def test_summary(results):
-    """Print an aggregate summary of multiple test results."""
+    """Print an aggregate summary of multiple test results in a single panel."""
     from rich.panel import Panel
     from rich.text import Text
     from rich.console import Group
@@ -328,26 +328,96 @@ def test_summary(results):
     except OSError:
         cols = 80
 
-    for node, test_result in results.items():
-        status_code = 0 if test_result and all(test_result.values()) else 1
-        if status_code == 0:
-            status_str = "[pass]✓ PASS[/pass]"
-            border = "pass"
-        else:
-            status_str = f"[fail]✗ FAIL[/fail]"
-            border = "fail"
+    summary_content = Text()
+    total_passed = 0
+    total_failed = 0
+    total_partial = 0
+
+    if not results:
+        summary_content.append("  No test results found.\n", style="error")
+    else:
+        for node, test_result in results.items():
+            summary_content.append(f"• ", style="border")
+            summary_content.append(f"{node.ljust(40)}", style="bold")
             
-        title_line = f"[bold]{node}[/bold] — {status_str}"
-        
-        test_output = Text()
-        test_output.append("TEST RESULTS:\n", style="header")
-        max_key_len = max(len(k) for k in test_result.keys()) if test_result else 0
-        for k, v in (test_result.items() if test_result else []):
-            mark = "✓" if v else "✗"
-            style = "success" if v else "error"
-            test_output.append(f"  {k.ljust(max_key_len)}  {mark}\n", style=style)
+            if test_result:
+                passed_count = sum(1 for v in test_result.values() if v)
+                total_count = len(test_result)
+                
+                if passed_count == total_count:
+                    total_passed += 1
+                    node_style = "success"
+                    mark = "✓ PASS"
+                elif passed_count > 0:
+                    total_partial += 1
+                    node_style = "warning"
+                    mark = f"⚠ PARTIAL ({passed_count}/{total_count})"
+                else:
+                    total_failed += 1
+                    node_style = "error"
+                    mark = "✗ FAIL"
+                
+                summary_content.append(f" {mark}\n", style=node_style)
+                for k, v in test_result.items():
+                    res_mark = "✓" if v else "✗"
+                    res_style = "success" if v else "error"
+                    summary_content.append(f"    {k.ljust(38)} {res_mark}\n", style=res_style)
+            else:
+                total_failed += 1
+                summary_content.append(" ✗ FAIL\n", style="error")
+                summary_content.append("    No results (execution failed)\n", style="error")
+
+    status_parts = []
+    if total_passed: status_parts.append(f"[pass]{total_passed} PASSED[/pass]")
+    if total_partial: status_parts.append(f"[warning]{total_partial} PARTIAL[/warning]")
+    if total_failed: status_parts.append(f"[fail]{total_failed} FAILED[/fail]")
+    
+    status_str = " | ".join(status_parts) if status_parts else "[error]NO RESULTS[/error]"
+    title_line = f"AGGREGATE TEST SUMMARY — {status_str}"
+    
+    _get_console().print(Panel(Group(Text(), summary_content), title=title_line, width=cols, border_style="border"))
+
+def run_summary(results):
+    """Print an aggregate summary of multiple execution results in a single panel."""
+    from rich.panel import Panel
+    from rich.text import Text
+    from rich.console import Group
+    import os
+    
+    try:
+        cols, _ = os.get_terminal_size()
+    except OSError:
+        cols = 80
+
+    summary_content = Text()
+    total_ok = 0
+    total_err = 0
+
+    if not results:
+        summary_content.append("  No execution results found.\n", style="error")
+    else:
+        for node, data in results.items():
+            summary_content.append(f"• ", style="border")
+            summary_content.append(f"{node.ljust(40)}", style="bold")
             
-        _get_console().print(Panel(Group(Text(), test_output), title=title_line, width=cols, border_style=border))
+            # Check if we have a status dict or just output (for backward compatibility)
+            status = data.get("status", 0) if isinstance(data, dict) else 0
+            
+            if status == 0:
+                total_ok += 1
+                summary_content.append(f" ✓ DONE\n", style="success")
+            else:
+                total_err += 1
+                summary_content.append(f" ✗ FAIL({status})\n", style="error")
+
+    status_parts = []
+    if total_ok: status_parts.append(f"[success]{total_ok} DONE[/success]")
+    if total_err: status_parts.append(f"[error]{total_err} FAILED[/error]")
+    
+    status_str = " | ".join(status_parts) if status_parts else "[error]NO RESULTS[/error]"
+    title_line = f"AGGREGATE EXECUTION SUMMARY — {status_str}"
+    
+    _get_console().print(Panel(Group(Text(), summary_content), title=title_line, width=cols, border_style="border"))
 
 def header(text):
     """Print a section header."""

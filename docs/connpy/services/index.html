@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.5">
+<meta name="generator" content="pdoc3 0.11.6">
 <title>connpy.services API documentation</title>
 <meta name="description" content="">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
@@ -594,7 +594,8 @@ el.replaceWith(d);
         folder: Optional[str] = None,
         prompt: Optional[str] = None,
         on_node_complete: Optional[Callable] = None,
-        logger: Optional[Callable] = None
+        logger: Optional[Callable] = None,
+        name: Optional[str] = None
     ) -&gt; Dict[str, str]:
 
         &#34;&#34;&#34;Execute commands on a set of nodes.&#34;&#34;&#34;
@@ -618,7 +619,15 @@ el.replaceWith(d);
                 logger=logger
             )
 
-            return results
+            # Combine output and status for the caller
+            full_results = {}
+            for unique in results:
+                full_results[unique] = {
+                    &#34;output&#34;: results[unique],
+                    &#34;status&#34;: executor.status.get(unique, 1)
+                }
+
+            return full_results
         except Exception as e:
             raise ConnpyError(f&#34;Execution failed: {e}&#34;)
 
@@ -630,9 +639,11 @@ el.replaceWith(d);
         variables: Optional[Dict[str, Any]] = None,
         parallel: int = 10,
         timeout: int = 10,
+        folder: Optional[str] = None,
         prompt: Optional[str] = None,
         on_node_complete: Optional[Callable] = None,
-        logger: Optional[Callable] = None
+        logger: Optional[Callable] = None,
+        name: Optional[str] = None
     ) -&gt; Dict[str, Dict[str, bool]]:
 
         &#34;&#34;&#34;Run commands and verify expected output on a set of nodes.&#34;&#34;&#34;
@@ -651,6 +662,7 @@ el.replaceWith(d);
                 vars=variables,
                 parallel=parallel,
                 timeout=timeout,
+                folder=folder,
                 prompt=prompt,
                 on_complete=on_node_complete,
                 logger=logger
@@ -672,37 +684,52 @@ el.replaceWith(d);
             
         return self.run_commands(nodes_filter, commands, parallel=parallel)
 
-    def run_yaml_playbook(self, playbook_path: str, parallel: int = 10) -&gt; Dict[str, Any]:
-        &#34;&#34;&#34;Run a structured Connpy YAML automation playbook.&#34;&#34;&#34;
-        if not os.path.exists(playbook_path):
-            raise ConnpyError(f&#34;Playbook file not found: {playbook_path}&#34;)
-            
-        try:
-            with open(playbook_path, &#34;r&#34;) as f:
-                playbook = yaml.load(f, Loader=yaml.FullLoader)
-        except Exception as e:
-            raise ConnpyError(f&#34;Failed to load playbook {playbook_path}: {e}&#34;)
+    def run_yaml_playbook(self, playbook_data: str, parallel: int = 10) -&gt; Dict[str, Any]:
+        &#34;&#34;&#34;Run a structured Connpy YAML automation playbook (from path or content).&#34;&#34;&#34;
+        playbook = None
+        if playbook_data.startswith(&#34;---YAML---\n&#34;):
+            try:
+                content = playbook_data[len(&#34;---YAML---\n&#34;):]
+                playbook = yaml.load(content, Loader=yaml.FullLoader)
+            except Exception as e:
+                raise ConnpyError(f&#34;Failed to parse YAML content: {e}&#34;)
+        else:
+            if not os.path.exists(playbook_data):
+                raise ConnpyError(f&#34;Playbook file not found: {playbook_data}&#34;)
+            try:
+                with open(playbook_data, &#34;r&#34;) as f:
+                    playbook = yaml.load(f, Loader=yaml.FullLoader)
+            except Exception as e:
+                raise ConnpyError(f&#34;Failed to load playbook {playbook_data}: {e}&#34;)
             
         # Basic validation
         if not isinstance(playbook, dict) or &#34;nodes&#34; not in playbook or &#34;commands&#34; not in playbook:
             raise ConnpyError(&#34;Invalid playbook format: missing &#39;nodes&#39; or &#39;commands&#39; keys.&#34;)
             
         action = playbook.get(&#34;action&#34;, &#34;run&#34;)
+        options = playbook.get(&#34;options&#34;, {})
+        
+        # Extract all fields similar to RunHandler.cli_run
+        exec_args = {
+            &#34;nodes_filter&#34;: playbook[&#34;nodes&#34;],
+            &#34;commands&#34;: playbook[&#34;commands&#34;],
+            &#34;variables&#34;: playbook.get(&#34;variables&#34;),
+            &#34;parallel&#34;: options.get(&#34;parallel&#34;, parallel),
+            &#34;timeout&#34;: playbook.get(&#34;timeout&#34;, options.get(&#34;timeout&#34;, 10)),
+            &#34;prompt&#34;: options.get(&#34;prompt&#34;),
+            &#34;name&#34;: playbook.get(&#34;name&#34;, &#34;Task&#34;)
+        }
+
+        # Map &#39;output&#39; field to folder path if it&#39;s not stdout/null
+        output_cfg = playbook.get(&#34;output&#34;)
+        if output_cfg not in [None, &#34;stdout&#34;]:
+            exec_args[&#34;folder&#34;] = output_cfg
+
         if action == &#34;run&#34;:
-            return self.run_commands(
-                nodes_filter=playbook[&#34;nodes&#34;],
-                commands=playbook[&#34;commands&#34;],
-                parallel=parallel,
-                timeout=playbook.get(&#34;timeout&#34;, 10)
-            )
+            return self.run_commands(**exec_args)
         elif action == &#34;test&#34;:
-            return self.test_commands(
-                nodes_filter=playbook[&#34;nodes&#34;],
-                commands=playbook[&#34;commands&#34;],
-                expected=playbook.get(&#34;expected&#34;, []),
-                parallel=parallel,
-                timeout=playbook.get(&#34;timeout&#34;, 10)
-            )
+            exec_args[&#34;expected&#34;] = playbook.get(&#34;expected&#34;, [])
+            return self.test_commands(**exec_args)
         else:
             raise ConnpyError(f&#34;Unsupported playbook action: {action}&#34;)</code></pre>
 </details>
@@ -743,7 +770,7 @@ el.replaceWith(d);
 <div class="desc"><p>Run a plain-text script containing one command per line.</p></div>
 </dd>
 <dt id="connpy.services.ExecutionService.run_commands"><code class="name flex">
-<span>def <span class="ident">run_commands</span></span>(<span>self,<br>nodes_filter: str,<br>commands: List[str],<br>variables: Dict[str, Any] | None = None,<br>parallel: int = 10,<br>timeout: int = 10,<br>folder: str | None = None,<br>prompt: str | None = None,<br>on_node_complete: Callable | None = None,<br>logger: Callable | None = None) ‑> Dict[str, str]</span>
+<span>def <span class="ident">run_commands</span></span>(<span>self,<br>nodes_filter: str,<br>commands: List[str],<br>variables: Dict[str, Any] | None = None,<br>parallel: int = 10,<br>timeout: int = 10,<br>folder: str | None = None,<br>prompt: str | None = None,<br>on_node_complete: Callable | None = None,<br>logger: Callable | None = None,<br>name: str | None = None) ‑> Dict[str, str]</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -760,7 +787,8 @@ el.replaceWith(d);
     folder: Optional[str] = None,
     prompt: Optional[str] = None,
     on_node_complete: Optional[Callable] = None,
-    logger: Optional[Callable] = None
+    logger: Optional[Callable] = None,
+    name: Optional[str] = None
 ) -&gt; Dict[str, str]:
 
     &#34;&#34;&#34;Execute commands on a set of nodes.&#34;&#34;&#34;
@@ -784,58 +812,81 @@ el.replaceWith(d);
             logger=logger
         )
 
-        return results
+        # Combine output and status for the caller
+        full_results = {}
+        for unique in results:
+            full_results[unique] = {
+                &#34;output&#34;: results[unique],
+                &#34;status&#34;: executor.status.get(unique, 1)
+            }
+
+        return full_results
     except Exception as e:
         raise ConnpyError(f&#34;Execution failed: {e}&#34;)</code></pre>
 </details>
 <div class="desc"><p>Execute commands on a set of nodes.</p></div>
 </dd>
 <dt id="connpy.services.ExecutionService.run_yaml_playbook"><code class="name flex">
-<span>def <span class="ident">run_yaml_playbook</span></span>(<span>self, playbook_path: str, parallel: int = 10) ‑> Dict[str, Any]</span>
+<span>def <span class="ident">run_yaml_playbook</span></span>(<span>self, playbook_data: str, parallel: int = 10) ‑> Dict[str, Any]</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def run_yaml_playbook(self, playbook_path: str, parallel: int = 10) -&gt; Dict[str, Any]:
-    &#34;&#34;&#34;Run a structured Connpy YAML automation playbook.&#34;&#34;&#34;
-    if not os.path.exists(playbook_path):
-        raise ConnpyError(f&#34;Playbook file not found: {playbook_path}&#34;)
-        
-    try:
-        with open(playbook_path, &#34;r&#34;) as f:
-            playbook = yaml.load(f, Loader=yaml.FullLoader)
-    except Exception as e:
-        raise ConnpyError(f&#34;Failed to load playbook {playbook_path}: {e}&#34;)
+<pre><code class="python">def run_yaml_playbook(self, playbook_data: str, parallel: int = 10) -&gt; Dict[str, Any]:
+    &#34;&#34;&#34;Run a structured Connpy YAML automation playbook (from path or content).&#34;&#34;&#34;
+    playbook = None
+    if playbook_data.startswith(&#34;---YAML---\n&#34;):
+        try:
+            content = playbook_data[len(&#34;---YAML---\n&#34;):]
+            playbook = yaml.load(content, Loader=yaml.FullLoader)
+        except Exception as e:
+            raise ConnpyError(f&#34;Failed to parse YAML content: {e}&#34;)
+    else:
+        if not os.path.exists(playbook_data):
+            raise ConnpyError(f&#34;Playbook file not found: {playbook_data}&#34;)
+        try:
+            with open(playbook_data, &#34;r&#34;) as f:
+                playbook = yaml.load(f, Loader=yaml.FullLoader)
+        except Exception as e:
+            raise ConnpyError(f&#34;Failed to load playbook {playbook_data}: {e}&#34;)
         
     # Basic validation
     if not isinstance(playbook, dict) or &#34;nodes&#34; not in playbook or &#34;commands&#34; not in playbook:
         raise ConnpyError(&#34;Invalid playbook format: missing &#39;nodes&#39; or &#39;commands&#39; keys.&#34;)
         
     action = playbook.get(&#34;action&#34;, &#34;run&#34;)
+    options = playbook.get(&#34;options&#34;, {})
+    
+    # Extract all fields similar to RunHandler.cli_run
+    exec_args = {
+        &#34;nodes_filter&#34;: playbook[&#34;nodes&#34;],
+        &#34;commands&#34;: playbook[&#34;commands&#34;],
+        &#34;variables&#34;: playbook.get(&#34;variables&#34;),
+        &#34;parallel&#34;: options.get(&#34;parallel&#34;, parallel),
+        &#34;timeout&#34;: playbook.get(&#34;timeout&#34;, options.get(&#34;timeout&#34;, 10)),
+        &#34;prompt&#34;: options.get(&#34;prompt&#34;),
+        &#34;name&#34;: playbook.get(&#34;name&#34;, &#34;Task&#34;)
+    }
+
+    # Map &#39;output&#39; field to folder path if it&#39;s not stdout/null
+    output_cfg = playbook.get(&#34;output&#34;)
+    if output_cfg not in [None, &#34;stdout&#34;]:
+        exec_args[&#34;folder&#34;] = output_cfg
+
     if action == &#34;run&#34;:
-        return self.run_commands(
-            nodes_filter=playbook[&#34;nodes&#34;],
-            commands=playbook[&#34;commands&#34;],
-            parallel=parallel,
-            timeout=playbook.get(&#34;timeout&#34;, 10)
-        )
+        return self.run_commands(**exec_args)
     elif action == &#34;test&#34;:
-        return self.test_commands(
-            nodes_filter=playbook[&#34;nodes&#34;],
-            commands=playbook[&#34;commands&#34;],
-            expected=playbook.get(&#34;expected&#34;, []),
-            parallel=parallel,
-            timeout=playbook.get(&#34;timeout&#34;, 10)
-        )
+        exec_args[&#34;expected&#34;] = playbook.get(&#34;expected&#34;, [])
+        return self.test_commands(**exec_args)
     else:
         raise ConnpyError(f&#34;Unsupported playbook action: {action}&#34;)</code></pre>
 </details>
-<div class="desc"><p>Run a structured Connpy YAML automation playbook.</p></div>
+<div class="desc"><p>Run a structured Connpy YAML automation playbook (from path or content).</p></div>
 </dd>
 <dt id="connpy.services.ExecutionService.test_commands"><code class="name flex">
-<span>def <span class="ident">test_commands</span></span>(<span>self,<br>nodes_filter: str,<br>commands: List[str],<br>expected: List[str],<br>variables: Dict[str, Any] | None = None,<br>parallel: int = 10,<br>timeout: int = 10,<br>prompt: str | None = None,<br>on_node_complete: Callable | None = None,<br>logger: Callable | None = None) ‑> Dict[str, Dict[str, bool]]</span>
+<span>def <span class="ident">test_commands</span></span>(<span>self,<br>nodes_filter: str,<br>commands: List[str],<br>expected: List[str],<br>variables: Dict[str, Any] | None = None,<br>parallel: int = 10,<br>timeout: int = 10,<br>folder: str | None = None,<br>prompt: str | None = None,<br>on_node_complete: Callable | None = None,<br>logger: Callable | None = None,<br>name: str | None = None) ‑> Dict[str, Dict[str, bool]]</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -850,9 +901,11 @@ el.replaceWith(d);
     variables: Optional[Dict[str, Any]] = None,
     parallel: int = 10,
     timeout: int = 10,
+    folder: Optional[str] = None,
     prompt: Optional[str] = None,
     on_node_complete: Optional[Callable] = None,
-    logger: Optional[Callable] = None
+    logger: Optional[Callable] = None,
+    name: Optional[str] = None
 ) -&gt; Dict[str, Dict[str, bool]]:
 
     &#34;&#34;&#34;Run commands and verify expected output on a set of nodes.&#34;&#34;&#34;
@@ -871,6 +924,7 @@ el.replaceWith(d);
             vars=variables,
             parallel=parallel,
             timeout=timeout,
+            folder=folder,
             prompt=prompt,
             on_complete=on_node_complete,
             logger=logger
@@ -3215,7 +3269,7 @@ el.replaceWith(d);
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
 </footer>
 </body>
 </html>

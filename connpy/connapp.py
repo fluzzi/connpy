@@ -289,6 +289,7 @@ class connapp:
         runparser = subparsers.add_parser("run", help="Run scripts or commands on nodes", description="Run scripts or commands on nodes", formatter_class=RichHelpFormatter) 
         runparser.error = self._custom_error
         runparser.add_argument("run", nargs='+', action=self._store_type, help=get_help("run"), default="run").completer = nodes_completer
+        runparser.add_argument("-t", "--test", dest="test_expected", nargs='+', help="Expected text(s) to validate in output. Converts the action from 'run' to 'test'")
         runparser.add_argument("-g","--generate", dest="action", action="store_const", help="Generate yaml file template", const="generate", default="run")
         runparser.set_defaults(func=self._run.dispatch)
         #APIPARSER
