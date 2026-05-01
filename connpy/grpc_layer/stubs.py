@@ -586,7 +586,6 @@ class AIStub:
                 if response.status_update:
                     if response.requires_confirmation:
                         if status: status.stop()
-                        if live_display: live_display.stop()
                         
                         # Show prompt and wait for answer
                         prompt_text = Text.from_ansi(response.status_update)
@@ -595,7 +594,6 @@ class AIStub:
                         if status: 
                             status.update("[ai_status]Agent: Resuming...")
                             status.start()
-                        if live_display: live_display.start()
                         
                         req_queue.put(connpy_pb2.AskRequest(confirmation_answer=ans))
                         continue
@@ -606,41 +604,52 @@ class AIStub:
                 
                 if response.debug_message:
                     if debug:
+                        if status:
+                            try: status.stop()
+                            except: pass
                         printer.console.print(Text.from_ansi(response.debug_message))
+                        if status:
+                            try: status.start()
+                            except: pass
                     continue
                 
                 if response.important_message:
+                    if status:
+                        try: status.stop()
+                        except: pass
                     printer.console.print(Text.from_ansi(response.important_message))
+                    if status:
+                        try: status.start()
+                        except: pass
                     continue
 
                 if not response.is_final:
-                    full_content += response.text_chunk
-                    
-                    if not live_display and not debug:
-                        if status: status.stop()
-                        live_display = Live(
-                            Panel(Markdown(full_content), title="AI Assistant", expand=False),
-                            console=printer.console,
-                            refresh_per_second=8,
-                            transient=False
-                        )
-                        live_display.start()
-                    elif live_display:
-                        live_display.update(Panel(Markdown(full_content), title="AI Assistant", expand=False))
+                    if response.text_chunk:
+                        full_content += response.text_chunk
+                        
+                        if status and not debug:
+                            # Update the spinner line with a preview of the response
+                            preview = full_content.replace("\n", " ").strip()
+                            if len(preview) > 60: preview = preview[:57] + "..."
+                            status.update(f"[ai_status]{preview}")
                     continue
                 
                 if response.is_final:
+                    # Final stop for status to ensure it disappears before the panel
+                    if status:
+                        try: status.stop()
+                        except: pass
+
                     final_result = from_struct(response.full_result)
                     responder = final_result.get("responder", "engineer")
                     alias = "architect" if responder == "architect" else "engineer"
                     role_label = "Network Architect" if responder == "architect" else "Network Engineer"
                     title = f"[bold {alias}]{role_label}[/bold {alias}]"
                     
-                    if live_display:
-                        live_display.update(Panel(Markdown(full_content), title=title, border_style=alias, expand=False))
-                        live_display.stop()
-                    elif full_content:
-                        printer.console.print(Panel(Markdown(full_content), title=title, border_style=alias, expand=False))
+                    # Always print the final Panel
+                    content_to_print = full_content or final_result.get("response", "")
+                    if content_to_print:
+                        printer.console.print(Panel(Markdown(content_to_print), title=title, border_style=alias, expand=False))
                     break
         except Exception as e:
             # Check if it was a gRPC error that we should let handle_errors catch

@@ -1,6 +1,7 @@
 from .base import BaseService
 import yaml
 import os
+from copy import deepcopy
 from .exceptions import InvalidConfigurationError, NodeNotFoundError, ReservedNameError
 from ..configfile import NoAliasDumper
 
@@ -23,13 +24,45 @@ class ImportExportService(BaseService):
     def export_to_dict(self, folders=None):
         """Export nodes/folders to a dictionary."""
         if not folders:
-            return self.config._getallnodesfull(extract=False)
+            return deepcopy(self.config.connections)
         else:
             # Validate folders exist
             for f in folders:
                 if f != "@" and f not in self.config._getallfolders():
                     raise NodeNotFoundError(f"Folder '{f}' not found.")
-            return self.config._getallnodesfull(folders, extract=False)
+            
+            flat = self.config._getallnodesfull(folders, extract=False)
+            nested = {}
+            for k, v in flat.items():
+                uniques = self.config._explode_unique(k)
+                if not uniques:
+                    continue
+                
+                if "folder" in uniques and "subfolder" in uniques:
+                    f_name = uniques["folder"]
+                    s_name = uniques["subfolder"]
+                    i_name = uniques["id"]
+                    
+                    if f_name not in nested:
+                        nested[f_name] = {"type": "folder"}
+                    if s_name not in nested[f_name]:
+                        nested[f_name][s_name] = {"type": "subfolder"}
+                        
+                    nested[f_name][s_name][i_name] = v
+                    
+                elif "folder" in uniques:
+                    f_name = uniques["folder"]
+                    i_name = uniques["id"]
+                    
+                    if f_name not in nested:
+                        nested[f_name] = {"type": "folder"}
+                        
+                    nested[f_name][i_name] = v
+                else:
+                    i_name = uniques["id"]
+                    nested[i_name] = v
+                    
+            return nested
 
     def import_from_file(self, file_path):
         """Import nodes/folders from a YAML file."""
@@ -48,26 +81,35 @@ class ImportExportService(BaseService):
         if not isinstance(data, dict):
             raise InvalidConfigurationError("Invalid import data format: expected a dictionary of nodes.")
 
-        # Process imports
-        for k, v in data.items():
-            uniques = self.config._explode_unique(k)
-            
-            # Ensure folders exist
-            if "folder" in uniques:
-                folder_name = f"@{uniques['folder']}"
-                if folder_name not in self.config._getallfolders():
-                    folder_uniques = self.config._explode_unique(folder_name)
-                    self.config._folder_add(**folder_uniques)
-            
-            if "subfolder" in uniques:
-                sub_name = f"@{uniques['subfolder']}@{uniques['folder']}"
-                if sub_name not in self.config._getallfolders():
-                    sub_uniques = self.config._explode_unique(sub_name)
-                    self.config._folder_add(**sub_uniques)
-            
-            # Add node/connection
-            v.update(uniques)
-            self._validate_node_name(k)
-            self.config._connections_add(**v)
-            
+        def _traverse_import(node_data, current_folder='', current_subfolder=''):
+            for k, v in node_data.items():
+                if k == "type":
+                    continue
+                if isinstance(v, dict):
+                    node_type = v.get("type", "connection")
+                    if node_type == "folder":
+                        self.config._folder_add(folder=k)
+                        _traverse_import(v, current_folder=k, current_subfolder='')
+                    elif node_type == "subfolder":
+                        self.config._folder_add(folder=current_folder, subfolder=k)
+                        _traverse_import(v, current_folder=current_folder, current_subfolder=k)
+                    elif node_type == "connection":
+                        unique_id = k
+                        if current_subfolder:
+                            unique_id = f"{k}@{current_subfolder}@{current_folder}"
+                        elif current_folder:
+                            unique_id = f"{k}@{current_folder}"
+                        self._validate_node_name(unique_id)
+                        
+                        kwargs = deepcopy(v)
+                        kwargs['id'] = k
+                        kwargs['folder'] = current_folder
+                        kwargs['subfolder'] = current_subfolder
+                        
+                        self.config._connections_add(**kwargs)
+                else:
+                    # Invalid format skip
+                    pass
+
+        _traverse_import(data)
         self.config._saveconfig(self.config.file)

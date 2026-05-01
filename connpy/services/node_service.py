@@ -67,8 +67,14 @@ class NodeService(BaseService):
         case_sensitive = self.config.config.get("case", False)
         
         if filter_str:
-            flags = re.IGNORECASE if not case_sensitive else 0
-            folders = [f for f in folders if re.search(filter_str, f, flags)]
+            if filter_str.startswith("@"):
+                if not case_sensitive:
+                    folders = [f for f in folders if f.lower() == filter_str.lower()]
+                else:
+                    folders = [f for f in folders if f == filter_str]
+            else:
+                flags = re.IGNORECASE if not case_sensitive else 0
+                folders = [f for f in folders if re.search(filter_str, f, flags)]
         return folders
 
     def get_node_details(self, unique_id):

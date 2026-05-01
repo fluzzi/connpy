@@ -78,7 +78,9 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
         unique_id = first_req.id
         sftp = first_req.sftp
         debug = first_req.debug
-        printer.console.print(f"[debug][DEBUG][/debug] gRPC interact_node request for: [bold cyan]{unique_id}[/bold cyan]")
+        
+        if debug:
+            printer.console.print(f"[debug][DEBUG][/debug] gRPC interact_node request for: [bold cyan]{unique_id}[/bold cyan]")
 
         if first_req.connection_params_json:
             import json
@@ -177,7 +179,8 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
         while True:
             data = response_queue.get()
             if data is None:
-                printer.console.print(f"[debug][DEBUG][/debug] gRPC interact_node session closed for: [bold cyan]{unique_id}[/bold cyan]")
+                if debug:
+                    printer.console.print(f"[debug][DEBUG][/debug] gRPC interact_node session closed for: [bold cyan]{unique_id}[/bold cyan]")
                 break
             yield connpy_pb2.InteractResponse(stdout_data=data)
     @handle_errors
@@ -388,12 +391,7 @@ class ExecutionServicer(connpy_pb2_grpc.ExecutionServiceServicer):
             
         def _worker():
             try:
-                # Set task name in thread state for printer if available
-                if request.name:
-                    printer.console.print(f"[debug][DEBUG][/debug] Executing task: [bold cyan]{request.name}[/bold cyan]")
-
-                self.service.run_commands(
-                    nodes_filter=nodes_filter,
+                self.service.run_commands(                    nodes_filter=nodes_filter,
                     commands=list(request.commands),
                     folder=request.folder if request.folder else None,
                     prompt=request.prompt if request.prompt else None,
@@ -439,10 +437,6 @@ class ExecutionServicer(connpy_pb2_grpc.ExecutionServiceServicer):
             
         def _worker():
             try:
-                # Set task name in thread state for printer if available
-                if request.name:
-                    printer.console.print(f"[debug][DEBUG][/debug] Executing task: [bold cyan]{request.name}[/bold cyan]")
-
                 self.service.test_commands(
                     nodes_filter=nodes_filter,
                     commands=list(request.commands),

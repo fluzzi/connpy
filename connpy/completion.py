@@ -234,8 +234,8 @@ def _build_tree(nodes, folders, profiles, plugins, configdir):
             "-a": None, "-r": None, "-s": None, "-e": None, "-h": None,
         },
         "plugin": {
-            "--add": lambda w: get_cwd(w, "--add"), 
-            "--update": lambda w: get_cwd(w, "--update"),
+            "--add": {"*": lambda w: get_cwd(w, "--add")}, 
+            "--update": {"*": lambda w: get_cwd(w, "--update")},
             "--del":     lambda w: _get_plugins("--del", configdir),
             "--enable":  lambda w: _get_plugins("--enable", configdir),
             "--disable": lambda w: _get_plugins("--disable", configdir),

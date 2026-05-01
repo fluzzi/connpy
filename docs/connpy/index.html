@@ -1182,9 +1182,12 @@ class ai:
 
                     if not debug and not chunk_callback:
                         if not is_streaming_text:
-                            # Stop spinner before starting live display
+                            # Stop spinner definitively
                             if status:
-                                status.stop()
+                                try:
+                                    status.stop()
+                                except Exception:
+                                    pass
                             live_display = Live(
                                 Panel(Markdown(full_content), title=title, border_style=border, expand=False),
                                 console=self.console,
@@ -1372,7 +1375,7 @@ class ai:
         tail_limit = int(final_limit * 0.4)
         return (text[:head_limit] + f&#34;\n\n[... OUTPUT TRUNCATED ...]\n\n&#34; + text[-tail_limit:])
 
-    def _print_debug_observation(self, fn, obs):
+    def _print_debug_observation(self, fn, obs, status=None):
         &#34;&#34;&#34;Prints a tool observation in a readable way during debug mode.&#34;&#34;&#34;
         # Try to parse as JSON if it&#39;s a string
         if isinstance(obs, str):
@@ -1396,6 +1399,7 @@ class ai:
                 content = Text(&#34;Empty data set&#34;)
             else:
                 # Add a small spacer instead of a Rule for cleaner look
+                from rich.console import Group
                 content = Group(*elements)
         elif isinstance(obs_data, list):
             content = Text(&#34;\n&#34;.join(f&#34;• {item}&#34; for item in obs_data))
@@ -1403,7 +1407,18 @@ class ai:
             content = Text(str(obs_data))
             
         title = f&#34;[bold]{fn}[/bold]&#34;
+        
+        # Stop status before printing panel to avoid ghosting
+        if status:
+            try: status.stop()
+            except: pass
+            
         self.console.print(Panel(content, title=title, border_style=&#34;ai_status&#34;))
+        
+        # Resume status
+        if status:
+            try: status.start()
+            except: pass
 
     def manage_memory_tool(self, content, action=&#34;append&#34;):
         &#34;&#34;&#34;Save or update long-term memory. Only use when user explicitly requests it.&#34;&#34;&#34;
@@ -1604,7 +1619,7 @@ class ai:
                         elif fn in self.tool_status_formatters: status.update(self.tool_status_formatters[fn](args))
 
                     if debug:
-                        self._print_debug_observation(f&#34;Decision: {fn}&#34;, args)
+                        self._print_debug_observation(f&#34;Decision: {fn}&#34;, args, status=status)
                     
                     if fn == &#34;list_nodes&#34;: obs = self.list_nodes_tool(**args)
                     elif fn == &#34;run_commands&#34;: obs = self.run_commands_tool(**args, status=status)
@@ -1613,7 +1628,7 @@ class ai:
                     else: obs = f&#34;Error: Unknown tool &#39;{fn}&#39;.&#34;
                     
                     if debug:
-                        self._print_debug_observation(f&#34;Observation: {fn}&#34;, obs)
+                        self._print_debug_observation(f&#34;Observation: {fn}&#34;, obs, status=status)
                     
                     # Ensure observation is a string and truncated for the LLM
                     obs_str = obs if isinstance(obs, str) else json.dumps(obs)
@@ -1883,7 +1898,7 @@ class ai:
                 streamed_response = False
                 try:
                     safe_messages = self._sanitize_messages(messages)
-                    if stream and (not debug or chunk_callback):
+                    if stream and chunk_callback:
                         response, streamed_response = self._stream_completion(
                             model=model, messages=safe_messages, tools=tools, api_key=key,
                             status=status, label=label, debug=debug, num_retries=3,
@@ -1926,7 +1941,13 @@ class ai:
                     # In CLI debug mode, only print intermediate reasoning if there are tool calls.
                     # If there are no tool calls, this content is the final answer and will be printed by the caller.
                     if resp_msg.tool_calls:
+                        if status:
+                            try: status.stop()
+                            except: pass
                         self.console.print(Panel(Markdown(resp_msg.content), title=f&#34;[{current_brain}][bold]{label} Reasoning[/bold][/{current_brain}]&#34;, border_style=&#34;architect&#34; if current_brain == &#34;architect&#34; else &#34;engineer&#34;))
+                        if status:
+                            try: status.start()
+                            except: pass
 
                 if not resp_msg.tool_calls: break
                 
@@ -1947,7 +1968,7 @@ class ai:
                         elif fn == &#34;manage_memory_tool&#34;: status.update(f&#34;[architect]Architect: [UPDATING MEMORY]&#34;)
 
                     if debug:
-                        self._print_debug_observation(f&#34;Decision: {fn}&#34;, args)
+                        self._print_debug_observation(f&#34;Decision: {fn}&#34;, args, status=status)
 
                     if fn == &#34;delegate_to_engineer&#34;:
                         obs, eng_usage = self._engineer_loop(args[&#34;task&#34;], status=status, debug=debug, chat_history=messages[:-1])
@@ -1966,7 +1987,14 @@ class ai:
                                 num_retries=3
                             )
                             obs = claude_resp.choices[0].message.content
-                            if debug: self.console.print(Panel(Markdown(obs), title=&#34;[architect]Architect Consultation[/architect]&#34;, border_style=&#34;architect&#34;))
+                            if debug:
+                                if status:
+                                    try: status.stop()
+                                    except: pass
+                                self.console.print(Panel(Markdown(obs), title=&#34;[architect]Architect Consultation[/architect]&#34;, border_style=&#34;architect&#34;))
+                                if status:
+                                    try: status.start()
+                                    except: pass
                         except Exception as e:
                             if status: status.update(&#34;[unavailable]Architect unavailable! Engineer continuing alone...&#34;)
                             obs = f&#34;Architect unavailable ({str(e)}). Proceeding with your best technical judgment.&#34;
@@ -1983,7 +2011,14 @@ class ai:
                         handover_msg = f&#34;HANDOVER FROM EXECUTION ENGINE\n\nReason: {args[&#39;reason&#39;]}\n\nContext: {args[&#39;context&#39;]}\n\nYou are now in control of this conversation.&#34;
                         pending_user_message = handover_msg
                         obs = &#34;Control transferred to Architect. Handover context will be provided.&#34;
-                        if debug: self.console.print(Panel(Text(handover_msg), title=&#34;[architect]Escalation to Architect[/architect]&#34;, border_style=&#34;architect&#34;))
+                        if debug:
+                            if status:
+                                try: status.stop()
+                                except: pass
+                            self.console.print(Panel(Text(handover_msg), title=&#34;[architect]Escalation to Architect[/architect]&#34;, border_style=&#34;architect&#34;))
+                            if status:
+                                try: status.start()
+                                except: pass
                     
                     elif fn == &#34;return_to_engineer&#34;:
                         if status: status.update(&#34;[engineer]Transferring control back to Engineer...&#34;)
@@ -1997,7 +2032,14 @@ class ai:
                         handover_msg = f&#34;HANDOVER FROM ARCHITECT\n\nSummary: {args[&#39;summary&#39;]}\n\nYou are now back in control. Continue handling the user&#39;s requests.&#34;
                         pending_user_message = handover_msg
                         obs = &#34;Control returned to Engineer. Handover summary will be provided.&#34;
-                        if debug: self.console.print(Panel(Text(handover_msg), title=&#34;[engineer]Return to Engineer[/engineer]&#34;, border_style=&#34;engineer&#34;))
+                        if debug:
+                            if status:
+                                try: status.stop()
+                                except: pass
+                            self.console.print(Panel(Text(handover_msg), title=&#34;[engineer]Return to Engineer[/engineer]&#34;, border_style=&#34;engineer&#34;))
+                            if status:
+                                try: status.start()
+                                except: pass
                     
                     elif fn == &#34;list_nodes&#34;: obs = self.list_nodes_tool(**args)
                     elif fn == &#34;run_commands&#34;: obs = self.run_commands_tool(**args, status=status)
@@ -2007,7 +2049,7 @@ class ai:
                     else: obs = f&#34;Error: {fn} unknown.&#34;
 
                     if debug and fn not in [&#34;delegate_to_engineer&#34;, &#34;consult_architect&#34;, &#34;escalate_to_architect&#34;, &#34;return_to_engineer&#34;]:
-                        self._print_debug_observation(f&#34;Observation: {fn}&#34;, obs)
+                        self._print_debug_observation(f&#34;Observation: {fn}&#34;, obs, status=status)
 
                     # Ensure observation is a string and truncated for the LLM
                     obs_str = obs if isinstance(obs, str) else json.dumps(obs)
@@ -2229,7 +2271,7 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
             streamed_response = False
             try:
                 safe_messages = self._sanitize_messages(messages)
-                if stream and (not debug or chunk_callback):
+                if stream and chunk_callback:
                     response, streamed_response = self._stream_completion(
                         model=model, messages=safe_messages, tools=tools, api_key=key,
                         status=status, label=label, debug=debug, num_retries=3,
@@ -2272,7 +2314,13 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
                 # In CLI debug mode, only print intermediate reasoning if there are tool calls.
                 # If there are no tool calls, this content is the final answer and will be printed by the caller.
                 if resp_msg.tool_calls:
+                    if status:
+                        try: status.stop()
+                        except: pass
                     self.console.print(Panel(Markdown(resp_msg.content), title=f&#34;[{current_brain}][bold]{label} Reasoning[/bold][/{current_brain}]&#34;, border_style=&#34;architect&#34; if current_brain == &#34;architect&#34; else &#34;engineer&#34;))
+                    if status:
+                        try: status.start()
+                        except: pass
 
             if not resp_msg.tool_calls: break
             
@@ -2293,7 +2341,7 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
                     elif fn == &#34;manage_memory_tool&#34;: status.update(f&#34;[architect]Architect: [UPDATING MEMORY]&#34;)
 
                 if debug:
-                    self._print_debug_observation(f&#34;Decision: {fn}&#34;, args)
+                    self._print_debug_observation(f&#34;Decision: {fn}&#34;, args, status=status)
 
                 if fn == &#34;delegate_to_engineer&#34;:
                     obs, eng_usage = self._engineer_loop(args[&#34;task&#34;], status=status, debug=debug, chat_history=messages[:-1])
@@ -2312,7 +2360,14 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
                             num_retries=3
                         )
                         obs = claude_resp.choices[0].message.content
-                        if debug: self.console.print(Panel(Markdown(obs), title=&#34;[architect]Architect Consultation[/architect]&#34;, border_style=&#34;architect&#34;))
+                        if debug:
+                            if status:
+                                try: status.stop()
+                                except: pass
+                            self.console.print(Panel(Markdown(obs), title=&#34;[architect]Architect Consultation[/architect]&#34;, border_style=&#34;architect&#34;))
+                            if status:
+                                try: status.start()
+                                except: pass
                     except Exception as e:
                         if status: status.update(&#34;[unavailable]Architect unavailable! Engineer continuing alone...&#34;)
                         obs = f&#34;Architect unavailable ({str(e)}). Proceeding with your best technical judgment.&#34;
@@ -2329,7 +2384,14 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
                     handover_msg = f&#34;HANDOVER FROM EXECUTION ENGINE\n\nReason: {args[&#39;reason&#39;]}\n\nContext: {args[&#39;context&#39;]}\n\nYou are now in control of this conversation.&#34;
                     pending_user_message = handover_msg
                     obs = &#34;Control transferred to Architect. Handover context will be provided.&#34;
-                    if debug: self.console.print(Panel(Text(handover_msg), title=&#34;[architect]Escalation to Architect[/architect]&#34;, border_style=&#34;architect&#34;))
+                    if debug:
+                        if status:
+                            try: status.stop()
+                            except: pass
+                        self.console.print(Panel(Text(handover_msg), title=&#34;[architect]Escalation to Architect[/architect]&#34;, border_style=&#34;architect&#34;))
+                        if status:
+                            try: status.start()
+                            except: pass
                 
                 elif fn == &#34;return_to_engineer&#34;:
                     if status: status.update(&#34;[engineer]Transferring control back to Engineer...&#34;)
@@ -2343,7 +2405,14 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
                     handover_msg = f&#34;HANDOVER FROM ARCHITECT\n\nSummary: {args[&#39;summary&#39;]}\n\nYou are now back in control. Continue handling the user&#39;s requests.&#34;
                     pending_user_message = handover_msg
                     obs = &#34;Control returned to Engineer. Handover summary will be provided.&#34;
-                    if debug: self.console.print(Panel(Text(handover_msg), title=&#34;[engineer]Return to Engineer[/engineer]&#34;, border_style=&#34;engineer&#34;))
+                    if debug:
+                        if status:
+                            try: status.stop()
+                            except: pass
+                        self.console.print(Panel(Text(handover_msg), title=&#34;[engineer]Return to Engineer[/engineer]&#34;, border_style=&#34;engineer&#34;))
+                        if status:
+                            try: status.start()
+                            except: pass
                 
                 elif fn == &#34;list_nodes&#34;: obs = self.list_nodes_tool(**args)
                 elif fn == &#34;run_commands&#34;: obs = self.run_commands_tool(**args, status=status)
@@ -2353,7 +2422,7 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
                 else: obs = f&#34;Error: {fn} unknown.&#34;
 
                 if debug and fn not in [&#34;delegate_to_engineer&#34;, &#34;consult_architect&#34;, &#34;escalate_to_architect&#34;, &#34;return_to_engineer&#34;]:
-                    self._print_debug_observation(f&#34;Observation: {fn}&#34;, obs)
+                    self._print_debug_observation(f&#34;Observation: {fn}&#34;, obs, status=status)
 
                 # Ensure observation is a string and truncated for the LLM
                 obs_str = obs if isinstance(obs, str) else json.dumps(obs)
@@ -3748,6 +3817,42 @@ class node:
                 else:
                     jumphost_cmd = jumphost_cmd + &#34; {}&#34;.format(&#34;@&#34;.join([self.jumphost[&#34;user&#34;],self.jumphost[&#34;host&#34;]]))
                 self.jumphost = f&#34;-o ProxyCommand=\&#34;{jumphost_cmd}\&#34;&#34;
+            elif self.jumphost[&#34;protocol&#34;] == &#34;ssm&#34;:
+                ssm_target = self.jumphost[&#34;host&#34;]
+                ssm_cmd = f&#34;aws ssm start-session --target {ssm_target} --document-name AWS-StartSSHSession --parameters &#39;portNumber=22&#39;&#34;
+                if isinstance(self.jumphost.get(&#34;tags&#34;), dict):
+                    if &#34;profile&#34; in self.jumphost[&#34;tags&#34;]:
+                        ssm_cmd += f&#34; --profile {self.jumphost[&#39;tags&#39;][&#39;profile&#39;]}&#34;
+                    if &#34;region&#34; in self.jumphost[&#34;tags&#34;]:
+                        ssm_cmd += f&#34; --region {self.jumphost[&#39;tags&#39;][&#39;region&#39;]}&#34;
+                if self.jumphost[&#34;options&#34;] != &#39;&#39;:
+                    ssm_cmd += f&#34; {self.jumphost[&#39;options&#39;]}&#34;
+                
+                bastion_user_part = f&#34;{self.jumphost[&#39;user&#39;]}@{ssm_target}&#34; if self.jumphost[&#39;user&#39;] else ssm_target
+                
+                ssh_opts = &#34;&#34;
+                if isinstance(self.jumphost.get(&#34;tags&#34;), dict) and &#34;ssh_options&#34; in self.jumphost[&#34;tags&#34;]:
+                    ssh_opts = f&#34; {self.jumphost[&#39;tags&#39;][&#39;ssh_options&#39;]}&#34;
+                
+                inner_ssh = f&#34;ssh{ssh_opts} -o ProxyCommand=&#39;{ssm_cmd}&#39; -W %h:%p {bastion_user_part}&#34;
+                self.jumphost = f&#34;-o ProxyCommand=\&#34;{inner_ssh}\&#34;&#34;
+            elif self.jumphost[&#34;protocol&#34;] in [&#34;kubectl&#34;, &#34;docker&#34;]:
+                nc_cmd = &#34;nc&#34;
+                if isinstance(self.jumphost.get(&#34;tags&#34;), dict) and &#34;nc_command&#34; in self.jumphost[&#34;tags&#34;]:
+                    nc_cmd = self.jumphost[&#34;tags&#34;][&#34;nc_command&#34;]
+                    
+                if self.jumphost[&#34;protocol&#34;] == &#34;kubectl&#34;:
+                    proxy_cmd = f&#34;kubectl exec &#34;
+                    if self.jumphost[&#34;options&#34;] != &#39;&#39;:
+                        proxy_cmd += f&#34;{self.jumphost[&#39;options&#39;]} &#34;
+                    proxy_cmd += f&#34;{self.jumphost[&#39;host&#39;]} -i -- {nc_cmd} %h %p&#34;
+                else:
+                    proxy_cmd = f&#34;docker &#34;
+                    if self.jumphost[&#34;options&#34;] != &#39;&#39;:
+                        proxy_cmd += f&#34;{self.jumphost[&#39;options&#39;]} &#34;
+                    proxy_cmd += f&#34;exec -i {self.jumphost[&#39;host&#39;]} {nc_cmd} %h %p&#34;
+                    
+                self.jumphost = f&#34;-o ProxyCommand=\&#34;{proxy_cmd}\&#34;&#34;
             else:
                 self.jumphost = &#34;&#34;
         
@@ -4003,8 +4108,6 @@ class node:
                         self.mylog.write(data)
                         
             async def keepalive_task():
-                if self.idletime &lt;= 0:
-                    return
                 while True:
                     await asyncio.sleep(1)
                     if time() - self.lastinput &gt;= self.idletime:
@@ -4015,8 +4118,6 @@ class node:
                             pass
                             
             async def savelog_task():
-                if not hasattr(self, &#39;logfile&#39;) or not hasattr(self, &#39;mylog&#39;):
-                    return
                 prev_size = 0
                 while True:
                     await asyncio.sleep(5)
@@ -4035,10 +4136,12 @@ class node:
                 # We want to exit if either happens, so return_exceptions=False, but we need to cancel the others.
                 tasks = [
                     asyncio.create_task(ingress_task()),
-                    asyncio.create_task(egress_task()),
-                    asyncio.create_task(keepalive_task()),
-                    asyncio.create_task(savelog_task())
+                    asyncio.create_task(egress_task())
                 ]
+                if self.idletime &gt; 0:
+                    tasks.append(asyncio.create_task(keepalive_task()))
+                if hasattr(self, &#39;logfile&#39;) and hasattr(self, &#39;mylog&#39;):
+                    tasks.append(asyncio.create_task(savelog_task()))
                 done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
                 for p in pending:
                     p.cancel()
@@ -4404,7 +4507,7 @@ class node:
             &#34;telnet&#34;: [&#39;[u|U]sername:&#39;, &#39;refused&#39;, &#39;supported&#39;, &#39;invalid|unrecognized option&#39;, &#39;ssh-keygen.*\&#34;&#39;, &#39;timeout|timed.out&#39;, &#39;unavailable&#39;, &#39;closed&#39;, password_prompt, prompt, &#39;suspend&#39;, pexpect.EOF, pexpect.TIMEOUT, &#34;No route to host&#34;, &#34;resolve hostname&#34;, &#34;no matching&#34;, &#34;[b|B]ad (owner|permissions)&#34;],
             &#34;kubectl&#34;: [&#39;[u|U]sername:&#39;, &#39;[r|R]efused&#39;, &#39;[E|e]rror&#39;, &#39;DEPRECATED&#39;, pexpect.TIMEOUT, password_prompt, prompt, pexpect.EOF, &#34;expired|invalid&#34;],
             &#34;docker&#34;: [&#39;[u|U]sername:&#39;, &#39;Cannot&#39;, &#39;[E|e]rror&#39;, &#39;failed&#39;, &#39;not a docker command&#39;, &#39;unknown&#39;, &#39;unable to resolve&#39;, pexpect.TIMEOUT, password_prompt, prompt, pexpect.EOF],
-            &#34;ssm&#34;: [&#39;[u|U]sername:&#39;, &#39;Cannot&#39;, &#39;[E|e]rror&#39;, &#39;failed&#39;, &#39;SessionManagerPlugin&#39;, &#39;unknown&#39;, &#39;unable to resolve&#39;, pexpect.TIMEOUT, password_prompt, prompt, pexpect.EOF]
+            &#34;ssm&#34;: [&#39;[u|U]sername:&#39;, &#39;Cannot&#39;, &#39;[E|e]rror&#39;, &#39;failed&#39;, &#39;SessionManagerPlugin&#39;, &#39;[u|U]nknown&#39;, &#39;unable to resolve&#39;, pexpect.TIMEOUT, password_prompt, prompt, pexpect.EOF]
         }
 
         error_indices = {

@@ -134,7 +134,6 @@ el.replaceWith(d);
         if &#34;usage&#34; in result:
             u = result[&#34;usage&#34;]
             console.print(f&#34;[debug]Tokens: {u[&#39;total&#39;]} (Input: {u[&#39;input&#39;]}, Output: {u[&#39;output&#39;]})[/debug]&#34;)
-        console.print()
 
     def interactive_chat(self, args, session_id):
         history = None
@@ -178,7 +177,6 @@ el.replaceWith(d);
                 if &#34;usage&#34; in result:
                     u = result[&#34;usage&#34;]
                     console.print(f&#34;[debug]Tokens: {u[&#39;total&#39;]} (Input: {u[&#39;input&#39;]}, Output: {u[&#39;output&#39;]})[/debug]&#34;)
-                console.print()
             except (KeyboardInterrupt, EOFError):
                 console.print(&#34;\n[dim]Session closed.[/dim]&#34;)
                 break</code></pre>
@@ -306,7 +304,6 @@ el.replaceWith(d);
             if &#34;usage&#34; in result:
                 u = result[&#34;usage&#34;]
                 console.print(f&#34;[debug]Tokens: {u[&#39;total&#39;]} (Input: {u[&#39;input&#39;]}, Output: {u[&#39;output&#39;]})[/debug]&#34;)
-            console.print()
         except (KeyboardInterrupt, EOFError):
             console.print(&#34;\n[dim]Session closed.[/dim]&#34;)
             break</code></pre>
@@ -335,8 +332,7 @@ el.replaceWith(d);
     
     if &#34;usage&#34; in result:
         u = result[&#34;usage&#34;]
-        console.print(f&#34;[debug]Tokens: {u[&#39;total&#39;]} (Input: {u[&#39;input&#39;]}, Output: {u[&#39;output&#39;]})[/debug]&#34;)
-    console.print()</code></pre>
+        console.print(f&#34;[debug]Tokens: {u[&#39;total&#39;]} (Input: {u[&#39;input&#39;]}, Output: {u[&#39;output&#39;]})[/debug]&#34;)</code></pre>
 </details>
 <div class="desc"></div>
 </dd>

@@ -20,7 +20,8 @@ class MethodHook:
             try:
                 args, kwargs = hook(*args, **kwargs)
             except Exception as e:
-                printer.error(f"{self.func.__name__} Pre-hook {hook.__name__} raised an exception: {e}")
+                hook_name = getattr(hook, "__name__", str(hook))
+                printer.error(f"{self.func.__name__} Pre-hook {hook_name} raised an exception: {e}")
 
         result = self.func(*args, **kwargs)
 
@@ -32,7 +33,8 @@ class MethodHook:
             try:
                 result = hook(*args, **kwargs, result=result)  # Pass result to hooks
             except Exception as e:
-                printer.error(f"{self.func.__name__} Post-hook {hook.__name__} raised an exception: {e}")
+                hook_name = getattr(hook, "__name__", str(hook))
+                printer.error(f"{self.func.__name__} Post-hook {hook_name} raised an exception: {e}")
 
         return result
 

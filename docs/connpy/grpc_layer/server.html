@@ -367,12 +367,7 @@ el.replaceWith(d);
             
         def _worker():
             try:
-                # Set task name in thread state for printer if available
-                if request.name:
-                    printer.console.print(f&#34;[debug][DEBUG][/debug] Executing task: [bold cyan]{request.name}[/bold cyan]&#34;)
-
-                self.service.run_commands(
-                    nodes_filter=nodes_filter,
+                self.service.run_commands(                    nodes_filter=nodes_filter,
                     commands=list(request.commands),
                     folder=request.folder if request.folder else None,
                     prompt=request.prompt if request.prompt else None,
@@ -418,10 +413,6 @@ el.replaceWith(d);
             
         def _worker():
             try:
-                # Set task name in thread state for printer if available
-                if request.name:
-                    printer.console.print(f&#34;[debug][DEBUG][/debug] Executing task: [bold cyan]{request.name}[/bold cyan]&#34;)
-
                 self.service.test_commands(
                     nodes_filter=nodes_filter,
                     commands=list(request.commands),
@@ -658,7 +649,9 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
         unique_id = first_req.id
         sftp = first_req.sftp
         debug = first_req.debug
-        printer.console.print(f&#34;[debug][DEBUG][/debug] gRPC interact_node request for: [bold cyan]{unique_id}[/bold cyan]&#34;)
+        
+        if debug:
+            printer.console.print(f&#34;[debug][DEBUG][/debug] gRPC interact_node request for: [bold cyan]{unique_id}[/bold cyan]&#34;)
 
         if first_req.connection_params_json:
             import json
@@ -757,7 +750,8 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
         while True:
             data = response_queue.get()
             if data is None:
-                printer.console.print(f&#34;[debug][DEBUG][/debug] gRPC interact_node session closed for: [bold cyan]{unique_id}[/bold cyan]&#34;)
+                if debug:
+                    printer.console.print(f&#34;[debug][DEBUG][/debug] gRPC interact_node session closed for: [bold cyan]{unique_id}[/bold cyan]&#34;)
                 break
             yield connpy_pb2.InteractResponse(stdout_data=data)
     @handle_errors

@@ -273,9 +273,12 @@ class ai:
 
                     if not debug and not chunk_callback:
                         if not is_streaming_text:
-                            # Stop spinner before starting live display
+                            # Stop spinner definitively
                             if status:
-                                status.stop()
+                                try:
+                                    status.stop()
+                                except Exception:
+                                    pass
                             live_display = Live(
                                 Panel(Markdown(full_content), title=title, border_style=border, expand=False),
                                 console=self.console,
@@ -463,7 +466,7 @@ class ai:
         tail_limit = int(final_limit * 0.4)
         return (text[:head_limit] + f"\n\n[... OUTPUT TRUNCATED ...]\n\n" + text[-tail_limit:])
 
-    def _print_debug_observation(self, fn, obs):
+    def _print_debug_observation(self, fn, obs, status=None):
         """Prints a tool observation in a readable way during debug mode."""
         # Try to parse as JSON if it's a string
         if isinstance(obs, str):
@@ -487,6 +490,7 @@ class ai:
                 content = Text("Empty data set")
             else:
                 # Add a small spacer instead of a Rule for cleaner look
+                from rich.console import Group
                 content = Group(*elements)
         elif isinstance(obs_data, list):
             content = Text("\n".join(f"• {item}" for item in obs_data))
@@ -494,7 +498,18 @@ class ai:
             content = Text(str(obs_data))
             
         title = f"[bold]{fn}[/bold]"
+        
+        # Stop status before printing panel to avoid ghosting
+        if status:
+            try: status.stop()
+            except: pass
+            
         self.console.print(Panel(content, title=title, border_style="ai_status"))
+        
+        # Resume status
+        if status:
+            try: status.start()
+            except: pass
 
     def manage_memory_tool(self, content, action="append"):
         """Save or update long-term memory. Only use when user explicitly requests it."""
@@ -695,7 +710,7 @@ class ai:
                         elif fn in self.tool_status_formatters: status.update(self.tool_status_formatters[fn](args))
 
                     if debug:
-                        self._print_debug_observation(f"Decision: {fn}", args)
+                        self._print_debug_observation(f"Decision: {fn}", args, status=status)
                     
                     if fn == "list_nodes": obs = self.list_nodes_tool(**args)
                     elif fn == "run_commands": obs = self.run_commands_tool(**args, status=status)
@@ -704,7 +719,7 @@ class ai:
                     else: obs = f"Error: Unknown tool '{fn}'."
                     
                     if debug:
-                        self._print_debug_observation(f"Observation: {fn}", obs)
+                        self._print_debug_observation(f"Observation: {fn}", obs, status=status)
                     
                     # Ensure observation is a string and truncated for the LLM
                     obs_str = obs if isinstance(obs, str) else json.dumps(obs)
@@ -974,7 +989,7 @@ class ai:
                 streamed_response = False
                 try:
                     safe_messages = self._sanitize_messages(messages)
-                    if stream and (not debug or chunk_callback):
+                    if stream and chunk_callback:
                         response, streamed_response = self._stream_completion(
                             model=model, messages=safe_messages, tools=tools, api_key=key,
                             status=status, label=label, debug=debug, num_retries=3,
@@ -1017,7 +1032,13 @@ class ai:
                     # In CLI debug mode, only print intermediate reasoning if there are tool calls.
                     # If there are no tool calls, this content is the final answer and will be printed by the caller.
                     if resp_msg.tool_calls:
+                        if status:
+                            try: status.stop()
+                            except: pass
                         self.console.print(Panel(Markdown(resp_msg.content), title=f"[{current_brain}][bold]{label} Reasoning[/bold][/{current_brain}]", border_style="architect" if current_brain == "architect" else "engineer"))
+                        if status:
+                            try: status.start()
+                            except: pass
 
                 if not resp_msg.tool_calls: break
                 
@@ -1038,7 +1059,7 @@ class ai:
                         elif fn == "manage_memory_tool": status.update(f"[architect]Architect: [UPDATING MEMORY]")
 
                     if debug:
-                        self._print_debug_observation(f"Decision: {fn}", args)
+                        self._print_debug_observation(f"Decision: {fn}", args, status=status)
 
                     if fn == "delegate_to_engineer":
                         obs, eng_usage = self._engineer_loop(args["task"], status=status, debug=debug, chat_history=messages[:-1])
@@ -1057,7 +1078,14 @@ class ai:
                                 num_retries=3
                             )
                             obs = claude_resp.choices[0].message.content
-                            if debug: self.console.print(Panel(Markdown(obs), title="[architect]Architect Consultation[/architect]", border_style="architect"))
+                            if debug:
+                                if status:
+                                    try: status.stop()
+                                    except: pass
+                                self.console.print(Panel(Markdown(obs), title="[architect]Architect Consultation[/architect]", border_style="architect"))
+                                if status:
+                                    try: status.start()
+                                    except: pass
                         except Exception as e:
                             if status: status.update("[unavailable]Architect unavailable! Engineer continuing alone...")
                             obs = f"Architect unavailable ({str(e)}). Proceeding with your best technical judgment."
@@ -1074,7 +1102,14 @@ class ai:
                         handover_msg = f"HANDOVER FROM EXECUTION ENGINE\n\nReason: {args['reason']}\n\nContext: {args['context']}\n\nYou are now in control of this conversation."
                         pending_user_message = handover_msg
                         obs = "Control transferred to Architect. Handover context will be provided."
-                        if debug: self.console.print(Panel(Text(handover_msg), title="[architect]Escalation to Architect[/architect]", border_style="architect"))
+                        if debug:
+                            if status:
+                                try: status.stop()
+                                except: pass
+                            self.console.print(Panel(Text(handover_msg), title="[architect]Escalation to Architect[/architect]", border_style="architect"))
+                            if status:
+                                try: status.start()
+                                except: pass
                     
                     elif fn == "return_to_engineer":
                         if status: status.update("[engineer]Transferring control back to Engineer...")
@@ -1088,7 +1123,14 @@ class ai:
                         handover_msg = f"HANDOVER FROM ARCHITECT\n\nSummary: {args['summary']}\n\nYou are now back in control. Continue handling the user's requests."
                         pending_user_message = handover_msg
                         obs = "Control returned to Engineer. Handover summary will be provided."
-                        if debug: self.console.print(Panel(Text(handover_msg), title="[engineer]Return to Engineer[/engineer]", border_style="engineer"))
+                        if debug:
+                            if status:
+                                try: status.stop()
+                                except: pass
+                            self.console.print(Panel(Text(handover_msg), title="[engineer]Return to Engineer[/engineer]", border_style="engineer"))
+                            if status:
+                                try: status.start()
+                                except: pass
                     
                     elif fn == "list_nodes": obs = self.list_nodes_tool(**args)
                     elif fn == "run_commands": obs = self.run_commands_tool(**args, status=status)
@@ -1098,7 +1140,7 @@ class ai:
                     else: obs = f"Error: {fn} unknown."
 
                     if debug and fn not in ["delegate_to_engineer", "consult_architect", "escalate_to_architect", "return_to_engineer"]:
-                        self._print_debug_observation(f"Observation: {fn}", obs)
+                        self._print_debug_observation(f"Observation: {fn}", obs, status=status)
 
                     # Ensure observation is a string and truncated for the LLM
                     obs_str = obs if isinstance(obs, str) else json.dumps(obs)

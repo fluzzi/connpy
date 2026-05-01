@@ -117,8 +117,14 @@ el.replaceWith(d);
         case_sensitive = self.config.config.get(&#34;case&#34;, False)
         
         if filter_str:
-            flags = re.IGNORECASE if not case_sensitive else 0
-            folders = [f for f in folders if re.search(filter_str, f, flags)]
+            if filter_str.startswith(&#34;@&#34;):
+                if not case_sensitive:
+                    folders = [f for f in folders if f.lower() == filter_str.lower()]
+                else:
+                    folders = [f for f in folders if f == filter_str]
+            else:
+                flags = re.IGNORECASE if not case_sensitive else 0
+                folders = [f for f in folders if re.search(filter_str, f, flags)]
         return folders
 
     def get_node_details(self, unique_id):
@@ -139,13 +145,20 @@ el.replaceWith(d);
         &#34;&#34;&#34;Generate and update the internal nodes cache.&#34;&#34;&#34;
         self.config._generate_nodes_cache(nodes=nodes, folders=folders, profiles=profiles)
 
-    def validate_parent_folder(self, unique_id):
+    def validate_parent_folder(self, unique_id, is_folder=False):
         &#34;&#34;&#34;Check if parent folder exists for a given node unique ID.&#34;&#34;&#34;
-        node_folder = unique_id.partition(&#34;@&#34;)[2]
-        if node_folder:
-            parent_folder = f&#34;@{node_folder}&#34;
-            if parent_folder not in self.config._getallfolders():
-                raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
+        if is_folder:
+            uniques = self.config._explode_unique(unique_id)
+            if uniques and &#34;subfolder&#34; in uniques and &#34;folder&#34; in uniques:
+                parent_folder = f&#34;@{uniques[&#39;folder&#39;]}&#34;
+                if parent_folder not in self.config._getallfolders():
+                    raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
+        else:
+            node_folder = unique_id.partition(&#34;@&#34;)[2]
+            if node_folder:
+                parent_folder = f&#34;@{node_folder}&#34;
+                if parent_folder not in self.config._getallfolders():
+                    raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
 
 
     def add_node(self, unique_id, data, is_folder=False):
@@ -165,7 +178,7 @@ el.replaceWith(d);
             
             # Check if parent folder exists when creating a subfolder
             if &#34;subfolder&#34; in uniques:
-                self.validate_parent_folder(unique_id)
+                self.validate_parent_folder(unique_id, is_folder=True)
                     
             self.config._folder_add(**uniques)
             self.config._saveconfig(self.config.file)
@@ -347,7 +360,7 @@ el.replaceWith(d);
         
         # Check if parent folder exists when creating a subfolder
         if &#34;subfolder&#34; in uniques:
-            self.validate_parent_folder(unique_id)
+            self.validate_parent_folder(unique_id, is_folder=True)
                 
         self.config._folder_add(**uniques)
         self.config._saveconfig(self.config.file)
@@ -563,8 +576,14 @@ el.replaceWith(d);
     case_sensitive = self.config.config.get(&#34;case&#34;, False)
     
     if filter_str:
-        flags = re.IGNORECASE if not case_sensitive else 0
-        folders = [f for f in folders if re.search(filter_str, f, flags)]
+        if filter_str.startswith(&#34;@&#34;):
+            if not case_sensitive:
+                folders = [f for f in folders if f.lower() == filter_str.lower()]
+            else:
+                folders = [f for f in folders if f == filter_str]
+        else:
+            flags = re.IGNORECASE if not case_sensitive else 0
+            folders = [f for f in folders if re.search(filter_str, f, flags)]
     return folders</code></pre>
 </details>
 <div class="desc"><p>Return all unique folders, optionally filtered by regex.</p></div>
@@ -693,20 +712,27 @@ el.replaceWith(d);
 <div class="desc"><p>Explicitly update an existing node.</p></div>
 </dd>
 <dt id="connpy.services.node_service.NodeService.validate_parent_folder"><code class="name flex">
-<span>def <span class="ident">validate_parent_folder</span></span>(<span>self, unique_id)</span>
+<span>def <span class="ident">validate_parent_folder</span></span>(<span>self, unique_id, is_folder=False)</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def validate_parent_folder(self, unique_id):
+<pre><code class="python">def validate_parent_folder(self, unique_id, is_folder=False):
     &#34;&#34;&#34;Check if parent folder exists for a given node unique ID.&#34;&#34;&#34;
-    node_folder = unique_id.partition(&#34;@&#34;)[2]
-    if node_folder:
-        parent_folder = f&#34;@{node_folder}&#34;
-        if parent_folder not in self.config._getallfolders():
-            raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)</code></pre>
+    if is_folder:
+        uniques = self.config._explode_unique(unique_id)
+        if uniques and &#34;subfolder&#34; in uniques and &#34;folder&#34; in uniques:
+            parent_folder = f&#34;@{uniques[&#39;folder&#39;]}&#34;
+            if parent_folder not in self.config._getallfolders():
+                raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
+    else:
+        node_folder = unique_id.partition(&#34;@&#34;)[2]
+        if node_folder:
+            parent_folder = f&#34;@{node_folder}&#34;
+            if parent_folder not in self.config._getallfolders():
+                raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)</code></pre>
 </details>
 <div class="desc"><p>Check if parent folder exists for a given node unique ID.</p></div>
 </dd>

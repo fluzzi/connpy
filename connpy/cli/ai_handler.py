@@ -88,7 +88,6 @@ class AIHandler:
         if "usage" in result:
             u = result["usage"]
             console.print(f"[debug]Tokens: {u['total']} (Input: {u['input']}, Output: {u['output']})[/debug]")
-        console.print()
 
     def interactive_chat(self, args, session_id):
         history = None
@@ -132,7 +131,6 @@ class AIHandler:
                 if "usage" in result:
                     u = result["usage"]
                     console.print(f"[debug]Tokens: {u['total']} (Input: {u['input']}, Output: {u['output']})[/debug]")
-                console.print()
             except (KeyboardInterrupt, EOFError):
                 console.print("\n[dim]Session closed.[/dim]")
                 break
