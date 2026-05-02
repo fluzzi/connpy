@@ -271,7 +271,7 @@ class ai:
                             raise KeyboardInterrupt
                         chunk_callback(delta.content)
 
-                    if not debug and not chunk_callback:
+                    if not chunk_callback:
                         if not is_streaming_text:
                             # Stop spinner definitively
                             if status:
@@ -279,9 +279,15 @@ class ai:
                                     status.stop()
                                 except Exception:
                                     pass
+                            
+                            # Create a stable, direct Console to bypass _ConsoleProxy recreation bugs
+                            from rich.console import Console as RichConsole
+                            from .printer import connpy_theme, get_original_stdout
+                            stable_console = RichConsole(theme=connpy_theme, file=get_original_stdout())
+                            
                             live_display = Live(
                                 Panel(Markdown(full_content), title=title, border_style=border, expand=False),
-                                console=self.console,
+                                console=stable_console,
                                 refresh_per_second=8,
                                 transient=False
                             )
@@ -303,7 +309,10 @@ class ai:
                     )
                 except Exception:
                     pass
-                live_display.stop()
+                try:
+                    live_display.stop()
+                except Exception:
+                    pass
         
         # Rebuild complete response from chunks
         try:
@@ -989,7 +998,7 @@ class ai:
                 streamed_response = False
                 try:
                     safe_messages = self._sanitize_messages(messages)
-                    if stream and chunk_callback:
+                    if stream:
                         response, streamed_response = self._stream_completion(
                             model=model, messages=safe_messages, tools=tools, api_key=key,
                             status=status, label=label, debug=debug, num_retries=3,
@@ -1028,8 +1037,8 @@ class ai:
                 if msg_dict.get("tool_calls") and msg_dict.get("content") == "": msg_dict["content"] = None
                 messages.append(msg_dict)
 
-                if debug and resp_msg.content:
-                    # In CLI debug mode, only print intermediate reasoning if there are tool calls.
+                if debug and resp_msg.content and not streamed_response:
+                    # In CLI debug mode, only print intermediate reasoning if there are tool calls AND it wasn't already streamed.
                     # If there are no tool calls, this content is the final answer and will be printed by the caller.
                     if resp_msg.tool_calls:
                         if status:

@@ -604,21 +604,33 @@ class AIStub:
                 
                 if response.debug_message:
                     if debug:
+                        if live_display:
+                            try: live_display.stop()
+                            except: pass
                         if status:
                             try: status.stop()
                             except: pass
                         printer.console.print(Text.from_ansi(response.debug_message))
-                        if status:
+                        if live_display:
+                            try: live_display.start()
+                            except: pass
+                        elif status:
                             try: status.start()
                             except: pass
                     continue
                 
                 if response.important_message:
+                    if live_display:
+                        try: live_display.stop()
+                        except: pass
                     if status:
                         try: status.stop()
                         except: pass
                     printer.console.print(Text.from_ansi(response.important_message))
-                    if status:
+                    if live_display:
+                        try: live_display.start()
+                        except: pass
+                    elif status:
                         try: status.start()
                         except: pass
                     continue
@@ -627,14 +639,33 @@ class AIStub:
                     if response.text_chunk:
                         full_content += response.text_chunk
                         
-                        if status and not debug:
-                            # Update the spinner line with a preview of the response
-                            preview = full_content.replace("\n", " ").strip()
-                            if len(preview) > 60: preview = preview[:57] + "..."
-                            status.update(f"[ai_status]{preview}")
+                        if not live_display:
+                            if status:
+                                try: status.stop()
+                                except: pass
+                            
+                            from rich.console import Console as RichConsole
+                            from ..printer import connpy_theme, get_original_stdout
+                            stable_console = RichConsole(theme=connpy_theme, file=get_original_stdout())
+                            
+                            # We default to Engineer title during stream, final result will correct it if needed
+                            live_display = Live(
+                                Panel(Markdown(full_content), title="[bold engineer]Network Engineer[/bold engineer]", border_style="engineer", expand=False),
+                                console=stable_console,
+                                refresh_per_second=8,
+                                transient=False
+                            )
+                            live_display.start()
+                        else:
+                            live_display.update(
+                                Panel(Markdown(full_content), title="[bold engineer]Network Engineer[/bold engineer]", border_style="engineer", expand=False)
+                            )
                     continue
                 
                 if response.is_final:
+                    if live_display:
+                        try: live_display.stop()
+                        except: pass
                     # Final stop for status to ensure it disappears before the panel
                     if status:
                         try: status.stop()
@@ -646,10 +677,13 @@ class AIStub:
                     role_label = "Network Architect" if responder == "architect" else "Network Engineer"
                     title = f"[bold {alias}]{role_label}[/bold {alias}]"
                     
-                    # Always print the final Panel
                     content_to_print = full_content or final_result.get("response", "")
                     if content_to_print:
-                        printer.console.print(Panel(Markdown(content_to_print), title=title, border_style=alias, expand=False))
+                        if live_display:
+                            # Re-render the final frame with correct title/colors
+                            live_display.update(Panel(Markdown(content_to_print), title=title, border_style=alias, expand=False))
+                        else:
+                            printer.console.print(Panel(Markdown(content_to_print), title=title, border_style=alias, expand=False))
                     break
         except Exception as e:
             # Check if it was a gRPC error that we should let handle_errors catch
