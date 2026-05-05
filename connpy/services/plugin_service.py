@@ -233,25 +233,44 @@ class PluginService(BaseService):
         from rich.console import Console
         
         from rich.console import Console
-        buf = io.StringIO()
+        import queue
+        import threading
+        
+        q = queue.Queue()
+        
+        class QueueIO(io.StringIO):
+            def write(self, s):
+                q.put(s)
+                return len(s)
+            def flush(self):
+                pass
+                
+        buf = QueueIO()
         old_console = printer._get_console()
         old_err_console = printer._get_err_console()
         
-        printer.set_thread_console(Console(file=buf, theme=printer.connpy_theme, force_terminal=True))
-        printer.set_thread_err_console(Console(file=buf, theme=printer.connpy_theme, force_terminal=True))
-        printer.set_thread_stream(buf)
+        def run_plugin():
+            printer.set_thread_console(Console(file=buf, theme=printer.connpy_theme, force_terminal=True))
+            printer.set_thread_err_console(Console(file=buf, theme=printer.connpy_theme, force_terminal=True))
+            printer.set_thread_stream(buf)
+            try:
+                if hasattr(module, "Entrypoint"):
+                    module.Entrypoint(args, parser, app)
+            except BaseException as e:
+                if not isinstance(e, SystemExit):
+                    import traceback
+                    printer.err_console.print(traceback.format_exc())
+            finally:
+                printer.set_thread_console(old_console)
+                printer.set_thread_err_console(old_err_console)
+                printer.set_thread_stream(None)
+                q.put(None)
+                
+        t = threading.Thread(target=run_plugin, daemon=True)
+        t.start()
         
-        try:
-            if hasattr(module, "Entrypoint"):
-                module.Entrypoint(args, parser, app)
-        except BaseException as e:
-            if not isinstance(e, SystemExit):
-                import traceback
-                printer.err_console.print(traceback.format_exc())
-        finally:
-            printer.set_thread_console(old_console)
-            printer.set_thread_err_console(old_err_console)
-            printer.set_thread_stream(None)
-            
-        for line in buf.getvalue().splitlines(keepends=True):
-            yield line
+        while True:
+            item = q.get()
+            if item is None:
+                break
+            yield item

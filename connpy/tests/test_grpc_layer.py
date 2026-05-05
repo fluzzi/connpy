@@ -78,15 +78,15 @@ class TestStubsMessageFormatting:
     @patch("select.select")
     def test_connect_dynamic_msg_formatting_ssm(self, mock_select, mock_read, mock_setraw, mock_getattr, mock_setattr):
         from connpy.grpc_layer.stubs import NodeStub
-        
+
         mock_getattr.return_value = [0, 0, 0, 0, 0, 0, [0] * 32]
         mock_channel = MagicMock()
         stub = NodeStub(mock_channel, "localhost:8048")
-        
+
         mock_resp = MagicMock()
         mock_resp.success = True
-        stub.stub.interact_node.return_value = iter([mock_resp])
-        
+        mock_resp.stdout_data = b''
+        stub.stub.interact_node.return_value = iter([mock_resp])        
         with patch("connpy.printer.success") as mock_success:
             with patch("sys.stdin.fileno", return_value=0):
                 mock_select.return_value = ([], [], [])

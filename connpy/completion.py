@@ -184,9 +184,37 @@ def _build_tree(nodes, folders, profiles, plugins, configdir):
         "folders": None,
     }
 
+    # --- Connect (default command) ---
+    # Long flags are offered; short forms (-d/-t) only used for navigation.
+    # Two states: before node (offer nodes + remaining long flags)
+    #             after node  (offer only remaining long flags, no more nodes)
+    connect_flags_long = ["--debug", "--sftp"]
+    connect_flags_all  = ["--debug", "-d", "--sftp", "-t"]
+
+    # Post-node: only offer remaining long flags
+    connect_after_node = {"__exclude_used__": True}
+    for f in connect_flags_all:
+        connect_after_node[f] = connect_after_node
+
+    # Pre-node: offer nodes + remaining long flags, consume node → post-node state
+    connect_dict = {"__exclude_used__": True}
+    connect_dict["__extra__"] = lambda w: (
+        list(nodes) + list(folders) + (list(plugins.keys()) if plugins else [])
+    )
+    connect_dict["*"] = connect_after_node
+    for f in connect_flags_all:
+        connect_dict[f] = connect_dict
+
     # --- Main Tree ---
     return {
+        # Root: offer nodes + long flags; after a node go to post-node state
         "__extra__": lambda w: list(nodes) + list(folders) + (list(plugins.keys()) if plugins else []),
+        "*": connect_after_node,
+
+        "--debug": connect_dict,
+        "-d":      connect_dict,
+        "--sftp":  connect_dict,
+        "-t":      connect_dict,
 
         "--add": {"profile": _profile_values},
         "--del": {"profile": _profile_values, "__extra__": _nodes_folders},

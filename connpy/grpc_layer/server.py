@@ -139,7 +139,39 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
             if sftp:
                 n.protocol = "sftp"
 
-        connect = n._connect(debug=debug)
+        # Build a logger that captures debug messages as ANSI-colored bytes for the client
+        debug_chunks = []
+        if debug:
+            from io import StringIO
+            from rich.console import Console as RichConsole
+            from ..printer import connpy_theme
+            from .. import printer as _printer
+
+            def remote_logger(msg_type, message):
+                buf = StringIO()
+                c = RichConsole(file=buf, force_terminal=True, width=120, theme=connpy_theme)
+                if msg_type == "debug":
+                    c.print(_printer._format_multiline("i", f"[DEBUG] {message}", style="info"))
+                elif msg_type == "success":
+                    c.print(_printer._format_multiline("✓", message, style="success"))
+                elif msg_type == "error":
+                    c.print(_printer._format_multiline("✗", message, style="error"))
+                else:
+                    c.print(str(message))
+                rendered = buf.getvalue()
+                if rendered:
+                    # Raw TTY needs \r\n instead of \n
+                    rendered = rendered.replace('\n', '\r\n')
+                    debug_chunks.append(rendered.encode())
+        else:
+            remote_logger = None
+
+        connect = n._connect(debug=debug, logger=remote_logger)
+
+        # Send debug output to client before checking result (always show the command)
+        for chunk in debug_chunks:
+            yield connpy_pb2.InteractResponse(stdout_data=chunk)
+
         if connect != True:
             yield connpy_pb2.InteractResponse(success=False, error_message=str(connect))
             return

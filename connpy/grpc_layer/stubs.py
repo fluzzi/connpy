@@ -86,25 +86,37 @@ class NodeStub:
 
         old_tty = termios.tcgetattr(sys.stdin)
         try:
+            import time
             tty.setraw(sys.stdin.fileno())
             response_iterator = self.stub.interact_node(request_generator())
             
-            # First response is connection status
+            # First phase: Wait for connection status, print early data
             try:
-                first_res = next(response_iterator)
-                if first_res.success:
-                    # Connection established on server, show success message
-                    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
-                    printer.success(conn_msg)
-                    tty.setraw(sys.stdin.fileno())
-                else:
-                    # Connection failed on server
-                    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
-                    printer.error(f"Connection failed: {first_res.error_message}")
-                    return
+                for res in response_iterator:
+                    if res.stdout_data:
+                        data = res.stdout_data
+                        if debug:
+                            data = data.replace(b'\x1b[H\x1b[2J', b'').replace(b'\x1bc', b'').replace(b'\x1b[3J', b'')
+                        os.write(sys.stdout.fileno(), data)
+                    
+                    if res.success:
+                        # Connection established on server, show success message
+                        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+                        printer.success(conn_msg)
+                        tty.setraw(sys.stdin.fileno())
+                        break
+                    
+                    if res.error_message:
+                        # Connection failed on server
+                        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+                        printer.error(f"Connection failed: {res.error_message}")
+                        return
             except StopIteration:
                 return
             
+            # Second phase: Stream active session
+            # Clear screen filter is only applied before success (Phase 1).
+            # Once the user has a prompt, Ctrl+L must work normally.
             for res in response_iterator:
                 if res.stdout_data:
                     os.write(sys.stdout.fileno(), res.stdout_data)
@@ -160,25 +172,37 @@ class NodeStub:
 
         old_tty = termios.tcgetattr(sys.stdin)
         try:
+            import time
             tty.setraw(sys.stdin.fileno())
             response_iterator = self.stub.interact_node(request_generator())
             
-            # First response is connection status
+            # First phase: Wait for connection status, print early data
             try:
-                first_res = next(response_iterator)
-                if first_res.success:
-                    # Connection established on server, show success message
-                    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
-                    printer.success(conn_msg)
-                    tty.setraw(sys.stdin.fileno())
-                else:
-                    # Connection failed on server
-                    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
-                    printer.error(f"Connection failed: {first_res.error_message}")
-                    return
+                for res in response_iterator:
+                    if res.stdout_data:
+                        data = res.stdout_data
+                        if debug:
+                            data = data.replace(b'\x1b[H\x1b[2J', b'').replace(b'\x1bc', b'').replace(b'\x1b[3J', b'')
+                        os.write(sys.stdout.fileno(), data)
+                    
+                    if res.success:
+                        # Connection established on server, show success message
+                        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+                        printer.success(conn_msg)
+                        tty.setraw(sys.stdin.fileno())
+                        break
+                    
+                    if res.error_message:
+                        # Connection failed on server
+                        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+                        printer.error(f"Connection failed: {res.error_message}")
+                        return
             except StopIteration:
                 return
                 
+            # Second phase: Stream active session
+            # Clear screen filter is only applied before success (Phase 1).
+            # Once the user has a prompt, Ctrl+L must work normally.
             for res in response_iterator:
                 if res.stdout_data:
                     os.write(sys.stdout.fileno(), res.stdout_data)

@@ -348,7 +348,8 @@ class node:
             x.start()
         if debug:
             if 'mylog' in dir(self):
-                print(self.mylog.getvalue().decode())
+                if not async_mode:
+                    print(self.mylog.getvalue().decode())
 
     def _teardown_interact_environment(self):
         if 'logfile' in dir(self) and hasattr(self, 'mylog'):
@@ -760,7 +761,12 @@ class node:
             elif self.protocol == "sftp":
                 cmd += " -P " + self.port
         if self.options:
-            cmd += " " + self.options
+            opts = self.options
+            if self.protocol == "sftp":
+                # Strip SSH-only flags that sftp doesn't support
+                opts = re.sub(r'(?<!\S)-[XxtTAaNf]\b', '', opts).strip()
+            if opts:
+                cmd += " " + opts
         if self.jumphost:
             cmd += " " + self.jumphost
         user_host = f"{self.user}@{self.host}" if self.user else self.host
@@ -875,6 +881,7 @@ class node:
                 if logger:
                     logger("debug", f"Command:\n{cmd}")
                 self.mylog = io.BytesIO()
+                self.mylog.write(f"[i] [DEBUG] Command:\r\n    {cmd}\r\n".encode())
                 child.logfile_read = self.mylog
 
 
