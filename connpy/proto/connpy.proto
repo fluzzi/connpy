@@ -65,6 +65,7 @@ service ImportExportService {
 service AIService {
     rpc ask (stream AskRequest) returns (stream AIResponse) {}
     rpc confirm (StringRequest) returns (BoolResponse) {}
+    rpc ask_copilot (CopilotRequest) returns (CopilotResponse) {}
     rpc list_sessions (google.protobuf.Empty) returns (ValueResponse) {}
     rpc delete_session (StringRequest) returns (google.protobuf.Empty) {}
     rpc configure_provider (ProviderRequest) returns (google.protobuf.Empty) {}
@@ -256,4 +257,17 @@ message NodeRunResult {
 message FullReplaceRequest {
     google.protobuf.Struct connections = 1;
     google.protobuf.Struct profiles = 2;
+}
+
+message CopilotRequest {
+    string terminal_buffer = 1;
+    string user_question = 2;
+    string node_info_json = 3;
+}
+
+message CopilotResponse {
+    repeated string commands = 1;
+    string guide = 2;
+    string risk_level = 3;
+    string error = 4;
 }

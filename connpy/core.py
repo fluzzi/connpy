@@ -75,6 +75,7 @@ class node:
                               
             - jumphost (str): Reference another node to be used as a jumphost
         '''
+        self.config = config
         if config == '':
             self.idletime = 0
             self.key = None
@@ -356,7 +357,7 @@ class node:
             with open(self.logfile, "w") as f:
                 f.write(self._logclean(self.mylog.getvalue().decode(), True))
 
-    async def _async_interact_loop(self, local_stream, resize_callback):
+    async def _async_interact_loop(self, local_stream, resize_callback, copilot_handler=None):
         local_stream.setup(resize_callback=resize_callback)
         try:
             child_fd = self.child.child_fd
@@ -411,11 +412,33 @@ class node:
                     data = await local_stream.read()
                     if not data:
                         break
-                    try:
-                        os.write(child_fd, data)
-                    except OSError:
-                        break
-                    self.lastinput = time()
+                    
+                    # Copilot interception
+                    if copilot_handler and b'\x00' in data:
+                        # Extract clean buffer from session log
+                        buffer = ""
+                        if hasattr(self, 'mylog'):
+                            raw = self.mylog.getvalue().decode(errors='replace')
+                            buffer = self._logclean(raw, var=True)
+                            # Pass the full buffer to the handler so the user can adjust context size interactively
+                        
+                        # Build node info from available metadata
+                        node_info = {"name": getattr(self, 'unique', 'unknown'), "host": getattr(self, 'host', 'unknown')}
+                        if isinstance(getattr(self, 'tags', None), dict):
+                            node_info["os"] = self.tags.get("os", "unknown")
+                        
+                        # Invoke copilot (async callback handles UI)
+                        await copilot_handler(buffer, node_info, local_stream, child_fd)
+                        continue
+                    
+                    # Remove any stray \x00 bytes and forward normally
+                    clean_data = data.replace(b'\x00', b'')
+                    if clean_data:
+                        try:
+                            os.write(child_fd, clean_data)
+                        except OSError:
+                            break
+                        self.lastinput = time()
                     
             async def egress_task():
                 # Continue stripping newlines from the live stream until we hit real text
@@ -505,7 +528,10 @@ class node:
                     except Exception:
                         pass
                 
-                asyncio.run(self._async_interact_loop(local_stream, resize_callback))
+                # Build local copilot handler
+                copilot_handler = self._build_local_copilot_handler()
+                
+                asyncio.run(self._async_interact_loop(local_stream, resize_callback, copilot_handler=copilot_handler))
             finally:
                 self._teardown_interact_environment()
         else:
@@ -514,6 +540,275 @@ class node:
             else:
                 printer.error(f"Connection failed: {str(connect)}")
             sys.exit(1)
+
+    def _build_local_copilot_handler(self):
+        """Build copilot handler for local CLI sessions using rich for rendering."""
+        config = getattr(self, 'config', None) if hasattr(self, 'config') else None
+        if not config:
+            return None
+        
+        # Persistent history across copilot invocations within the same session
+        from prompt_toolkit.history import InMemoryHistory
+        copilot_history = InMemoryHistory()
+        
+        async def handler(buffer, node_info, stream, child_fd):
+            import termios, tty
+            import asyncio
+            import os
+            import sys
+            
+            try:
+                # Disable LocalStream reader so it doesn't steal keystrokes from Prompt
+                loop = asyncio.get_running_loop()
+                loop.remove_reader(sys.stdin.fileno())
+                
+                # Override SIGINT so asyncio doesn't kill the event loop when we press Ctrl+C
+                import signal
+                orig_sigint = signal.getsignal(signal.SIGINT)
+                def custom_sigint(sig, frame):
+                    raise KeyboardInterrupt()
+                signal.signal(signal.SIGINT, custom_sigint)
+                
+                # 1. Salir de raw mode para poder usar input() y rich
+                stdin_fd = sys.stdin.fileno()
+                
+                # Get true original settings saved before entering raw mode
+                original_settings = getattr(stream, 'original_tty_settings', None)
+                if original_settings:
+                    import copy
+                    new_settings = copy.deepcopy(original_settings)
+                    new_settings[3] = new_settings[3] & ~termios.ECHOCTL
+                    termios.tcsetattr(stdin_fd, termios.TCSADRAIN, new_settings)
+                
+                # Remove O_NONBLOCK from stdin so Prompt.ask() works
+                import fcntl
+                flags = fcntl.fcntl(stdin_fd, fcntl.F_GETFL)
+                fcntl.fcntl(stdin_fd, fcntl.F_SETFL, flags & ~os.O_NONBLOCK)
+                
+                # Force a carriage return so the UI doesn't start mid-line
+                sys.stdout.write('\r\n')
+                sys.stdout.flush()
+                
+                from rich.console import Console
+                from rich.panel import Panel
+                from rich.markdown import Markdown
+                from rich.prompt import Prompt
+                from .printer import connpy_theme
+
+                
+                console = Console(theme=connpy_theme)
+                console.print("\n")
+                console.print(Panel(
+                    "[bold cyan]AI Terminal Copilot[/bold cyan]\n"
+                    "[dim]Type your question. Enter to send, Escape/Ctrl+C to cancel.\n"
+                    "Ctrl+\u2191/\u2193 to adjust context lines. \u2191\u2193 for question history.[/dim]",
+                    border_style="cyan"
+                ))
+                
+                # 2. Capturar pregunta del usuario
+                total_lines = len(buffer.split('\n'))
+                context_lines = [min(50, total_lines)]
+                cancelled = [False]
+                
+                from prompt_toolkit import PromptSession
+                from prompt_toolkit.key_binding import KeyBindings
+                from prompt_toolkit.formatted_text import HTML
+                
+                bindings = KeyBindings()
+                
+                @bindings.add('c-up')
+                def _(event):
+                    if context_lines[0] >= total_lines:
+                        context_lines[0] = min(50, total_lines)
+                    else:
+                        context_lines[0] = min(context_lines[0] + 50, total_lines)
+                    event.app.invalidate()
+                
+                @bindings.add('c-down')
+                def _(event):
+                    if context_lines[0] <= min(50, total_lines):
+                        context_lines[0] = total_lines
+                    else:
+                        context_lines[0] = max(context_lines[0] - 50, min(50, total_lines))
+                    event.app.invalidate()
+                
+                @bindings.add('escape')
+                def _(event):
+                    cancelled[0] = True
+                    event.app.exit(result='')
+                
+                def get_prompt_text():
+                    return HTML(f"<ansicyan>Ask [Ctx: {context_lines[0]}/{total_lines}L]: </ansicyan>")
+                
+                session = PromptSession(history=copilot_history)
+                question = await session.prompt_async(get_prompt_text, key_bindings=bindings)
+                if cancelled[0] or not question.strip():
+                    console.print("\n[dim]Copilot cancelled.[/dim]")
+                    os.write(child_fd, b'\x15\r')
+                    return
+                
+                # Slice the buffer dynamically based on selected context
+                buffer_lines = buffer.split('\n')
+                active_buffer = '\n'.join(buffer_lines[-context_lines[0]:])
+                
+                # 3. Llamar al AI con spinner
+                from .services.ai_service import AIService
+                service = AIService(config)
+                
+                past_questions = copilot_history.get_strings()
+                if len(past_questions) > 1:
+                    # Limit history to last 5 questions to save tokens, excluding current
+                    recent_history = past_questions[-6:-1]
+                    history_text = "\n".join(f"- {q}" for q in recent_history)
+                    enriched_question = f"Previous questions in this session:\n{history_text}\n\nCurrent Question:\n{question}"
+                else:
+                    enriched_question = question
+                
+                with console.status("[bold cyan]Thinking...[/bold cyan]", spinner="dots"):
+                    result = await asyncio.to_thread(service.ask_copilot, active_buffer, enriched_question, node_info)
+                
+                if result.get("error"):
+                    console.print(f"[red]Error: {result['error']}[/red]")
+                    return
+                
+                # 4. Renderizar respuesta
+                if result.get("guide"):
+                    console.print(Panel(
+                        Markdown(result["guide"]),
+                        title="[bold cyan]Copilot Guide[/bold cyan]",
+                        border_style="cyan"
+                    ))
+                
+                commands = result.get("commands", [])
+                risk = result.get("risk_level", "low")
+                risk_style = {"low": "green", "high": "yellow", "destructive": "red"}.get(risk, "green")
+                
+                if commands:
+                    cmd_text = "\n".join(f"  {i+1}. {cmd}" for i, cmd in enumerate(commands))
+                    console.print(Panel(
+                        cmd_text,
+                        title=f"[bold {risk_style}]Suggested Commands [{risk.upper()}][/bold {risk_style}]",
+                        border_style=risk_style
+                    ))
+                    
+                    # 5. Preguntar si inyectar (usando prompt_toolkit)
+                    confirm_session = PromptSession()
+                    confirm_bindings = KeyBindings()
+                    
+                    @confirm_bindings.add('escape')
+                    def _(event):
+                        event.app.exit(result='n')
+                    
+                    pt_color = "ansi" + risk_style
+                    action = await confirm_session.prompt_async(
+                        HTML(f"<{pt_color}>Send commands? (y/n/e/number/range) [n]: </{pt_color}>"),
+                        key_bindings=confirm_bindings
+                    )
+                    
+                    if not action.strip():
+                        action = "n"
+                        
+                    console.print("[dim]Returning to session...[/dim]\n")
+                    
+                    action_l = action.lower().strip()
+                    if action_l in ('y', 'yes', 'all'):
+                        os.write(child_fd, b'\x15')  # Ctrl+U to clear line
+                        await asyncio.sleep(0.1)
+                        for cmd in commands:
+                            os.write(child_fd, (cmd + "\n").encode())
+                            await asyncio.sleep(0.3)
+                    elif action_l.startswith('e'):
+                        # Edit mode
+                        edit_session = PromptSession()
+                        cmds_to_edit = []
+                        
+                        if len(action_l) > 1 and action_l[1:].isdigit():
+                            idx = int(action_l[1:]) - 1
+                            if 0 <= idx < len(commands):
+                                cmds_to_edit = [commands[idx]]
+                        else:
+                            cmds_to_edit = commands
+                            
+                        if cmds_to_edit:
+                            target_cmd = "\n".join(cmds_to_edit)
+                            try:
+                                edited_cmd = await edit_session.prompt_async(
+                                    HTML("<ansicyan>Edit commands (Alt+Enter or Esc,Enter to submit):\n</ansicyan>"),
+                                    default=target_cmd,
+                                    multiline=True
+                                )
+                                if edited_cmd.strip():
+                                    os.write(child_fd, b'\x15')
+                                    await asyncio.sleep(0.1)
+                                    for cmd in edited_cmd.split('\n'):
+                                        if cmd.strip():
+                                            os.write(child_fd, (cmd.strip() + "\n").encode())
+                                            await asyncio.sleep(0.3)
+                                else:
+                                    os.write(child_fd, b'\x15\r')
+                            except KeyboardInterrupt:
+                                os.write(child_fd, b'\x15\r')
+                        else:
+                            os.write(child_fd, b'\x15\r')
+                    elif action_l not in ('n', 'no', ''):
+                        try:
+                            selected_indices = set()
+                            for part in action_l.split(','):
+                                part = part.strip()
+                                if not part: continue
+                                if '-' in part:
+                                    start_str, end_str = part.split('-', 1)
+                                    start = int(start_str) - 1
+                                    end = int(end_str) - 1
+                                    for i in range(start, end + 1):
+                                        selected_indices.add(i)
+                                else:
+                                    selected_indices.add(int(part) - 1)
+                            
+                            valid_indices = sorted([i for i in selected_indices if 0 <= i < len(commands)])
+                            if valid_indices:
+                                os.write(child_fd, b'\x15')  # Ctrl+U to clear line
+                                await asyncio.sleep(0.1)
+                                if len(valid_indices) == 1:
+                                    os.write(child_fd, (commands[valid_indices[0]] + "\n").encode())
+                                else:
+                                    for idx in valid_indices:
+                                        os.write(child_fd, (commands[idx] + "\n").encode())
+                                        await asyncio.sleep(0.3)
+                            else:
+                                os.write(child_fd, b'\x15\r')  # Ctrl+U + Enter to abort line and get new prompt
+                        except ValueError:
+                            os.write(child_fd, b'\x15\r')
+                    else:
+                        os.write(child_fd, b'\x15\r')
+                else:
+                    console.print("[dim]Returning to session...[/dim]\n")
+                    os.write(child_fd, b'\x15\r')
+            except KeyboardInterrupt:
+                if 'console' in locals():
+                    console.print("\n[dim]Copilot cancelled via Ctrl+C.[/dim]\n")
+                else:
+                    print("\n[dim]Copilot cancelled via Ctrl+C.[/dim]\n")
+                os.write(child_fd, b'\x15\r')
+            except Exception as e:
+                import traceback
+                print(f"\n[ERROR in Copilot Handler] {e}", flush=True)
+                traceback.print_exc()
+            finally:
+                # 6. Restaurar raw mode, O_NONBLOCK y SIGINT
+                tty.setraw(stdin_fd)
+                fcntl.fcntl(stdin_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+                if 'orig_sigint' in locals():
+                    signal.signal(signal.SIGINT, orig_sigint)
+                
+                # Re-enable LocalStream reader
+                try:
+                    loop = asyncio.get_running_loop()
+                    loop.add_reader(stdin_fd, stream._read_ready)
+                except Exception:
+                    pass
+        
+        return handler
 
 
     @MethodHook

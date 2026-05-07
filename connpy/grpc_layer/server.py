@@ -749,6 +749,22 @@ class AIServicer(connpy_pb2_grpc.AIServiceServicer):
         return connpy_pb2.BoolResponse(value=res)
 
     @handle_errors
+    def ask_copilot(self, request, context):
+        import json
+        node_info = json.loads(request.node_info_json) if request.node_info_json else None
+        result = self.service.ask_copilot(
+            request.terminal_buffer,
+            request.user_question,
+            node_info
+        )
+        return connpy_pb2.CopilotResponse(
+            commands=result.get("commands", []),
+            guide=result.get("guide", ""),
+            risk_level=result.get("risk_level", "low"),
+            error=result.get("error") or ""
+        )
+
+    @handle_errors
     def list_sessions(self, request, context):
         return connpy_pb2.ValueResponse(data=to_value(self.service.list_sessions()))
 

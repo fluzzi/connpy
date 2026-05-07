@@ -1212,4 +1212,111 @@ class ai:
         }
 
     @MethodHook
+    def ask_copilot(self, terminal_buffer, user_question, node_info=None):
+        """Single-shot copilot for augmented terminal sessions.
+        
+        Args:
+            terminal_buffer: Sanitized terminal screen content (últimas N líneas).
+            user_question: Pregunta del usuario sobre la sesión activa.
+            node_info: Optional dict con metadata del nodo (os, name, etc.)
+        
+        Returns:
+            dict: {commands: list[str], guide: str, risk_level: str, error: str|None}
+        """
+        import json
+        
+        node_info = node_info or {}
+        os_info = node_info.get("os", "unknown")
+        node_name = node_info.get("name", "unknown")
+        
+        system_prompt = f"""Role: TERMINAL COPILOT. You assist a network engineer during a live SSH session.
+Rules:
+1. Answer the user's question directly based on the Terminal Context.
+2. If the user asks you to analyze, parse, or extract data from the Terminal Context, DO IT directly in the 'guide' section (you can use markdown tables or lists). Do NOT just give them a command to do it themselves.
+3. If the user wants to execute an action, provide the required CLI commands in the 'commands' array. If no commands are needed, leave it empty.
+4. ULTRA-CONCISE. Keep your guide to the point.
+5. You MUST call provide_copilot_assistance with your response.
+6. risk_level: "low" for read-only/no commands, "high" for config changes, "destructive" for potentially dangerous ops.
+
+Terminal Context:
+{terminal_buffer}
+
+Device OS: {os_info}
+Node: {node_name}"""
+
+        tools = [{
+            "type": "function",
+            "function": {
+                "name": "provide_copilot_assistance",
+                "description": "Provide terminal copilot assistance with suggested commands and a brief guide.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "commands": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Ordered list of CLI commands. Each item is one command line."
+                        },
+                        "guide": {
+                            "type": "string",
+                            "description": "Brief tactical guide in markdown. 3-4 sentences max."
+                        },
+                        "risk_level": {
+                            "type": "string",
+                            "enum": ["low", "high", "destructive"],
+                            "description": "Risk level: low=read-only, high=config change, destructive=dangerous."
+                        }
+                    },
+                    "required": ["commands", "guide", "risk_level"]
+                }
+            }
+        }]
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_question}
+        ]
+
+        try:
+            response = completion(
+                model=self.engineer_model,
+                messages=messages,
+                tools=tools,
+                tool_choice={"type": "function", "function": {"name": "provide_copilot_assistance"}},
+                api_key=self.engineer_key,
+                stream=False
+            )
+            
+            message = response.choices[0].message
+            if hasattr(message, "tool_calls") and message.tool_calls:
+                for tool_call in message.tool_calls:
+                    if tool_call.function.name == "provide_copilot_assistance":
+                        try:
+                            args = json.loads(tool_call.function.arguments)
+                            return {
+                                "commands": args.get("commands", []),
+                                "guide": args.get("guide", ""),
+                                "risk_level": args.get("risk_level", "low"),
+                                "error": None
+                            }
+                        except json.JSONDecodeError:
+                            pass
+                            
+            # Fallback if no tool called or decode error
+            return {
+                "commands": [],
+                "guide": getattr(message, "content", "") or "Could not parse response.",
+                "risk_level": "low",
+                "error": None
+            }
+            
+        except Exception as e:
+            return {
+                "commands": [],
+                "guide": "",
+                "risk_level": "low",
+                "error": str(e)
+            }
+
+    @MethodHook
     def confirm(self, user_input): return True

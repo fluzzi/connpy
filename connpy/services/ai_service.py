@@ -17,6 +17,12 @@ class AIService(BaseService):
         agent = ai(self.config, console=console)
         return agent.confirm(input_text)
 
+    def ask_copilot(self, terminal_buffer, user_question, node_info=None):
+        """Ask the AI copilot for terminal assistance."""
+        from connpy.ai import ai
+        agent = ai(self.config)
+        return agent.ask_copilot(terminal_buffer, user_question, node_info)
+
 
     def list_sessions(self):
         """Return a list of all saved AI sessions."""

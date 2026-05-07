@@ -2,7 +2,8 @@
 """Client and server classes corresponding to protobuf-defined services."""
 import grpc
 import warnings
-from . import connpy_pb2 as connpy__pb2
+
+import connpy_pb2 as connpy__pb2
 from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 
 GRPC_GENERATED_VERSION = '1.80.0'
@@ -1895,6 +1896,11 @@ class AIServiceStub(object):
                 request_serializer=connpy__pb2.StringRequest.SerializeToString,
                 response_deserializer=connpy__pb2.BoolResponse.FromString,
                 _registered_method=True)
+        self.ask_copilot = channel.unary_unary(
+                '/connpy.AIService/ask_copilot',
+                request_serializer=connpy__pb2.CopilotRequest.SerializeToString,
+                response_deserializer=connpy__pb2.CopilotResponse.FromString,
+                _registered_method=True)
         self.list_sessions = channel.unary_unary(
                 '/connpy.AIService/list_sessions',
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
@@ -1927,6 +1933,12 @@ class AIServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def confirm(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ask_copilot(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -1968,6 +1980,11 @@ def add_AIServiceServicer_to_server(servicer, server):
                     servicer.confirm,
                     request_deserializer=connpy__pb2.StringRequest.FromString,
                     response_serializer=connpy__pb2.BoolResponse.SerializeToString,
+            ),
+            'ask_copilot': grpc.unary_unary_rpc_method_handler(
+                    servicer.ask_copilot,
+                    request_deserializer=connpy__pb2.CopilotRequest.FromString,
+                    response_serializer=connpy__pb2.CopilotResponse.SerializeToString,
             ),
             'list_sessions': grpc.unary_unary_rpc_method_handler(
                     servicer.list_sessions,
@@ -2044,6 +2061,33 @@ class AIService(object):
             '/connpy.AIService/confirm',
             connpy__pb2.StringRequest.SerializeToString,
             connpy__pb2.BoolResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ask_copilot(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/connpy.AIService/ask_copilot',
+            connpy__pb2.CopilotRequest.SerializeToString,
+            connpy__pb2.CopilotResponse.FromString,
             options,
             channel_credentials,
             insecure,
