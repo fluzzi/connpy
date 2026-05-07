@@ -664,15 +664,33 @@ class node:
                 else:
                     enriched_question = question
                 
-                with console.status("[bold cyan]Thinking...[/bold cyan]", spinner="dots"):
-                    result = await asyncio.to_thread(service.ask_copilot, active_buffer, enriched_question, node_info)
+                from rich.live import Live
+                
+                live_text = "Thinking..."
+                panel = Panel(live_text, title="[bold cyan]Copilot Guide[/bold cyan]", border_style="cyan")
+                
+                def on_chunk(text):
+                    nonlocal live_text
+                    if live_text == "Thinking...":
+                        live_text = ""
+                    live_text += text
+                    try:
+                        # Use call_soon_threadsafe if possible, but rich Live is thread-safe enough
+                        loop.call_soon_threadsafe(
+                            lambda: live.update(Panel(Markdown(live_text), title="[bold cyan]Copilot Guide[/bold cyan]", border_style="cyan"))
+                        )
+                    except Exception:
+                        live.update(Panel(Markdown(live_text), title="[bold cyan]Copilot Guide[/bold cyan]", border_style="cyan"))
+                
+                with Live(panel, console=console, refresh_per_second=10) as live:
+                    result = await asyncio.to_thread(service.ask_copilot, active_buffer, enriched_question, node_info, chunk_callback=on_chunk)
                 
                 if result.get("error"):
                     console.print(f"[red]Error: {result['error']}[/red]")
                     return
                 
-                # 4. Renderizar respuesta
-                if result.get("guide"):
+                # If nothing was streamed (fallback), or to ensure final state
+                if live_text == "Thinking..." and result.get("guide"):
                     console.print(Panel(
                         Markdown(result["guide"]),
                         title="[bold cyan]Copilot Guide[/bold cyan]",

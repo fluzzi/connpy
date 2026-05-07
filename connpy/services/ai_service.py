@@ -17,11 +17,11 @@ class AIService(BaseService):
         agent = ai(self.config, console=console)
         return agent.confirm(input_text)
 
-    def ask_copilot(self, terminal_buffer, user_question, node_info=None):
+    def ask_copilot(self, terminal_buffer, user_question, node_info=None, chunk_callback=None):
         """Ask the AI copilot for terminal assistance."""
         from connpy.ai import ai
         agent = ai(self.config)
-        return agent.ask_copilot(terminal_buffer, user_question, node_info)
+        return agent.ask_copilot(terminal_buffer, user_question, node_info, chunk_callback=chunk_callback)
 
 
     def list_sessions(self):

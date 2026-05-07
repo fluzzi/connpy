@@ -1212,18 +1212,20 @@ class ai:
         }
 
     @MethodHook
-    def ask_copilot(self, terminal_buffer, user_question, node_info=None):
+    def ask_copilot(self, terminal_buffer, user_question, node_info=None, chunk_callback=None):
         """Single-shot copilot for augmented terminal sessions.
         
         Args:
             terminal_buffer: Sanitized terminal screen content (últimas N líneas).
             user_question: Pregunta del usuario sobre la sesión activa.
             node_info: Optional dict con metadata del nodo (os, name, etc.)
+            chunk_callback: Optional callable for streaming the guide.
         
         Returns:
             dict: {commands: list[str], guide: str, risk_level: str, error: str|None}
         """
         import json
+        import re
         
         node_info = node_info or {}
         os_info = node_info.get("os", "unknown")
@@ -1232,45 +1234,27 @@ class ai:
         system_prompt = f"""Role: TERMINAL COPILOT. You assist a network engineer during a live SSH session.
 Rules:
 1. Answer the user's question directly based on the Terminal Context.
-2. If the user asks you to analyze, parse, or extract data from the Terminal Context, DO IT directly in the 'guide' section (you can use markdown tables or lists). Do NOT just give them a command to do it themselves.
-3. If the user wants to execute an action, provide the required CLI commands in the 'commands' array. If no commands are needed, leave it empty.
+2. If the user asks you to analyze, parse, or extract data from the Terminal Context, DO IT directly in the <guide> section (you can use markdown tables or lists). Do NOT just give them a command to do it themselves.
+3. If the user wants to execute an action, provide the required CLI commands inside a <commands> block, one command per line. If no commands are needed, leave it empty or omit the block.
 4. ULTRA-CONCISE. Keep your guide to the point.
-5. You MUST call provide_copilot_assistance with your response.
-6. risk_level: "low" for read-only/no commands, "high" for config changes, "destructive" for potentially dangerous ops.
+5. You MUST output your response in the following strict format:
+<guide>
+Your brief tactical guide in markdown. 3-4 sentences max.
+</guide>
+<commands>
+command 1
+command 2
+</commands>
+<risk>
+low, high, or destructive
+</risk>
+6. Risk level: "low" for read-only/no commands, "high" for config changes, "destructive" for potentially dangerous ops.
 
 Terminal Context:
 {terminal_buffer}
 
 Device OS: {os_info}
 Node: {node_name}"""
-
-        tools = [{
-            "type": "function",
-            "function": {
-                "name": "provide_copilot_assistance",
-                "description": "Provide terminal copilot assistance with suggested commands and a brief guide.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "commands": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": "Ordered list of CLI commands. Each item is one command line."
-                        },
-                        "guide": {
-                            "type": "string",
-                            "description": "Brief tactical guide in markdown. 3-4 sentences max."
-                        },
-                        "risk_level": {
-                            "type": "string",
-                            "enum": ["low", "high", "destructive"],
-                            "description": "Risk level: low=read-only, high=config change, destructive=dangerous."
-                        }
-                    },
-                    "required": ["commands", "guide", "risk_level"]
-                }
-            }
-        }]
 
         messages = [
             {"role": "system", "content": system_prompt},
@@ -1281,32 +1265,66 @@ Node: {node_name}"""
             response = completion(
                 model=self.engineer_model,
                 messages=messages,
-                tools=tools,
-                tool_choice={"type": "function", "function": {"name": "provide_copilot_assistance"}},
                 api_key=self.engineer_key,
-                stream=False
+                stream=True
             )
             
-            message = response.choices[0].message
-            if hasattr(message, "tool_calls") and message.tool_calls:
-                for tool_call in message.tool_calls:
-                    if tool_call.function.name == "provide_copilot_assistance":
-                        try:
-                            args = json.loads(tool_call.function.arguments)
-                            return {
-                                "commands": args.get("commands", []),
-                                "guide": args.get("guide", ""),
-                                "risk_level": args.get("risk_level", "low"),
-                                "error": None
-                            }
-                        except json.JSONDecodeError:
-                            pass
+            full_content = ""
+            streamed_guide = ""
+            
+            for chunk in response:
+                delta = chunk.choices[0].delta
+                if hasattr(delta, 'content') and delta.content:
+                    full_content += delta.content
+                    
+                    if chunk_callback:
+                        start_idx = full_content.find("<guide>")
+                        if start_idx != -1:
+                            after_start = full_content[start_idx + 7:]
+                            end_idx = after_start.find("</guide>")
                             
-            # Fallback if no tool called or decode error
+                            if end_idx != -1:
+                                current_guide = after_start[:end_idx]
+                            else:
+                                current_guide = after_start
+                                if current_guide.endswith("<"): current_guide = current_guide[:-1]
+                                elif current_guide.endswith("</"): current_guide = current_guide[:-2]
+                                elif current_guide.endswith("</g"): current_guide = current_guide[:-3]
+                                elif current_guide.endswith("</gu"): current_guide = current_guide[:-4]
+                                elif current_guide.endswith("</gui"): current_guide = current_guide[:-5]
+                                elif current_guide.endswith("</guid"): current_guide = current_guide[:-6]
+                                elif current_guide.endswith("</guide"): current_guide = current_guide[:-7]
+                            
+                            new_text = current_guide[len(streamed_guide):]
+                            if new_text:
+                                chunk_callback(new_text)
+                                streamed_guide += new_text
+
+            guide = ""
+            commands = []
+            risk_level = "low"
+            
+            guide_match = re.search(r"<guide>(.*?)</guide>", full_content, re.DOTALL)
+            if guide_match:
+                guide = guide_match.group(1).strip()
+                
+            cmd_match = re.search(r"<commands>(.*?)</commands>", full_content, re.DOTALL)
+            if cmd_match:
+                cmds_raw = cmd_match.group(1).strip()
+                if cmds_raw:
+                    commands = [c.strip() for c in cmds_raw.split('\n') if c.strip()]
+                    
+            risk_match = re.search(r"<risk>(.*?)</risk>", full_content, re.DOTALL)
+            if risk_match:
+                risk_level = risk_match.group(1).strip().lower()
+
+            if not guide and full_content and not ("<guide>" in full_content):
+                guide = full_content.strip()
+
             return {
-                "commands": [],
-                "guide": getattr(message, "content", "") or "Could not parse response.",
-                "risk_level": "low",
+                "commands": commands,
+                "guide": guide,
+                "risk_level": risk_level,
                 "error": None
             }
             
