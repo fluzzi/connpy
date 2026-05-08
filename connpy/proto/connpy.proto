@@ -90,12 +90,22 @@ message InteractRequest {
     int32 cols = 5;
     int32 rows = 6;
     string connection_params_json = 7;
+    // Copilot fields
+    string copilot_question = 8;
+    string copilot_action = 9;
+    string copilot_context_buffer = 10;
 }
 
 message InteractResponse {
     bytes stdout_data = 1;
     bool success = 2;
     string error_message = 3;
+    // Copilot fields
+    bool copilot_prompt = 4;
+    string copilot_buffer_preview = 5;
+    string copilot_response_json = 6;
+    string copilot_node_info_json = 7;
+    string copilot_stream_chunk = 8;
 }
 
 message FilterRequest {

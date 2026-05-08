@@ -127,6 +127,7 @@ class RemoteStream:
         self.response_queue = response_queue
         self.running = True
         self._reader_queue = asyncio.Queue()
+        self.copilot_queue = asyncio.Queue()
         self.resize_callback = None
         self._loop = None
         self.t = None
@@ -143,6 +144,13 @@ class RemoteStream:
                     if req.cols > 0 and req.rows > 0:
                         if self.resize_callback:
                             self._loop.call_soon_threadsafe(self.resize_callback, req.rows, req.cols)
+                    if getattr(req, "copilot_question", ""):
+                        self._loop.call_soon_threadsafe(self.copilot_queue.put_nowait, {
+                            "question": req.copilot_question,
+                            "context_buffer": getattr(req, "copilot_context_buffer", "")
+                        })
+                    if getattr(req, "copilot_action", ""):
+                        self._loop.call_soon_threadsafe(self.copilot_queue.put_nowait, {"action": req.copilot_action})
                     if req.stdin_data:
                         self._loop.call_soon_threadsafe(self._reader_queue.put_nowait, req.stdin_data)
             except Exception:

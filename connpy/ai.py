@@ -1231,6 +1231,18 @@ class ai:
         os_info = node_info.get("os", "unknown")
         node_name = node_info.get("name", "unknown")
         
+        # Load vendor-specific command reference if available
+        vendor_reference = ""
+        if os_info and os_info != "unknown":
+            try:
+                os_filename = os_info.lower().replace(" ", "_")
+                ref_path = os.path.join(self.config.defaultdir, "ai_references", f"{os_filename}.md")
+                if os.path.exists(ref_path):
+                    with open(ref_path, "r") as f:
+                        vendor_reference = f.read().strip()
+            except Exception:
+                pass
+        
         system_prompt = f"""Role: TERMINAL COPILOT. You assist a network engineer during a live SSH session.
 Rules:
 1. Answer the user's question directly based on the Terminal Context.
@@ -1255,6 +1267,9 @@ Terminal Context:
 
 Device OS: {os_info}
 Node: {node_name}"""
+        
+        if vendor_reference:
+            system_prompt += f"\n\nVendor Command Reference:\n{vendor_reference}"
 
         messages = [
             {"role": "system", "content": system_prompt},

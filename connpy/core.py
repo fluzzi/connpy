@@ -397,7 +397,8 @@ class node:
             
             def _child_read_ready():
                 try:
-                    data = os.read(child_fd, 4096)
+                    # Increase buffer to 64KB for better high-speed handling
+                    data = os.read(child_fd, 65536)
                     if data:
                         child_reader_queue.put_nowait(data)
                     else:
@@ -422,8 +423,8 @@ class node:
                         buffer = ""
                         if hasattr(self, 'mylog'):
                             raw = self.mylog.getvalue().decode(errors='replace')
-                            buffer = self._logclean(raw, var=True)
-                            # Pass the full buffer to the handler so the user can adjust context size interactively
+                            # Move heavy log cleaning to a thread
+                            buffer = await asyncio.to_thread(self._logclean, raw, True)
                         
                         # Build node info from available metadata
                         node_info = {"name": getattr(self, 'unique', 'unknown'), "host": getattr(self, 'host', 'unknown')}
@@ -454,18 +455,41 @@ class node:
                     data = await child_reader_queue.get()
                     if not data:
                         break
-                        
-                    if skip_newlines:
-                        stripped = data.lstrip(b'\r\n')
-                        if stripped:
-                            skip_newlines = False
-                            data = stripped
-                        else:
-                            continue
-                            
-                    await local_stream.write(data)
-                    if hasattr(self, 'mylog'):
-                        self.mylog.write(data)
+                    
+                    # Batching Optimization: Drain the queue to batch writes during high-volume bursts
+                    # Helps the terminal parse ANSI faster and reduces syscalls.
+                    chunks = [data]
+                    while not child_reader_queue.empty():
+                        try:
+                            extra = child_reader_queue.get_nowait()
+                            if not extra:
+                                chunks.append(b'') # Re-put EOF later or handle it
+                                break
+                            chunks.append(extra)
+                        except asyncio.QueueEmpty:
+                            break
+                    
+                    has_eof = chunks[-1] == b''
+                    if has_eof:
+                        chunks.pop()
+                    
+                    if chunks:
+                        combined_data = b''.join(chunks)
+                        if skip_newlines:
+                            stripped = combined_data.lstrip(b'\r\n')
+                            if stripped:
+                                skip_newlines = False
+                                combined_data = stripped
+                            else:
+                                if has_eof: break
+                                continue
+                                
+                        await local_stream.write(combined_data)
+                        if hasattr(self, 'mylog'):
+                            self.mylog.write(combined_data)
+                    
+                    if has_eof:
+                        break
                         
             async def keepalive_task():
                 while True:
@@ -484,16 +508,17 @@ class node:
                     current_size = self.mylog.tell()
                     if current_size != prev_size:
                         try:
+                            # Move heavy log cleaning to a thread to avoid freezing the interaction loop
+                            raw_log = self.mylog.getvalue().decode(errors='replace')
+                            cleaned_log = await asyncio.to_thread(self._logclean, raw_log, True)
                             with open(self.logfile, "w") as f:
-                                f.write(self._logclean(self.mylog.getvalue().decode(), True))
+                                f.write(cleaned_log)
                             prev_size = current_size
                         except Exception:
                             pass
 
             try:
-                # gather runs until any task completes (or we just let them run until EOF breaks them)
-                # Ingress breaks on user EOF. Egress breaks on child EOF. 
-                # We want to exit if either happens, so return_exceptions=False, but we need to cancel the others.
+                # We wait for either the user (ingress) or the child (egress) to finish
                 tasks = [
                     asyncio.create_task(ingress_task()),
                     asyncio.create_task(egress_task())
@@ -502,9 +527,34 @@ class node:
                     tasks.append(asyncio.create_task(keepalive_task()))
                 if hasattr(self, 'logfile') and hasattr(self, 'mylog'):
                     tasks.append(asyncio.create_task(savelog_task()))
-                done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-                for p in pending:
-                    p.cancel()
+                
+                done, pending = await asyncio.wait(
+                    [tasks[0], tasks[1]], 
+                    return_when=asyncio.FIRST_COMPLETED
+                )
+                
+                # If ingress finished first (user quit), give egress a small window to catch up 
+                # on the remaining output in the queue.
+                if tasks[0] in done and tasks[1] not in done:
+                    try:
+                        await asyncio.wait_for(tasks[1], timeout=0.2)
+                    except (asyncio.TimeoutError, asyncio.CancelledError):
+                        pass
+                
+                for t in tasks:
+                    if t not in done:
+                        t.cancel()
+                    
+                # Final log sync on thread to avoid losing last lines
+                if hasattr(self, 'logfile') and hasattr(self, 'mylog'):
+                    try:
+                        raw_log = self.mylog.getvalue().decode(errors='replace')
+                        cleaned_log = await asyncio.to_thread(self._logclean, raw_log, True)
+                        with open(self.logfile, "w") as f:
+                            f.write(cleaned_log)
+                    except Exception:
+                        pass
+
             finally:
                 loop.remove_reader(child_fd)
                 try:
@@ -651,9 +701,9 @@ class node:
                                 if cmd_text:
                                     blocks.append((cmd_byte_positions[i], preview[:80]))
                     
-                    # Add synthetic "current prompt" block (zero context)
-                    last_line = buffer.split('\n')[-1].strip() if buffer.strip() else "(prompt)"
-                    blocks.append((len(raw_bytes), last_line[:80]))
+                # Add synthetic "current prompt" block (zero context)
+                last_line = buffer.split('\n')[-1].strip() if buffer.strip() else "(prompt)"
+                blocks.append((len(raw_bytes), last_line[:80]))
                         
                 context_cmd = [1]
                 total_cmds = len(blocks)
@@ -744,12 +794,12 @@ class node:
                     bottom_toolbar=get_toolbar
                 )
                 
-                if cancelled[0] or not question.strip():
+                if cancelled[0] or not question.strip() or question.strip() == "CANCEL":
                     console.print("\n[dim]Copilot cancelled.[/dim]")
                     os.write(child_fd, b'\x15\r')
                     return
                         
-                    active_buffer = get_active_buffer()
+                active_buffer = get_active_buffer()
                 
                 # 3. Llamar al AI con spinner
                 from .services.ai_service import AIService

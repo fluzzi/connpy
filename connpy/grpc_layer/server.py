@@ -55,8 +55,13 @@ def handle_errors(func):
         return wrapper
 
 class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
-    def __init__(self, config):
+    def __init__(self, config, debug=False):
         self.service = NodeService(config)
+        self.server_debug = debug
+        if debug:
+            from rich.console import Console
+            from ..printer import connpy_theme, get_original_stdout
+            self.server_console = Console(theme=connpy_theme, file=get_original_stdout())
 
     @handle_errors
     def interact_node(self, request_iterator, context):
@@ -79,8 +84,8 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
         sftp = first_req.sftp
         debug = first_req.debug
         
-        if debug:
-            printer.console.print(f"[debug][DEBUG][/debug] gRPC interact_node request for: [bold cyan]{unique_id}[/bold cyan]")
+        if self.server_debug:
+            self.server_console.print(f"[debug][DEBUG][/debug] gRPC interact_node request for: [bold cyan]{unique_id}[/bold cyan]")
 
         if first_req.connection_params_json:
             import json
@@ -198,7 +203,107 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
                     except Exception:
                         pass
 
-                asyncio.run(n._async_interact_loop(remote_stream, resize_callback))
+                async def remote_copilot_handler(buffer, node_info, stream, child_fd, cmd_byte_positions=None):
+                    import json
+                    import asyncio
+                    import os
+
+                    node_info_json = json.dumps(node_info) if node_info else ""
+                    # 1. Send prompt to client
+                    response_queue.put(connpy_pb2.InteractResponse(
+                        copilot_prompt=True,
+                        copilot_buffer_preview=buffer[-200:],
+                        copilot_node_info_json=node_info_json
+                    ))
+
+                    # 2. Await the question from client via the copilot_queue
+                    try:
+                        req_data = await asyncio.wait_for(remote_stream.copilot_queue.get(), timeout=120)
+                        if "question" not in req_data or not req_data["question"] or req_data["question"] == "CANCEL":
+                            os.write(child_fd, b'\x15\r')
+                            return
+                        question = req_data["question"]
+                        context_buffer = req_data.get("context_buffer", "")
+                        if not context_buffer:
+                            context_buffer = buffer
+                    except asyncio.TimeoutError:
+                        os.write(child_fd, b'\x15\r')
+                        return
+                        
+                    # 3. Call AI Service with streaming
+                    from ..services.ai_service import AIService
+                    service = AIService(self.service.config)
+                    
+                    def chunk_callback(chunk_text):
+                        if chunk_text:
+                            response_queue.put(connpy_pb2.InteractResponse(
+                                copilot_stream_chunk=chunk_text
+                            ))
+                            
+                    result = await asyncio.to_thread(service.ask_copilot, context_buffer, question, node_info, chunk_callback=chunk_callback)
+                    
+                    # 4. Send response back to client
+                    response_queue.put(connpy_pb2.InteractResponse(
+                        copilot_response_json=json.dumps(result)
+                    ))
+                    
+                    # 5. Wait for user action
+                    try:
+                        action_data = await asyncio.wait_for(remote_stream.copilot_queue.get(), timeout=60)
+                        if "action" not in action_data or not action_data["action"]:
+                            return
+                        action = action_data["action"]
+                    except asyncio.TimeoutError:
+                        return
+                        
+                    if action == "send_all":
+                        commands = result.get("commands", [])
+                        os.write(child_fd, b'\x15') # Ctrl+U to clear line
+                        await asyncio.sleep(0.1)
+                        for cmd in commands:
+                            os.write(child_fd, (cmd + "\n").encode())
+                            await asyncio.sleep(0.3)
+                    elif action.startswith("custom:"):
+                        custom_cmds = action[7:]
+                        os.write(child_fd, b'\x15')
+                        await asyncio.sleep(0.1)
+                        for cmd in custom_cmds.split('\n'):
+                            if cmd.strip():
+                                os.write(child_fd, (cmd.strip() + "\n").encode())
+                                await asyncio.sleep(0.3)
+                    elif action not in ('cancel', 'n', 'no'):
+                        # Handle numbers and ranges like "1,2,4-6"
+                        try:
+                            commands = result.get("commands", [])
+                            selected_indices = set()
+                            for part in action.split(','):
+                                part = part.strip()
+                                if not part: continue
+                                if '-' in part:
+                                    start_str, end_str = part.split('-', 1)
+                                    start = int(start_str) - 1
+                                    end = int(end_str) - 1
+                                    for i in range(start, end + 1):
+                                        selected_indices.add(i)
+                                else:
+                                    selected_indices.add(int(part) - 1)
+                            
+                            valid_indices = sorted([i for i in selected_indices if 0 <= i < len(commands)])
+                            if valid_indices:
+                                os.write(child_fd, b'\x15')
+                                await asyncio.sleep(0.1)
+                                for idx in valid_indices:
+                                    os.write(child_fd, (commands[idx] + "\n").encode())
+                                    await asyncio.sleep(0.3)
+                            else:
+                                os.write(child_fd, b'\x15\r')
+                        except (ValueError, IndexError):
+                            os.write(child_fd, b'\x15\r')
+                    else:
+                        # Cancelled or invalid action
+                        os.write(child_fd, b'\x15\r')
+
+                asyncio.run(n._async_interact_loop(remote_stream, resize_callback, copilot_handler=remote_copilot_handler))
             except Exception as e:
                 pass
             finally:
@@ -207,14 +312,19 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
 
         t_loop = threading.Thread(target=run_async_loop, daemon=True)
         t_loop.start()
+        def response_generator():
+            while True:
+                data = response_queue.get()
+                if data is None:
+                    if self.server_debug:
+                        self.server_console.print(f"[debug][DEBUG][/debug] gRPC interact_node session closed for: [bold cyan]{unique_id}[/bold cyan]")
+                    break
+                if isinstance(data, connpy_pb2.InteractResponse):
+                    yield data
+                else:
+                    yield connpy_pb2.InteractResponse(stdout_data=data)
+        yield from response_generator()
 
-        while True:
-            data = response_queue.get()
-            if data is None:
-                if debug:
-                    printer.console.print(f"[debug][DEBUG][/debug] gRPC interact_node session closed for: [bold cyan]{unique_id}[/bold cyan]")
-                break
-            yield connpy_pb2.InteractResponse(stdout_data=data)
     @handle_errors
     def list_nodes(self, request, context):
         f = request.filter_str if request.filter_str else None
@@ -837,7 +947,7 @@ def serve(config, port=8048, debug=False):
     interceptors = [LoggingInterceptor()] if debug else []
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10), interceptors=interceptors)
     
-    connpy_pb2_grpc.add_NodeServiceServicer_to_server(NodeServicer(config), server)
+    connpy_pb2_grpc.add_NodeServiceServicer_to_server(NodeServicer(config, debug=debug), server)
     connpy_pb2_grpc.add_ProfileServiceServicer_to_server(ProfileServicer(config), server)
     connpy_pb2_grpc.add_ConfigServiceServicer_to_server(ConfigServicer(config), server)
     plugin_servicer = PluginServicer(config)
