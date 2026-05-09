@@ -106,6 +106,7 @@ message InteractResponse {
     string copilot_response_json = 6;
     string copilot_node_info_json = 7;
     string copilot_stream_chunk = 8;
+    string copilot_injected_command = 9;
 }
 
 message FilterRequest {

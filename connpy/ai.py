@@ -1352,4 +1352,150 @@ Node: {node_name}"""
             }
 
     @MethodHook
+    async def aask_copilot(self, terminal_buffer, user_question, node_info=None, chunk_callback=None):
+        import json
+        import re
+        from litellm import acompletion
+        import asyncio
+        import warnings
+        
+        # Suppress unawaited coroutine warnings from LiteLLM's internal streaming logic during sudden cancellation
+        warnings.filterwarnings("ignore", message="coroutine '.*async_streaming.*' was never awaited", category=RuntimeWarning)
+        
+        node_info = node_info or {}
+        os_info = node_info.get("os", "unknown")
+        node_name = node_info.get("name", "unknown")
+        
+        vendor_reference = ""
+        if os_info and os_info != "unknown":
+            try:
+                os_filename = os_info.lower().replace(" ", "_")
+                ref_path = os.path.join(self.config.defaultdir, "ai_references", f"{os_filename}.md")
+                if os.path.exists(ref_path):
+                    with open(ref_path, "r") as f:
+                        vendor_reference = f.read().strip()
+            except Exception:
+                pass
+        
+        system_prompt = f"""Role: TERMINAL COPILOT. You assist a network engineer during a live SSH session.
+Rules:
+1. Answer the user's question directly based on the Terminal Context.
+2. If the user asks you to analyze, parse, or extract data from the Terminal Context, DO IT directly in the <guide> section (you can use markdown tables or lists). Do NOT just give them a command to do it themselves.
+3. If the user wants to execute an action, provide the required CLI commands inside a <commands> block, one command per line. If no commands are needed, leave it empty or omit the block.
+4. ULTRA-CONCISE. Keep your guide to the point.
+5. You MUST output your response in the following strict format:
+<guide>
+Your brief tactical guide in markdown. 3-4 sentences max.
+</guide>
+<commands>
+command 1
+command 2
+</commands>
+<risk>
+low, high, or destructive
+</risk>
+6. Risk level: "low" for read-only/no commands, "high" for config changes, "destructive" for potentially dangerous ops.
+
+Terminal Context:
+{terminal_buffer}
+
+Device OS: {os_info}
+Node: {node_name}"""
+        
+        if vendor_reference:
+            system_prompt += f"\n\nVendor Command Reference:\n{vendor_reference}"
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_question}
+        ]
+
+        try:
+            response = await acompletion(
+                model=self.engineer_model,
+                messages=messages,
+                api_key=self.engineer_key,
+                stream=True
+            )
+            
+            full_content = ""
+            streamed_guide = ""
+            
+            async for chunk in response:
+                delta = chunk.choices[0].delta
+                if hasattr(delta, 'content') and delta.content:
+                    full_content += delta.content
+                    
+                    if chunk_callback:
+                        start_idx = full_content.find("<guide>")
+                        if start_idx != -1:
+                            after_start = full_content[start_idx + 7:]
+                            end_idx = after_start.find("</guide>")
+                            
+                            if end_idx != -1:
+                                current_guide = after_start[:end_idx]
+                            else:
+                                current_guide = after_start
+                                if current_guide.endswith("<"): current_guide = current_guide[:-1]
+                                elif current_guide.endswith("</"): current_guide = current_guide[:-2]
+                                elif current_guide.endswith("</g"): current_guide = current_guide[:-3]
+                                elif current_guide.endswith("</gu"): current_guide = current_guide[:-4]
+                                elif current_guide.endswith("</gui"): current_guide = current_guide[:-5]
+                                elif current_guide.endswith("</guid"): current_guide = current_guide[:-6]
+                                elif current_guide.endswith("</guide"): current_guide = current_guide[:-7]
+                            
+                            new_text = current_guide[len(streamed_guide):]
+                            if new_text:
+                                chunk_callback(new_text)
+                                streamed_guide += new_text
+
+            guide = ""
+            commands = []
+            risk_level = "low"
+            
+            guide_match = re.search(r"<guide>(.*?)</guide>", full_content, re.DOTALL)
+            if guide_match:
+                guide = guide_match.group(1).strip()
+                
+            cmd_match = re.search(r"<commands>(.*?)</commands>", full_content, re.DOTALL)
+            if cmd_match:
+                cmds_raw = cmd_match.group(1).strip()
+                if cmds_raw:
+                    commands = [c.strip() for c in cmds_raw.split('\n') if c.strip()]
+                    
+            risk_match = re.search(r"<risk>(.*?)</risk>", full_content, re.DOTALL)
+            if risk_match:
+                risk_level = risk_match.group(1).strip().lower()
+
+            if not guide and full_content and not ("<guide>" in full_content):
+                guide = full_content.strip()
+
+            return {
+                "commands": commands,
+                "guide": guide,
+                "risk_level": risk_level,
+                "error": None
+            }
+            
+        except asyncio.CancelledError:
+            # Client cancelled the request via gRPC or local interrupt
+            if 'response' in locals():
+                try:
+                    if hasattr(response, 'aclose'):
+                        # Fire and forget the close to avoid blocking the cancel
+                        asyncio.create_task(response.aclose())
+                    elif hasattr(response, 'close'):
+                        response.close()
+                except Exception:
+                    pass
+            return None
+        except Exception as e:
+            return {
+                "commands": [],
+                "guide": "",
+                "risk_level": "low",
+                "error": str(e)
+            }
+
+    @MethodHook
     def confirm(self, user_input): return True

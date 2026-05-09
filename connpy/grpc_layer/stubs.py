@@ -53,7 +53,7 @@ class NodeStub:
         
         request_queue = queue.Queue()
         client_buffer_bytes = bytearray()
-        cmd_byte_positions = [0]
+        cmd_byte_positions = [(0, None)]
         pause_stdin = [False]
         wake_r, wake_w = os.pipe()
 
@@ -101,7 +101,7 @@ class NodeStub:
                         if not data:
                             break
                         if b'\r' in data or b'\n' in data:
-                            cmd_byte_positions.append(len(client_buffer_bytes))
+                            cmd_byte_positions.append((len(client_buffer_bytes), None))
                         yield connpy_pb2.InteractRequest(stdin_data=data)
                     except OSError:
                         break
@@ -123,9 +123,26 @@ class NodeStub:
             tty.setraw(sys.stdin.fileno())
             response_iterator = self.stub.interact_node(request_generator())
             
+            import queue
+            response_queue = queue.Queue()
+            
+            def response_consumer():
+                try:
+                    for r in response_iterator:
+                        response_queue.put(r)
+                except Exception:
+                    pass
+                response_queue.put(None)
+                
+            t_consumer = threading.Thread(target=response_consumer, daemon=True)
+            t_consumer.start()
+            
             # First phase: Wait for connection status, print early data
             try:
-                for res in response_iterator:
+                while True:
+                    res = response_queue.get()
+                    if res is None:
+                        return
                     if res.stdout_data:
                         data = res.stdout_data
                         if debug:
@@ -145,13 +162,16 @@ class NodeStub:
                         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
                         printer.error(f"Connection failed: {res.error_message}")
                         return
-            except StopIteration:
+            except queue.Empty:
                 return
             
             # Second phase: Stream active session
             # Clear screen filter is only applied before success (Phase 1).
             # Once the user has a prompt, Ctrl+L must work normally.
-            for res in response_iterator:
+            while True:
+                res = response_queue.get()
+                if res is None:
+                    break
                 if res.copilot_prompt:
                     pause_generator()
                     import json
@@ -165,6 +185,7 @@ class NodeStub:
                     from prompt_toolkit.formatted_text import HTML
                     from prompt_toolkit.history import InMemoryHistory
                     from ..printer import connpy_theme
+                    from ..core import copilot_terminal_mode
                     
                     if not hasattr(self, 'copilot_history'):
                         self.copilot_history = InMemoryHistory()
@@ -200,17 +221,30 @@ class NodeStub:
                             prompt_re = re.compile(re.sub(r'(?<!\\)\$', '', default_prompt))
                             
                         for i in range(1, len(cmd_byte_positions)):
-                            chunk = raw_bytes[cmd_byte_positions[i-1]:cmd_byte_positions[i]]
-                            cleaned = dummy_node._logclean(chunk.decode(errors='replace'), var=True)
-                            lines = [l for l in cleaned.split('\n') if l.strip()]
-                            preview = lines[-1].strip() if lines else ""
+                            pos, known_cmd = cmd_byte_positions[i]
+                            prev_pos = cmd_byte_positions[i-1][0]
                             
-                            if preview:
-                                match = prompt_re.search(preview)
-                                if match:
-                                    cmd_text = preview[match.end():].strip()
-                                    if cmd_text:
-                                        blocks.append((cmd_byte_positions[i], preview[:80]))
+                            if known_cmd:
+                                # AI-injected command: we already know the command text
+                                prev_chunk = raw_bytes[prev_pos:pos]
+                                prev_cleaned = dummy_node._logclean(prev_chunk.decode(errors='replace'), var=True)
+                                prev_lines = [l for l in prev_cleaned.split('\n') if l.strip()]
+                                prompt_text = prev_lines[-1].strip() if prev_lines else ""
+                                preview = f"{prompt_text}{known_cmd}" if prompt_text else known_cmd
+                                blocks.append((pos, preview[:80]))
+                            else:
+                                # User-typed command: derive from raw log chunk
+                                chunk = raw_bytes[prev_pos:pos]
+                                cleaned = dummy_node._logclean(chunk.decode(errors='replace'), var=True)
+                                lines = [l for l in cleaned.split('\n') if l.strip()]
+                                preview = lines[-1].strip() if lines else ""
+                                
+                                if preview:
+                                    match = prompt_re.search(preview)
+                                    if match:
+                                        cmd_text = preview[match.end():].strip()
+                                        if cmd_text:
+                                            blocks.append((pos, preview[:80]))
                         
                     clean_buffer = dummy_node._logclean(raw_bytes.decode(errors='replace'), var=True)
                     last_line = clean_buffer.split('\n')[-1].strip() if clean_buffer.strip() else "(prompt)"
@@ -303,19 +337,11 @@ class NodeStub:
                     except KeyboardInterrupt:
                         question = ""
 
-                    # Switch back to raw mode immediately so Ctrl+C during streaming doesn't break gRPC
-                    tty.setraw(sys.stdin.fileno())
-                    
-                    # IMPORTANT: Enable OPOST so rich.Live renders correctly (translates \n to \r\n).
-                    # Without this, the UI repeats the panel multiple times in raw mode.
-                    mode = termios.tcgetattr(sys.stdin.fileno())
-                    mode[1] = mode[1] | termios.OPOST
-                    termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, mode)
-
                     if not question or not question.strip() or question.strip() == "CANCEL":
                         console.print("\n[dim]Copilot cancelled.[/dim]")
                         request_queue.put(connpy_pb2.InteractRequest(copilot_question="CANCEL"))
                         resume_generator()
+                        tty.setraw(sys.stdin.fileno())
                         continue
 
                     active_buffer = get_active_buffer()
@@ -327,9 +353,30 @@ class NodeStub:
                     result = {}
                     cancelled = False
                     
-                    try:
-                        with Live(panel, console=console, refresh_per_second=10) as live:
-                            for chunk_res in response_iterator:
+                    with copilot_terminal_mode(), Live(panel, console=console, refresh_per_second=10) as live:
+                        # Make stdin non-blocking to check for Ctrl+C locally
+                        import fcntl
+                        flags = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
+                        fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, flags | os.O_NONBLOCK)
+                        
+                        while True:
+                            # 1. Read input for Ctrl+C
+                            try:
+                                key = os.read(sys.stdin.fileno(), 1024)
+                                if b'\x03' in key:
+                                    cancelled = True
+                                    request_queue.put(connpy_pb2.InteractRequest(copilot_question="CANCEL"))
+                                    console.print("\n[dim]Copilot cancelled via Ctrl+C. Disconnecting...[/dim]")
+                                    break
+                            except OSError:
+                                pass
+                                
+                            # 2. Wait for response chunk
+                            try:
+                                chunk_res = response_queue.get(timeout=0.1)
+                                if chunk_res is None:
+                                    break
+                                    
                                 if chunk_res.copilot_stream_chunk:
                                     if live_text == "Thinking...": live_text = ""
                                     live_text += chunk_res.copilot_stream_chunk
@@ -337,13 +384,16 @@ class NodeStub:
                                 elif chunk_res.copilot_response_json:
                                     result = json.loads(chunk_res.copilot_response_json)
                                     break
-                    except KeyboardInterrupt:
-                        cancelled = True
-                        console.print("\n[dim]Copilot cancelled via Ctrl+C. Disconnecting...[/dim]")
-                        break
+                            except queue.Empty:
+                                continue
+                                
+                        # Restore blocking mode
+                        fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, flags)
 
                     if cancelled:
-                        break
+                        resume_generator()
+                        tty.setraw(sys.stdin.fileno())
+                        continue
                         
                     if result.get("error"):
                         console.print(f"[red]Error: {result['error']}[/red]")
@@ -424,6 +474,9 @@ class NodeStub:
                     tty.setraw(sys.stdin.fileno())
                     continue
 
+                if res.copilot_injected_command:
+                    cmd_byte_positions.append((len(client_buffer_bytes), res.copilot_injected_command))
+
                 if res.stdout_data:
                     os.write(sys.stdout.fileno(), res.stdout_data)
                     client_buffer_bytes.extend(res.stdout_data)
@@ -445,7 +498,7 @@ class NodeStub:
         params_json = json.dumps(connection_params)
         request_queue = queue.Queue()
         client_buffer_bytes = bytearray()
-        cmd_byte_positions = [0]
+        cmd_byte_positions = [(0, None)]
         pause_stdin = [False]
         wake_r, wake_w = os.pipe()
 
@@ -494,7 +547,7 @@ class NodeStub:
                         if not data:
                             break
                         if b'\r' in data or b'\n' in data:
-                            cmd_byte_positions.append(len(client_buffer_bytes))
+                            cmd_byte_positions.append((len(client_buffer_bytes), None))
                         yield connpy_pb2.InteractRequest(stdin_data=data)
                     except OSError:
                         break
@@ -517,9 +570,26 @@ class NodeStub:
             tty.setraw(sys.stdin.fileno())
             response_iterator = self.stub.interact_node(request_generator())
             
+            import queue
+            response_queue = queue.Queue()
+            
+            def response_consumer():
+                try:
+                    for r in response_iterator:
+                        response_queue.put(r)
+                except Exception:
+                    pass
+                response_queue.put(None)
+                
+            t_consumer = threading.Thread(target=response_consumer, daemon=True)
+            t_consumer.start()
+            
             # First phase: Wait for connection status, print early data
             try:
-                for res in response_iterator:
+                while True:
+                    res = response_queue.get()
+                    if res is None:
+                        return
                     if res.stdout_data:
                         data = res.stdout_data
                         if debug:
@@ -539,13 +609,14 @@ class NodeStub:
                         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
                         printer.error(f"Connection failed: {res.error_message}")
                         return
-            except StopIteration:
+            except queue.Empty:
                 return
                 
             # Second phase: Stream active session
-            # Clear screen filter is only applied before success (Phase 1).
-            # Once the user has a prompt, Ctrl+L must work normally.
-            for res in response_iterator:
+            while True:
+                res = response_queue.get()
+                if res is None:
+                    break
                 if res.copilot_prompt:
                     pause_generator()
                     import json
@@ -559,6 +630,7 @@ class NodeStub:
                     from prompt_toolkit.formatted_text import HTML
                     from prompt_toolkit.history import InMemoryHistory
                     from ..printer import connpy_theme
+                    from ..core import copilot_terminal_mode
                     
                     if not hasattr(self, 'copilot_history'):
                         self.copilot_history = InMemoryHistory()
@@ -594,17 +666,30 @@ class NodeStub:
                             prompt_re = re.compile(re.sub(r'(?<!\\)\$', '', default_prompt))
                             
                         for i in range(1, len(cmd_byte_positions)):
-                            chunk = raw_bytes[cmd_byte_positions[i-1]:cmd_byte_positions[i]]
-                            cleaned = dummy_node._logclean(chunk.decode(errors='replace'), var=True)
-                            lines = [l for l in cleaned.split('\n') if l.strip()]
-                            preview = lines[-1].strip() if lines else ""
+                            pos, known_cmd = cmd_byte_positions[i]
+                            prev_pos = cmd_byte_positions[i-1][0]
                             
-                            if preview:
-                                match = prompt_re.search(preview)
-                                if match:
-                                    cmd_text = preview[match.end():].strip()
-                                    if cmd_text:
-                                        blocks.append((cmd_byte_positions[i], preview[:80]))
+                            if known_cmd:
+                                # AI-injected command: we already know the command text
+                                prev_chunk = raw_bytes[prev_pos:pos]
+                                prev_cleaned = dummy_node._logclean(prev_chunk.decode(errors='replace'), var=True)
+                                prev_lines = [l for l in prev_cleaned.split('\n') if l.strip()]
+                                prompt_text = prev_lines[-1].strip() if prev_lines else ""
+                                preview = f"{prompt_text}{known_cmd}" if prompt_text else known_cmd
+                                blocks.append((pos, preview[:80]))
+                            else:
+                                # User-typed command: derive from raw log chunk
+                                chunk = raw_bytes[prev_pos:pos]
+                                cleaned = dummy_node._logclean(chunk.decode(errors='replace'), var=True)
+                                lines = [l for l in cleaned.split('\n') if l.strip()]
+                                preview = lines[-1].strip() if lines else ""
+                                
+                                if preview:
+                                    match = prompt_re.search(preview)
+                                    if match:
+                                        cmd_text = preview[match.end():].strip()
+                                        if cmd_text:
+                                            blocks.append((pos, preview[:80]))
                         
                     clean_buffer = dummy_node._logclean(raw_bytes.decode(errors='replace'), var=True)
                     last_line = clean_buffer.split('\n')[-1].strip() if clean_buffer.strip() else "(prompt)"
@@ -697,19 +782,11 @@ class NodeStub:
                     except KeyboardInterrupt:
                         question = ""
 
-                    # Switch back to raw mode immediately so Ctrl+C during streaming doesn't break gRPC
-                    tty.setraw(sys.stdin.fileno())
-                    
-                    # IMPORTANT: Enable OPOST so rich.Live renders correctly (translates \n to \r\n).
-                    # Without this, the UI repeats the panel multiple times in raw mode.
-                    mode = termios.tcgetattr(sys.stdin.fileno())
-                    mode[1] = mode[1] | termios.OPOST
-                    termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, mode)
-
                     if not question or not question.strip() or question.strip() == "CANCEL":
                         console.print("\n[dim]Copilot cancelled.[/dim]")
                         request_queue.put(connpy_pb2.InteractRequest(copilot_question="CANCEL"))
                         resume_generator()
+                        tty.setraw(sys.stdin.fileno())
                         continue
 
                     active_buffer = get_active_buffer()
@@ -721,9 +798,27 @@ class NodeStub:
                     result = {}
                     cancelled = False
                     
-                    try:
-                        with Live(panel, console=console, refresh_per_second=10) as live:
-                            for chunk_res in response_iterator:
+                    with copilot_terminal_mode(), Live(panel, console=console, refresh_per_second=10) as live:
+                        import fcntl
+                        flags = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
+                        fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, flags | os.O_NONBLOCK)
+                        
+                        while True:
+                            try:
+                                key = os.read(sys.stdin.fileno(), 1024)
+                                if b'\x03' in key:
+                                    cancelled = True
+                                    request_queue.put(connpy_pb2.InteractRequest(copilot_question="CANCEL"))
+                                    console.print("\n[dim]Copilot cancelled via Ctrl+C. Disconnecting...[/dim]")
+                                    break
+                            except OSError:
+                                pass
+                                
+                            try:
+                                chunk_res = response_queue.get(timeout=0.1)
+                                if chunk_res is None:
+                                    break
+                                    
                                 if chunk_res.copilot_stream_chunk:
                                     if live_text == "Thinking...": live_text = ""
                                     live_text += chunk_res.copilot_stream_chunk
@@ -731,13 +826,15 @@ class NodeStub:
                                 elif chunk_res.copilot_response_json:
                                     result = json.loads(chunk_res.copilot_response_json)
                                     break
-                    except KeyboardInterrupt:
-                        cancelled = True
-                        console.print("\n[dim]Copilot cancelled via Ctrl+C. Disconnecting...[/dim]")
-                        break
+                            except queue.Empty:
+                                continue
+                                
+                        fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, flags)
 
                     if cancelled:
-                        break
+                        resume_generator()
+                        tty.setraw(sys.stdin.fileno())
+                        continue
                         
                     if result.get("error"):
                         console.print(f"[red]Error: {result['error']}[/red]")
@@ -817,6 +914,9 @@ class NodeStub:
                     resume_generator()
                     tty.setraw(sys.stdin.fileno())
                     continue
+
+                if res.copilot_injected_command:
+                    cmd_byte_positions.append((len(client_buffer_bytes), res.copilot_injected_command))
 
                 if res.stdout_data:
                     os.write(sys.stdout.fileno(), res.stdout_data)

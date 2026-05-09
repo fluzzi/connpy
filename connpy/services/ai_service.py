@@ -23,6 +23,12 @@ class AIService(BaseService):
         agent = ai(self.config)
         return agent.ask_copilot(terminal_buffer, user_question, node_info, chunk_callback=chunk_callback)
 
+    async def aask_copilot(self, terminal_buffer, user_question, node_info=None, chunk_callback=None):
+        """Ask the AI copilot for terminal assistance asynchronously."""
+        from connpy.ai import ai
+        agent = ai(self.config)
+        return await agent.aask_copilot(terminal_buffer, user_question, node_info, chunk_callback=chunk_callback)
+
 
     def list_sessions(self):
         """Return a list of all saved AI sessions."""

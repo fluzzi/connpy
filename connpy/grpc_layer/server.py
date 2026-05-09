@@ -217,6 +217,14 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
                     ))
 
                     # 2. Await the question from client via the copilot_queue
+                    import threading
+                    def preload_ai_deps():
+                        try:
+                            import litellm
+                        except Exception:
+                            pass
+                    threading.Thread(target=preload_ai_deps, daemon=True).start()
+                    
                     try:
                         req_data = await asyncio.wait_for(remote_stream.copilot_queue.get(), timeout=120)
                         if "question" not in req_data or not req_data["question"] or req_data["question"] == "CANCEL":
@@ -240,7 +248,27 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
                                 copilot_stream_chunk=chunk_text
                             ))
                             
-                    result = await asyncio.to_thread(service.ask_copilot, context_buffer, question, node_info, chunk_callback=chunk_callback)
+                    ai_task = asyncio.create_task(service.aask_copilot(context_buffer, question, node_info, chunk_callback=chunk_callback))
+                    wait_action_task = asyncio.create_task(remote_stream.copilot_queue.get())
+                    
+                    done, pending = await asyncio.wait(
+                        [ai_task, wait_action_task],
+                        return_when=asyncio.FIRST_COMPLETED
+                    )
+                    
+                    if wait_action_task in done:
+                        req_data = wait_action_task.result()
+                        ai_task.cancel()
+                        if req_data.get("question") == "CANCEL" or req_data.get("action") == "cancel":
+                            os.write(child_fd, b'\x15\r')
+                            return
+                        return
+                    else:
+                        wait_action_task.cancel()
+                        result = ai_task.result()
+                        if not result:
+                            os.write(child_fd, b'\x15\r')
+                            return
                     
                     # 4. Send response back to client
                     response_queue.put(connpy_pb2.InteractResponse(
@@ -250,10 +278,12 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
                     # 5. Wait for user action
                     try:
                         action_data = await asyncio.wait_for(remote_stream.copilot_queue.get(), timeout=60)
-                        if "action" not in action_data or not action_data["action"]:
+                        if "action" not in action_data or not action_data["action"] or action_data["action"] == "cancel":
+                            os.write(child_fd, b'\x15\r')
                             return
                         action = action_data["action"]
                     except asyncio.TimeoutError:
+                        os.write(child_fd, b'\x15\r')
                         return
                         
                     if action == "send_all":
@@ -262,6 +292,7 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
                         await asyncio.sleep(0.1)
                         for cmd in commands:
                             os.write(child_fd, (cmd + "\n").encode())
+                            response_queue.put(connpy_pb2.InteractResponse(copilot_injected_command=cmd))
                             await asyncio.sleep(0.3)
                     elif action.startswith("custom:"):
                         custom_cmds = action[7:]
@@ -270,6 +301,7 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
                         for cmd in custom_cmds.split('\n'):
                             if cmd.strip():
                                 os.write(child_fd, (cmd.strip() + "\n").encode())
+                                response_queue.put(connpy_pb2.InteractResponse(copilot_injected_command=cmd.strip()))
                                 await asyncio.sleep(0.3)
                     elif action not in ('cancel', 'n', 'no'):
                         # Handle numbers and ranges like "1,2,4-6"
@@ -294,6 +326,7 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
                                 await asyncio.sleep(0.1)
                                 for idx in valid_indices:
                                     os.write(child_fd, (commands[idx] + "\n").encode())
+                                    response_queue.put(connpy_pb2.InteractResponse(copilot_injected_command=commands[idx]))
                                     await asyncio.sleep(0.3)
                             else:
                                 os.write(child_fd, b'\x15\r')

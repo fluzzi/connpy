@@ -18,7 +18,31 @@ import asyncio
 import fcntl
 from . import printer
 from .tunnels import LocalStream
+from contextlib import contextmanager
 
+@contextmanager
+def copilot_terminal_mode():
+    import sys, tty, termios
+    fd = sys.stdin.fileno()
+    try:
+        old_settings = termios.tcgetattr(fd)
+        
+        # Primero pasamos a raw mode absoluto para matar ISIG, ICANON, ECHO, etc.
+        tty.setraw(fd)
+        
+        # Luego rehabilitamos OPOST para que rich.Live se dibuje correctamente
+        new_settings = termios.tcgetattr(fd)
+        new_settings[1] = new_settings[1] | termios.OPOST
+        termios.tcsetattr(fd, termios.TCSANOW, new_settings)
+        
+        yield
+    except Exception:
+        yield
+    finally:
+        try:
+            termios.tcsetattr(fd, termios.TCSANOW, old_settings)
+        except Exception:
+            pass
 
 #functions and classes
 @ClassHook
@@ -393,7 +417,8 @@ class node:
             child_reader_queue = asyncio.Queue()
             
             # Track command byte positions for copilot context navigation
-            cmd_byte_positions = [0]
+            # Each entry is (byte_position, command_text_or_None)
+            cmd_byte_positions = [(0, None)]
             
             def _child_read_ready():
                 try:
@@ -440,7 +465,7 @@ class node:
                     if clean_data:
                         # Track command boundaries when user hits Enter
                         if hasattr(self, 'mylog') and (b'\r' in clean_data or b'\n' in clean_data):
-                            cmd_byte_positions.append(self.mylog.tell())
+                            cmd_byte_positions.append((self.mylog.tell(), None))
                             
                         try:
                             os.write(child_fd, clean_data)
@@ -613,18 +638,15 @@ class node:
             import asyncio
             import os
             import sys
+            import fcntl
+            
+            flags = 0
+            stdin_fd = sys.stdin.fileno()
             
             try:
                 # Disable LocalStream reader so it doesn't steal keystrokes from Prompt
                 loop = asyncio.get_running_loop()
                 loop.remove_reader(sys.stdin.fileno())
-                
-                # Override SIGINT so asyncio doesn't kill the event loop when we press Ctrl+C
-                import signal
-                orig_sigint = signal.getsignal(signal.SIGINT)
-                def custom_sigint(sig, frame):
-                    raise KeyboardInterrupt()
-                signal.signal(signal.SIGINT, custom_sigint)
                 
                 # 1. Salir de raw mode para poder usar input() y rich
                 stdin_fd = sys.stdin.fileno()
@@ -635,6 +657,9 @@ class node:
                     import copy
                     new_settings = copy.deepcopy(original_settings)
                     new_settings[3] = new_settings[3] & ~termios.ECHOCTL
+                    # CRITICAL: Prevent OS from translating Ctrl+C into SIGINT
+                    # This prevents the asyncio event loop from crashing when user hits Ctrl+C
+                    new_settings[3] = new_settings[3] & ~termios.ISIG
                     termios.tcsetattr(stdin_fd, termios.TCSADRAIN, new_settings)
                 
                 # Remove O_NONBLOCK from stdin so Prompt.ask() works
@@ -688,18 +713,32 @@ class node:
                         prompt_re = re.compile(re.sub(r'(?<!\\)\$', '', default_prompt))
                         
                     for i in range(1, len(cmd_byte_positions)):
-                        chunk = raw_bytes[cmd_byte_positions[i-1]:cmd_byte_positions[i]]
-                        cleaned = self._logclean(chunk.decode(errors='replace'), var=True)
-                        lines = [l for l in cleaned.split('\n') if l.strip()]
-                        preview = lines[-1].strip() if lines else ""
+                        pos, known_cmd = cmd_byte_positions[i]
+                        prev_pos = cmd_byte_positions[i-1][0]
                         
-                        if preview:
-                            match = prompt_re.search(preview)
-                            if match:
-                                cmd_text = preview[match.end():].strip()
-                                # Only add if there is actual text typed (filters out empty enters and paginations)
-                                if cmd_text:
-                                    blocks.append((cmd_byte_positions[i], preview[:80]))
+                        if known_cmd:
+                            # AI-injected command: we already know the command text
+                            # Build preview from prompt (last line of previous chunk) + command
+                            prev_chunk = raw_bytes[prev_pos:pos]
+                            prev_cleaned = self._logclean(prev_chunk.decode(errors='replace'), var=True)
+                            prev_lines = [l for l in prev_cleaned.split('\n') if l.strip()]
+                            prompt_text = prev_lines[-1].strip() if prev_lines else ""
+                            preview = f"{prompt_text}{known_cmd}" if prompt_text else known_cmd
+                            blocks.append((pos, preview[:80]))
+                        else:
+                            # User-typed command: derive from raw log chunk
+                            chunk = raw_bytes[prev_pos:pos]
+                            cleaned = self._logclean(chunk.decode(errors='replace'), var=True)
+                            lines = [l for l in cleaned.split('\n') if l.strip()]
+                            preview = lines[-1].strip() if lines else ""
+                            
+                            if preview:
+                                match = prompt_re.search(preview)
+                                if match:
+                                    cmd_text = preview[match.end():].strip()
+                                    # Only add if there is actual text typed (filters out empty enters and paginations)
+                                    if cmd_text:
+                                        blocks.append((pos, preview[:80]))
                     
                 # Add synthetic "current prompt" block (zero context)
                 last_line = buffer.split('\n')[-1].strip() if buffer.strip() else "(prompt)"
@@ -787,12 +826,23 @@ class node:
                     _, (_, preview) = get_current_block()
                     return HTML(f"<ansigray>\u25b6 {preview}  [Tab: {mode_label}]</ansigray>")
                     
-                session = PromptSession(history=copilot_history)
-                question = await session.prompt_async(
-                    get_prompt_text,
-                    key_bindings=bindings,
-                    bottom_toolbar=get_toolbar
-                )
+                import threading
+                def preload_ai_deps():
+                    try:
+                        import litellm
+                    except Exception:
+                        pass
+                threading.Thread(target=preload_ai_deps, daemon=True).start()
+                
+                try:
+                    session = PromptSession(history=copilot_history)
+                    question = await session.prompt_async(
+                        get_prompt_text,
+                        key_bindings=bindings,
+                        bottom_toolbar=get_toolbar
+                    )
+                except KeyboardInterrupt:
+                    question = ""
                 
                 if cancelled[0] or not question.strip() or question.strip() == "CANCEL":
                     console.print("\n[dim]Copilot cancelled.[/dim]")
@@ -832,8 +882,48 @@ class node:
                     except Exception:
                         live.update(Panel(Markdown(live_text), title="[bold cyan]Copilot Guide[/bold cyan]", border_style="cyan"))
                 
-                with Live(panel, console=console, refresh_per_second=10) as live:
-                    result = await asyncio.to_thread(service.ask_copilot, active_buffer, enriched_question, node_info, chunk_callback=on_chunk)
+                with copilot_terminal_mode(), Live(panel, console=console, refresh_per_second=10) as live:
+                    # Launch the AI call as a task
+                    ai_task = asyncio.create_task(service.aask_copilot(active_buffer, enriched_question, node_info, chunk_callback=on_chunk))
+                    
+                    # Make stdin non-blocking
+                    import fcntl
+                    flags = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
+                    fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, flags | os.O_NONBLOCK)
+                    
+                    cancelled = False
+                    result = None
+                    
+                    try:
+                        while not ai_task.done():
+                            try:
+                                key = os.read(sys.stdin.fileno(), 1024)
+                                if b'\x03' in key:
+                                    cancelled = True
+                                    ai_task.cancel()
+                                    console.print("\n[dim]Copilot cancelled via Ctrl+C.[/dim]")
+                                    break
+                            except OSError:
+                                pass
+                            # Yield to event loop to allow AI task to progress
+                            await asyncio.sleep(0.05)
+                            
+                        if not cancelled:
+                            result = ai_task.result()
+                    except asyncio.CancelledError:
+                        cancelled = True
+                        console.print("\n[dim]Copilot cancelled.[/dim]")
+                    except KeyboardInterrupt:
+                        cancelled = True
+                        ai_task.cancel()
+                        console.print("\n[dim]Copilot cancelled via Ctrl+C.[/dim]")
+                    finally:
+                        # Restore stdin flags
+                        fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, flags)
+                        
+                    if cancelled or not result:
+                        os.write(child_fd, b'\x15\r')
+                        return
                 
                 if result.get("error"):
                     console.print(f"[red]Error: {result['error']}[/red]")
@@ -868,10 +958,13 @@ class node:
                         event.app.exit(result='n')
                     
                     pt_color = "ansi" + risk_style
-                    action = await confirm_session.prompt_async(
-                        HTML(f"<{pt_color}>Send commands? (y/n/e/number/range) [n]: </{pt_color}>"),
-                        key_bindings=confirm_bindings
-                    )
+                    try:
+                        action = await confirm_session.prompt_async(
+                            HTML(f"<{pt_color}>Send commands? (y/n/e/number/range) [n]: </{pt_color}>"),
+                            key_bindings=confirm_bindings
+                        )
+                    except KeyboardInterrupt:
+                        action = "n"
                     
                     if not action.strip():
                         action = "n"
@@ -883,6 +976,8 @@ class node:
                         os.write(child_fd, b'\x15')  # Ctrl+U to clear line
                         await asyncio.sleep(0.1)
                         for cmd in commands:
+                            if cmd_byte_positions is not None and hasattr(self, 'mylog'):
+                                cmd_byte_positions.append((self.mylog.tell(), cmd))
                             os.write(child_fd, (cmd + "\n").encode())
                             await asyncio.sleep(0.3)
                     elif action_l.startswith('e'):
@@ -910,6 +1005,8 @@ class node:
                                     await asyncio.sleep(0.1)
                                     for cmd in edited_cmd.split('\n'):
                                         if cmd.strip():
+                                            if cmd_byte_positions is not None and hasattr(self, 'mylog'):
+                                                cmd_byte_positions.append((self.mylog.tell(), cmd.strip()))
                                             os.write(child_fd, (cmd.strip() + "\n").encode())
                                             await asyncio.sleep(0.3)
                                 else:
@@ -938,9 +1035,13 @@ class node:
                                 os.write(child_fd, b'\x15')  # Ctrl+U to clear line
                                 await asyncio.sleep(0.1)
                                 if len(valid_indices) == 1:
+                                    if cmd_byte_positions is not None and hasattr(self, 'mylog'):
+                                        cmd_byte_positions.append((self.mylog.tell(), commands[valid_indices[0]]))
                                     os.write(child_fd, (commands[valid_indices[0]] + "\n").encode())
                                 else:
                                     for idx in valid_indices:
+                                        if cmd_byte_positions is not None and hasattr(self, 'mylog'):
+                                            cmd_byte_positions.append((self.mylog.tell(), commands[idx]))
                                         os.write(child_fd, (commands[idx] + "\n").encode())
                                         await asyncio.sleep(0.3)
                             else:
@@ -966,8 +1067,6 @@ class node:
                 # 6. Restaurar raw mode, O_NONBLOCK y SIGINT
                 tty.setraw(stdin_fd)
                 fcntl.fcntl(stdin_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
-                if 'orig_sigint' in locals():
-                    signal.signal(signal.SIGINT, orig_sigint)
                 
                 # Re-enable LocalStream reader
                 try:
