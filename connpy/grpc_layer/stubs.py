@@ -292,7 +292,7 @@ class NodeStub:
                         context_mode[0] = (context_mode[0] + 1) % 3
                         event.app.invalidate()
                         
-                    @bindings.add('escape')
+                    @bindings.add('escape', eager=True)
                     def _(event):
                         event.app.exit(result='')
                         
@@ -363,10 +363,11 @@ class NodeStub:
                             # 1. Read input for Ctrl+C
                             try:
                                 key = os.read(sys.stdin.fileno(), 1024)
-                                if b'\x03' in key:
+                                if b'\x03' in key or b'\x1b' in key:
                                     cancelled = True
                                     request_queue.put(connpy_pb2.InteractRequest(copilot_question="CANCEL"))
-                                    console.print("\n[dim]Copilot cancelled via Ctrl+C. Disconnecting...[/dim]")
+                                    msg = "Ctrl+C" if b'\x03' in key else "Esc"
+                                    console.print(f"\n[dim]Copilot cancelled via {msg}.[/dim]")
                                     break
                             except OSError:
                                 pass
@@ -421,7 +422,7 @@ class NodeStub:
                         try:
                             confirm_session = PromptSession()
                             confirm_bindings = KeyBindings()
-                            @confirm_bindings.add('escape')
+                            @confirm_bindings.add('escape', eager=True)
                             def _(event):
                                 event.app.exit(result='n')
                             
@@ -454,10 +455,19 @@ class NodeStub:
                             if cmds_to_edit:
                                 target_cmd = "\n".join(cmds_to_edit)
                                 try:
+                                    edit_bindings = KeyBindings()
+                                    @edit_bindings.add('c-j')
+                                    def _(event):
+                                        event.app.exit(result=event.app.current_buffer.text)
+                                    @edit_bindings.add('escape', eager=True)
+                                    def _(event):
+                                        event.app.exit(result='')
+                                        
                                     edited_cmd = edit_session.prompt(
-                                        HTML("<ansicyan>Edit commands (Alt+Enter or Esc,Enter to submit):\n</ansicyan>"),
+                                        HTML("<ansicyan>Edit commands (Ctrl+Enter to submit, Esc to cancel):\n</ansicyan>"),
                                         default=target_cmd,
-                                        multiline=True
+                                        multiline=True,
+                                        key_bindings=edit_bindings
                                     )
                                     if edited_cmd.strip():
                                         action_sent = "custom:" + edited_cmd.strip()
@@ -737,7 +747,7 @@ class NodeStub:
                         context_mode[0] = (context_mode[0] + 1) % 3
                         event.app.invalidate()
                         
-                    @bindings.add('escape')
+                    @bindings.add('escape', eager=True)
                     def _(event):
                         event.app.exit(result='')
                         
@@ -806,10 +816,11 @@ class NodeStub:
                         while True:
                             try:
                                 key = os.read(sys.stdin.fileno(), 1024)
-                                if b'\x03' in key:
+                                if b'\x03' in key or b'\x1b' in key:
                                     cancelled = True
                                     request_queue.put(connpy_pb2.InteractRequest(copilot_question="CANCEL"))
-                                    console.print("\n[dim]Copilot cancelled via Ctrl+C. Disconnecting...[/dim]")
+                                    msg = "Ctrl+C" if b'\x03' in key else "Esc"
+                                    console.print(f"\n[dim]Copilot cancelled via {msg}.[/dim]")
                                     break
                             except OSError:
                                 pass
@@ -862,7 +873,7 @@ class NodeStub:
                         try:
                             confirm_session = PromptSession()
                             confirm_bindings = KeyBindings()
-                            @confirm_bindings.add('escape')
+                            @confirm_bindings.add('escape', eager=True)
                             def _(event):
                                 event.app.exit(result='n')
                             
@@ -895,10 +906,19 @@ class NodeStub:
                             if cmds_to_edit:
                                 target_cmd = "\n".join(cmds_to_edit)
                                 try:
+                                    edit_bindings = KeyBindings()
+                                    @edit_bindings.add('c-j')
+                                    def _(event):
+                                        event.app.exit(result=event.app.current_buffer.text)
+                                    @edit_bindings.add('escape', eager=True)
+                                    def _(event):
+                                        event.app.exit(result='')
+
                                     edited_cmd = edit_session.prompt(
-                                        HTML("<ansicyan>Edit commands (Alt+Enter or Esc,Enter to submit):\n</ansicyan>"),
+                                        HTML("<ansicyan>Edit commands (Ctrl+Enter to submit, Esc to cancel):\n</ansicyan>"),
                                         default=target_cmd,
-                                        multiline=True
+                                        multiline=True,
+                                        key_bindings=edit_bindings
                                     )
                                     if edited_cmd.strip():
                                         action_sent = "custom:" + edited_cmd.strip()

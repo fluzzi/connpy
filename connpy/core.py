@@ -785,7 +785,7 @@ class node:
                     context_mode[0] = (context_mode[0] + 1) % 3
                     event.app.invalidate()
                     
-                @bindings.add('escape')
+                @bindings.add('escape', eager=True)
                 def _(event):
                     cancelled[0] = True
                     event.app.exit(result='')
@@ -898,10 +898,11 @@ class node:
                         while not ai_task.done():
                             try:
                                 key = os.read(sys.stdin.fileno(), 1024)
-                                if b'\x03' in key:
+                                if b'\x03' in key or b'\x1b' in key:
                                     cancelled = True
                                     ai_task.cancel()
-                                    console.print("\n[dim]Copilot cancelled via Ctrl+C.[/dim]")
+                                    msg = "Ctrl+C" if b'\x03' in key else "Esc"
+                                    console.print(f"\n[dim]Copilot cancelled via {msg}.[/dim]")
                                     break
                             except OSError:
                                 pass
@@ -953,7 +954,7 @@ class node:
                     confirm_session = PromptSession()
                     confirm_bindings = KeyBindings()
                     
-                    @confirm_bindings.add('escape')
+                    @confirm_bindings.add('escape', eager=True)
                     def _(event):
                         event.app.exit(result='n')
                     
@@ -994,11 +995,21 @@ class node:
                             
                         if cmds_to_edit:
                             target_cmd = "\n".join(cmds_to_edit)
+                            edit_bindings = KeyBindings()
+                            @edit_bindings.add('c-j')
+                            def _(event):
+                                event.app.exit(result=event.app.current_buffer.text)
+                            
+                            @edit_bindings.add('escape', eager=True)
+                            def _(event):
+                                event.app.exit(result='')
+                            
                             try:
                                 edited_cmd = await edit_session.prompt_async(
-                                    HTML("<ansicyan>Edit commands (Alt+Enter or Esc,Enter to submit):\n</ansicyan>"),
+                                    HTML("<ansicyan>Edit commands (Ctrl+Enter to submit, Esc to cancel):\n</ansicyan>"),
                                     default=target_cmd,
-                                    multiline=True
+                                    multiline=True,
+                                    key_bindings=edit_bindings
                                 )
                                 if edited_cmd.strip():
                                     os.write(child_fd, b'\x15')
