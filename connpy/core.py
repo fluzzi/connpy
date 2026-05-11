@@ -354,14 +354,17 @@ class node:
             port_str = f":{self.port}" if self.port and self.protocol not in ["ssm", "kubectl", "docker"] else ""
             logger("success", f"Connected to {self.unique} at {self.host}{port_str} via: {self.protocol}")
 
+        # Always initialize self.mylog to capture terminal context for the AI Copilot
+        if not hasattr(self, 'mylog'):
+            self.mylog = io.BytesIO()
+            
+        if not async_mode:
+            self.child.logfile_read = self.mylog
+            
+        # Only start disk-logging tasks if logfile is configured
         if 'logfile' in dir(self):
-            # Initialize self.mylog
-            if not 'mylog' in dir(self):
-                self.mylog = io.BytesIO()
             if not async_mode:
-                self.child.logfile_read = self.mylog
-                
-                # Start the _savelog thread
+                # Start the _savelog thread (sync mode)
                 log_thread = threading.Thread(target=self._savelog)
                 log_thread.daemon = True
                 log_thread.start()

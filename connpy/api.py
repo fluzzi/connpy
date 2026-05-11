@@ -54,6 +54,8 @@ def debug_api(port=8048, config=None):
     printer.info(f"gRPC Server running in debug mode on port {port}...")
     _wait_for_termination()
     server.stop(0)
+    from .ai import cleanup
+    cleanup()
 
 def start_server(port=8048, config=None):
     try:
@@ -67,6 +69,9 @@ def start_server(port=8048, config=None):
         conf = config or configfile()
         server = serve(conf, port=port, debug=False)
         _wait_for_termination()
+        server.stop(0)
+        from .ai import cleanup
+        cleanup()
     except Exception as e:
         printer.error(f"Background API failed to start: {e}")
         os._exit(1)

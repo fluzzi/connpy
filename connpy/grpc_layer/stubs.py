@@ -345,7 +345,17 @@ class NodeStub:
                         continue
 
                     active_buffer = get_active_buffer()
-                    request_queue.put(connpy_pb2.InteractRequest(copilot_question=question, copilot_context_buffer=active_buffer))
+                    # Enrich question with history (same as local CLI)
+                    past_questions = self.copilot_history.get_strings()
+                    if len(past_questions) > 1:
+                        # Limit history to last 5 questions to save tokens, excluding current
+                        recent_history = past_questions[-6:-1]
+                        history_text = "\n".join(f"- {q}" for q in recent_history)
+                        enriched_question = f"Previous questions in this session:\n{history_text}\n\nCurrent Question:\n{question}"
+                    else:
+                        enriched_question = question
+                        
+                    request_queue.put(connpy_pb2.InteractRequest(copilot_question=enriched_question, copilot_context_buffer=active_buffer))
                     
                     from rich.live import Live
                     live_text = "Thinking..."
@@ -800,7 +810,17 @@ class NodeStub:
                         continue
 
                     active_buffer = get_active_buffer()
-                    request_queue.put(connpy_pb2.InteractRequest(copilot_question=question, copilot_context_buffer=active_buffer))
+                    # Enrich question with history (same as local CLI)
+                    past_questions = self.copilot_history.get_strings()
+                    if len(past_questions) > 1:
+                        # Limit history to last 5 questions to save tokens, excluding current
+                        recent_history = past_questions[-6:-1]
+                        history_text = "\n".join(f"- {q}" for q in recent_history)
+                        enriched_question = f"Previous questions in this session:\n{history_text}\n\nCurrent Question:\n{question}"
+                    else:
+                        enriched_question = question
+                        
+                    request_queue.put(connpy_pb2.InteractRequest(copilot_question=enriched_question, copilot_context_buffer=active_buffer))
                     
                     from rich.live import Live
                     live_text = "Thinking..."

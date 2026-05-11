@@ -470,6 +470,13 @@ class connapp:
             # Handle global Ctrl+C gracefully
             printer.warning("Operation cancelled by user.")
             sys.exit(130)
+        finally:
+            # Safely cleanup AI sessions (litellm)
+            try:
+                from .ai import cleanup
+                cleanup()
+            except ImportError:
+                pass
 
     class _store_type(argparse.Action):
         #Custom store type for cli app.

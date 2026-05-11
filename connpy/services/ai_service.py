@@ -19,15 +19,18 @@ class AIService(BaseService):
 
     def ask_copilot(self, terminal_buffer, user_question, node_info=None, chunk_callback=None):
         """Ask the AI copilot for terminal assistance."""
-        from connpy.ai import ai
+        from connpy.ai import ai, run_ai_async
         agent = ai(self.config)
-        return agent.ask_copilot(terminal_buffer, user_question, node_info, chunk_callback=chunk_callback)
+        future = run_ai_async(agent.aask_copilot(terminal_buffer, user_question, node_info, chunk_callback=chunk_callback))
+        return future.result()
 
     async def aask_copilot(self, terminal_buffer, user_question, node_info=None, chunk_callback=None):
         """Ask the AI copilot for terminal assistance asynchronously."""
-        from connpy.ai import ai
+        from connpy.ai import ai, run_ai_async
+        import asyncio
         agent = ai(self.config)
-        return await agent.aask_copilot(terminal_buffer, user_question, node_info, chunk_callback=chunk_callback)
+        future = run_ai_async(agent.aask_copilot(terminal_buffer, user_question, node_info, chunk_callback=chunk_callback))
+        return await asyncio.wrap_future(future)
 
 
     def list_sessions(self):

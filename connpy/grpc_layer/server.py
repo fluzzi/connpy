@@ -207,8 +207,55 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
                     import json
                     import asyncio
                     import os
+                    import re
 
-                    node_info_json = json.dumps(node_info) if node_info else ""
+                    # Build context blocks like local CLI does
+                    blocks = []
+                    raw_bytes = n.mylog.getvalue() if hasattr(n, 'mylog') else b''
+                    
+                    if cmd_byte_positions and len(cmd_byte_positions) >= 2 and raw_bytes:
+                        default_prompt = r'>$|#$|\$$|>.$|#.$|\$.$'
+                        device_prompt = node_info.get("prompt", default_prompt) if isinstance(node_info, dict) else default_prompt
+                        prompt_re_str = re.sub(r'(?<!\\)\$', '', device_prompt)
+                        try:
+                            prompt_re = re.compile(prompt_re_str)
+                        except Exception:
+                            prompt_re = re.compile(re.sub(r'(?<!\\)\$', '', default_prompt))
+                            
+                        for i in range(1, len(cmd_byte_positions)):
+                            pos, known_cmd = cmd_byte_positions[i]
+                            prev_pos = cmd_byte_positions[i-1][0]
+                            
+                            if known_cmd:
+                                prev_chunk = raw_bytes[prev_pos:pos]
+                                prev_cleaned = n._logclean(prev_chunk.decode(errors='replace'), var=True)
+                                prev_lines = [l for l in prev_cleaned.split('\n') if l.strip()]
+                                prompt_text = prev_lines[-1].strip() if prev_lines else ""
+                                preview = f"{prompt_text}{known_cmd}" if prompt_text else known_cmd
+                                blocks.append({"pos": pos, "preview": preview[:80], "type": "cmd"})
+                            else:
+                                chunk = raw_bytes[prev_pos:pos]
+                                cleaned = n._logclean(chunk.decode(errors='replace'), var=True)
+                                lines = [l for l in cleaned.split('\n') if l.strip()]
+                                preview = lines[-1].strip() if lines else ""
+                                
+                                if preview:
+                                    match = prompt_re.search(preview)
+                                    if match:
+                                        cmd_text = preview[match.end():].strip()
+                                        if cmd_text:
+                                            blocks.append({"pos": pos, "preview": preview[:80], "type": "cmd"})
+                    
+                    clean_buffer = n._logclean(raw_bytes.decode(errors='replace'), var=True)
+                    last_line = clean_buffer.split('\n')[-1].strip() if clean_buffer.strip() else "(prompt)"
+                    blocks.append({"pos": len(raw_bytes), "preview": last_line[:80], "type": "current"})
+
+                    if node_info is None:
+                        node_info = {}
+                    node_info["context_blocks"] = blocks
+                    node_info["full_buffer"] = buffer
+
+                    node_info_json = json.dumps(node_info)
                     # 1. Send prompt to client
                     response_queue.put(connpy_pb2.InteractResponse(
                         copilot_prompt=True,
@@ -231,8 +278,17 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
                             os.write(child_fd, b'\x15\r')
                             return
                         question = req_data["question"]
+                        
                         context_buffer = req_data.get("context_buffer", "")
-                        if not context_buffer:
+                        if context_buffer.startswith('{"context_start_pos"'):
+                            try:
+                                parsed = json.loads(context_buffer)
+                                start_pos = parsed["context_start_pos"]
+                                selected_raw = raw_bytes[start_pos:]
+                                context_buffer = n._logclean(selected_raw.decode(errors='replace'), var=True)
+                            except Exception:
+                                context_buffer = buffer
+                        elif not context_buffer:
                             context_buffer = buffer
                     except asyncio.TimeoutError:
                         os.write(child_fd, b'\x15\r')
@@ -248,7 +304,10 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
                                 copilot_stream_chunk=chunk_text
                             ))
                             
-                    ai_task = asyncio.create_task(service.aask_copilot(context_buffer, question, node_info, chunk_callback=chunk_callback))
+                    # Create a clean version of node_info for the AI to save tokens and match local CLI behavior
+                    ai_node_info = {k: v for k, v in node_info.items() if k not in ("context_blocks", "full_buffer")}
+                    
+                    ai_task = asyncio.create_task(service.aask_copilot(context_buffer, question, ai_node_info, chunk_callback=chunk_callback))
                     wait_action_task = asyncio.create_task(remote_stream.copilot_queue.get())
                     
                     done, pending = await asyncio.wait(

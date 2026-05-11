@@ -3,6 +3,8 @@ import sys
 import json
 import re
 import datetime
+import threading
+import asyncio
 from textwrap import dedent
 from .core import nodes
 
@@ -35,6 +37,61 @@ from rich.console import Group
 from rich.rule import Rule
 
 console = printer.console
+
+
+_ai_loop = None
+_ai_thread = None
+_ai_lock = threading.Lock()
+
+def _get_ai_loop():
+    global _ai_loop, _ai_thread
+    with _ai_lock:
+        if _ai_loop is None:
+            _ai_loop = asyncio.new_event_loop()
+            _ai_thread = threading.Thread(target=_ai_loop.run_forever, name="ConnpyAILoop", daemon=True)
+            _ai_thread.start()
+        return _ai_loop
+
+def run_ai_async(coro):
+    """Run a coroutine in the dedicated AI background loop."""
+    loop = _get_ai_loop()
+    return asyncio.run_coroutine_threadsafe(coro, loop)
+
+
+def cleanup():
+    """Safely close any global litellm sessions in the dedicated AI loop."""
+    global _ai_loop
+    if _ai_loop:
+        try:
+            future = asyncio.run_coroutine_threadsafe(_async_cleanup(), _ai_loop)
+            future.result(timeout=5)
+        except:
+            pass
+
+
+async def _async_cleanup():
+    """Internal async cleanup for litellm sessions."""
+    try:
+        import litellm
+        # 1. Close synchronous session
+        if hasattr(litellm, "client_session") and litellm.client_session:
+            try:
+                if hasattr(litellm.client_session, "close"):
+                    res = litellm.client_session.close()
+                    if asyncio.iscoroutine(res): await res
+            except: pass
+            litellm.client_session = None
+
+        # 2. Close asynchronous session
+        if hasattr(litellm, "aclient_session") and litellm.aclient_session:
+            try:
+                session = litellm.aclient_session
+                litellm.aclient_session = None
+                if hasattr(session, "close"):
+                    await session.close()
+            except: pass
+    except ImportError:
+        pass
 
 
 @ClassHook
@@ -1358,6 +1415,7 @@ Node: {node_name}"""
         from litellm import acompletion
         import asyncio
         import warnings
+        import aiohttp
         
         # Suppress unawaited coroutine warnings from LiteLLM's internal streaming logic during sudden cancellation
         warnings.filterwarnings("ignore", message="coroutine '.*async_streaming.*' was never awaited", category=RuntimeWarning)
