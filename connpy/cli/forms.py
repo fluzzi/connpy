@@ -197,3 +197,84 @@ class Forms:
             answer["tags"] = ast.literal_eval(answer["tags"])
             
         return answer
+
+    def mcp_wizard(self, mcp_servers):
+        """Interactive wizard to manage MCP servers."""
+        from .helpers import theme
+        
+        while True:
+            options = [
+                ("List Configured Servers", "list"),
+                ("Add/Update Server", "add"),
+                ("Enable/Disable Server", "toggle"),
+                ("Remove Server", "remove"),
+                ("Back", "exit")
+            ]
+            
+            questions = [
+                inquirer.List("action", message="MCP Configuration", choices=options)
+            ]
+            
+            answers = inquirer.prompt(questions, theme=theme)
+            if not answers or answers["action"] == "exit":
+                return None
+                
+            action = answers["action"]
+            
+            if action == "list":
+                if not mcp_servers:
+                    print("\nNo MCP servers configured.\n")
+                else:
+                    return {"action": "list"}
+            
+            elif action == "add":
+                questions = [
+                    inquirer.Text("name", message="Server Name (identifier)"),
+                    inquirer.Text("url", message="SSE URL (e.g., http://localhost:8000/sse)"),
+                    inquirer.Confirm("enabled", message="Enabled?", default=True),
+                    inquirer.Text("auto_load_os", message="Auto-load on specific OS (blank for any)")
+                ]
+                answers = inquirer.prompt(questions, theme=theme)
+                if answers:
+                    return {
+                        "action": "add",
+                        "name": answers["name"],
+                        "url": answers["url"],
+                        "enabled": answers["enabled"],
+                        "os": answers["auto_load_os"]
+                    }
+            
+            elif action == "toggle":
+                if not mcp_servers:
+                    print("\nNo servers to toggle.\n")
+                    continue
+                
+                choices = []
+                for name, cfg in mcp_servers.items():
+                    status = "[Enabled]" if cfg.get("enabled", True) else "[Disabled]"
+                    choices.append((f"{name} {status}", name))
+                
+                questions = [
+                    inquirer.List("name", message="Select server to toggle", choices=choices + [("Cancel", None)])
+                ]
+                answers = inquirer.prompt(questions, theme=theme)
+                if answers and answers["name"]:
+                    current = mcp_servers[answers["name"]].get("enabled", True)
+                    return {
+                        "action": "update",
+                        "name": answers["name"],
+                        "enabled": not current
+                    }
+            
+            elif action == "remove":
+                if not mcp_servers:
+                    print("\nNo servers to remove.\n")
+                    continue
+                    
+                questions = [
+                    inquirer.List("name", message="Select server to remove", choices=list(mcp_servers.keys()) + ["Cancel"])
+                ]
+                answers = inquirer.prompt(questions, theme=theme)
+                if answers and answers["name"] != "Cancel":
+                    return {"action": "remove", "name": answers["name"]}
+        return None

@@ -60,6 +60,40 @@ class AIService(BaseService):
         self.config.config["ai"] = settings
         self.config._saveconfig(self.config.file)
 
+    def configure_mcp(self, name, url=None, enabled=None, auto_load_on_os=None, remove=False):
+        """Update MCP server settings in the configuration with smart merging."""
+        ai_settings = self.config.config.get("ai", {})
+        mcp_servers = ai_settings.get("mcp_servers", {})
+        
+        if remove:
+            if name in mcp_servers:
+                del mcp_servers[name]
+        else:
+            # Get existing or new
+            server_cfg = mcp_servers.get(name, {})
+            
+            # Partial updates
+            if url is not None:
+                server_cfg["url"] = url
+            
+            if enabled is not None:
+                server_cfg["enabled"] = bool(enabled)
+            elif "enabled" not in server_cfg:
+                server_cfg["enabled"] = True # Default for new entries
+                
+            if auto_load_on_os is not None:
+                if auto_load_on_os == "": # Explicit clear
+                    if "auto_load_on_os" in server_cfg:
+                        del server_cfg["auto_load_on_os"]
+                else:
+                    server_cfg["auto_load_on_os"] = auto_load_on_os
+            
+            mcp_servers[name] = server_cfg
+            
+        ai_settings["mcp_servers"] = mcp_servers
+        self.config.config["ai"] = ai_settings
+        self.config._saveconfig(self.config.file)
+
     def load_session_data(self, session_id):
         """Load a session's raw data by ID."""
         from connpy.ai import ai

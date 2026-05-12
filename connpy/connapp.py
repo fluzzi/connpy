@@ -284,6 +284,7 @@ class connapp:
         aiparser.add_argument("--session", nargs=1, help="Resume a specific AI session by ID")
         aiparser.add_argument("--resume", action="store_true", help="Resume the most recent AI session")
         aiparser.add_argument("--delete", "--delete-session", dest="delete_session", nargs=1, help="Delete an AI session by ID")
+        aiparser.add_argument("--mcp", nargs='*', metavar=('ACTION', 'NAME'), help="Manage MCP servers. Actions: list, add, remove, enable, disable. Leave empty for interactive wizard.")
         aiparser.set_defaults(func=self._ai.dispatch)
         #RUNPARSER
         runparser = subparsers.add_parser("run", help="Run scripts or commands on nodes", description="Run scripts or commands on nodes", formatter_class=RichHelpFormatter) 

@@ -14,7 +14,7 @@ class ExecutionService(BaseService):
         commands: List[str], 
         variables: Optional[Dict[str, Any]] = None,
         parallel: int = 10,
-        timeout: int = 10,
+        timeout: int = 20,
         folder: Optional[str] = None,
         prompt: Optional[str] = None,
         on_node_complete: Optional[Callable] = None,
@@ -62,7 +62,7 @@ class ExecutionService(BaseService):
         expected: List[str],
         variables: Optional[Dict[str, Any]] = None,
         parallel: int = 10,
-        timeout: int = 10,
+        timeout: int = 20,
         folder: Optional[str] = None,
         prompt: Optional[str] = None,
         on_node_complete: Optional[Callable] = None,
@@ -139,7 +139,7 @@ class ExecutionService(BaseService):
             "commands": playbook["commands"],
             "variables": playbook.get("variables"),
             "parallel": options.get("parallel", parallel),
-            "timeout": playbook.get("timeout", options.get("timeout", 10)),
+            "timeout": playbook.get("timeout", options.get("timeout", 20)),
             "prompt": options.get("prompt"),
             "name": playbook.get("name", "Task")
         }

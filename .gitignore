@@ -50,6 +50,7 @@ coverage.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
+scratch/
 
 # Translations
 *.mo
@@ -162,3 +163,4 @@ repo_consolidado_limpio.md
 connpy_roadmap.md
 MULTI_USER_PLAN.md
 COPILOT_PLAN.md
+ARCHITECTURAL_DEBT_REFACTOR.md

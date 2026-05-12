@@ -207,59 +207,19 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
                     import json
                     import asyncio
                     import os
-                    import re
-
-                    # Build context blocks like local CLI does
-                    blocks = []
-                    raw_bytes = n.mylog.getvalue() if hasattr(n, 'mylog') else b''
-                    
-                    if cmd_byte_positions and len(cmd_byte_positions) >= 2 and raw_bytes:
-                        default_prompt = r'>$|#$|\$$|>.$|#.$|\$.$'
-                        device_prompt = node_info.get("prompt", default_prompt) if isinstance(node_info, dict) else default_prompt
-                        prompt_re_str = re.sub(r'(?<!\\)\$', '', device_prompt)
-                        try:
-                            prompt_re = re.compile(prompt_re_str)
-                        except Exception:
-                            prompt_re = re.compile(re.sub(r'(?<!\\)\$', '', default_prompt))
-                            
-                        for i in range(1, len(cmd_byte_positions)):
-                            pos, known_cmd = cmd_byte_positions[i]
-                            prev_pos = cmd_byte_positions[i-1][0]
-                            
-                            if known_cmd:
-                                prev_chunk = raw_bytes[prev_pos:pos]
-                                prev_cleaned = n._logclean(prev_chunk.decode(errors='replace'), var=True)
-                                prev_lines = [l for l in prev_cleaned.split('\n') if l.strip()]
-                                prompt_text = prev_lines[-1].strip() if prev_lines else ""
-                                preview = f"{prompt_text}{known_cmd}" if prompt_text else known_cmd
-                                blocks.append({"pos": pos, "preview": preview[:80], "type": "cmd"})
-                            else:
-                                chunk = raw_bytes[prev_pos:pos]
-                                cleaned = n._logclean(chunk.decode(errors='replace'), var=True)
-                                lines = [l for l in cleaned.split('\n') if l.strip()]
-                                preview = lines[-1].strip() if lines else ""
-                                
-                                if preview:
-                                    match = prompt_re.search(preview)
-                                    if match:
-                                        cmd_text = preview[match.end():].strip()
-                                        if cmd_text:
-                                            blocks.append({"pos": pos, "preview": preview[:80], "type": "cmd"})
-                    
-                    clean_buffer = n._logclean(raw_bytes.decode(errors='replace'), var=True)
-                    last_line = clean_buffer.split('\n')[-1].strip() if clean_buffer.strip() else "(prompt)"
-                    blocks.append({"pos": len(raw_bytes), "preview": last_line[:80], "type": "current"})
 
                     if node_info is None:
                         node_info = {}
-                    node_info["context_blocks"] = blocks
-                    node_info["full_buffer"] = buffer
 
                     node_info_json = json.dumps(node_info)
+                    
+                    # Convert buffer to string if it's bytes for the preview
+                    preview_str = buffer[-200:].decode(errors='replace') if isinstance(buffer, bytes) else str(buffer)[-200:]
+                    
                     # 1. Send prompt to client
                     response_queue.put(connpy_pb2.InteractResponse(
                         copilot_prompt=True,
-                        copilot_buffer_preview=buffer[-200:],
+                        copilot_buffer_preview=preview_str,
                         copilot_node_info_json=node_info_json
                     ))
 
@@ -349,19 +309,33 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
                         commands = result.get("commands", [])
                         os.write(child_fd, b'\x15') # Ctrl+U to clear line
                         await asyncio.sleep(0.1)
+
+                        # Prepend screen length command to avoid pagination
+                        if "screen_length_command" in n.tags:
+                            os.write(child_fd, (n.tags["screen_length_command"] + "\n").encode())
+                            response_queue.put(connpy_pb2.InteractResponse(copilot_injected_command=n.tags["screen_length_command"]))
+                            await asyncio.sleep(0.8)
+
                         for cmd in commands:
                             os.write(child_fd, (cmd + "\n").encode())
                             response_queue.put(connpy_pb2.InteractResponse(copilot_injected_command=cmd))
-                            await asyncio.sleep(0.3)
+                            await asyncio.sleep(0.8)
                     elif action.startswith("custom:"):
                         custom_cmds = action[7:]
                         os.write(child_fd, b'\x15')
                         await asyncio.sleep(0.1)
+                        
+                        # Prepend screen length command to avoid pagination
+                        if "screen_length_command" in n.tags:
+                            os.write(child_fd, (n.tags["screen_length_command"] + "\n").encode())
+                            response_queue.put(connpy_pb2.InteractResponse(copilot_injected_command=n.tags["screen_length_command"]))
+                            await asyncio.sleep(0.8)
+
                         for cmd in custom_cmds.split('\n'):
                             if cmd.strip():
                                 os.write(child_fd, (cmd.strip() + "\n").encode())
                                 response_queue.put(connpy_pb2.InteractResponse(copilot_injected_command=cmd.strip()))
-                                await asyncio.sleep(0.3)
+                                await asyncio.sleep(0.8)
                     elif action not in ('cancel', 'n', 'no'):
                         # Handle numbers and ranges like "1,2,4-6"
                         try:
@@ -383,10 +357,17 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
                             if valid_indices:
                                 os.write(child_fd, b'\x15')
                                 await asyncio.sleep(0.1)
+                                
+                                # Prepend screen length command to avoid pagination
+                                if "screen_length_command" in n.tags:
+                                    os.write(child_fd, (n.tags["screen_length_command"] + "\n").encode())
+                                    response_queue.put(connpy_pb2.InteractResponse(copilot_injected_command=n.tags["screen_length_command"]))
+                                    await asyncio.sleep(0.8)
+
                                 for idx in valid_indices:
                                     os.write(child_fd, (commands[idx] + "\n").encode())
                                     response_queue.put(connpy_pb2.InteractResponse(copilot_injected_command=commands[idx]))
-                                    await asyncio.sleep(0.3)
+                                    await asyncio.sleep(0.8)
                             else:
                                 os.write(child_fd, b'\x15\r')
                         except (ValueError, IndexError):
@@ -978,6 +959,17 @@ class AIServicer(connpy_pb2_grpc.AIServiceServicer):
     @handle_errors
     def configure_provider(self, request, context):
         self.service.configure_provider(request.provider, request.model, request.api_key)
+        return Empty()
+    
+    @handle_errors
+    def configure_mcp(self, request, context):
+        self.service.configure_mcp(
+            request.name, 
+            url=request.url or None, 
+            enabled=request.enabled, 
+            auto_load_on_os=request.auto_load_on_os or None, 
+            remove=request.remove
+        )
         return Empty()
 
     @handle_errors

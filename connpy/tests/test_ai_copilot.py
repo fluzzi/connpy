@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, AsyncMock
 import json
 import asyncio
 
@@ -11,12 +11,23 @@ class DummyConfig:
         self.config = {"ai": {"engineer_api_key": "test_key", "engineer_model": "test_model"}}
         self.defaultdir = "/tmp"
 
+class MockAsyncIterator:
+    def __init__(self, items):
+        self.items = items
+    def __aiter__(self):
+        return self
+    async def __anext__(self):
+        if not self.items:
+            raise StopAsyncIteration
+        return self.items.pop(0)
+
 @pytest.fixture
-def mock_completion():
-    with patch('connpy.ai.completion') as mock:
+def mock_acompletion():
+    # Patch acompletion inside connpy.ai.aask_copilot
+    with patch('litellm.acompletion') as mock:
         yield mock
 
-def test_ask_copilot_tool_call(mock_completion):
+def test_aask_copilot_tool_call(mock_acompletion):
     agent = ai(DummyConfig())
     
     # Setup mock response for streaming
@@ -32,13 +43,20 @@ def test_ask_copilot_tool_call(mock_completion):
         def __init__(self, content):
             self.choices = [MockChoice(content)]
             
-    mock_completion.return_value = [
-        MockChunk("<guide>Check the interfaces and running config.</guide>"),
-        MockChunk("<commands>\nshow ip int br\nshow run\n</commands>"),
-        MockChunk("<risk>low</risk>")
-    ]
+    # acompletion is awaited and returns an async iterator
+    async def mock_ac(*args, **kwargs):
+        return MockAsyncIterator([
+            MockChunk("<guide>Check the interfaces and running config.</guide>"),
+            MockChunk("<commands>\nshow ip int br\nshow run\n</commands>"),
+            MockChunk("<risk>low</risk>")
+        ])
     
-    result = agent.ask_copilot("Router#", "What do I do?")
+    mock_acompletion.side_effect = mock_ac
+    
+    async def run_test():
+        return await agent.aask_copilot("Router#", "What do I do?")
+    
+    result = asyncio.run(run_test())
     
     if result["error"]:
         print(f"ERROR OCCURRED: {result['error']}")
@@ -48,7 +66,7 @@ def test_ask_copilot_tool_call(mock_completion):
     assert result["risk_level"] == "low"
     assert result["commands"] == ["show ip int br", "show run"]
 
-def test_ask_copilot_fallback(mock_completion):
+def test_aask_copilot_fallback(mock_acompletion):
     agent = ai(DummyConfig())
     
     # Setup mock response for streaming
@@ -64,11 +82,17 @@ def test_ask_copilot_fallback(mock_completion):
         def __init__(self, content):
             self.choices = [MockChoice(content)]
             
-    mock_completion.return_value = [
-        MockChunk("Here is some text response instead of tool call.")
-    ]
+    async def mock_ac(*args, **kwargs):
+        return MockAsyncIterator([
+            MockChunk("Here is some text response instead of tool call.")
+        ])
     
-    result = agent.ask_copilot("Router#", "What do I do?")
+    mock_acompletion.side_effect = mock_ac
+    
+    async def run_test():
+        return await agent.aask_copilot("Router#", "What do I do?")
+    
+    result = asyncio.run(run_test())
     
     if result["error"]:
         print(f"ERROR OCCURRED: {result['error']}")

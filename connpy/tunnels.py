@@ -47,6 +47,24 @@ class LocalStream:
                 # signal handling not supported on some loops (e.g., Windows Proactor)
                 pass
 
+    def stop_reading(self):
+        """Temporarily stop reading from stdin."""
+        if self._loop and self.stdin_fd is not None:
+            try:
+                self._loop.remove_reader(self.stdin_fd)
+            except Exception:
+                pass
+
+    def start_reading(self):
+        """Resume reading from stdin."""
+        if self._loop and self.stdin_fd is not None:
+            try:
+                # Ensure we don't add it twice
+                self._loop.remove_reader(self.stdin_fd)
+            except Exception:
+                pass
+            self._loop.add_reader(self.stdin_fd, self._read_ready)
+
     def teardown(self):
         if self._loop:
             try:

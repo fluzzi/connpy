@@ -7,6 +7,7 @@ import threading
 import asyncio
 from textwrap import dedent
 from .core import nodes
+from .mcp_client import MCPClientManager
 
 _litellm_initialized = False
 
@@ -143,6 +144,9 @@ class ai:
         self.tool_status_formatters = {}      # {"tool_name": formatter_callable}
         self.engineer_prompt_extensions = []  # Extra text for engineer prompt
         self.architect_prompt_extensions = [] # Extra text for architect prompt
+        
+        # MCP Manager
+        self.mcp_manager = MCPClientManager(self.config)
 
         # Long-term memory
         self.memory_path = os.path.join(self.config.defaultdir, "ai_memory.md")
@@ -677,7 +681,7 @@ class ai:
                     self.console.print("[pass]✓ Trust Mode Enabled. All future commands in this session will execute without confirmation.[/pass]")
                 elif user_resp_lower in ['y', 'yes']:
                     self.console.print("[pass]✓ Executing...[/pass]")
-                elif user_resp_lower in ['n', 'no', '']:
+                elif user_resp_lower in ['n', 'no', '', 'cancel']:
                     self.console.print("[fail]✗ Execution rejected by user.[/fail]")
                     return "Error: User rejected execution."
                 else:
@@ -773,6 +777,10 @@ class ai:
                             cmd_str = cmds[0] if cmds else ""
                             status.update(f"[ai_status]Engineer: [CMD] {cmd_str}")
                         elif fn == "get_node_info": status.update(f"[ai_status]Engineer: [INSPECT] {args.get('node_name','')}")
+                        elif fn.startswith("mcp_"):
+                            server = fn.split("__")[0].replace("mcp_", "")
+                            tool = fn.split("__")[1] if "__" in fn else fn
+                            status.update(f"[ai_status]Engineer: [MCP:{server}] {tool}")
                         elif fn in self.tool_status_formatters: status.update(self.tool_status_formatters[fn](args))
 
                     if debug:
@@ -781,6 +789,8 @@ class ai:
                     if fn == "list_nodes": obs = self.list_nodes_tool(**args)
                     elif fn == "run_commands": obs = self.run_commands_tool(**args, status=status)
                     elif fn == "get_node_info": obs = self.get_node_info_tool(**args)
+                    elif fn.startswith("mcp_"):
+                        obs = run_ai_async(self.mcp_manager.call_tool(fn, args)).result(timeout=60)
                     elif fn in self.external_tool_handlers: obs = self.external_tool_handlers[fn](self, **args)
                     else: obs = f"Error: Unknown tool '{fn}'."
                     
@@ -801,14 +811,22 @@ class ai:
         except Exception as e:
             return f"Engineer failed: {str(e)}", usage
 
-    def _get_engineer_tools(self):
+    def _get_engineer_tools(self, os_filter: str = None):
         """Define tools available to the Engineer."""
         base_tools = [
-            {"type": "function", "function": {"name": "list_nodes", "description": "Lists available nodes in the inventory.", "parameters": {"type": "object", "properties": {"filter_pattern": {"type": "string", "description": "Regex to filter nodes (e.g. '.*', 'border.*')."}}}}},
-            {"type": "function", "function": {"name": "run_commands", "description": "Runs one or more commands on matched nodes. MANDATORY: You MUST call 'list_nodes' first to verify the target list.", "parameters": {"type": "object", "properties": {"nodes_filter": {"type": "string", "description": "Exact node name or verified filter pattern."}, "commands": {"type": "array", "items": {"type": "string"}, "description": "List of commands (e.g. ['show ip route', 'show int desc'])."}}, "required": ["nodes_filter", "commands"]}}},
-            {"type": "function", "function": {"name": "get_node_info", "description": "Gets full metadata for a specific node.", "parameters": {"type": "object", "properties": {"node_name": {"type": "string"}}, "required": ["node_name"]}}}
+            {"type": "function", "function": {"name": "list_nodes", "description": "[Universal Platform] Lists available nodes in the inventory.", "parameters": {"type": "object", "properties": {"filter_pattern": {"type": "string", "description": "Regex to filter nodes (e.g. '.*', 'border.*')."}}}}},
+            {"type": "function", "function": {"name": "run_commands", "description": "[Universal Platform] Runs one or more commands on matched nodes. MANDATORY: You MUST call 'list_nodes' first to verify the target list.", "parameters": {"type": "object", "properties": {"nodes_filter": {"type": "string", "description": "Exact node name or verified filter pattern."}, "commands": {"type": "array", "items": {"type": "string"}, "description": "List of commands (e.g. ['show ip route', 'show int desc'])."}}, "required": ["nodes_filter", "commands"]}}},
+            {"type": "function", "function": {"name": "get_node_info", "description": "[Universal Platform] Gets full metadata for a specific node.", "parameters": {"type": "object", "properties": {"node_name": {"type": "string"}}, "required": ["node_name"]}}}
         ]
         
+        # Add dynamic tools from MCP
+        try:
+            mcp_tools = run_ai_async(self.mcp_manager.get_tools_for_llm(os_filter=os_filter)).result(timeout=10)
+            base_tools.extend(mcp_tools)
+        except Exception as e:
+            # Silently fail for LLM tools
+            pass
+
         if self.architect_key:
             base_tools.extend([
                 {"type": "function", "function": {"name": "consult_architect", "description": "Ask the Strategic Reasoning Engine for advice on complex design, architecture, or troubleshooting decisions. You remain in control and will present the response to the user. Use this for: configuration planning, design validation, complex troubleshooting.", "parameters": {"type": "object", "properties": {"question": {"type": "string", "description": "Strategic question or decision needed."}, "technical_summary": {"type": "string", "description": "Technical findings and context gathered so far."}}, "required": ["question", "technical_summary"]}}},
@@ -1202,6 +1220,8 @@ class ai:
                     elif fn == "run_commands": obs = self.run_commands_tool(**args, status=status)
                     elif fn == "get_node_info": obs = self.get_node_info_tool(**args)
                     elif fn == "manage_memory_tool": obs = self.manage_memory_tool(**args)
+                    elif fn.startswith("mcp_"):
+                        obs = run_ai_async(self.mcp_manager.call_tool(fn, args)).result(timeout=60)
                     elif fn in self.external_tool_handlers: obs = self.external_tool_handlers[fn](self, **args)
                     else: obs = f"Error: {fn} unknown."
 
@@ -1269,146 +1289,6 @@ class ai:
         }
 
     @MethodHook
-    def ask_copilot(self, terminal_buffer, user_question, node_info=None, chunk_callback=None):
-        """Single-shot copilot for augmented terminal sessions.
-        
-        Args:
-            terminal_buffer: Sanitized terminal screen content (últimas N líneas).
-            user_question: Pregunta del usuario sobre la sesión activa.
-            node_info: Optional dict con metadata del nodo (os, name, etc.)
-            chunk_callback: Optional callable for streaming the guide.
-        
-        Returns:
-            dict: {commands: list[str], guide: str, risk_level: str, error: str|None}
-        """
-        import json
-        import re
-        
-        node_info = node_info or {}
-        os_info = node_info.get("os", "unknown")
-        node_name = node_info.get("name", "unknown")
-        
-        # Load vendor-specific command reference if available
-        vendor_reference = ""
-        if os_info and os_info != "unknown":
-            try:
-                os_filename = os_info.lower().replace(" ", "_")
-                ref_path = os.path.join(self.config.defaultdir, "ai_references", f"{os_filename}.md")
-                if os.path.exists(ref_path):
-                    with open(ref_path, "r") as f:
-                        vendor_reference = f.read().strip()
-            except Exception:
-                pass
-        
-        system_prompt = f"""Role: TERMINAL COPILOT. You assist a network engineer during a live SSH session.
-Rules:
-1. Answer the user's question directly based on the Terminal Context.
-2. If the user asks you to analyze, parse, or extract data from the Terminal Context, DO IT directly in the <guide> section (you can use markdown tables or lists). Do NOT just give them a command to do it themselves.
-3. If the user wants to execute an action, provide the required CLI commands inside a <commands> block, one command per line. If no commands are needed, leave it empty or omit the block.
-4. ULTRA-CONCISE. Keep your guide to the point.
-5. You MUST output your response in the following strict format:
-<guide>
-Your brief tactical guide in markdown. 3-4 sentences max.
-</guide>
-<commands>
-command 1
-command 2
-</commands>
-<risk>
-low, high, or destructive
-</risk>
-6. Risk level: "low" for read-only/no commands, "high" for config changes, "destructive" for potentially dangerous ops.
-
-Terminal Context:
-{terminal_buffer}
-
-Device OS: {os_info}
-Node: {node_name}"""
-        
-        if vendor_reference:
-            system_prompt += f"\n\nVendor Command Reference:\n{vendor_reference}"
-
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_question}
-        ]
-
-        try:
-            response = completion(
-                model=self.engineer_model,
-                messages=messages,
-                api_key=self.engineer_key,
-                stream=True
-            )
-            
-            full_content = ""
-            streamed_guide = ""
-            
-            for chunk in response:
-                delta = chunk.choices[0].delta
-                if hasattr(delta, 'content') and delta.content:
-                    full_content += delta.content
-                    
-                    if chunk_callback:
-                        start_idx = full_content.find("<guide>")
-                        if start_idx != -1:
-                            after_start = full_content[start_idx + 7:]
-                            end_idx = after_start.find("</guide>")
-                            
-                            if end_idx != -1:
-                                current_guide = after_start[:end_idx]
-                            else:
-                                current_guide = after_start
-                                if current_guide.endswith("<"): current_guide = current_guide[:-1]
-                                elif current_guide.endswith("</"): current_guide = current_guide[:-2]
-                                elif current_guide.endswith("</g"): current_guide = current_guide[:-3]
-                                elif current_guide.endswith("</gu"): current_guide = current_guide[:-4]
-                                elif current_guide.endswith("</gui"): current_guide = current_guide[:-5]
-                                elif current_guide.endswith("</guid"): current_guide = current_guide[:-6]
-                                elif current_guide.endswith("</guide"): current_guide = current_guide[:-7]
-                            
-                            new_text = current_guide[len(streamed_guide):]
-                            if new_text:
-                                chunk_callback(new_text)
-                                streamed_guide += new_text
-
-            guide = ""
-            commands = []
-            risk_level = "low"
-            
-            guide_match = re.search(r"<guide>(.*?)</guide>", full_content, re.DOTALL)
-            if guide_match:
-                guide = guide_match.group(1).strip()
-                
-            cmd_match = re.search(r"<commands>(.*?)</commands>", full_content, re.DOTALL)
-            if cmd_match:
-                cmds_raw = cmd_match.group(1).strip()
-                if cmds_raw:
-                    commands = [c.strip() for c in cmds_raw.split('\n') if c.strip()]
-                    
-            risk_match = re.search(r"<risk>(.*?)</risk>", full_content, re.DOTALL)
-            if risk_match:
-                risk_level = risk_match.group(1).strip().lower()
-
-            if not guide and full_content and not ("<guide>" in full_content):
-                guide = full_content.strip()
-
-            return {
-                "commands": commands,
-                "guide": guide,
-                "risk_level": risk_level,
-                "error": None
-            }
-            
-        except Exception as e:
-            return {
-                "commands": [],
-                "guide": "",
-                "risk_level": "low",
-                "error": str(e)
-            }
-
-    @MethodHook
     async def aask_copilot(self, terminal_buffer, user_question, node_info=None, chunk_callback=None):
         import json
         import re
@@ -1463,49 +1343,136 @@ Node: {node_name}"""
         if vendor_reference:
             system_prompt += f"\n\nVendor Command Reference:\n{vendor_reference}"
 
+        # Fetch MCP tools for the current OS
+        mcp_tools = []
+        try:
+            mcp_tools = await self.mcp_manager.get_tools_for_llm(os_filter=os_info)
+        except Exception:
+            pass
+            
+        if mcp_tools:
+            system_prompt += f"\n\nAvailable MCP Tools: {', '.join([t['function']['name'] for t in mcp_tools])}"
+            system_prompt += "\nUse these tools to validate syntax or find exact commands if needed before providing the final guide."
+
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_question}
         ]
 
+        iteration = 0
+        max_iterations = 5 # Allow up to 5 iterations for tool usage
+        
         try:
-            response = await acompletion(
-                model=self.engineer_model,
-                messages=messages,
-                api_key=self.engineer_key,
-                stream=True
-            )
-            
-            full_content = ""
-            streamed_guide = ""
-            
-            async for chunk in response:
-                delta = chunk.choices[0].delta
-                if hasattr(delta, 'content') and delta.content:
-                    full_content += delta.content
+            while iteration < max_iterations:
+                iteration += 1
+                response = await acompletion(
+                    model=self.engineer_model,
+                    messages=messages,
+                    tools=mcp_tools if mcp_tools else None,
+                    api_key=self.engineer_key,
+                    stream=True
+                )
+                
+                full_content = ""
+                streamed_guide = ""
+                tool_calls = []
+                
+                async for chunk in response:
+                    delta = chunk.choices[0].delta
                     
-                    if chunk_callback:
-                        start_idx = full_content.find("<guide>")
-                        if start_idx != -1:
-                            after_start = full_content[start_idx + 7:]
-                            end_idx = after_start.find("</guide>")
-                            
-                            if end_idx != -1:
-                                current_guide = after_start[:end_idx]
+                    # Accumulate tool calls
+                    if hasattr(delta, 'tool_calls') and delta.tool_calls:
+                        for tc in delta.tool_calls:
+                            idx = tc.index
+                            if idx >= len(tool_calls):
+                                tool_calls.append({"id": tc.id, "type": "function", "function": {"name": tc.function.name or "", "arguments": tc.function.arguments or ""}})
                             else:
-                                current_guide = after_start
-                                if current_guide.endswith("<"): current_guide = current_guide[:-1]
-                                elif current_guide.endswith("</"): current_guide = current_guide[:-2]
-                                elif current_guide.endswith("</g"): current_guide = current_guide[:-3]
-                                elif current_guide.endswith("</gu"): current_guide = current_guide[:-4]
-                                elif current_guide.endswith("</gui"): current_guide = current_guide[:-5]
-                                elif current_guide.endswith("</guid"): current_guide = current_guide[:-6]
-                                elif current_guide.endswith("</guide"): current_guide = current_guide[:-7]
-                            
-                            new_text = current_guide[len(streamed_guide):]
-                            if new_text:
-                                chunk_callback(new_text)
-                                streamed_guide += new_text
+                                if tc.id: tool_calls[idx]["id"] = tc.id
+                                if tc.function.name: tool_calls[idx]["function"]["name"] = tc.function.name
+                                if tc.function.arguments: tool_calls[idx]["function"]["arguments"] += tc.function.arguments
+
+                    if hasattr(delta, 'content') and delta.content:
+                        full_content += delta.content
+                        
+                        if chunk_callback and not tool_calls: # Only stream if not using tools
+                            start_idx = full_content.find("<guide>")
+                            if start_idx != -1:
+                                after_start = full_content[start_idx + 7:]
+                                end_idx = after_start.find("</guide>")
+                                
+                                if end_idx != -1:
+                                    current_guide = after_start[:end_idx]
+                                else:
+                                    current_guide = after_start
+                                    if current_guide.endswith("<"): current_guide = current_guide[:-1]
+                                    elif current_guide.endswith("</"): current_guide = current_guide[:-2]
+                                    elif current_guide.endswith("</g"): current_guide = current_guide[:-3]
+                                    elif current_guide.endswith("</gu"): current_guide = current_guide[:-4]
+                                    elif current_guide.endswith("</gui"): current_guide = current_guide[:-5]
+                                    elif current_guide.endswith("</guid"): current_guide = current_guide[:-6]
+                                    elif current_guide.endswith("</guide"): current_guide = current_guide[:-7]
+                                
+                                new_text = current_guide[len(streamed_guide):]
+                                if new_text:
+                                    chunk_callback(new_text)
+                                    streamed_guide += new_text
+
+                if not tool_calls:
+                    break
+                    
+                # Execute tool calls
+                messages.append({"role": "assistant", "content": full_content or None, "tool_calls": tool_calls})
+                for tc in tool_calls:
+                    fn = tc["function"]["name"]
+                    args = json.loads(tc["function"]["arguments"])
+                    
+                    if "mcp_" in fn:
+                        try:
+                            obs = await asyncio.wait_for(self.mcp_manager.call_tool(fn, args), timeout=30.0)
+                        except Exception as e:
+                            obs = f"Error calling MCP tool: {e}"
+                    else:
+                        obs = f"Error: Tool {fn} not allowed in Copilot."
+                        
+                    messages.append({"tool_call_id": tc["id"], "role": "tool", "name": fn, "content": self._truncate(str(obs))})
+
+            # If we hit the limit and it was still using tools, force a final answer
+            if tool_calls and iteration >= max_iterations:
+                messages.append({"role": "user", "content": "Tool limit reached. Provide your final tactical guide now based on the findings."})
+                response = await acompletion(
+                    model=self.engineer_model,
+                    messages=messages,
+                    tools=None,
+                    api_key=self.engineer_key,
+                    stream=True
+                )
+                
+                full_content = ""
+                streamed_guide = ""
+                async for chunk in response:
+                    delta = chunk.choices[0].delta
+                    if hasattr(delta, 'content') and delta.content:
+                        full_content += delta.content
+                        if chunk_callback:
+                            start_idx = full_content.find("<guide>")
+                            if start_idx != -1:
+                                after_start = full_content[start_idx + 7:]
+                                end_idx = after_start.find("</guide>")
+                                if end_idx != -1:
+                                    current_guide = after_start[:end_idx]
+                                else:
+                                    current_guide = after_start
+                                    if current_guide.endswith("<"): current_guide = current_guide[:-1]
+                                    elif current_guide.endswith("</"): current_guide = current_guide[:-2]
+                                    elif current_guide.endswith("</g"): current_guide = current_guide[:-3]
+                                    elif current_guide.endswith("</gu"): current_guide = current_guide[:-4]
+                                    elif current_guide.endswith("</gui"): current_guide = current_guide[:-5]
+                                    elif current_guide.endswith("</guid"): current_guide = current_guide[:-6]
+                                    elif current_guide.endswith("</guide"): current_guide = current_guide[:-7]
+                                new_text = current_guide[len(streamed_guide):]
+                                if new_text:
+                                    chunk_callback(new_text)
+                                    streamed_guide += new_text
 
             guide = ""
             commands = []

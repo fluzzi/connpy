@@ -9,6 +9,7 @@ from .utils import to_value, from_value, to_struct, from_struct
 from ..services.exceptions import ConnpyError
 from ..hooks import MethodHook
 from .. import printer
+from ..cli.terminal_ui import log_cleaner, CopilotInterface
 
 def handle_errors(func):
     @wraps(func)
@@ -40,6 +41,60 @@ class NodeStub:
         self.stub = connpy_pb2_grpc.NodeServiceStub(channel)
         self.remote_host = remote_host
         self.config = config
+
+    def _handle_remote_copilot(self, res, request_queue, response_queue, client_buffer_bytes, cmd_byte_positions, pause_generator, resume_generator, old_tty):
+        import json, asyncio, termios, sys, tty, queue
+        from ..core import copilot_terminal_mode
+        from . import connpy_pb2
+
+        pause_generator()
+        
+        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+        interface = CopilotInterface(self.config, history=getattr(self, 'copilot_history', None))
+        self.copilot_history = interface.history
+        
+        node_info = json.loads(res.copilot_node_info_json) if res.copilot_node_info_json else {}
+
+        async def on_ai_call_remote(active_buffer, question, chunk_callback):
+            # Send request to server
+            request_queue.put(connpy_pb2.InteractRequest(
+                copilot_question=question, 
+                copilot_context_buffer=active_buffer
+            ))
+            # Wait for chunks from server
+            while True:
+                try:
+                    chunk_res = response_queue.get(timeout=0.1)
+                    if chunk_res is None: return {"error": "Server disconnected"}
+                    if chunk_res.copilot_stream_chunk:
+                        chunk_callback(chunk_res.copilot_stream_chunk)
+                    elif chunk_res.copilot_response_json:
+                        return json.loads(chunk_res.copilot_response_json)
+                except queue.Empty:
+                    await asyncio.sleep(0.05)
+
+        # Wrap in async loop
+        async def run_remote_copilot():
+            return await interface.run_session(
+                raw_bytes=bytes(client_buffer_bytes),
+                cmd_byte_positions=cmd_byte_positions,
+                node_info=node_info,
+                on_ai_call=on_ai_call_remote
+            )
+        
+        with copilot_terminal_mode():
+            action, commands, custom_cmd = asyncio.run(run_remote_copilot())
+        
+        # Prepare final action for server
+        action_sent = "cancel"
+        if action == "send_all": 
+            action_sent = "send_all"
+        elif action == "custom" and custom_cmd:
+            action_sent = f"custom:{chr(10).join(custom_cmd)}"
+
+        request_queue.put(connpy_pb2.InteractRequest(copilot_action=action_sent))
+        resume_generator()
+        tty.setraw(sys.stdin.fileno())
 
     @handle_errors
     def connect_node(self, unique_id, sftp=False, debug=False, logger=None):
@@ -173,325 +228,11 @@ class NodeStub:
                 if res is None:
                     break
                 if res.copilot_prompt:
-                    pause_generator()
-                    import json
-                    import asyncio
-                    import re
-                    from rich.console import Console
-                    from rich.panel import Panel
-                    from rich.markdown import Markdown
-                    from prompt_toolkit import PromptSession
-                    from prompt_toolkit.key_binding import KeyBindings
-                    from prompt_toolkit.formatted_text import HTML
-                    from prompt_toolkit.history import InMemoryHistory
-                    from ..printer import connpy_theme
-                    from ..core import copilot_terminal_mode
-                    
-                    if not hasattr(self, 'copilot_history'):
-                        self.copilot_history = InMemoryHistory()
-                    
-                    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
-                    import fcntl
-                    flags = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
-                    fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, flags & ~os.O_NONBLOCK)
-                    console = Console(theme=connpy_theme)
-                    console.print("\n")
-                    console.print(Panel(
-                        "[bold cyan]AI Terminal Copilot[/bold cyan]\n"
-                        "[dim]Type your question. Enter to send, Escape/Ctrl+C to cancel.\n"
-                        "Tab to change context mode. Ctrl+\u2191/\u2193 to adjust context. \u2191\u2193 for question history.[/dim]",
-                        border_style="cyan"
-                    ))
-                    
-                    node_info = json.loads(res.copilot_node_info_json) if res.copilot_node_info_json else {}
-                    
-                    # Logic for context selection
-                    blocks = []
-                    raw_bytes = client_buffer_bytes
-                    from ..core import node
-                    dummy_node = node("dummy", "dummy") # For logclean
-                    
-                    if cmd_byte_positions and len(cmd_byte_positions) >= 2 and raw_bytes:
-                        default_prompt = r'>$|#$|\$$|>.$|#.$|\$.$'
-                        device_prompt = node_info.get("prompt", default_prompt)
-                        prompt_re_str = re.sub(r'(?<!\\)\$', '', device_prompt)
-                        try:
-                            prompt_re = re.compile(prompt_re_str)
-                        except Exception:
-                            prompt_re = re.compile(re.sub(r'(?<!\\)\$', '', default_prompt))
-                            
-                        for i in range(1, len(cmd_byte_positions)):
-                            pos, known_cmd = cmd_byte_positions[i]
-                            prev_pos = cmd_byte_positions[i-1][0]
-                            
-                            if known_cmd:
-                                # AI-injected command: we already know the command text
-                                prev_chunk = raw_bytes[prev_pos:pos]
-                                prev_cleaned = dummy_node._logclean(prev_chunk.decode(errors='replace'), var=True)
-                                prev_lines = [l for l in prev_cleaned.split('\n') if l.strip()]
-                                prompt_text = prev_lines[-1].strip() if prev_lines else ""
-                                preview = f"{prompt_text}{known_cmd}" if prompt_text else known_cmd
-                                blocks.append((pos, preview[:80]))
-                            else:
-                                # User-typed command: derive from raw log chunk
-                                chunk = raw_bytes[prev_pos:pos]
-                                cleaned = dummy_node._logclean(chunk.decode(errors='replace'), var=True)
-                                lines = [l for l in cleaned.split('\n') if l.strip()]
-                                preview = lines[-1].strip() if lines else ""
-                                
-                                if preview:
-                                    match = prompt_re.search(preview)
-                                    if match:
-                                        cmd_text = preview[match.end():].strip()
-                                        if cmd_text:
-                                            blocks.append((pos, preview[:80]))
-                        
-                    clean_buffer = dummy_node._logclean(raw_bytes.decode(errors='replace'), var=True)
-                    last_line = clean_buffer.split('\n')[-1].strip() if clean_buffer.strip() else "(prompt)"
-                    blocks.append((len(raw_bytes), last_line[:80]))
-                            
-                    context_cmd = [1]
-                    total_cmds = len(blocks)
-                    total_lines = len(clean_buffer.split('\n'))
-                    context_lines = [min(50, total_lines)]
-                    context_mode = [0]
-                    MODE_RANGE, MODE_SINGLE, MODE_LINES = 0, 1, 2
-                    
-                    bindings = KeyBindings()
-                    
-                    @bindings.add('c-up')
-                    def _(event):
-                        if context_mode[0] == MODE_LINES:
-                            if context_lines[0] >= total_lines:
-                                context_lines[0] = min(50, total_lines)
-                            else:
-                                context_lines[0] = min(context_lines[0] + 50, total_lines)
-                        else:
-                            if context_cmd[0] < total_cmds:
-                                context_cmd[0] += 1
-                            else:
-                                context_cmd[0] = 1
-                        event.app.invalidate()
-                    
-                    @bindings.add('c-down')
-                    def _(event):
-                        if context_mode[0] == MODE_LINES:
-                            if context_lines[0] <= min(50, total_lines):
-                                context_lines[0] = total_lines
-                            else:
-                                context_lines[0] = max(context_lines[0] - 50, min(50, total_lines))
-                        else:
-                            if context_cmd[0] > 1:
-                                context_cmd[0] -= 1
-                            else:
-                                context_cmd[0] = total_cmds
-                        event.app.invalidate()
-                    
-                    @bindings.add('tab')
-                    def _(event):
-                        context_mode[0] = (context_mode[0] + 1) % 3
-                        event.app.invalidate()
-                        
-                    @bindings.add('escape', eager=True)
-                    def _(event):
-                        event.app.exit(result='')
-                        
-                    def get_current_block():
-                        idx = max(0, total_cmds - context_cmd[0])
-                        return idx, blocks[idx]
-                    
-                    def get_active_buffer():
-                        if context_mode[0] == MODE_LINES:
-                            buffer_lines = clean_buffer.split('\n')
-                            return '\n'.join(buffer_lines[-context_lines[0]:])
-                        
-                        idx, (start, preview) = get_current_block()
-                        if context_mode[0] == MODE_SINGLE and idx + 1 < total_cmds:
-                            end = blocks[idx + 1][0]
-                            active_raw = raw_bytes[start:end]
-                        else:
-                            active_raw = raw_bytes[start:]
-                        return preview + "\n" + dummy_node._logclean(active_raw.decode(errors='replace'), var=True)
-                        
-                    def get_prompt_text():
-                        if context_mode[0] == MODE_LINES:
-                            return HTML(f"<ansicyan>Ask [Ctx: {context_lines[0]}/{total_lines}L]: </ansicyan>")
-                        
-                        lines_count = len(get_active_buffer().split('\n'))
-                        if context_mode[0] == MODE_SINGLE:
-                            return HTML(f"<ansicyan>Ask [Cmd {context_cmd[0]} ~{lines_count}L]: </ansicyan>")
-                        else:
-                            return HTML(f"<ansicyan>Ask [Cmd {context_cmd[0]}\u2192END ~{lines_count}L]: </ansicyan>")
-                        
-                    def get_toolbar():
-                        mode_labels = {MODE_RANGE: "RANGE", MODE_SINGLE: "SINGLE", MODE_LINES: "LINES"}
-                        mode_label = mode_labels[context_mode[0]]
-                        if context_mode[0] == MODE_LINES:
-                            return HTML(f"<ansigray>\u25b6 Ctrl+\u2191/\u2193 adjusts by 50 lines  [Tab: {mode_label}]</ansigray>")
-                        _, (_, preview) = get_current_block()
-                        return HTML(f"<ansigray>\u25b6 {preview}  [Tab: {mode_label}]</ansigray>")
-                    
-                    try:
-                        session = PromptSession(history=self.copilot_history)
-                        question = session.prompt(get_prompt_text, key_bindings=bindings, bottom_toolbar=get_toolbar)
-                    except KeyboardInterrupt:
-                        question = ""
-
-                    if not question or not question.strip() or question.strip() == "CANCEL":
-                        console.print("\n[dim]Copilot cancelled.[/dim]")
-                        request_queue.put(connpy_pb2.InteractRequest(copilot_question="CANCEL"))
-                        resume_generator()
-                        tty.setraw(sys.stdin.fileno())
-                        continue
-
-                    active_buffer = get_active_buffer()
-                    # Enrich question with history (same as local CLI)
-                    past_questions = self.copilot_history.get_strings()
-                    if len(past_questions) > 1:
-                        # Limit history to last 5 questions to save tokens, excluding current
-                        recent_history = past_questions[-6:-1]
-                        history_text = "\n".join(f"- {q}" for q in recent_history)
-                        enriched_question = f"Previous questions in this session:\n{history_text}\n\nCurrent Question:\n{question}"
-                    else:
-                        enriched_question = question
-                        
-                    request_queue.put(connpy_pb2.InteractRequest(copilot_question=enriched_question, copilot_context_buffer=active_buffer))
-                    
-                    from rich.live import Live
-                    live_text = "Thinking..."
-                    panel = Panel(live_text, title="[bold cyan]Copilot Guide[/bold cyan]", border_style="cyan")
-                    result = {}
-                    cancelled = False
-                    
-                    with copilot_terminal_mode(), Live(panel, console=console, refresh_per_second=10) as live:
-                        # Make stdin non-blocking to check for Ctrl+C locally
-                        import fcntl
-                        flags = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
-                        fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, flags | os.O_NONBLOCK)
-                        
-                        while True:
-                            # 1. Read input for Ctrl+C
-                            try:
-                                key = os.read(sys.stdin.fileno(), 1024)
-                                if b'\x03' in key or b'\x1b' in key:
-                                    cancelled = True
-                                    request_queue.put(connpy_pb2.InteractRequest(copilot_question="CANCEL"))
-                                    msg = "Ctrl+C" if b'\x03' in key else "Esc"
-                                    console.print(f"\n[dim]Copilot cancelled via {msg}.[/dim]")
-                                    break
-                            except OSError:
-                                pass
-                                
-                            # 2. Wait for response chunk
-                            try:
-                                chunk_res = response_queue.get(timeout=0.1)
-                                if chunk_res is None:
-                                    break
-                                    
-                                if chunk_res.copilot_stream_chunk:
-                                    if live_text == "Thinking...": live_text = ""
-                                    live_text += chunk_res.copilot_stream_chunk
-                                    live.update(Panel(Markdown(live_text), title="[bold cyan]Copilot Guide[/bold cyan]", border_style="cyan"))
-                                elif chunk_res.copilot_response_json:
-                                    result = json.loads(chunk_res.copilot_response_json)
-                                    break
-                            except queue.Empty:
-                                continue
-                                
-                        # Restore blocking mode
-                        fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, flags)
-
-                    if cancelled:
-                        resume_generator()
-                        tty.setraw(sys.stdin.fileno())
-                        continue
-                        
-                    if result.get("error"):
-                        console.print(f"[red]Error: {result['error']}[/red]")
-                        request_queue.put(connpy_pb2.InteractRequest(copilot_action="cancel"))
-                        resume_generator()
-                        tty.setraw(sys.stdin.fileno())
-                        continue
-
-                    if live_text == "Thinking..." and result.get("guide"):
-                        console.print(Panel(Markdown(result["guide"]), title="[bold cyan]Copilot Guide[/bold cyan]", border_style="cyan"))
-
-                    commands = result.get("commands", [])
-                    risk = result.get("risk_level", "low")
-                    risk_style = {"low": "green", "high": "yellow", "destructive": "red"}.get(risk, "green")
-                    
-                    action_sent = "cancel"
-                    if commands:
-                        cmd_text = "\n".join(f"  {i+1}. {cmd}" for i, cmd in enumerate(commands))
-                        console.print(Panel(
-                            cmd_text,
-                            title=f"[bold {risk_style}]Suggested Commands [{risk.upper()}][/bold {risk_style}]",
-                            border_style=risk_style
-                        ))
-                        
-                        try:
-                            confirm_session = PromptSession()
-                            confirm_bindings = KeyBindings()
-                            @confirm_bindings.add('escape', eager=True)
-                            def _(event):
-                                event.app.exit(result='n')
-                            
-                            pt_color = "ansi" + risk_style
-                            action = confirm_session.prompt(
-                                HTML(f"<{pt_color}>Send commands? (y/n/e/number/range) [n]: </{pt_color}>"),
-                                key_bindings=confirm_bindings
-                            )
-                        except KeyboardInterrupt:
-                            action = "n"
-                            
-                        if not action.strip():
-                            action = "n"
-                            
-                        action_l = action.lower().strip()
-                        if action_l in ('y', 'yes', 'all'):
-                            action_sent = "send_all"
-                        elif action_l.startswith('e'):
-                            action_sent = f"edit_{action_l[1:]}" if len(action_l) > 1 else "edit_all"
-                            # For remote editing, the client edits and sends back as custom action 
-                            edit_session = PromptSession()
-                            cmds_to_edit = []
-                            if action_sent.startswith("edit_") and action_sent[5:].isdigit():
-                                idx = int(action_sent[5:]) - 1
-                                if 0 <= idx < len(commands):
-                                    cmds_to_edit = [commands[idx]]
-                            else:
-                                cmds_to_edit = commands
-                                
-                            if cmds_to_edit:
-                                target_cmd = "\n".join(cmds_to_edit)
-                                try:
-                                    edit_bindings = KeyBindings()
-                                    @edit_bindings.add('c-j')
-                                    def _(event):
-                                        event.app.exit(result=event.app.current_buffer.text)
-                                    @edit_bindings.add('escape', eager=True)
-                                    def _(event):
-                                        event.app.exit(result='')
-                                        
-                                    edited_cmd = edit_session.prompt(
-                                        HTML("<ansicyan>Edit commands (Ctrl+Enter to submit, Esc to cancel):\n</ansicyan>"),
-                                        default=target_cmd,
-                                        multiline=True,
-                                        key_bindings=edit_bindings
-                                    )
-                                    if edited_cmd.strip():
-                                        action_sent = "custom:" + edited_cmd.strip()
-                                    else:
-                                        action_sent = "cancel"
-                                except KeyboardInterrupt:
-                                    action_sent = "cancel"
-                        elif action_l not in ('n', 'no', ''):
-                            action_sent = action_l
-                    
-                    console.print("[dim]Returning to session...[/dim]\n")
-                    request_queue.put(connpy_pb2.InteractRequest(copilot_action=action_sent))
-                    resume_generator()
-                    tty.setraw(sys.stdin.fileno())
+                    self._handle_remote_copilot(
+                        res, request_queue, response_queue, 
+                        client_buffer_bytes, cmd_byte_positions, 
+                        pause_generator, resume_generator, old_tty
+                    )
                     continue
 
                 if res.copilot_injected_command:
@@ -638,321 +379,11 @@ class NodeStub:
                 if res is None:
                     break
                 if res.copilot_prompt:
-                    pause_generator()
-                    import json
-                    import asyncio
-                    import re
-                    from rich.console import Console
-                    from rich.panel import Panel
-                    from rich.markdown import Markdown
-                    from prompt_toolkit import PromptSession
-                    from prompt_toolkit.key_binding import KeyBindings
-                    from prompt_toolkit.formatted_text import HTML
-                    from prompt_toolkit.history import InMemoryHistory
-                    from ..printer import connpy_theme
-                    from ..core import copilot_terminal_mode
-                    
-                    if not hasattr(self, 'copilot_history'):
-                        self.copilot_history = InMemoryHistory()
-                    
-                    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
-                    import fcntl
-                    flags = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
-                    fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, flags & ~os.O_NONBLOCK)
-                    console = Console(theme=connpy_theme)
-                    console.print("\n")
-                    console.print(Panel(
-                        "[bold cyan]AI Terminal Copilot[/bold cyan]\n"
-                        "[dim]Type your question. Enter to send, Escape/Ctrl+C to cancel.\n"
-                        "Tab to change context mode. Ctrl+\u2191/\u2193 to adjust context. \u2191\u2193 for question history.[/dim]",
-                        border_style="cyan"
-                    ))
-                    
-                    node_info = json.loads(res.copilot_node_info_json) if res.copilot_node_info_json else {}
-                    
-                    # Logic for context selection
-                    blocks = []
-                    raw_bytes = client_buffer_bytes
-                    from ..core import node
-                    dummy_node = node("dummy", "dummy") # For logclean
-                    
-                    if cmd_byte_positions and len(cmd_byte_positions) >= 2 and raw_bytes:
-                        default_prompt = r'>$|#$|\$$|>.$|#.$|\$.$'
-                        device_prompt = node_info.get("prompt", default_prompt)
-                        prompt_re_str = re.sub(r'(?<!\\)\$', '', device_prompt)
-                        try:
-                            prompt_re = re.compile(prompt_re_str)
-                        except Exception:
-                            prompt_re = re.compile(re.sub(r'(?<!\\)\$', '', default_prompt))
-                            
-                        for i in range(1, len(cmd_byte_positions)):
-                            pos, known_cmd = cmd_byte_positions[i]
-                            prev_pos = cmd_byte_positions[i-1][0]
-                            
-                            if known_cmd:
-                                # AI-injected command: we already know the command text
-                                prev_chunk = raw_bytes[prev_pos:pos]
-                                prev_cleaned = dummy_node._logclean(prev_chunk.decode(errors='replace'), var=True)
-                                prev_lines = [l for l in prev_cleaned.split('\n') if l.strip()]
-                                prompt_text = prev_lines[-1].strip() if prev_lines else ""
-                                preview = f"{prompt_text}{known_cmd}" if prompt_text else known_cmd
-                                blocks.append((pos, preview[:80]))
-                            else:
-                                # User-typed command: derive from raw log chunk
-                                chunk = raw_bytes[prev_pos:pos]
-                                cleaned = dummy_node._logclean(chunk.decode(errors='replace'), var=True)
-                                lines = [l for l in cleaned.split('\n') if l.strip()]
-                                preview = lines[-1].strip() if lines else ""
-                                
-                                if preview:
-                                    match = prompt_re.search(preview)
-                                    if match:
-                                        cmd_text = preview[match.end():].strip()
-                                        if cmd_text:
-                                            blocks.append((pos, preview[:80]))
-                        
-                    clean_buffer = dummy_node._logclean(raw_bytes.decode(errors='replace'), var=True)
-                    last_line = clean_buffer.split('\n')[-1].strip() if clean_buffer.strip() else "(prompt)"
-                    blocks.append((len(raw_bytes), last_line[:80]))
-                            
-                    context_cmd = [1]
-                    total_cmds = len(blocks)
-                    total_lines = len(clean_buffer.split('\n'))
-                    context_lines = [min(50, total_lines)]
-                    context_mode = [0]
-                    MODE_RANGE, MODE_SINGLE, MODE_LINES = 0, 1, 2
-                    
-                    bindings = KeyBindings()
-                    
-                    @bindings.add('c-up')
-                    def _(event):
-                        if context_mode[0] == MODE_LINES:
-                            if context_lines[0] >= total_lines:
-                                context_lines[0] = min(50, total_lines)
-                            else:
-                                context_lines[0] = min(context_lines[0] + 50, total_lines)
-                        else:
-                            if context_cmd[0] < total_cmds:
-                                context_cmd[0] += 1
-                            else:
-                                context_cmd[0] = 1
-                        event.app.invalidate()
-                    
-                    @bindings.add('c-down')
-                    def _(event):
-                        if context_mode[0] == MODE_LINES:
-                            if context_lines[0] <= min(50, total_lines):
-                                context_lines[0] = total_lines
-                            else:
-                                context_lines[0] = max(context_lines[0] - 50, min(50, total_lines))
-                        else:
-                            if context_cmd[0] > 1:
-                                context_cmd[0] -= 1
-                            else:
-                                context_cmd[0] = total_cmds
-                        event.app.invalidate()
-                    
-                    @bindings.add('tab')
-                    def _(event):
-                        context_mode[0] = (context_mode[0] + 1) % 3
-                        event.app.invalidate()
-                        
-                    @bindings.add('escape', eager=True)
-                    def _(event):
-                        event.app.exit(result='')
-                        
-                    def get_current_block():
-                        idx = max(0, total_cmds - context_cmd[0])
-                        return idx, blocks[idx]
-                    
-                    def get_active_buffer():
-                        if context_mode[0] == MODE_LINES:
-                            buffer_lines = clean_buffer.split('\n')
-                            return '\n'.join(buffer_lines[-context_lines[0]:])
-                        
-                        idx, (start, preview) = get_current_block()
-                        if context_mode[0] == MODE_SINGLE and idx + 1 < total_cmds:
-                            end = blocks[idx + 1][0]
-                            active_raw = raw_bytes[start:end]
-                        else:
-                            active_raw = raw_bytes[start:]
-                        return preview + "\n" + dummy_node._logclean(active_raw.decode(errors='replace'), var=True)
-                        
-                    def get_prompt_text():
-                        if context_mode[0] == MODE_LINES:
-                            return HTML(f"<ansicyan>Ask [Ctx: {context_lines[0]}/{total_lines}L]: </ansicyan>")
-                        
-                        lines_count = len(get_active_buffer().split('\n'))
-                        if context_mode[0] == MODE_SINGLE:
-                            return HTML(f"<ansicyan>Ask [Cmd {context_cmd[0]} ~{lines_count}L]: </ansicyan>")
-                        else:
-                            return HTML(f"<ansicyan>Ask [Cmd {context_cmd[0]}\u2192END ~{lines_count}L]: </ansicyan>")
-                        
-                    def get_toolbar():
-                        mode_labels = {MODE_RANGE: "RANGE", MODE_SINGLE: "SINGLE", MODE_LINES: "LINES"}
-                        mode_label = mode_labels[context_mode[0]]
-                        if context_mode[0] == MODE_LINES:
-                            return HTML(f"<ansigray>\u25b6 Ctrl+\u2191/\u2193 adjusts by 50 lines  [Tab: {mode_label}]</ansigray>")
-                        _, (_, preview) = get_current_block()
-                        return HTML(f"<ansigray>\u25b6 {preview}  [Tab: {mode_label}]</ansigray>")
-                    
-                    try:
-                        session = PromptSession(history=self.copilot_history)
-                        question = session.prompt(get_prompt_text, key_bindings=bindings, bottom_toolbar=get_toolbar)
-                    except KeyboardInterrupt:
-                        question = ""
-
-                    if not question or not question.strip() or question.strip() == "CANCEL":
-                        console.print("\n[dim]Copilot cancelled.[/dim]")
-                        request_queue.put(connpy_pb2.InteractRequest(copilot_question="CANCEL"))
-                        resume_generator()
-                        tty.setraw(sys.stdin.fileno())
-                        continue
-
-                    active_buffer = get_active_buffer()
-                    # Enrich question with history (same as local CLI)
-                    past_questions = self.copilot_history.get_strings()
-                    if len(past_questions) > 1:
-                        # Limit history to last 5 questions to save tokens, excluding current
-                        recent_history = past_questions[-6:-1]
-                        history_text = "\n".join(f"- {q}" for q in recent_history)
-                        enriched_question = f"Previous questions in this session:\n{history_text}\n\nCurrent Question:\n{question}"
-                    else:
-                        enriched_question = question
-                        
-                    request_queue.put(connpy_pb2.InteractRequest(copilot_question=enriched_question, copilot_context_buffer=active_buffer))
-                    
-                    from rich.live import Live
-                    live_text = "Thinking..."
-                    panel = Panel(live_text, title="[bold cyan]Copilot Guide[/bold cyan]", border_style="cyan")
-                    result = {}
-                    cancelled = False
-                    
-                    with copilot_terminal_mode(), Live(panel, console=console, refresh_per_second=10) as live:
-                        import fcntl
-                        flags = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
-                        fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, flags | os.O_NONBLOCK)
-                        
-                        while True:
-                            try:
-                                key = os.read(sys.stdin.fileno(), 1024)
-                                if b'\x03' in key or b'\x1b' in key:
-                                    cancelled = True
-                                    request_queue.put(connpy_pb2.InteractRequest(copilot_question="CANCEL"))
-                                    msg = "Ctrl+C" if b'\x03' in key else "Esc"
-                                    console.print(f"\n[dim]Copilot cancelled via {msg}.[/dim]")
-                                    break
-                            except OSError:
-                                pass
-                                
-                            try:
-                                chunk_res = response_queue.get(timeout=0.1)
-                                if chunk_res is None:
-                                    break
-                                    
-                                if chunk_res.copilot_stream_chunk:
-                                    if live_text == "Thinking...": live_text = ""
-                                    live_text += chunk_res.copilot_stream_chunk
-                                    live.update(Panel(Markdown(live_text), title="[bold cyan]Copilot Guide[/bold cyan]", border_style="cyan"))
-                                elif chunk_res.copilot_response_json:
-                                    result = json.loads(chunk_res.copilot_response_json)
-                                    break
-                            except queue.Empty:
-                                continue
-                                
-                        fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, flags)
-
-                    if cancelled:
-                        resume_generator()
-                        tty.setraw(sys.stdin.fileno())
-                        continue
-                        
-                    if result.get("error"):
-                        console.print(f"[red]Error: {result['error']}[/red]")
-                        request_queue.put(connpy_pb2.InteractRequest(copilot_action="cancel"))
-                        resume_generator()
-                        tty.setraw(sys.stdin.fileno())
-                        continue
-
-                    if live_text == "Thinking..." and result.get("guide"):
-                        console.print(Panel(Markdown(result["guide"]), title="[bold cyan]Copilot Guide[/bold cyan]", border_style="cyan"))
-
-                    commands = result.get("commands", [])
-                    risk = result.get("risk_level", "low")
-                    risk_style = {"low": "green", "high": "yellow", "destructive": "red"}.get(risk, "green")
-                    
-                    action_sent = "cancel"
-                    if commands:
-                        cmd_text = "\n".join(f"  {i+1}. {cmd}" for i, cmd in enumerate(commands))
-                        console.print(Panel(
-                            cmd_text,
-                            title=f"[bold {risk_style}]Suggested Commands [{risk.upper()}][/bold {risk_style}]",
-                            border_style=risk_style
-                        ))
-                        
-                        try:
-                            confirm_session = PromptSession()
-                            confirm_bindings = KeyBindings()
-                            @confirm_bindings.add('escape', eager=True)
-                            def _(event):
-                                event.app.exit(result='n')
-                            
-                            pt_color = "ansi" + risk_style
-                            action = confirm_session.prompt(
-                                HTML(f"<{pt_color}>Send commands? (y/n/e/number/range) [n]: </{pt_color}>"),
-                                key_bindings=confirm_bindings
-                            )
-                        except KeyboardInterrupt:
-                            action = "n"
-                            
-                        if not action.strip():
-                            action = "n"
-                            
-                        action_l = action.lower().strip()
-                        if action_l in ('y', 'yes', 'all'):
-                            action_sent = "send_all"
-                        elif action_l.startswith('e'):
-                            action_sent = f"edit_{action_l[1:]}" if len(action_l) > 1 else "edit_all"
-                            # For remote editing, the client edits and sends back as custom action 
-                            edit_session = PromptSession()
-                            cmds_to_edit = []
-                            if action_sent.startswith("edit_") and action_sent[5:].isdigit():
-                                idx = int(action_sent[5:]) - 1
-                                if 0 <= idx < len(commands):
-                                    cmds_to_edit = [commands[idx]]
-                            else:
-                                cmds_to_edit = commands
-                                
-                            if cmds_to_edit:
-                                target_cmd = "\n".join(cmds_to_edit)
-                                try:
-                                    edit_bindings = KeyBindings()
-                                    @edit_bindings.add('c-j')
-                                    def _(event):
-                                        event.app.exit(result=event.app.current_buffer.text)
-                                    @edit_bindings.add('escape', eager=True)
-                                    def _(event):
-                                        event.app.exit(result='')
-
-                                    edited_cmd = edit_session.prompt(
-                                        HTML("<ansicyan>Edit commands (Ctrl+Enter to submit, Esc to cancel):\n</ansicyan>"),
-                                        default=target_cmd,
-                                        multiline=True,
-                                        key_bindings=edit_bindings
-                                    )
-                                    if edited_cmd.strip():
-                                        action_sent = "custom:" + edited_cmd.strip()
-                                    else:
-                                        action_sent = "cancel"
-                                except KeyboardInterrupt:
-                                    action_sent = "cancel"
-                        elif action_l not in ('n', 'no', ''):
-                            action_sent = action_l
-                    
-                    console.print("[dim]Returning to session...[/dim]\n")
-                    request_queue.put(connpy_pb2.InteractRequest(copilot_action=action_sent))
-                    resume_generator()
-                    tty.setraw(sys.stdin.fileno())
+                    self._handle_remote_copilot(
+                        res, request_queue, response_queue, 
+                        client_buffer_bytes, cmd_byte_positions, 
+                        pause_generator, resume_generator, old_tty
+                    )
                     continue
 
                 if res.copilot_injected_command:
@@ -1495,6 +926,17 @@ class AIStub:
     def configure_provider(self, provider, model=None, api_key=None):
         req = connpy_pb2.ProviderRequest(provider=provider, model=model or "", api_key=api_key or "")
         self.stub.configure_provider(req)
+
+    @handle_errors
+    def configure_mcp(self, name, url=None, enabled=True, auto_load_on_os=None, remove=False):
+        req = connpy_pb2.MCPRequest(
+            name=name,
+            url=url or "",
+            enabled=enabled,
+            auto_load_on_os=auto_load_on_os or "",
+            remove=remove
+        )
+        self.stub.configure_mcp(req)
 
     @handle_errors
     def load_session_data(self, session_id):
