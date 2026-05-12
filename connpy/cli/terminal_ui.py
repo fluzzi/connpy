@@ -18,98 +18,23 @@ from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.history import InMemoryHistory
 
 from ..printer import connpy_theme
-
-def log_cleaner(data: str) -> str:
-    """
-    Stateless version of _logclean to remove ANSI sequences and process cursor movements.
-    """
-    if not data:
-        return ""
-            
-    lines = data.split('\n')
-    cleaned_lines = []
-    
-    # Regex to capture: ANSI sequences, control characters (\r, \b, etc), and plain text chunks
-    token_re = re.compile(r'(\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/ ]*[@-~])|\r|\b|\x7f|[\x00-\x1F]|[^\x1B\r\b\x7f\x00-\x1F]+)')
-    
-    for line in lines:
-        buffer = []
-        cursor = 0
-        
-        for token in token_re.findall(line):
-            if token == '\r':
-                cursor = 0
-            elif token in ('\b', '\x7f'):
-                if cursor > 0:
-                    cursor -= 1
-            elif token == '\x1B[D': # Left Arrow
-                if cursor > 0:
-                    cursor -= 1
-            elif token == '\x1B[C': # Right Arrow
-                if cursor < len(buffer):
-                    cursor += 1
-            elif token == '\x1B[K': # Clear to end of line
-                buffer = buffer[:cursor]
-            elif token.startswith('\x1B'):
-                continue
-            elif len(token) == 1 and ord(token) < 32:
-                continue
-            else:
-                for char in token:
-                    if cursor == len(buffer):
-                        buffer.append(char)
-                    else:
-                        buffer[cursor] = char
-                    cursor += 1
-        cleaned_lines.append("".join(buffer))
-        
-    return "\n".join(cleaned_lines).replace('\n\n', '\n').strip()
+from connpy.utils import log_cleaner
+from ..services.ai_service import AIService
 
 class CopilotInterface:
-    def __init__(self, config, history=None):
+    def __init__(self, config, history=None, pt_input=None, pt_output=None, rich_file=None):
         self.config = config
-        self.console = Console(theme=connpy_theme)
         self.history = history or InMemoryHistory()
+        self.pt_input = pt_input
+        self.pt_output = pt_output
+        self.ai_service = AIService(config)
+        
+        if rich_file:
+            self.console = Console(theme=connpy_theme, force_terminal=True, file=rich_file)
+        else:
+            self.console = Console(theme=connpy_theme)
+            
         self.mode_range, self.mode_single, self.mode_lines = 0, 1, 2
-
-    def extract_blocks(self, raw_bytes: bytes, cmd_byte_positions: List[tuple], node_info: dict) -> List[tuple]:
-        """Identifies command blocks in the terminal history."""
-        blocks = []
-        if not (cmd_byte_positions and len(cmd_byte_positions) >= 2 and raw_bytes):
-            return blocks
-            
-        default_prompt = r'>$|#$|\$$|>.$|#.$|\$.$'
-        device_prompt = node_info.get("prompt", default_prompt) if isinstance(node_info, dict) else default_prompt
-        prompt_re_str = re.sub(r'(?<!\\)\$', '', device_prompt)
-        try:
-            prompt_re = re.compile(prompt_re_str)
-        except Exception:
-            prompt_re = re.compile(re.sub(r'(?<!\\)\$', '', default_prompt))
-            
-        for i in range(1, len(cmd_byte_positions)):
-            pos, known_cmd = cmd_byte_positions[i]
-            prev_pos = cmd_byte_positions[i-1][0]
-            
-            if known_cmd:
-                prev_chunk = raw_bytes[prev_pos:pos]
-                prev_cleaned = log_cleaner(prev_chunk.decode(errors='replace'))
-                prev_lines = [l for l in prev_cleaned.split('\n') if l.strip()]
-                prompt_text = prev_lines[-1].strip() if prev_lines else ""
-                preview = f"{prompt_text}{known_cmd}" if prompt_text else known_cmd
-                blocks.append((pos, preview[:80]))
-            else:
-                chunk = raw_bytes[prev_pos:pos]
-                cleaned = log_cleaner(chunk.decode(errors='replace'))
-                lines = [l for l in cleaned.split('\n') if l.strip()]
-                preview = lines[-1].strip() if lines else ""
-                
-                if preview:
-                    match = prompt_re.search(preview)
-                    if match:
-                        cmd_text = preview[match.end():].strip()
-                        if cmd_text:
-                            blocks.append((pos, preview[:80]))
-        return blocks
 
     async def run_session(self, 
                           raw_bytes: bytes, 
@@ -125,7 +50,7 @@ class CopilotInterface:
         try:
             # Prepare UI state
             buffer = log_cleaner(raw_bytes.decode(errors='replace'))
-            blocks = self.extract_blocks(raw_bytes, cmd_byte_positions, node_info)
+            blocks = self.ai_service.build_context_blocks(raw_bytes, cmd_byte_positions, node_info)
             last_line = buffer.split('\n')[-1].strip() if buffer.strip() else "(prompt)"
             blocks.append((len(raw_bytes), last_line[:80]))
             
@@ -273,15 +198,47 @@ class CopilotInterface:
             def _(ev): ev.app.exit(result='n')
             
             try:
-                action = await confirm_session.prompt_async(HTML(f"<ansi{style}>Send? (y/n/e/number) [n]: </ansi{style}>"), key_bindings=c_bindings)
+                action = await confirm_session.prompt_async(HTML(f"<ansi{style}>Send? (y/n/e/range) [n]: </ansi{style}>"), key_bindings=c_bindings)
             except (KeyboardInterrupt, EOFError):
                 action = "n"
+
+            def parse_indices(text, max_len):
+                """Helper to parse '1-3, 5, 7' into [0, 1, 2, 4, 6]."""
+                indices = []
+                # Replace commas with spaces and split
+                parts = text.replace(',', ' ').split()
+                for part in parts:
+                    if '-' in part:
+                        try:
+                            start, end = map(int, part.split('-'))
+                            # Ensure inclusive and 0-indexed
+                            indices.extend(range(start-1, end))
+                        except: continue
+                    elif part.isdigit():
+                        indices.append(int(part)-1)
+                # Filter valid indices and remove duplicates
+                return [i for i in sorted(set(indices)) if 0 <= i < max_len]
 
             action_l = (action or "n").lower().strip()
             if action_l in ('y', 'yes', 'all'):
                 return "send_all", commands, None
+            
+            # Check for numeric selection (e.g., "1, 2-4")
+            if re.match(r'^[0-9,\-\s]+$', action_l):
+                selected_idxs = parse_indices(action_l, len(commands))
+                if selected_idxs:
+                    return "send_all", [commands[i] for i in selected_idxs], None
+
             elif action_l.startswith('e'):
-                target = "\n".join(commands)
+                # Check if it's a selective edit like 'e1-2'
+                selection_str = action_l[1:].strip()
+                if selection_str:
+                    idxs = parse_indices(selection_str, len(commands))
+                    cmds_to_edit = [commands[i] for i in idxs] if idxs else commands
+                else:
+                    cmds_to_edit = commands
+
+                target = "\n".join(cmds_to_edit)
                 e_bindings = KeyBindings()
                 @e_bindings.add('c-j')
                 def _(ev): ev.app.exit(result=ev.app.current_buffer.text)

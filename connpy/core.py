@@ -258,7 +258,7 @@ class node:
     @MethodHook
     def _logclean(self, logfile, var = False):
         """Remove special ascii characters and process terminal cursor movements to clean logs."""
-        from .cli.terminal_ui import log_cleaner
+        from .utils import log_cleaner
         
         if var == False:
             try:

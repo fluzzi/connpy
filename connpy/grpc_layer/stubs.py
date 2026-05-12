@@ -9,7 +9,8 @@ from .utils import to_value, from_value, to_struct, from_struct
 from ..services.exceptions import ConnpyError
 from ..hooks import MethodHook
 from .. import printer
-from ..cli.terminal_ui import log_cleaner, CopilotInterface
+from ..cli.terminal_ui import CopilotInterface
+from ..utils import log_cleaner
 
 def handle_errors(func):
     @wraps(func)
@@ -87,11 +88,12 @@ class NodeStub:
         
         # Prepare final action for server
         action_sent = "cancel"
-        if action == "send_all": 
-            action_sent = "send_all"
+        if action == "send_all" and commands:
+            # In remote mode, send the selected commands as a custom block
+            # so the server executes exactly what the user picked (e.g., selection '1')
+            action_sent = f"custom:{chr(10).join(commands)}"
         elif action == "custom" and custom_cmd:
             action_sent = f"custom:{chr(10).join(custom_cmd)}"
-
         request_queue.put(connpy_pb2.InteractRequest(copilot_action=action_sent))
         resume_generator()
         tty.setraw(sys.stdin.fileno())

@@ -1,8 +1,49 @@
+import re
 from .base import BaseService
 from .exceptions import InvalidConfigurationError
+from connpy.utils import log_cleaner
 
 class AIService(BaseService):
     """Business logic for interacting with AI agents and LLM configurations."""
+
+    def build_context_blocks(self, raw_bytes: bytes, cmd_byte_positions: list, node_info: dict) -> list:
+        """Identifies command blocks in the terminal history."""
+        blocks = []
+        if not (cmd_byte_positions and len(cmd_byte_positions) >= 2 and raw_bytes):
+            return blocks
+            
+        default_prompt = r'>$|#$|\$$|>.$|#.$|\$.$'
+        device_prompt = node_info.get("prompt", default_prompt) if isinstance(node_info, dict) else default_prompt
+        prompt_re_str = re.sub(r'(?<!\\)\$', '', device_prompt)
+        try:
+            prompt_re = re.compile(prompt_re_str)
+        except Exception:
+            prompt_re = re.compile(re.sub(r'(?<!\\)\$', '', default_prompt))
+            
+        for i in range(1, len(cmd_byte_positions)):
+            pos, known_cmd = cmd_byte_positions[i]
+            prev_pos = cmd_byte_positions[i-1][0]
+            
+            if known_cmd:
+                prev_chunk = raw_bytes[prev_pos:pos]
+                prev_cleaned = log_cleaner(prev_chunk.decode(errors='replace'))
+                prev_lines = [l for l in prev_cleaned.split('\n') if l.strip()]
+                prompt_text = prev_lines[-1].strip() if prev_lines else ""
+                preview = f"{prompt_text}{known_cmd}" if prompt_text else known_cmd
+                blocks.append((pos, preview[:80]))
+            else:
+                chunk = raw_bytes[prev_pos:pos]
+                cleaned = log_cleaner(chunk.decode(errors='replace'))
+                lines = [l for l in cleaned.split('\n') if l.strip()]
+                preview = lines[-1].strip() if lines else ""
+                
+                if preview:
+                    match = prompt_re.search(preview)
+                    if match:
+                        cmd_text = preview[match.end():].strip()
+                        if cmd_text:
+                            blocks.append((pos, preview[:80]))
+        return blocks
 
     def ask(self, input_text, dryrun=False, chat_history=None, status=None, debug=False, session_id=None, console=None, chunk_callback=None, confirm_handler=None, trust=False, **overrides):
         """Send a prompt to the AI agent."""
