@@ -1,9 +1,17 @@
-version: "3.8"
 services:
   connpy-app:
     build: .
-    image: connpy-app
+    image: connpy:latest
+    container_name: connpy
+    # Fundamental para la interactividad de la terminal
+    stdin_open: true
+    tty: true
+    environment:
+      - TERM=xterm-256color
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
-      - ./docker/connpy/:/app
-      - ./docker/logs/:/logs
-      - ./docker/ssh/:/root/.ssh/
+      - ./docker/config:/config
+      - ./docker/ssh:/root/.ssh
+      - /var/run/docker.sock:/var/run/docker.sock
+    # No definimos comando por defecto para que 'run' sea más natural

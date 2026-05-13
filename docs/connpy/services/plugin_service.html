@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.6">
+<meta name="generator" content="pdoc3 0.11.5">
 <title>connpy.services.plugin_service API documentation</title>
 <meta name="description" content="">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
@@ -284,28 +284,47 @@ el.replaceWith(d);
         from rich.console import Console
         
         from rich.console import Console
-        buf = io.StringIO()
+        import queue
+        import threading
+        
+        q = queue.Queue()
+        
+        class QueueIO(io.StringIO):
+            def write(self, s):
+                q.put(s)
+                return len(s)
+            def flush(self):
+                pass
+                
+        buf = QueueIO()
         old_console = printer._get_console()
         old_err_console = printer._get_err_console()
         
-        printer.set_thread_console(Console(file=buf, theme=printer.connpy_theme, force_terminal=True))
-        printer.set_thread_err_console(Console(file=buf, theme=printer.connpy_theme, force_terminal=True))
-        printer.set_thread_stream(buf)
+        def run_plugin():
+            printer.set_thread_console(Console(file=buf, theme=printer.connpy_theme, force_terminal=True))
+            printer.set_thread_err_console(Console(file=buf, theme=printer.connpy_theme, force_terminal=True))
+            printer.set_thread_stream(buf)
+            try:
+                if hasattr(module, &#34;Entrypoint&#34;):
+                    module.Entrypoint(args, parser, app)
+            except BaseException as e:
+                if not isinstance(e, SystemExit):
+                    import traceback
+                    printer.err_console.print(traceback.format_exc())
+            finally:
+                printer.set_thread_console(old_console)
+                printer.set_thread_err_console(old_err_console)
+                printer.set_thread_stream(None)
+                q.put(None)
+                
+        t = threading.Thread(target=run_plugin, daemon=True)
+        t.start()
         
-        try:
-            if hasattr(module, &#34;Entrypoint&#34;):
-                module.Entrypoint(args, parser, app)
-        except BaseException as e:
-            if not isinstance(e, SystemExit):
-                import traceback
-                printer.err_console.print(traceback.format_exc())
-        finally:
-            printer.set_thread_console(old_console)
-            printer.set_thread_err_console(old_err_console)
-            printer.set_thread_stream(None)
-            
-        for line in buf.getvalue().splitlines(keepends=True):
-            yield line</code></pre>
+        while True:
+            item = q.get()
+            if item is None:
+                break
+            yield item</code></pre>
 </details>
 <div class="desc"><p>Business logic for enabling, disabling, and listing plugins.</p>
 <p>Initialize the service.</p>
@@ -560,28 +579,47 @@ el.replaceWith(d);
     from rich.console import Console
     
     from rich.console import Console
-    buf = io.StringIO()
+    import queue
+    import threading
+    
+    q = queue.Queue()
+    
+    class QueueIO(io.StringIO):
+        def write(self, s):
+            q.put(s)
+            return len(s)
+        def flush(self):
+            pass
+            
+    buf = QueueIO()
     old_console = printer._get_console()
     old_err_console = printer._get_err_console()
     
-    printer.set_thread_console(Console(file=buf, theme=printer.connpy_theme, force_terminal=True))
-    printer.set_thread_err_console(Console(file=buf, theme=printer.connpy_theme, force_terminal=True))
-    printer.set_thread_stream(buf)
+    def run_plugin():
+        printer.set_thread_console(Console(file=buf, theme=printer.connpy_theme, force_terminal=True))
+        printer.set_thread_err_console(Console(file=buf, theme=printer.connpy_theme, force_terminal=True))
+        printer.set_thread_stream(buf)
+        try:
+            if hasattr(module, &#34;Entrypoint&#34;):
+                module.Entrypoint(args, parser, app)
+        except BaseException as e:
+            if not isinstance(e, SystemExit):
+                import traceback
+                printer.err_console.print(traceback.format_exc())
+        finally:
+            printer.set_thread_console(old_console)
+            printer.set_thread_err_console(old_err_console)
+            printer.set_thread_stream(None)
+            q.put(None)
+            
+    t = threading.Thread(target=run_plugin, daemon=True)
+    t.start()
     
-    try:
-        if hasattr(module, &#34;Entrypoint&#34;):
-            module.Entrypoint(args, parser, app)
-    except BaseException as e:
-        if not isinstance(e, SystemExit):
-            import traceback
-            printer.err_console.print(traceback.format_exc())
-    finally:
-        printer.set_thread_console(old_console)
-        printer.set_thread_err_console(old_err_console)
-        printer.set_thread_stream(None)
-        
-    for line in buf.getvalue().splitlines(keepends=True):
-        yield line</code></pre>
+    while True:
+        item = q.get()
+        if item is None:
+            break
+        yield item</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -671,7 +709,7 @@ el.replaceWith(d);
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
 </footer>
 </body>
 </html>

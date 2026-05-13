@@ -45,6 +45,65 @@ class AIService(BaseService):
                             blocks.append((pos, preview[:80]))
         return blocks
 
+    def process_copilot_input(self, input_text: str, session_state: dict) -> dict:
+        """Parses slash commands and manages session state. Returns directive dict."""
+        text = input_text.strip()
+        if not text.startswith('/'):
+            return {"action": "execute", "clean_prompt": text, "overrides": {}}
+            
+        parts = text.split(maxsplit=1)
+        cmd = parts[0].lower()
+        args = parts[1] if len(parts) > 1 else ""
+        
+        # 1. State Commands (Persistent)
+        if cmd == "/os":
+            if args:
+                session_state['os'] = args
+                return {"action": "state_update", "message": f"OS context changed to {args}"}
+        elif cmd == "/prompt":
+            if args:
+                session_state['prompt'] = args
+                return {"action": "state_update", "message": f"Prompt regex changed to {args}"}
+        elif cmd == "/memorize":
+            if args:
+                session_state['memories'].append(args)
+                return {"action": "state_update", "message": f"Memory added: {args}"}
+        elif cmd == "/clear":
+            session_state['memories'] = []
+            return {"action": "state_update", "message": "Memory cleared"}
+            
+        # 2. Hybrid Commands
+        elif cmd == "/architect":
+            if not args:
+                session_state['persona'] = 'architect'
+                return {"action": "state_update", "message": "Persona set to Architect"}
+            else:
+                return {"action": "execute", "clean_prompt": args, "overrides": {"persona": "architect"}}
+                
+        elif cmd == "/engineer":
+            if not args:
+                session_state['persona'] = 'engineer'
+                return {"action": "state_update", "message": "Persona set to Engineer"}
+            else:
+                return {"action": "execute", "clean_prompt": args, "overrides": {"persona": "engineer"}}
+                
+        elif cmd == "/trust":
+            if not args:
+                session_state['trust_mode'] = True
+                return {"action": "state_update", "message": "Auto-execute (trust) enabled for session"}
+            else:
+                return {"action": "execute", "clean_prompt": args, "overrides": {"trust": True}}
+                
+        elif cmd == "/untrust":
+            if not args:
+                session_state['trust_mode'] = False
+                return {"action": "state_update", "message": "Auto-execute (trust) disabled for session"}
+            else:
+                return {"action": "execute", "clean_prompt": args, "overrides": {"trust": False}}
+
+        # Unknown command, execute normally
+        return {"action": "execute", "clean_prompt": text, "overrides": {}}
+
     def ask(self, input_text, dryrun=False, chat_history=None, status=None, debug=False, session_id=None, console=None, chunk_callback=None, confirm_handler=None, trust=False, **overrides):
         """Send a prompt to the AI agent."""
         from connpy.ai import ai

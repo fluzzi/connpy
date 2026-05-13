@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.6">
+<meta name="generator" content="pdoc3 0.11.5">
 <title>connpy.tunnels API documentation</title>
 <meta name="description" content="">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
@@ -93,6 +93,24 @@ el.replaceWith(d);
             except (NotImplementedError, RuntimeError):
                 # signal handling not supported on some loops (e.g., Windows Proactor)
                 pass
+
+    def stop_reading(self):
+        &#34;&#34;&#34;Temporarily stop reading from stdin.&#34;&#34;&#34;
+        if self._loop and self.stdin_fd is not None:
+            try:
+                self._loop.remove_reader(self.stdin_fd)
+            except Exception:
+                pass
+
+    def start_reading(self):
+        &#34;&#34;&#34;Resume reading from stdin.&#34;&#34;&#34;
+        if self._loop and self.stdin_fd is not None:
+            try:
+                # Ensure we don&#39;t add it twice
+                self._loop.remove_reader(self.stdin_fd)
+            except Exception:
+                pass
+            self._loop.add_reader(self.stdin_fd, self._read_ready)
 
     def teardown(self):
         if self._loop:
@@ -216,6 +234,44 @@ Handles terminal raw mode, async I/O, and SIGWINCH signals.</p></div>
 </details>
 <div class="desc"></div>
 </dd>
+<dt id="connpy.tunnels.LocalStream.start_reading"><code class="name flex">
+<span>def <span class="ident">start_reading</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def start_reading(self):
+    &#34;&#34;&#34;Resume reading from stdin.&#34;&#34;&#34;
+    if self._loop and self.stdin_fd is not None:
+        try:
+            # Ensure we don&#39;t add it twice
+            self._loop.remove_reader(self.stdin_fd)
+        except Exception:
+            pass
+        self._loop.add_reader(self.stdin_fd, self._read_ready)</code></pre>
+</details>
+<div class="desc"><p>Resume reading from stdin.</p></div>
+</dd>
+<dt id="connpy.tunnels.LocalStream.stop_reading"><code class="name flex">
+<span>def <span class="ident">stop_reading</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def stop_reading(self):
+    &#34;&#34;&#34;Temporarily stop reading from stdin.&#34;&#34;&#34;
+    if self._loop and self.stdin_fd is not None:
+        try:
+            self._loop.remove_reader(self.stdin_fd)
+        except Exception:
+            pass</code></pre>
+</details>
+<div class="desc"><p>Temporarily stop reading from stdin.</p></div>
+</dd>
 <dt id="connpy.tunnels.LocalStream.teardown"><code class="name flex">
 <span>def <span class="ident">teardown</span></span>(<span>self)</span>
 </code></dt>
@@ -293,6 +349,7 @@ Handles terminal raw mode, async I/O, and SIGWINCH signals.</p></div>
         self.response_queue = response_queue
         self.running = True
         self._reader_queue = asyncio.Queue()
+        self.copilot_queue = asyncio.Queue()
         self.resize_callback = None
         self._loop = None
         self.t = None
@@ -309,6 +366,19 @@ Handles terminal raw mode, async I/O, and SIGWINCH signals.</p></div>
                     if req.cols &gt; 0 and req.rows &gt; 0:
                         if self.resize_callback:
                             self._loop.call_soon_threadsafe(self.resize_callback, req.rows, req.cols)
+                    # Copilot dispatching
+                    copilot_msg = {}
+                    if getattr(req, &#34;copilot_question&#34;, &#34;&#34;):
+                        copilot_msg.update({
+                            &#34;question&#34;: req.copilot_question,
+                            &#34;context_buffer&#34;: getattr(req, &#34;copilot_context_buffer&#34;, &#34;&#34;),
+                            &#34;node_info_json&#34;: getattr(req, &#34;copilot_node_info_json&#34;, &#34;&#34;)
+                        })
+                    if getattr(req, &#34;copilot_action&#34;, &#34;&#34;):
+                        copilot_msg[&#34;action&#34;] = req.copilot_action
+                    
+                    if copilot_msg:
+                        self._loop.call_soon_threadsafe(self.copilot_queue.put_nowait, copilot_msg)
                     if req.stdin_data:
                         self._loop.call_soon_threadsafe(self._reader_queue.put_nowait, req.stdin_data)
             except Exception:
@@ -374,6 +444,19 @@ Bridges the blocking gRPC iterators with the async _async_interact_loop.</p></di
                 if req.cols &gt; 0 and req.rows &gt; 0:
                     if self.resize_callback:
                         self._loop.call_soon_threadsafe(self.resize_callback, req.rows, req.cols)
+                # Copilot dispatching
+                copilot_msg = {}
+                if getattr(req, &#34;copilot_question&#34;, &#34;&#34;):
+                    copilot_msg.update({
+                        &#34;question&#34;: req.copilot_question,
+                        &#34;context_buffer&#34;: getattr(req, &#34;copilot_context_buffer&#34;, &#34;&#34;),
+                        &#34;node_info_json&#34;: getattr(req, &#34;copilot_node_info_json&#34;, &#34;&#34;)
+                    })
+                if getattr(req, &#34;copilot_action&#34;, &#34;&#34;):
+                    copilot_msg[&#34;action&#34;] = req.copilot_action
+                
+                if copilot_msg:
+                    self._loop.call_soon_threadsafe(self.copilot_queue.put_nowait, copilot_msg)
                 if req.stdin_data:
                     self._loop.call_soon_threadsafe(self._reader_queue.put_nowait, req.stdin_data)
         except Exception:
@@ -438,9 +521,11 @@ Bridges the blocking gRPC iterators with the async _async_interact_loop.</p></di
 <ul>
 <li>
 <h4><code><a title="connpy.tunnels.LocalStream" href="#connpy.tunnels.LocalStream">LocalStream</a></code></h4>
-<ul class="">
+<ul class="two-column">
 <li><code><a title="connpy.tunnels.LocalStream.read" href="#connpy.tunnels.LocalStream.read">read</a></code></li>
 <li><code><a title="connpy.tunnels.LocalStream.setup" href="#connpy.tunnels.LocalStream.setup">setup</a></code></li>
+<li><code><a title="connpy.tunnels.LocalStream.start_reading" href="#connpy.tunnels.LocalStream.start_reading">start_reading</a></code></li>
+<li><code><a title="connpy.tunnels.LocalStream.stop_reading" href="#connpy.tunnels.LocalStream.stop_reading">stop_reading</a></code></li>
 <li><code><a title="connpy.tunnels.LocalStream.teardown" href="#connpy.tunnels.LocalStream.teardown">teardown</a></code></li>
 <li><code><a title="connpy.tunnels.LocalStream.write" href="#connpy.tunnels.LocalStream.write">write</a></code></li>
 </ul>
@@ -460,7 +545,7 @@ Bridges the blocking gRPC iterators with the async _async_interact_loop.</p></di
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
 </footer>
 </body>
 </html>

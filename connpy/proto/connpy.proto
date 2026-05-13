@@ -95,6 +95,7 @@ message InteractRequest {
     string copilot_question = 8;
     string copilot_action = 9;
     string copilot_context_buffer = 10;
+    string copilot_node_info_json = 13;
 }
 
 message InteractResponse {

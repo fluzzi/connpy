@@ -223,158 +223,138 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
                         copilot_node_info_json=node_info_json
                     ))
 
-                    # 2. Await the question from client via the copilot_queue
-                    import threading
-                    def preload_ai_deps():
-                        try:
-                            import litellm
-                        except Exception:
-                            pass
-                    threading.Thread(target=preload_ai_deps, daemon=True).start()
-                    
-                    try:
-                        req_data = await asyncio.wait_for(remote_stream.copilot_queue.get(), timeout=120)
-                        if "question" not in req_data or not req_data["question"] or req_data["question"] == "CANCEL":
-                            os.write(child_fd, b'\x15\r')
-                            return
-                        question = req_data["question"]
-                        
-                        context_buffer = req_data.get("context_buffer", "")
-                        if context_buffer.startswith('{"context_start_pos"'):
+                    while True:
+                        # 2. Await the question from client via the copilot_queue
+                        import threading
+                        def preload_ai_deps():
                             try:
-                                parsed = json.loads(context_buffer)
-                                start_pos = parsed["context_start_pos"]
-                                selected_raw = raw_bytes[start_pos:]
-                                context_buffer = n._logclean(selected_raw.decode(errors='replace'), var=True)
+                                import litellm
                             except Exception:
-                                context_buffer = buffer
-                        elif not context_buffer:
-                            context_buffer = buffer
-                    except asyncio.TimeoutError:
-                        os.write(child_fd, b'\x15\r')
-                        return
+                                pass
+                        threading.Thread(target=preload_ai_deps, daemon=True).start()
                         
-                    # 3. Call AI Service with streaming
-                    from ..services.ai_service import AIService
-                    service = AIService(self.service.config)
-                    
-                    def chunk_callback(chunk_text):
-                        if chunk_text:
-                            response_queue.put(connpy_pb2.InteractResponse(
-                                copilot_stream_chunk=chunk_text
-                            ))
-                            
-                    # Create a clean version of node_info for the AI to save tokens and match local CLI behavior
-                    ai_node_info = {k: v for k, v in node_info.items() if k not in ("context_blocks", "full_buffer")}
-                    
-                    ai_task = asyncio.create_task(service.aask_copilot(context_buffer, question, ai_node_info, chunk_callback=chunk_callback))
-                    wait_action_task = asyncio.create_task(remote_stream.copilot_queue.get())
-                    
-                    done, pending = await asyncio.wait(
-                        [ai_task, wait_action_task],
-                        return_when=asyncio.FIRST_COMPLETED
-                    )
-                    
-                    if wait_action_task in done:
-                        req_data = wait_action_task.result()
-                        ai_task.cancel()
-                        if req_data.get("question") == "CANCEL" or req_data.get("action") == "cancel":
-                            os.write(child_fd, b'\x15\r')
-                            return
-                        return
-                    else:
-                        wait_action_task.cancel()
-                        result = ai_task.result()
-                        if not result:
-                            os.write(child_fd, b'\x15\r')
-                            return
-                    
-                    # 4. Send response back to client
-                    response_queue.put(connpy_pb2.InteractResponse(
-                        copilot_response_json=json.dumps(result)
-                    ))
-                    
-                    # 5. Wait for user action
-                    try:
-                        action_data = await asyncio.wait_for(remote_stream.copilot_queue.get(), timeout=60)
-                        if "action" not in action_data or not action_data["action"] or action_data["action"] == "cancel":
-                            os.write(child_fd, b'\x15\r')
-                            return
-                        action = action_data["action"]
-                    except asyncio.TimeoutError:
-                        os.write(child_fd, b'\x15\r')
-                        return
-                        
-                    if action == "send_all":
-                        commands = result.get("commands", [])
-                        os.write(child_fd, b'\x15') # Ctrl+U to clear line
-                        await asyncio.sleep(0.1)
-
-                        # Prepend screen length command to avoid pagination
-                        if "screen_length_command" in n.tags:
-                            os.write(child_fd, (n.tags["screen_length_command"] + "\n").encode())
-                            response_queue.put(connpy_pb2.InteractResponse(copilot_injected_command=n.tags["screen_length_command"]))
-                            await asyncio.sleep(0.8)
-
-                        for cmd in commands:
-                            os.write(child_fd, (cmd + "\n").encode())
-                            response_queue.put(connpy_pb2.InteractResponse(copilot_injected_command=cmd))
-                            await asyncio.sleep(0.8)
-                    elif action.startswith("custom:"):
-                        custom_cmds = action[7:]
-                        os.write(child_fd, b'\x15')
-                        await asyncio.sleep(0.1)
-                        
-                        # Prepend screen length command to avoid pagination
-                        if "screen_length_command" in n.tags:
-                            os.write(child_fd, (n.tags["screen_length_command"] + "\n").encode())
-                            response_queue.put(connpy_pb2.InteractResponse(copilot_injected_command=n.tags["screen_length_command"]))
-                            await asyncio.sleep(0.8)
-
-                        for cmd in custom_cmds.split('\n'):
-                            if cmd.strip():
-                                os.write(child_fd, (cmd.strip() + "\n").encode())
-                                response_queue.put(connpy_pb2.InteractResponse(copilot_injected_command=cmd.strip()))
-                                await asyncio.sleep(0.8)
-                    elif action not in ('cancel', 'n', 'no'):
-                        # Handle numbers and ranges like "1,2,4-6"
                         try:
-                            commands = result.get("commands", [])
-                            selected_indices = set()
-                            for part in action.split(','):
-                                part = part.strip()
-                                if not part: continue
-                                if '-' in part:
-                                    start_str, end_str = part.split('-', 1)
-                                    start = int(start_str) - 1
-                                    end = int(end_str) - 1
-                                    for i in range(start, end + 1):
-                                        selected_indices.add(i)
-                                else:
-                                    selected_indices.add(int(part) - 1)
-                            
-                            valid_indices = sorted([i for i in selected_indices if 0 <= i < len(commands)])
-                            if valid_indices:
-                                os.write(child_fd, b'\x15')
-                                await asyncio.sleep(0.1)
-                                
-                                # Prepend screen length command to avoid pagination
-                                if "screen_length_command" in n.tags:
-                                    os.write(child_fd, (n.tags["screen_length_command"] + "\n").encode())
-                                    response_queue.put(connpy_pb2.InteractResponse(copilot_injected_command=n.tags["screen_length_command"]))
-                                    await asyncio.sleep(0.8)
-
-                                for idx in valid_indices:
-                                    os.write(child_fd, (commands[idx] + "\n").encode())
-                                    response_queue.put(connpy_pb2.InteractResponse(copilot_injected_command=commands[idx]))
-                                    await asyncio.sleep(0.8)
-                            else:
+                            req_data = await asyncio.wait_for(remote_stream.copilot_queue.get(), timeout=120)
+                            if not req_data: return
+                            if "question" not in req_data or not req_data["question"] or req_data["question"] == "CANCEL" or req_data.get("action") == "cancel":
                                 os.write(child_fd, b'\x15\r')
-                        except (ValueError, IndexError):
+                                return
+                            question = req_data["question"]
+                            
+                            merged_node_info_str = req_data.get("node_info_json", "")
+                            if merged_node_info_str:
+                                try:
+                                    merged_node_info = json.loads(merged_node_info_str)
+                                    node_info.update(merged_node_info)
+                                except: pass
+
+                            context_buffer = req_data.get("context_buffer", "")
+                            if context_buffer.startswith('{"context_start_pos"'):
+                                try:
+                                    parsed = json.loads(context_buffer)
+                                    start_pos = parsed["context_start_pos"]
+                                    selected_raw = raw_bytes[start_pos:]
+                                    context_buffer = n._logclean(selected_raw.decode(errors='replace'), var=True)
+                                except Exception:
+                                    context_buffer = buffer
+                            elif not context_buffer:
+                                context_buffer = buffer
+                        except asyncio.TimeoutError:
                             os.write(child_fd, b'\x15\r')
-                    else:
-                        # Cancelled or invalid action
-                        os.write(child_fd, b'\x15\r')
+                            return
+                            
+                        # 3. Call AI Service with streaming
+                        from ..services.ai_service import AIService
+                        service = AIService(self.service.config)
+                        
+                        def chunk_callback(chunk_text):
+                            if chunk_text:
+                                response_queue.put(connpy_pb2.InteractResponse(
+                                    copilot_stream_chunk=chunk_text
+                                ))
+                                
+                        # Create a clean version of node_info for the AI to save tokens and match local CLI behavior
+                        ai_node_info = {k: v for k, v in node_info.items() if k not in ("context_blocks", "full_buffer")}
+                        
+                        ai_task = asyncio.create_task(service.aask_copilot(context_buffer, question, ai_node_info, chunk_callback=chunk_callback))
+                        wait_action_task = asyncio.create_task(remote_stream.copilot_queue.get())
+                        
+                        done, pending = await asyncio.wait(
+                            [ai_task, wait_action_task],
+                            return_when=asyncio.FIRST_COMPLETED
+                        )
+                        
+                        if wait_action_task in done:
+                            req_data = wait_action_task.result()
+                            ai_task.cancel()
+                            if req_data.get("action") == "cancel" or req_data.get("question") == "CANCEL":
+                                os.write(child_fd, b'\x15\r')
+                                return
+                            continue # Loop back instead of returning to keep session alive
+                        else:
+                            wait_action_task.cancel()
+                            result = ai_task.result()
+                            if not result:
+                                os.write(child_fd, b'\x15\r')
+                                return
+                        
+                        # 4. Send response back to client
+                        response_queue.put(connpy_pb2.InteractResponse(
+                            copilot_response_json=json.dumps(result)
+                        ))
+                        
+                        # 5. Wait for user action
+                        try:
+                            action_data = await asyncio.wait_for(remote_stream.copilot_queue.get(), timeout=60)
+                            if not action_data: return
+                            action = action_data.get("action", "cancel")
+                            
+                            if action == "continue":
+                                continue # Loop back for next question
+                                
+                            if action == "cancel":
+                                os.write(child_fd, b'\x15\r')
+                                return
+                        except asyncio.TimeoutError:
+                            os.write(child_fd, b'\x15\r')
+                            return
+                            
+                        if action == "send_all":
+                            commands = result.get("commands", [])
+                            os.write(child_fd, b'\x15') # Ctrl+U to clear line
+                            await asyncio.sleep(0.1)
+
+                            # Prepend screen length command to avoid pagination
+                            if "screen_length_command" in n.tags:
+                                os.write(child_fd, (n.tags["screen_length_command"] + "\n").encode())
+                                response_queue.put(connpy_pb2.InteractResponse(copilot_injected_command=n.tags["screen_length_command"]))
+                                await asyncio.sleep(0.8)
+
+                            for cmd in commands:
+                                os.write(child_fd, (cmd + "\n").encode())
+                                response_queue.put(connpy_pb2.InteractResponse(copilot_injected_command=cmd))
+                                await asyncio.sleep(0.8)
+                            return
+                        elif action.startswith("custom:"):
+                            custom_cmds = action[7:]
+                            os.write(child_fd, b'\x15')
+                            await asyncio.sleep(0.1)
+                            
+                            # Prepend screen length command to avoid pagination
+                            if "screen_length_command" in n.tags:
+                                os.write(child_fd, (n.tags["screen_length_command"] + "\n").encode())
+                                response_queue.put(connpy_pb2.InteractResponse(copilot_injected_command=n.tags["screen_length_command"]))
+                                await asyncio.sleep(0.8)
+
+                            for cmd in custom_cmds.split('\n'):
+                                if cmd.strip():
+                                    os.write(child_fd, (cmd.strip() + "\n").encode())
+                                    response_queue.put(connpy_pb2.InteractResponse(copilot_injected_command=cmd.strip()))
+                                    await asyncio.sleep(0.8)
+                            return
+                        else:
+                            os.write(child_fd, b'\x15\r')
+                            return
 
                 asyncio.run(n._async_interact_loop(remote_stream, resize_callback, copilot_handler=remote_copilot_handler))
             except Exception as e:

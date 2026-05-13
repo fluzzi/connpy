@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
 <meta name="generator" content="pdoc3 0.11.5">
-<title>connpy.cli.api_handler API documentation</title>
+<title>connpy.utils API documentation</title>
 <meta name="description" content="">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
@@ -33,7 +33,7 @@ el.replaceWith(d);
 <main>
 <article id="content">
 <header>
-<h1 class="title">Module <code>connpy.cli.api_handler</code></h1>
+<h1 class="title">Module <code>connpy.utils</code></h1>
 </header>
 <section id="section-intro">
 </section>
@@ -42,131 +42,67 @@ el.replaceWith(d);
 <section>
 </section>
 <section>
+<h2 class="section-title" id="header-functions">Functions</h2>
+<dl>
+<dt id="connpy.utils.log_cleaner"><code class="name flex">
+<span>def <span class="ident">log_cleaner</span></span>(<span>data: str) ‑> str</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def log_cleaner(data: str) -&gt; str:
+    &#34;&#34;&#34;
+    Stateless utility to remove ANSI sequences and process cursor movements.
+    &#34;&#34;&#34;
+    if not data:
+        return &#34;&#34;
+            
+    lines = data.split(&#39;\n&#39;)
+    cleaned_lines = []
+    
+    # Regex to capture: ANSI sequences, control characters (\r, \b, etc), and plain text chunks
+    token_re = re.compile(r&#39;(\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/ ]*[@-~])|\r|\b|\x7f|[\x00-\x1F]|[^\x1B\r\b\x7f\x00-\x1F]+)&#39;)
+    
+    for line in lines:
+        buffer = []
+        cursor = 0
+        
+        for token in token_re.findall(line):
+            if token == &#39;\r&#39;:
+                cursor = 0
+            elif token in (&#39;\b&#39;, &#39;\x7f&#39;):
+                if cursor &gt; 0:
+                    cursor -= 1
+            elif token == &#39;\x1B[D&#39;: # Left Arrow
+                if cursor &gt; 0:
+                    cursor -= 1
+            elif token == &#39;\x1B[C&#39;: # Right Arrow
+                if cursor &lt; len(buffer):
+                    cursor += 1
+            elif token == &#39;\x1B[K&#39;: # Clear to end of line
+                buffer = buffer[:cursor]
+            elif token.startswith(&#39;\x1B&#39;):
+                continue
+            elif len(token) == 1 and ord(token) &lt; 32:
+                continue
+            else:
+                for char in token:
+                    if cursor == len(buffer):
+                        buffer.append(char)
+                    else:
+                        buffer[cursor] = char
+                    cursor += 1
+        cleaned_lines.append(&#34;&#34;.join(buffer))
+        
+    return &#34;\n&#34;.join(cleaned_lines).replace(&#39;\n\n&#39;, &#39;\n&#39;).strip()</code></pre>
+</details>
+<div class="desc"><p>Stateless utility to remove ANSI sequences and process cursor movements.</p></div>
+</dd>
+</dl>
 </section>
 <section>
-<h2 class="section-title" id="header-classes">Classes</h2>
-<dl>
-<dt id="connpy.cli.api_handler.APIHandler"><code class="flex name class">
-<span>class <span class="ident">APIHandler</span></span>
-<span>(</span><span>app)</span>
-</code></dt>
-<dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">class APIHandler:
-    def __init__(self, app):
-        self.app = app
-
-    def dispatch(self, args):
-        try:
-            status = self.app.services.system.get_api_status()
-            
-            if args.command == &#34;stop&#34;:
-                if not status[&#34;running&#34;]:
-                    printer.warning(&#34;API does not seem to be running.&#34;)
-                else:
-                    stopped = self.app.services.system.stop_api()
-                    if stopped:
-                        printer.success(&#34;API stopped successfully.&#34;)
-            
-            elif args.command == &#34;restart&#34;:
-                port = args.data if args.data and isinstance(args.data, int) else None
-                if status[&#34;running&#34;]:
-                    printer.info(f&#34;Stopping server with process ID {status[&#39;pid&#39;]}...&#34;)
-                
-                # Service handles port preservation if port is None
-                self.app.services.system.restart_api(port=port)
-                
-                if status[&#34;running&#34;]:
-                    printer.info(f&#34;Server with process ID {status[&#39;pid&#39;]} stopped.&#34;)
-                
-                # Re-fetch status to show the actual port used
-                new_status = self.app.services.system.get_api_status()
-                printer.success(f&#34;API restarted on port {new_status.get(&#39;port&#39;, &#39;unknown&#39;)}.&#34;)
-
-            elif args.command == &#34;start&#34;:
-                if status[&#34;running&#34;]:
-                    msg = f&#34;Connpy server is already running (PID: {status[&#39;pid&#39;]}&#34;
-                    if status.get(&#34;port&#34;):
-                        msg += f&#34;, Port: {status[&#39;port&#39;]}&#34;
-                    msg += &#34;).&#34;
-                    printer.warning(msg)
-                else:
-                    port = args.data if args.data and isinstance(args.data, int) else 8048
-                    self.app.services.system.start_api(port=port)
-                    printer.success(f&#34;API started on port {port}.&#34;)
-                
-            elif args.command == &#34;debug&#34;:
-                port = args.data if args.data and isinstance(args.data, int) else 8048
-                self.app.services.system.debug_api(port=port)
-        except ConnpyError as e:
-            printer.error(str(e))
-            sys.exit(1)</code></pre>
-</details>
-<div class="desc"></div>
-<h3>Methods</h3>
-<dl>
-<dt id="connpy.cli.api_handler.APIHandler.dispatch"><code class="name flex">
-<span>def <span class="ident">dispatch</span></span>(<span>self, args)</span>
-</code></dt>
-<dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def dispatch(self, args):
-    try:
-        status = self.app.services.system.get_api_status()
-        
-        if args.command == &#34;stop&#34;:
-            if not status[&#34;running&#34;]:
-                printer.warning(&#34;API does not seem to be running.&#34;)
-            else:
-                stopped = self.app.services.system.stop_api()
-                if stopped:
-                    printer.success(&#34;API stopped successfully.&#34;)
-        
-        elif args.command == &#34;restart&#34;:
-            port = args.data if args.data and isinstance(args.data, int) else None
-            if status[&#34;running&#34;]:
-                printer.info(f&#34;Stopping server with process ID {status[&#39;pid&#39;]}...&#34;)
-            
-            # Service handles port preservation if port is None
-            self.app.services.system.restart_api(port=port)
-            
-            if status[&#34;running&#34;]:
-                printer.info(f&#34;Server with process ID {status[&#39;pid&#39;]} stopped.&#34;)
-            
-            # Re-fetch status to show the actual port used
-            new_status = self.app.services.system.get_api_status()
-            printer.success(f&#34;API restarted on port {new_status.get(&#39;port&#39;, &#39;unknown&#39;)}.&#34;)
-
-        elif args.command == &#34;start&#34;:
-            if status[&#34;running&#34;]:
-                msg = f&#34;Connpy server is already running (PID: {status[&#39;pid&#39;]}&#34;
-                if status.get(&#34;port&#34;):
-                    msg += f&#34;, Port: {status[&#39;port&#39;]}&#34;
-                msg += &#34;).&#34;
-                printer.warning(msg)
-            else:
-                port = args.data if args.data and isinstance(args.data, int) else 8048
-                self.app.services.system.start_api(port=port)
-                printer.success(f&#34;API started on port {port}.&#34;)
-            
-        elif args.command == &#34;debug&#34;:
-            port = args.data if args.data and isinstance(args.data, int) else 8048
-            self.app.services.system.debug_api(port=port)
-    except ConnpyError as e:
-        printer.error(str(e))
-        sys.exit(1)</code></pre>
-</details>
-<div class="desc"></div>
-</dd>
-</dl>
-</dd>
-</dl>
 </section>
 </article>
 <nav id="sidebar">
@@ -176,17 +112,12 @@ el.replaceWith(d);
 <ul id="index">
 <li><h3>Super-module</h3>
 <ul>
-<li><code><a title="connpy.cli" href="index.html">connpy.cli</a></code></li>
+<li><code><a title="connpy" href="index.html">connpy</a></code></li>
 </ul>
 </li>
-<li><h3><a href="#header-classes">Classes</a></h3>
-<ul>
-<li>
-<h4><code><a title="connpy.cli.api_handler.APIHandler" href="#connpy.cli.api_handler.APIHandler">APIHandler</a></code></h4>
+<li><h3><a href="#header-functions">Functions</a></h3>
 <ul class="">
-<li><code><a title="connpy.cli.api_handler.APIHandler.dispatch" href="#connpy.cli.api_handler.APIHandler.dispatch">dispatch</a></code></li>
-</ul>
-</li>
+<li><code><a title="connpy.utils.log_cleaner" href="#connpy.utils.log_cleaner">log_cleaner</a></code></li>
 </ul>
 </li>
 </ul>

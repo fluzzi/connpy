@@ -89,6 +89,10 @@ class connapp:
         if hasattr(self.services.nodes, "list_folders") and hasattr(self.services.nodes.list_folders, "register_post_hook"):
             self.services.nodes.list_folders.register_post_hook(self.services.context.filter_node_list)
 
+        # Apply theme from config if exists before remote connection attempts
+        user_theme = self.config.config.get("theme", {})
+        self._apply_app_theme(user_theme)
+
         # Populate data via services
         try:
             self.nodes_list = self.services.nodes.list_nodes()
@@ -151,10 +155,6 @@ class connapp:
             return kwargs.get("result")
 
         configfile._saveconfig.register_post_hook(auto_sync_hook)
-        
-        # Apply theme from config if exists
-        user_theme = self.config.config.get("theme", {})
-        self._apply_app_theme(user_theme)
 
     def _apply_app_theme(self, styles):
         """Unified method to apply theme to printer and help formatter."""

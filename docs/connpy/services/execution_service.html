@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.6">
+<meta name="generator" content="pdoc3 0.11.5">
 <title>connpy.services.execution_service API documentation</title>
 <meta name="description" content="">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
@@ -64,7 +64,7 @@ el.replaceWith(d);
         commands: List[str], 
         variables: Optional[Dict[str, Any]] = None,
         parallel: int = 10,
-        timeout: int = 10,
+        timeout: int = 20,
         folder: Optional[str] = None,
         prompt: Optional[str] = None,
         on_node_complete: Optional[Callable] = None,
@@ -112,7 +112,7 @@ el.replaceWith(d);
         expected: List[str],
         variables: Optional[Dict[str, Any]] = None,
         parallel: int = 10,
-        timeout: int = 10,
+        timeout: int = 20,
         folder: Optional[str] = None,
         prompt: Optional[str] = None,
         on_node_complete: Optional[Callable] = None,
@@ -189,7 +189,7 @@ el.replaceWith(d);
             &#34;commands&#34;: playbook[&#34;commands&#34;],
             &#34;variables&#34;: playbook.get(&#34;variables&#34;),
             &#34;parallel&#34;: options.get(&#34;parallel&#34;, parallel),
-            &#34;timeout&#34;: playbook.get(&#34;timeout&#34;, options.get(&#34;timeout&#34;, 10)),
+            &#34;timeout&#34;: playbook.get(&#34;timeout&#34;, options.get(&#34;timeout&#34;, 20)),
             &#34;prompt&#34;: options.get(&#34;prompt&#34;),
             &#34;name&#34;: playbook.get(&#34;name&#34;, &#34;Task&#34;)
         }
@@ -244,7 +244,7 @@ el.replaceWith(d);
 <div class="desc"><p>Run a plain-text script containing one command per line.</p></div>
 </dd>
 <dt id="connpy.services.execution_service.ExecutionService.run_commands"><code class="name flex">
-<span>def <span class="ident">run_commands</span></span>(<span>self,<br>nodes_filter: str,<br>commands: List[str],<br>variables: Dict[str, Any] | None = None,<br>parallel: int = 10,<br>timeout: int = 10,<br>folder: str | None = None,<br>prompt: str | None = None,<br>on_node_complete: Callable | None = None,<br>logger: Callable | None = None,<br>name: str | None = None) ‑> Dict[str, str]</span>
+<span>def <span class="ident">run_commands</span></span>(<span>self,<br>nodes_filter: str,<br>commands: List[str],<br>variables: Dict[str, Any] | None = None,<br>parallel: int = 10,<br>timeout: int = 20,<br>folder: str | None = None,<br>prompt: str | None = None,<br>on_node_complete: Callable | None = None,<br>logger: Callable | None = None,<br>name: str | None = None) ‑> Dict[str, str]</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -257,7 +257,7 @@ el.replaceWith(d);
     commands: List[str], 
     variables: Optional[Dict[str, Any]] = None,
     parallel: int = 10,
-    timeout: int = 10,
+    timeout: int = 20,
     folder: Optional[str] = None,
     prompt: Optional[str] = None,
     on_node_complete: Optional[Callable] = None,
@@ -339,7 +339,7 @@ el.replaceWith(d);
         &#34;commands&#34;: playbook[&#34;commands&#34;],
         &#34;variables&#34;: playbook.get(&#34;variables&#34;),
         &#34;parallel&#34;: options.get(&#34;parallel&#34;, parallel),
-        &#34;timeout&#34;: playbook.get(&#34;timeout&#34;, options.get(&#34;timeout&#34;, 10)),
+        &#34;timeout&#34;: playbook.get(&#34;timeout&#34;, options.get(&#34;timeout&#34;, 20)),
         &#34;prompt&#34;: options.get(&#34;prompt&#34;),
         &#34;name&#34;: playbook.get(&#34;name&#34;, &#34;Task&#34;)
     }
@@ -360,7 +360,7 @@ el.replaceWith(d);
 <div class="desc"><p>Run a structured Connpy YAML automation playbook (from path or content).</p></div>
 </dd>
 <dt id="connpy.services.execution_service.ExecutionService.test_commands"><code class="name flex">
-<span>def <span class="ident">test_commands</span></span>(<span>self,<br>nodes_filter: str,<br>commands: List[str],<br>expected: List[str],<br>variables: Dict[str, Any] | None = None,<br>parallel: int = 10,<br>timeout: int = 10,<br>folder: str | None = None,<br>prompt: str | None = None,<br>on_node_complete: Callable | None = None,<br>logger: Callable | None = None,<br>name: str | None = None) ‑> Dict[str, Dict[str, bool]]</span>
+<span>def <span class="ident">test_commands</span></span>(<span>self,<br>nodes_filter: str,<br>commands: List[str],<br>expected: List[str],<br>variables: Dict[str, Any] | None = None,<br>parallel: int = 10,<br>timeout: int = 20,<br>folder: str | None = None,<br>prompt: str | None = None,<br>on_node_complete: Callable | None = None,<br>logger: Callable | None = None,<br>name: str | None = None) ‑> Dict[str, Dict[str, bool]]</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -374,7 +374,7 @@ el.replaceWith(d);
     expected: List[str],
     variables: Optional[Dict[str, Any]] = None,
     parallel: int = 10,
-    timeout: int = 10,
+    timeout: int = 20,
     folder: Optional[str] = None,
     prompt: Optional[str] = None,
     on_node_complete: Optional[Callable] = None,
@@ -449,7 +449,7 @@ el.replaceWith(d);
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
 </footer>
 </body>
 </html>

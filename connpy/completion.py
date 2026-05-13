@@ -169,11 +169,21 @@ def _build_tree(nodes, folders, profiles, plugins, configdir):
     }
 
     # State Machine Definitions
+    mcp_dict = {
+        "list": None,
+        "add": {"*": {"*": {"*": None}}}, # name url [os]
+        "remove": {"*": None},
+        "enable": {"*": None},
+        "disable": {"*": None},
+        "--help": None, "-h": None
+    }
+
     ai_dict = {"__exclude_used__": True, "--help": None, "-h": None}
     for opt in ["--engineer-model", "--engineer-api-key", "--architect-model", "--architect-api-key"]:
         ai_dict[opt] = {"*": ai_dict} # takes value, loops back
     for opt in ["--debug", "--trust", "--list", "--list-sessions", "--session", "--resume", "--delete", "--delete-session", "-y"]:
         ai_dict[opt] = ai_dict # takes no value, loops back
+    ai_dict["--mcp"] = mcp_dict
     ai_dict["*"] = ai_dict
 
     mv_state = {"__extra__": _nodes, "--help": None, "-h": None}

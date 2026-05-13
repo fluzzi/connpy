@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.6">
+<meta name="generator" content="pdoc3 0.11.5">
 <title>connpy.cli.ai_handler API documentation</title>
 <meta name="description" content="">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
@@ -77,6 +77,9 @@ el.replaceWith(d);
             except Exception as e:
                 printer.error(str(e))
             return
+
+        if args.mcp is not None:
+            return self.configure_mcp(args)
             
         # Determinar session_id para retomar
         session_id = None
@@ -156,7 +159,7 @@ el.replaceWith(d);
             try:
                 user_query = Prompt.ask(&#34;[user_prompt]User[/user_prompt]&#34;)
                 if not user_query.strip(): continue
-                if user_query.lower() in [&#39;exit&#39;, &#39;quit&#39;, &#39;bye&#39;]: break
+                if user_query.lower() in [&#39;exit&#39;, &#39;quit&#39;, &#39;bye&#39;, &#39;cancel&#39;]: break
                 
                 with console.status(&#34;[ai_status]Agent is thinking...&#34;) as status:
                     result = self.app.myai.ask(user_query, chat_history=history, status=status, debug=args.debug, trust=args.trust, **self.ai_overrides)
@@ -179,11 +182,245 @@ el.replaceWith(d);
                     console.print(f&#34;[debug]Tokens: {u[&#39;total&#39;]} (Input: {u[&#39;input&#39;]}, Output: {u[&#39;output&#39;]})[/debug]&#34;)
             except (KeyboardInterrupt, EOFError):
                 console.print(&#34;\n[dim]Session closed.[/dim]&#34;)
-                break</code></pre>
+                break
+
+    def configure_mcp(self, args):
+        &#34;&#34;&#34;Handle MCP server configuration via CLI tokens or interactive wizard.&#34;&#34;&#34;
+        mcp_args = args.mcp
+        
+        # 1. Non-interactive CLI Mode (if arguments are provided)
+        if mcp_args:
+            action = mcp_args[0].lower()
+            
+            if action == &#34;list&#34;:
+                settings = self.app.services.config_svc.get_settings()
+                mcp_servers = settings.get(&#34;ai&#34;, {}).get(&#34;mcp_servers&#34;, {})
+                if not mcp_servers:
+                    printer.info(&#34;No MCP servers configured.&#34;)
+                else:
+                    columns = [&#34;Name&#34;, &#34;URL&#34;, &#34;Enabled&#34;, &#34;Auto-load OS&#34;]
+                    rows = []
+                    for name, cfg in mcp_servers.items():
+                        rows.append([
+                            name, 
+                            cfg.get(&#34;url&#34;, &#34;&#34;), 
+                            &#34;[green]Yes[/green]&#34; if cfg.get(&#34;enabled&#34;, True) else &#34;[red]No[/red]&#34;,
+                            cfg.get(&#34;auto_load_on_os&#34;, &#34;Any&#34;)
+                        ])
+                    printer.table(&#34;Configured MCP Servers&#34;, columns, rows)
+                return
+
+            elif action == &#34;add&#34;:
+                if len(mcp_args) &lt; 3:
+                    printer.error(&#34;Usage: connpy ai --mcp add &lt;name&gt; &lt;url&gt; [os_filter]&#34;)
+                    return
+                name, url = mcp_args[1], mcp_args[2]
+                os_filter = mcp_args[3] if len(mcp_args) &gt; 3 else None
+                try:
+                    self.app.services.ai.configure_mcp(name, url=url, auto_load_on_os=os_filter)
+                    printer.success(f&#34;MCP server &#39;{name}&#39; added/updated.&#34;)
+                except Exception as e:
+                    printer.error(str(e))
+                return
+
+            elif action == &#34;remove&#34;:
+                if len(mcp_args) &lt; 2:
+                    printer.error(&#34;Usage: connpy ai --mcp remove &lt;name&gt;&#34;)
+                    return
+                name = mcp_args[1]
+                try:
+                    self.app.services.ai.configure_mcp(name, remove=True)
+                    printer.success(f&#34;MCP server &#39;{name}&#39; removed.&#34;)
+                except Exception as e:
+                    printer.error(str(e))
+                return
+
+            elif action in [&#34;enable&#34;, &#34;disable&#34;]:
+                if len(mcp_args) &lt; 2:
+                    printer.error(f&#34;Usage: connpy ai --mcp {action} &lt;name&gt;&#34;)
+                    return
+                name = mcp_args[1]
+                enabled = (action == &#34;enable&#34;)
+                try:
+                    self.app.services.ai.configure_mcp(name, enabled=enabled)
+                    printer.success(f&#34;MCP server &#39;{name}&#39; {&#39;enabled&#39; if enabled else &#39;disabled&#39;}.&#34;)
+                except Exception as e:
+                    printer.error(str(e))
+                return
+            
+            else:
+                printer.error(f&#34;Unknown MCP action: {action}&#34;)
+                printer.info(&#34;Available actions: list, add, remove, enable, disable&#34;)
+                return
+
+        # 2. Interactive Wizard Mode (if no arguments provided)
+        # Import forms dynamically to avoid circular dependencies if any
+        if not hasattr(self.app, &#34;cli_forms&#34;):
+            from .forms import Forms
+            self.app.cli_forms = Forms(self.app)
+            
+        settings = self.app.services.config_svc.get_settings()
+        mcp_servers = settings.get(&#34;ai&#34;, {}).get(&#34;mcp_servers&#34;, {})
+        
+        result = self.app.cli_forms.mcp_wizard(mcp_servers)
+        if not result:
+            return
+
+        action = result[&#34;action&#34;]
+        try:
+            if action == &#34;list&#34;:
+                # Recursive call to the non-interactive list logic
+                args.mcp = [&#34;list&#34;]
+                return self.configure_mcp(args)
+            
+            elif action == &#34;add&#34;:
+                self.app.services.ai.configure_mcp(
+                    result[&#34;name&#34;], 
+                    url=result[&#34;url&#34;], 
+                    enabled=result[&#34;enabled&#34;],
+                    auto_load_on_os=result[&#34;os&#34;]
+                )
+                printer.success(f&#34;MCP server &#39;{result[&#39;name&#39;]}&#39; saved.&#34;)
+            
+            elif action == &#34;update&#34;: # Used for toggle
+                self.app.services.ai.configure_mcp(
+                    result[&#34;name&#34;], 
+                    enabled=result[&#34;enabled&#34;]
+                )
+                printer.success(f&#34;MCP server &#39;{result[&#39;name&#39;]}&#39; updated.&#34;)
+                
+            elif action == &#34;remove&#34;:
+                self.app.services.ai.configure_mcp(result[&#34;name&#34;], remove=True)
+                printer.success(f&#34;MCP server &#39;{result[&#39;name&#39;]}&#39; removed.&#34;)
+                
+        except Exception as e:
+            printer.error(str(e))</code></pre>
 </details>
 <div class="desc"></div>
 <h3>Methods</h3>
 <dl>
+<dt id="connpy.cli.ai_handler.AIHandler.configure_mcp"><code class="name flex">
+<span>def <span class="ident">configure_mcp</span></span>(<span>self, args)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def configure_mcp(self, args):
+    &#34;&#34;&#34;Handle MCP server configuration via CLI tokens or interactive wizard.&#34;&#34;&#34;
+    mcp_args = args.mcp
+    
+    # 1. Non-interactive CLI Mode (if arguments are provided)
+    if mcp_args:
+        action = mcp_args[0].lower()
+        
+        if action == &#34;list&#34;:
+            settings = self.app.services.config_svc.get_settings()
+            mcp_servers = settings.get(&#34;ai&#34;, {}).get(&#34;mcp_servers&#34;, {})
+            if not mcp_servers:
+                printer.info(&#34;No MCP servers configured.&#34;)
+            else:
+                columns = [&#34;Name&#34;, &#34;URL&#34;, &#34;Enabled&#34;, &#34;Auto-load OS&#34;]
+                rows = []
+                for name, cfg in mcp_servers.items():
+                    rows.append([
+                        name, 
+                        cfg.get(&#34;url&#34;, &#34;&#34;), 
+                        &#34;[green]Yes[/green]&#34; if cfg.get(&#34;enabled&#34;, True) else &#34;[red]No[/red]&#34;,
+                        cfg.get(&#34;auto_load_on_os&#34;, &#34;Any&#34;)
+                    ])
+                printer.table(&#34;Configured MCP Servers&#34;, columns, rows)
+            return
+
+        elif action == &#34;add&#34;:
+            if len(mcp_args) &lt; 3:
+                printer.error(&#34;Usage: connpy ai --mcp add &lt;name&gt; &lt;url&gt; [os_filter]&#34;)
+                return
+            name, url = mcp_args[1], mcp_args[2]
+            os_filter = mcp_args[3] if len(mcp_args) &gt; 3 else None
+            try:
+                self.app.services.ai.configure_mcp(name, url=url, auto_load_on_os=os_filter)
+                printer.success(f&#34;MCP server &#39;{name}&#39; added/updated.&#34;)
+            except Exception as e:
+                printer.error(str(e))
+            return
+
+        elif action == &#34;remove&#34;:
+            if len(mcp_args) &lt; 2:
+                printer.error(&#34;Usage: connpy ai --mcp remove &lt;name&gt;&#34;)
+                return
+            name = mcp_args[1]
+            try:
+                self.app.services.ai.configure_mcp(name, remove=True)
+                printer.success(f&#34;MCP server &#39;{name}&#39; removed.&#34;)
+            except Exception as e:
+                printer.error(str(e))
+            return
+
+        elif action in [&#34;enable&#34;, &#34;disable&#34;]:
+            if len(mcp_args) &lt; 2:
+                printer.error(f&#34;Usage: connpy ai --mcp {action} &lt;name&gt;&#34;)
+                return
+            name = mcp_args[1]
+            enabled = (action == &#34;enable&#34;)
+            try:
+                self.app.services.ai.configure_mcp(name, enabled=enabled)
+                printer.success(f&#34;MCP server &#39;{name}&#39; {&#39;enabled&#39; if enabled else &#39;disabled&#39;}.&#34;)
+            except Exception as e:
+                printer.error(str(e))
+            return
+        
+        else:
+            printer.error(f&#34;Unknown MCP action: {action}&#34;)
+            printer.info(&#34;Available actions: list, add, remove, enable, disable&#34;)
+            return
+
+    # 2. Interactive Wizard Mode (if no arguments provided)
+    # Import forms dynamically to avoid circular dependencies if any
+    if not hasattr(self.app, &#34;cli_forms&#34;):
+        from .forms import Forms
+        self.app.cli_forms = Forms(self.app)
+        
+    settings = self.app.services.config_svc.get_settings()
+    mcp_servers = settings.get(&#34;ai&#34;, {}).get(&#34;mcp_servers&#34;, {})
+    
+    result = self.app.cli_forms.mcp_wizard(mcp_servers)
+    if not result:
+        return
+
+    action = result[&#34;action&#34;]
+    try:
+        if action == &#34;list&#34;:
+            # Recursive call to the non-interactive list logic
+            args.mcp = [&#34;list&#34;]
+            return self.configure_mcp(args)
+        
+        elif action == &#34;add&#34;:
+            self.app.services.ai.configure_mcp(
+                result[&#34;name&#34;], 
+                url=result[&#34;url&#34;], 
+                enabled=result[&#34;enabled&#34;],
+                auto_load_on_os=result[&#34;os&#34;]
+            )
+            printer.success(f&#34;MCP server &#39;{result[&#39;name&#39;]}&#39; saved.&#34;)
+        
+        elif action == &#34;update&#34;: # Used for toggle
+            self.app.services.ai.configure_mcp(
+                result[&#34;name&#34;], 
+                enabled=result[&#34;enabled&#34;]
+            )
+            printer.success(f&#34;MCP server &#39;{result[&#39;name&#39;]}&#39; updated.&#34;)
+            
+        elif action == &#34;remove&#34;:
+            self.app.services.ai.configure_mcp(result[&#34;name&#34;], remove=True)
+            printer.success(f&#34;MCP server &#39;{result[&#39;name&#39;]}&#39; removed.&#34;)
+            
+    except Exception as e:
+        printer.error(str(e))</code></pre>
+</details>
+<div class="desc"><p>Handle MCP server configuration via CLI tokens or interactive wizard.</p></div>
+</dd>
 <dt id="connpy.cli.ai_handler.AIHandler.dispatch"><code class="name flex">
 <span>def <span class="ident">dispatch</span></span>(<span>self, args)</span>
 </code></dt>
@@ -210,6 +447,9 @@ el.replaceWith(d);
         except Exception as e:
             printer.error(str(e))
         return
+
+    if args.mcp is not None:
+        return self.configure_mcp(args)
         
     # Determinar session_id para retomar
     session_id = None
@@ -283,7 +523,7 @@ el.replaceWith(d);
         try:
             user_query = Prompt.ask(&#34;[user_prompt]User[/user_prompt]&#34;)
             if not user_query.strip(): continue
-            if user_query.lower() in [&#39;exit&#39;, &#39;quit&#39;, &#39;bye&#39;]: break
+            if user_query.lower() in [&#39;exit&#39;, &#39;quit&#39;, &#39;bye&#39;, &#39;cancel&#39;]: break
             
             with console.status(&#34;[ai_status]Agent is thinking...&#34;) as status:
                 result = self.app.myai.ask(user_query, chat_history=history, status=status, debug=args.debug, trust=args.trust, **self.ai_overrides)
@@ -356,6 +596,7 @@ el.replaceWith(d);
 <li>
 <h4><code><a title="connpy.cli.ai_handler.AIHandler" href="#connpy.cli.ai_handler.AIHandler">AIHandler</a></code></h4>
 <ul class="">
+<li><code><a title="connpy.cli.ai_handler.AIHandler.configure_mcp" href="#connpy.cli.ai_handler.AIHandler.configure_mcp">configure_mcp</a></code></li>
 <li><code><a title="connpy.cli.ai_handler.AIHandler.dispatch" href="#connpy.cli.ai_handler.AIHandler.dispatch">dispatch</a></code></li>
 <li><code><a title="connpy.cli.ai_handler.AIHandler.interactive_chat" href="#connpy.cli.ai_handler.AIHandler.interactive_chat">interactive_chat</a></code></li>
 <li><code><a title="connpy.cli.ai_handler.AIHandler.single_question" href="#connpy.cli.ai_handler.AIHandler.single_question">single_question</a></code></li>
@@ -367,7 +608,7 @@ el.replaceWith(d);
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
 </footer>
 </body>
 </html>

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.6">
+<meta name="generator" content="pdoc3 0.11.5">
 <title>connpy.services.ai_service API documentation</title>
 <meta name="description" content="">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
@@ -58,6 +58,104 @@ el.replaceWith(d);
 <pre><code class="python">class AIService(BaseService):
     &#34;&#34;&#34;Business logic for interacting with AI agents and LLM configurations.&#34;&#34;&#34;
 
+    def build_context_blocks(self, raw_bytes: bytes, cmd_byte_positions: list, node_info: dict) -&gt; list:
+        &#34;&#34;&#34;Identifies command blocks in the terminal history.&#34;&#34;&#34;
+        blocks = []
+        if not (cmd_byte_positions and len(cmd_byte_positions) &gt;= 2 and raw_bytes):
+            return blocks
+            
+        default_prompt = r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;
+        device_prompt = node_info.get(&#34;prompt&#34;, default_prompt) if isinstance(node_info, dict) else default_prompt
+        prompt_re_str = re.sub(r&#39;(?&lt;!\\)\$&#39;, &#39;&#39;, device_prompt)
+        try:
+            prompt_re = re.compile(prompt_re_str)
+        except Exception:
+            prompt_re = re.compile(re.sub(r&#39;(?&lt;!\\)\$&#39;, &#39;&#39;, default_prompt))
+            
+        for i in range(1, len(cmd_byte_positions)):
+            pos, known_cmd = cmd_byte_positions[i]
+            prev_pos = cmd_byte_positions[i-1][0]
+            
+            if known_cmd:
+                prev_chunk = raw_bytes[prev_pos:pos]
+                prev_cleaned = log_cleaner(prev_chunk.decode(errors=&#39;replace&#39;))
+                prev_lines = [l for l in prev_cleaned.split(&#39;\n&#39;) if l.strip()]
+                prompt_text = prev_lines[-1].strip() if prev_lines else &#34;&#34;
+                preview = f&#34;{prompt_text}{known_cmd}&#34; if prompt_text else known_cmd
+                blocks.append((pos, preview[:80]))
+            else:
+                chunk = raw_bytes[prev_pos:pos]
+                cleaned = log_cleaner(chunk.decode(errors=&#39;replace&#39;))
+                lines = [l for l in cleaned.split(&#39;\n&#39;) if l.strip()]
+                preview = lines[-1].strip() if lines else &#34;&#34;
+                
+                if preview:
+                    match = prompt_re.search(preview)
+                    if match:
+                        cmd_text = preview[match.end():].strip()
+                        if cmd_text:
+                            blocks.append((pos, preview[:80]))
+        return blocks
+
+    def process_copilot_input(self, input_text: str, session_state: dict) -&gt; dict:
+        &#34;&#34;&#34;Parses slash commands and manages session state. Returns directive dict.&#34;&#34;&#34;
+        text = input_text.strip()
+        if not text.startswith(&#39;/&#39;):
+            return {&#34;action&#34;: &#34;execute&#34;, &#34;clean_prompt&#34;: text, &#34;overrides&#34;: {}}
+            
+        parts = text.split(maxsplit=1)
+        cmd = parts[0].lower()
+        args = parts[1] if len(parts) &gt; 1 else &#34;&#34;
+        
+        # 1. State Commands (Persistent)
+        if cmd == &#34;/os&#34;:
+            if args:
+                session_state[&#39;os&#39;] = args
+                return {&#34;action&#34;: &#34;state_update&#34;, &#34;message&#34;: f&#34;OS context changed to {args}&#34;}
+        elif cmd == &#34;/prompt&#34;:
+            if args:
+                session_state[&#39;prompt&#39;] = args
+                return {&#34;action&#34;: &#34;state_update&#34;, &#34;message&#34;: f&#34;Prompt regex changed to {args}&#34;}
+        elif cmd == &#34;/memorize&#34;:
+            if args:
+                session_state[&#39;memories&#39;].append(args)
+                return {&#34;action&#34;: &#34;state_update&#34;, &#34;message&#34;: f&#34;Memory added: {args}&#34;}
+        elif cmd == &#34;/clear&#34;:
+            session_state[&#39;memories&#39;] = []
+            return {&#34;action&#34;: &#34;state_update&#34;, &#34;message&#34;: &#34;Memory cleared&#34;}
+            
+        # 2. Hybrid Commands
+        elif cmd == &#34;/architect&#34;:
+            if not args:
+                session_state[&#39;persona&#39;] = &#39;architect&#39;
+                return {&#34;action&#34;: &#34;state_update&#34;, &#34;message&#34;: &#34;Persona set to Architect&#34;}
+            else:
+                return {&#34;action&#34;: &#34;execute&#34;, &#34;clean_prompt&#34;: args, &#34;overrides&#34;: {&#34;persona&#34;: &#34;architect&#34;}}
+                
+        elif cmd == &#34;/engineer&#34;:
+            if not args:
+                session_state[&#39;persona&#39;] = &#39;engineer&#39;
+                return {&#34;action&#34;: &#34;state_update&#34;, &#34;message&#34;: &#34;Persona set to Engineer&#34;}
+            else:
+                return {&#34;action&#34;: &#34;execute&#34;, &#34;clean_prompt&#34;: args, &#34;overrides&#34;: {&#34;persona&#34;: &#34;engineer&#34;}}
+                
+        elif cmd == &#34;/trust&#34;:
+            if not args:
+                session_state[&#39;trust_mode&#39;] = True
+                return {&#34;action&#34;: &#34;state_update&#34;, &#34;message&#34;: &#34;Auto-execute (trust) enabled for session&#34;}
+            else:
+                return {&#34;action&#34;: &#34;execute&#34;, &#34;clean_prompt&#34;: args, &#34;overrides&#34;: {&#34;trust&#34;: True}}
+                
+        elif cmd == &#34;/untrust&#34;:
+            if not args:
+                session_state[&#39;trust_mode&#39;] = False
+                return {&#34;action&#34;: &#34;state_update&#34;, &#34;message&#34;: &#34;Auto-execute (trust) disabled for session&#34;}
+            else:
+                return {&#34;action&#34;: &#34;execute&#34;, &#34;clean_prompt&#34;: args, &#34;overrides&#34;: {&#34;trust&#34;: False}}
+
+        # Unknown command, execute normally
+        return {&#34;action&#34;: &#34;execute&#34;, &#34;clean_prompt&#34;: text, &#34;overrides&#34;: {}}
+
     def ask(self, input_text, dryrun=False, chat_history=None, status=None, debug=False, session_id=None, console=None, chunk_callback=None, confirm_handler=None, trust=False, **overrides):
         &#34;&#34;&#34;Send a prompt to the AI agent.&#34;&#34;&#34;
         from connpy.ai import ai
@@ -70,6 +168,21 @@ el.replaceWith(d);
         from connpy.ai import ai
         agent = ai(self.config, console=console)
         return agent.confirm(input_text)
+
+    def ask_copilot(self, terminal_buffer, user_question, node_info=None, chunk_callback=None):
+        &#34;&#34;&#34;Ask the AI copilot for terminal assistance.&#34;&#34;&#34;
+        from connpy.ai import ai, run_ai_async
+        agent = ai(self.config)
+        future = run_ai_async(agent.aask_copilot(terminal_buffer, user_question, node_info, chunk_callback=chunk_callback))
+        return future.result()
+
+    async def aask_copilot(self, terminal_buffer, user_question, node_info=None, chunk_callback=None):
+        &#34;&#34;&#34;Ask the AI copilot for terminal assistance asynchronously.&#34;&#34;&#34;
+        from connpy.ai import ai, run_ai_async
+        import asyncio
+        agent = ai(self.config)
+        future = run_ai_async(agent.aask_copilot(terminal_buffer, user_question, node_info, chunk_callback=chunk_callback))
+        return await asyncio.wrap_future(future)
 
 
     def list_sessions(self):
@@ -99,6 +212,40 @@ el.replaceWith(d);
         self.config.config[&#34;ai&#34;] = settings
         self.config._saveconfig(self.config.file)
 
+    def configure_mcp(self, name, url=None, enabled=None, auto_load_on_os=None, remove=False):
+        &#34;&#34;&#34;Update MCP server settings in the configuration with smart merging.&#34;&#34;&#34;
+        ai_settings = self.config.config.get(&#34;ai&#34;, {})
+        mcp_servers = ai_settings.get(&#34;mcp_servers&#34;, {})
+        
+        if remove:
+            if name in mcp_servers:
+                del mcp_servers[name]
+        else:
+            # Get existing or new
+            server_cfg = mcp_servers.get(name, {})
+            
+            # Partial updates
+            if url is not None:
+                server_cfg[&#34;url&#34;] = url
+            
+            if enabled is not None:
+                server_cfg[&#34;enabled&#34;] = bool(enabled)
+            elif &#34;enabled&#34; not in server_cfg:
+                server_cfg[&#34;enabled&#34;] = True # Default for new entries
+                
+            if auto_load_on_os is not None:
+                if auto_load_on_os == &#34;&#34;: # Explicit clear
+                    if &#34;auto_load_on_os&#34; in server_cfg:
+                        del server_cfg[&#34;auto_load_on_os&#34;]
+                else:
+                    server_cfg[&#34;auto_load_on_os&#34;] = auto_load_on_os
+            
+            mcp_servers[name] = server_cfg
+            
+        ai_settings[&#34;mcp_servers&#34;] = mcp_servers
+        self.config.config[&#34;ai&#34;] = ai_settings
+        self.config._saveconfig(self.config.file)
+
     def load_session_data(self, session_id):
         &#34;&#34;&#34;Load a session&#39;s raw data by ID.&#34;&#34;&#34;
         from connpy.ai import ai
@@ -118,6 +265,24 @@ el.replaceWith(d);
 </ul>
 <h3>Methods</h3>
 <dl>
+<dt id="connpy.services.ai_service.AIService.aask_copilot"><code class="name flex">
+<span>async def <span class="ident">aask_copilot</span></span>(<span>self, terminal_buffer, user_question, node_info=None, chunk_callback=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">async def aask_copilot(self, terminal_buffer, user_question, node_info=None, chunk_callback=None):
+    &#34;&#34;&#34;Ask the AI copilot for terminal assistance asynchronously.&#34;&#34;&#34;
+    from connpy.ai import ai, run_ai_async
+    import asyncio
+    agent = ai(self.config)
+    future = run_ai_async(agent.aask_copilot(terminal_buffer, user_question, node_info, chunk_callback=chunk_callback))
+    return await asyncio.wrap_future(future)</code></pre>
+</details>
+<div class="desc"><p>Ask the AI copilot for terminal assistance asynchronously.</p></div>
+</dd>
 <dt id="connpy.services.ai_service.AIService.ask"><code class="name flex">
 <span>def <span class="ident">ask</span></span>(<span>self,<br>input_text,<br>dryrun=False,<br>chat_history=None,<br>status=None,<br>debug=False,<br>session_id=None,<br>console=None,<br>chunk_callback=None,<br>confirm_handler=None,<br>trust=False,<br>**overrides)</span>
 </code></dt>
@@ -133,6 +298,116 @@ el.replaceWith(d);
     return agent.ask(input_text, dryrun, chat_history, status=status, debug=debug, session_id=session_id, chunk_callback=chunk_callback)</code></pre>
 </details>
 <div class="desc"><p>Send a prompt to the AI agent.</p></div>
+</dd>
+<dt id="connpy.services.ai_service.AIService.ask_copilot"><code class="name flex">
+<span>def <span class="ident">ask_copilot</span></span>(<span>self, terminal_buffer, user_question, node_info=None, chunk_callback=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def ask_copilot(self, terminal_buffer, user_question, node_info=None, chunk_callback=None):
+    &#34;&#34;&#34;Ask the AI copilot for terminal assistance.&#34;&#34;&#34;
+    from connpy.ai import ai, run_ai_async
+    agent = ai(self.config)
+    future = run_ai_async(agent.aask_copilot(terminal_buffer, user_question, node_info, chunk_callback=chunk_callback))
+    return future.result()</code></pre>
+</details>
+<div class="desc"><p>Ask the AI copilot for terminal assistance.</p></div>
+</dd>
+<dt id="connpy.services.ai_service.AIService.build_context_blocks"><code class="name flex">
+<span>def <span class="ident">build_context_blocks</span></span>(<span>self, raw_bytes: bytes, cmd_byte_positions: list, node_info: dict) ‑> list</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def build_context_blocks(self, raw_bytes: bytes, cmd_byte_positions: list, node_info: dict) -&gt; list:
+    &#34;&#34;&#34;Identifies command blocks in the terminal history.&#34;&#34;&#34;
+    blocks = []
+    if not (cmd_byte_positions and len(cmd_byte_positions) &gt;= 2 and raw_bytes):
+        return blocks
+        
+    default_prompt = r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;
+    device_prompt = node_info.get(&#34;prompt&#34;, default_prompt) if isinstance(node_info, dict) else default_prompt
+    prompt_re_str = re.sub(r&#39;(?&lt;!\\)\$&#39;, &#39;&#39;, device_prompt)
+    try:
+        prompt_re = re.compile(prompt_re_str)
+    except Exception:
+        prompt_re = re.compile(re.sub(r&#39;(?&lt;!\\)\$&#39;, &#39;&#39;, default_prompt))
+        
+    for i in range(1, len(cmd_byte_positions)):
+        pos, known_cmd = cmd_byte_positions[i]
+        prev_pos = cmd_byte_positions[i-1][0]
+        
+        if known_cmd:
+            prev_chunk = raw_bytes[prev_pos:pos]
+            prev_cleaned = log_cleaner(prev_chunk.decode(errors=&#39;replace&#39;))
+            prev_lines = [l for l in prev_cleaned.split(&#39;\n&#39;) if l.strip()]
+            prompt_text = prev_lines[-1].strip() if prev_lines else &#34;&#34;
+            preview = f&#34;{prompt_text}{known_cmd}&#34; if prompt_text else known_cmd
+            blocks.append((pos, preview[:80]))
+        else:
+            chunk = raw_bytes[prev_pos:pos]
+            cleaned = log_cleaner(chunk.decode(errors=&#39;replace&#39;))
+            lines = [l for l in cleaned.split(&#39;\n&#39;) if l.strip()]
+            preview = lines[-1].strip() if lines else &#34;&#34;
+            
+            if preview:
+                match = prompt_re.search(preview)
+                if match:
+                    cmd_text = preview[match.end():].strip()
+                    if cmd_text:
+                        blocks.append((pos, preview[:80]))
+    return blocks</code></pre>
+</details>
+<div class="desc"><p>Identifies command blocks in the terminal history.</p></div>
+</dd>
+<dt id="connpy.services.ai_service.AIService.configure_mcp"><code class="name flex">
+<span>def <span class="ident">configure_mcp</span></span>(<span>self, name, url=None, enabled=None, auto_load_on_os=None, remove=False)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def configure_mcp(self, name, url=None, enabled=None, auto_load_on_os=None, remove=False):
+    &#34;&#34;&#34;Update MCP server settings in the configuration with smart merging.&#34;&#34;&#34;
+    ai_settings = self.config.config.get(&#34;ai&#34;, {})
+    mcp_servers = ai_settings.get(&#34;mcp_servers&#34;, {})
+    
+    if remove:
+        if name in mcp_servers:
+            del mcp_servers[name]
+    else:
+        # Get existing or new
+        server_cfg = mcp_servers.get(name, {})
+        
+        # Partial updates
+        if url is not None:
+            server_cfg[&#34;url&#34;] = url
+        
+        if enabled is not None:
+            server_cfg[&#34;enabled&#34;] = bool(enabled)
+        elif &#34;enabled&#34; not in server_cfg:
+            server_cfg[&#34;enabled&#34;] = True # Default for new entries
+            
+        if auto_load_on_os is not None:
+            if auto_load_on_os == &#34;&#34;: # Explicit clear
+                if &#34;auto_load_on_os&#34; in server_cfg:
+                    del server_cfg[&#34;auto_load_on_os&#34;]
+            else:
+                server_cfg[&#34;auto_load_on_os&#34;] = auto_load_on_os
+        
+        mcp_servers[name] = server_cfg
+        
+    ai_settings[&#34;mcp_servers&#34;] = mcp_servers
+    self.config.config[&#34;ai&#34;] = ai_settings
+    self.config._saveconfig(self.config.file)</code></pre>
+</details>
+<div class="desc"><p>Update MCP server settings in the configuration with smart merging.</p></div>
 </dd>
 <dt id="connpy.services.ai_service.AIService.configure_provider"><code class="name flex">
 <span>def <span class="ident">configure_provider</span></span>(<span>self, provider, model=None, api_key=None)</span>
@@ -223,6 +498,75 @@ el.replaceWith(d);
 </details>
 <div class="desc"><p>Load a session's raw data by ID.</p></div>
 </dd>
+<dt id="connpy.services.ai_service.AIService.process_copilot_input"><code class="name flex">
+<span>def <span class="ident">process_copilot_input</span></span>(<span>self, input_text: str, session_state: dict) ‑> dict</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def process_copilot_input(self, input_text: str, session_state: dict) -&gt; dict:
+    &#34;&#34;&#34;Parses slash commands and manages session state. Returns directive dict.&#34;&#34;&#34;
+    text = input_text.strip()
+    if not text.startswith(&#39;/&#39;):
+        return {&#34;action&#34;: &#34;execute&#34;, &#34;clean_prompt&#34;: text, &#34;overrides&#34;: {}}
+        
+    parts = text.split(maxsplit=1)
+    cmd = parts[0].lower()
+    args = parts[1] if len(parts) &gt; 1 else &#34;&#34;
+    
+    # 1. State Commands (Persistent)
+    if cmd == &#34;/os&#34;:
+        if args:
+            session_state[&#39;os&#39;] = args
+            return {&#34;action&#34;: &#34;state_update&#34;, &#34;message&#34;: f&#34;OS context changed to {args}&#34;}
+    elif cmd == &#34;/prompt&#34;:
+        if args:
+            session_state[&#39;prompt&#39;] = args
+            return {&#34;action&#34;: &#34;state_update&#34;, &#34;message&#34;: f&#34;Prompt regex changed to {args}&#34;}
+    elif cmd == &#34;/memorize&#34;:
+        if args:
+            session_state[&#39;memories&#39;].append(args)
+            return {&#34;action&#34;: &#34;state_update&#34;, &#34;message&#34;: f&#34;Memory added: {args}&#34;}
+    elif cmd == &#34;/clear&#34;:
+        session_state[&#39;memories&#39;] = []
+        return {&#34;action&#34;: &#34;state_update&#34;, &#34;message&#34;: &#34;Memory cleared&#34;}
+        
+    # 2. Hybrid Commands
+    elif cmd == &#34;/architect&#34;:
+        if not args:
+            session_state[&#39;persona&#39;] = &#39;architect&#39;
+            return {&#34;action&#34;: &#34;state_update&#34;, &#34;message&#34;: &#34;Persona set to Architect&#34;}
+        else:
+            return {&#34;action&#34;: &#34;execute&#34;, &#34;clean_prompt&#34;: args, &#34;overrides&#34;: {&#34;persona&#34;: &#34;architect&#34;}}
+            
+    elif cmd == &#34;/engineer&#34;:
+        if not args:
+            session_state[&#39;persona&#39;] = &#39;engineer&#39;
+            return {&#34;action&#34;: &#34;state_update&#34;, &#34;message&#34;: &#34;Persona set to Engineer&#34;}
+        else:
+            return {&#34;action&#34;: &#34;execute&#34;, &#34;clean_prompt&#34;: args, &#34;overrides&#34;: {&#34;persona&#34;: &#34;engineer&#34;}}
+            
+    elif cmd == &#34;/trust&#34;:
+        if not args:
+            session_state[&#39;trust_mode&#39;] = True
+            return {&#34;action&#34;: &#34;state_update&#34;, &#34;message&#34;: &#34;Auto-execute (trust) enabled for session&#34;}
+        else:
+            return {&#34;action&#34;: &#34;execute&#34;, &#34;clean_prompt&#34;: args, &#34;overrides&#34;: {&#34;trust&#34;: True}}
+            
+    elif cmd == &#34;/untrust&#34;:
+        if not args:
+            session_state[&#39;trust_mode&#39;] = False
+            return {&#34;action&#34;: &#34;state_update&#34;, &#34;message&#34;: &#34;Auto-execute (trust) disabled for session&#34;}
+        else:
+            return {&#34;action&#34;: &#34;execute&#34;, &#34;clean_prompt&#34;: args, &#34;overrides&#34;: {&#34;trust&#34;: False}}
+
+    # Unknown command, execute normally
+    return {&#34;action&#34;: &#34;execute&#34;, &#34;clean_prompt&#34;: text, &#34;overrides&#34;: {}}</code></pre>
+</details>
+<div class="desc"><p>Parses slash commands and manages session state. Returns directive dict.</p></div>
+</dd>
 </dl>
 <h3>Inherited members</h3>
 <ul class="hlist">
@@ -250,13 +594,18 @@ el.replaceWith(d);
 <ul>
 <li>
 <h4><code><a title="connpy.services.ai_service.AIService" href="#connpy.services.ai_service.AIService">AIService</a></code></h4>
-<ul class="two-column">
+<ul class="">
+<li><code><a title="connpy.services.ai_service.AIService.aask_copilot" href="#connpy.services.ai_service.AIService.aask_copilot">aask_copilot</a></code></li>
 <li><code><a title="connpy.services.ai_service.AIService.ask" href="#connpy.services.ai_service.AIService.ask">ask</a></code></li>
+<li><code><a title="connpy.services.ai_service.AIService.ask_copilot" href="#connpy.services.ai_service.AIService.ask_copilot">ask_copilot</a></code></li>
+<li><code><a title="connpy.services.ai_service.AIService.build_context_blocks" href="#connpy.services.ai_service.AIService.build_context_blocks">build_context_blocks</a></code></li>
+<li><code><a title="connpy.services.ai_service.AIService.configure_mcp" href="#connpy.services.ai_service.AIService.configure_mcp">configure_mcp</a></code></li>
 <li><code><a title="connpy.services.ai_service.AIService.configure_provider" href="#connpy.services.ai_service.AIService.configure_provider">configure_provider</a></code></li>
 <li><code><a title="connpy.services.ai_service.AIService.confirm" href="#connpy.services.ai_service.AIService.confirm">confirm</a></code></li>
 <li><code><a title="connpy.services.ai_service.AIService.delete_session" href="#connpy.services.ai_service.AIService.delete_session">delete_session</a></code></li>
 <li><code><a title="connpy.services.ai_service.AIService.list_sessions" href="#connpy.services.ai_service.AIService.list_sessions">list_sessions</a></code></li>
 <li><code><a title="connpy.services.ai_service.AIService.load_session_data" href="#connpy.services.ai_service.AIService.load_session_data">load_session_data</a></code></li>
+<li><code><a title="connpy.services.ai_service.AIService.process_copilot_input" href="#connpy.services.ai_service.AIService.process_copilot_input">process_copilot_input</a></code></li>
 </ul>
 </li>
 </ul>
@@ -265,7 +614,7 @@ el.replaceWith(d);
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
 </footer>
 </body>
 </html>

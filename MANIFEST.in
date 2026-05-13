@@ -1,0 +1,8 @@
+include LICENSE
+include README.md
+include requirements.txt
+recursive-include connpy/core_plugins *
+recursive-include connpy/proto *
+recursive-include connpy/grpc *.proto
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]

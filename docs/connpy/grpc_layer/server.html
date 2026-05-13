@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.6">
+<meta name="generator" content="pdoc3 0.11.5">
 <title>connpy.grpc_layer.server API documentation</title>
 <meta name="description" content="">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
@@ -96,7 +96,7 @@ el.replaceWith(d);
     interceptors = [LoggingInterceptor()] if debug else []
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10), interceptors=interceptors)
     
-    connpy_pb2_grpc.add_NodeServiceServicer_to_server(NodeServicer(config), server)
+    connpy_pb2_grpc.add_NodeServiceServicer_to_server(NodeServicer(config, debug=debug), server)
     connpy_pb2_grpc.add_ProfileServiceServicer_to_server(ProfileServicer(config), server)
     connpy_pb2_grpc.add_ConfigServiceServicer_to_server(ConfigServicer(config), server)
     plugin_servicer = PluginServicer(config)
@@ -246,6 +246,22 @@ el.replaceWith(d);
         return connpy_pb2.BoolResponse(value=res)
 
     @handle_errors
+    def ask_copilot(self, request, context):
+        import json
+        node_info = json.loads(request.node_info_json) if request.node_info_json else None
+        result = self.service.ask_copilot(
+            request.terminal_buffer,
+            request.user_question,
+            node_info
+        )
+        return connpy_pb2.CopilotResponse(
+            commands=result.get(&#34;commands&#34;, []),
+            guide=result.get(&#34;guide&#34;, &#34;&#34;),
+            risk_level=result.get(&#34;risk_level&#34;, &#34;low&#34;),
+            error=result.get(&#34;error&#34;) or &#34;&#34;
+        )
+
+    @handle_errors
     def list_sessions(self, request, context):
         return connpy_pb2.ValueResponse(data=to_value(self.service.list_sessions()))
 
@@ -257,6 +273,17 @@ el.replaceWith(d);
     @handle_errors
     def configure_provider(self, request, context):
         self.service.configure_provider(request.provider, request.model, request.api_key)
+        return Empty()
+    
+    @handle_errors
+    def configure_mcp(self, request, context):
+        self.service.configure_mcp(
+            request.name, 
+            url=request.url or None, 
+            enabled=request.enabled, 
+            auto_load_on_os=request.auto_load_on_os or None, 
+            remove=request.remove
+        )
         return Empty()
 
     @handle_errors
@@ -273,6 +300,8 @@ el.replaceWith(d);
 <li><code><b><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer">AIServiceServicer</a></b></code>:
 <ul class="hlist">
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.ask" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.ask">ask</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.ask_copilot" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.ask_copilot">ask_copilot</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.configure_mcp" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.configure_mcp">configure_mcp</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.configure_provider" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.configure_provider">configure_provider</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.confirm" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.confirm">confirm</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.delete_session" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.delete_session">delete_session</a></code></li>
@@ -618,7 +647,7 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
 </dd>
 <dt id="connpy.grpc_layer.server.NodeServicer"><code class="flex name class">
 <span>class <span class="ident">NodeServicer</span></span>
-<span>(</span><span>config)</span>
+<span>(</span><span>config, debug=False)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -626,8 +655,13 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
-    def __init__(self, config):
+    def __init__(self, config, debug=False):
         self.service = NodeService(config)
+        self.server_debug = debug
+        if debug:
+            from rich.console import Console
+            from ..printer import connpy_theme, get_original_stdout
+            self.server_console = Console(theme=connpy_theme, file=get_original_stdout())
 
     @handle_errors
     def interact_node(self, request_iterator, context):
@@ -650,8 +684,8 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
         sftp = first_req.sftp
         debug = first_req.debug
         
-        if debug:
-            printer.console.print(f&#34;[debug][DEBUG][/debug] gRPC interact_node request for: [bold cyan]{unique_id}[/bold cyan]&#34;)
+        if self.server_debug:
+            self.server_console.print(f&#34;[debug][DEBUG][/debug] gRPC interact_node request for: [bold cyan]{unique_id}[/bold cyan]&#34;)
 
         if first_req.connection_params_json:
             import json
@@ -710,7 +744,39 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
             if sftp:
                 n.protocol = &#34;sftp&#34;
 
-        connect = n._connect(debug=debug)
+        # Build a logger that captures debug messages as ANSI-colored bytes for the client
+        debug_chunks = []
+        if debug:
+            from io import StringIO
+            from rich.console import Console as RichConsole
+            from ..printer import connpy_theme
+            from .. import printer as _printer
+
+            def remote_logger(msg_type, message):
+                buf = StringIO()
+                c = RichConsole(file=buf, force_terminal=True, width=120, theme=connpy_theme)
+                if msg_type == &#34;debug&#34;:
+                    c.print(_printer._format_multiline(&#34;i&#34;, f&#34;[DEBUG] {message}&#34;, style=&#34;info&#34;))
+                elif msg_type == &#34;success&#34;:
+                    c.print(_printer._format_multiline(&#34;✓&#34;, message, style=&#34;success&#34;))
+                elif msg_type == &#34;error&#34;:
+                    c.print(_printer._format_multiline(&#34;✗&#34;, message, style=&#34;error&#34;))
+                else:
+                    c.print(str(message))
+                rendered = buf.getvalue()
+                if rendered:
+                    # Raw TTY needs \r\n instead of \n
+                    rendered = rendered.replace(&#39;\n&#39;, &#39;\r\n&#39;)
+                    debug_chunks.append(rendered.encode())
+        else:
+            remote_logger = None
+
+        connect = n._connect(debug=debug, logger=remote_logger)
+
+        # Send debug output to client before checking result (always show the command)
+        for chunk in debug_chunks:
+            yield connpy_pb2.InteractResponse(stdout_data=chunk)
+
         if connect != True:
             yield connpy_pb2.InteractResponse(success=False, error_message=str(connect))
             return
@@ -737,7 +803,160 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
                     except Exception:
                         pass
 
-                asyncio.run(n._async_interact_loop(remote_stream, resize_callback))
+                async def remote_copilot_handler(buffer, node_info, stream, child_fd, cmd_byte_positions=None):
+                    import json
+                    import asyncio
+                    import os
+
+                    if node_info is None:
+                        node_info = {}
+
+                    node_info_json = json.dumps(node_info)
+                    
+                    # Convert buffer to string if it&#39;s bytes for the preview
+                    preview_str = buffer[-200:].decode(errors=&#39;replace&#39;) if isinstance(buffer, bytes) else str(buffer)[-200:]
+                    
+                    # 1. Send prompt to client
+                    response_queue.put(connpy_pb2.InteractResponse(
+                        copilot_prompt=True,
+                        copilot_buffer_preview=preview_str,
+                        copilot_node_info_json=node_info_json
+                    ))
+
+                    while True:
+                        # 2. Await the question from client via the copilot_queue
+                        import threading
+                        def preload_ai_deps():
+                            try:
+                                import litellm
+                            except Exception:
+                                pass
+                        threading.Thread(target=preload_ai_deps, daemon=True).start()
+                        
+                        try:
+                            req_data = await asyncio.wait_for(remote_stream.copilot_queue.get(), timeout=120)
+                            if not req_data: return
+                            if &#34;question&#34; not in req_data or not req_data[&#34;question&#34;] or req_data[&#34;question&#34;] == &#34;CANCEL&#34; or req_data.get(&#34;action&#34;) == &#34;cancel&#34;:
+                                os.write(child_fd, b&#39;\x15\r&#39;)
+                                return
+                            question = req_data[&#34;question&#34;]
+                            
+                            merged_node_info_str = req_data.get(&#34;node_info_json&#34;, &#34;&#34;)
+                            if merged_node_info_str:
+                                try:
+                                    merged_node_info = json.loads(merged_node_info_str)
+                                    node_info.update(merged_node_info)
+                                except: pass
+
+                            context_buffer = req_data.get(&#34;context_buffer&#34;, &#34;&#34;)
+                            if context_buffer.startswith(&#39;{&#34;context_start_pos&#34;&#39;):
+                                try:
+                                    parsed = json.loads(context_buffer)
+                                    start_pos = parsed[&#34;context_start_pos&#34;]
+                                    selected_raw = raw_bytes[start_pos:]
+                                    context_buffer = n._logclean(selected_raw.decode(errors=&#39;replace&#39;), var=True)
+                                except Exception:
+                                    context_buffer = buffer
+                            elif not context_buffer:
+                                context_buffer = buffer
+                        except asyncio.TimeoutError:
+                            os.write(child_fd, b&#39;\x15\r&#39;)
+                            return
+                            
+                        # 3. Call AI Service with streaming
+                        from ..services.ai_service import AIService
+                        service = AIService(self.service.config)
+                        
+                        def chunk_callback(chunk_text):
+                            if chunk_text:
+                                response_queue.put(connpy_pb2.InteractResponse(
+                                    copilot_stream_chunk=chunk_text
+                                ))
+                                
+                        # Create a clean version of node_info for the AI to save tokens and match local CLI behavior
+                        ai_node_info = {k: v for k, v in node_info.items() if k not in (&#34;context_blocks&#34;, &#34;full_buffer&#34;)}
+                        
+                        ai_task = asyncio.create_task(service.aask_copilot(context_buffer, question, ai_node_info, chunk_callback=chunk_callback))
+                        wait_action_task = asyncio.create_task(remote_stream.copilot_queue.get())
+                        
+                        done, pending = await asyncio.wait(
+                            [ai_task, wait_action_task],
+                            return_when=asyncio.FIRST_COMPLETED
+                        )
+                        
+                        if wait_action_task in done:
+                            req_data = wait_action_task.result()
+                            ai_task.cancel()
+                            if req_data.get(&#34;action&#34;) == &#34;cancel&#34; or req_data.get(&#34;question&#34;) == &#34;CANCEL&#34;:
+                                os.write(child_fd, b&#39;\x15\r&#39;)
+                                return
+                            continue # Loop back instead of returning to keep session alive
+                        else:
+                            wait_action_task.cancel()
+                            result = ai_task.result()
+                            if not result:
+                                os.write(child_fd, b&#39;\x15\r&#39;)
+                                return
+                        
+                        # 4. Send response back to client
+                        response_queue.put(connpy_pb2.InteractResponse(
+                            copilot_response_json=json.dumps(result)
+                        ))
+                        
+                        # 5. Wait for user action
+                        try:
+                            action_data = await asyncio.wait_for(remote_stream.copilot_queue.get(), timeout=60)
+                            if not action_data: return
+                            action = action_data.get(&#34;action&#34;, &#34;cancel&#34;)
+                            
+                            if action == &#34;continue&#34;:
+                                continue # Loop back for next question
+                                
+                            if action == &#34;cancel&#34;:
+                                os.write(child_fd, b&#39;\x15\r&#39;)
+                                return
+                        except asyncio.TimeoutError:
+                            os.write(child_fd, b&#39;\x15\r&#39;)
+                            return
+                            
+                        if action == &#34;send_all&#34;:
+                            commands = result.get(&#34;commands&#34;, [])
+                            os.write(child_fd, b&#39;\x15&#39;) # Ctrl+U to clear line
+                            await asyncio.sleep(0.1)
+
+                            # Prepend screen length command to avoid pagination
+                            if &#34;screen_length_command&#34; in n.tags:
+                                os.write(child_fd, (n.tags[&#34;screen_length_command&#34;] + &#34;\n&#34;).encode())
+                                response_queue.put(connpy_pb2.InteractResponse(copilot_injected_command=n.tags[&#34;screen_length_command&#34;]))
+                                await asyncio.sleep(0.8)
+
+                            for cmd in commands:
+                                os.write(child_fd, (cmd + &#34;\n&#34;).encode())
+                                response_queue.put(connpy_pb2.InteractResponse(copilot_injected_command=cmd))
+                                await asyncio.sleep(0.8)
+                            return
+                        elif action.startswith(&#34;custom:&#34;):
+                            custom_cmds = action[7:]
+                            os.write(child_fd, b&#39;\x15&#39;)
+                            await asyncio.sleep(0.1)
+                            
+                            # Prepend screen length command to avoid pagination
+                            if &#34;screen_length_command&#34; in n.tags:
+                                os.write(child_fd, (n.tags[&#34;screen_length_command&#34;] + &#34;\n&#34;).encode())
+                                response_queue.put(connpy_pb2.InteractResponse(copilot_injected_command=n.tags[&#34;screen_length_command&#34;]))
+                                await asyncio.sleep(0.8)
+
+                            for cmd in custom_cmds.split(&#39;\n&#39;):
+                                if cmd.strip():
+                                    os.write(child_fd, (cmd.strip() + &#34;\n&#34;).encode())
+                                    response_queue.put(connpy_pb2.InteractResponse(copilot_injected_command=cmd.strip()))
+                                    await asyncio.sleep(0.8)
+                            return
+                        else:
+                            os.write(child_fd, b&#39;\x15\r&#39;)
+                            return
+
+                asyncio.run(n._async_interact_loop(remote_stream, resize_callback, copilot_handler=remote_copilot_handler))
             except Exception as e:
                 pass
             finally:
@@ -746,14 +965,19 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
 
         t_loop = threading.Thread(target=run_async_loop, daemon=True)
         t_loop.start()
+        def response_generator():
+            while True:
+                data = response_queue.get()
+                if data is None:
+                    if self.server_debug:
+                        self.server_console.print(f&#34;[debug][DEBUG][/debug] gRPC interact_node session closed for: [bold cyan]{unique_id}[/bold cyan]&#34;)
+                    break
+                if isinstance(data, connpy_pb2.InteractResponse):
+                    yield data
+                else:
+                    yield connpy_pb2.InteractResponse(stdout_data=data)
+        yield from response_generator()
 
-        while True:
-            data = response_queue.get()
-            if data is None:
-                if debug:
-                    printer.console.print(f&#34;[debug][DEBUG][/debug] gRPC interact_node session closed for: [bold cyan]{unique_id}[/bold cyan]&#34;)
-                break
-            yield connpy_pb2.InteractResponse(stdout_data=data)
     @handle_errors
     def list_nodes(self, request, context):
         f = request.filter_str if request.filter_str else None
@@ -1319,7 +1543,7 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
 </footer>
 </body>
 </html>

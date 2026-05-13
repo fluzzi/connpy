@@ -121,7 +121,7 @@ class RunHandler:
                     commands=commands,
                     variables=variables,
                     parallel=options.get("parallel", 10),
-                    timeout=options.get("timeout", 10),
+                    timeout=options.get("timeout", 20),
                     folder=folder,
                     prompt=prompt,
                     on_node_complete=_on_run_complete
@@ -155,7 +155,7 @@ class RunHandler:
                     expected=expected,
                     variables=variables,
                     parallel=options.get("parallel", 10),
-                    timeout=options.get("timeout", 10),
+                    timeout=options.get("timeout", 20),
                     folder=folder,
                     prompt=prompt,
                     on_node_complete=_on_test_complete

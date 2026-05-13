@@ -46,8 +46,9 @@ def _get_local():
         _local.console = None
     if not hasattr(_local, 'err_console'):
         _local.err_console = None
-    if not hasattr(_local, 'theme'):
-        _local.theme = None
+    if not hasattr(_local, 'theme') or _local.theme is None:
+        from rich.theme import Theme
+        _local.theme = Theme(_global_active_styles)
     return _local
 
 def set_thread_stream(stream):
@@ -69,22 +70,44 @@ def get_original_stderr():
 
 # Centralized design system
 STYLES = {
-    "info": "cyan",
-    "warning": "yellow",
-    "error": "red",
-    "success": "green",
-    "debug": "dim",
-    "header": "bold cyan",
-    "key": "bold cyan",
-    "border": "cyan",
-    "pass": "bold green",
-    "fail": "bold red",
-    "engineer": "blue",
-    "architect": "medium_purple",
-    "ai_status": "bold green",
-    "user_prompt": "bold cyan",
-    "unavailable": "orange3",
+    "info": "#00ffff",        # Cyan
+    "warning": "#ffff00",     # Yellow
+    "error": "#ff0000",       # Red
+    "success": "#00ff00",     # Green
+    "debug": "#888888",
+    "header": "bold #00ffff",
+    "key": "bold #00ffff",
+    "border": "#00ffff",
+    "pass": "bold #00ff00",
+    "fail": "bold #ff0000",
+    "engineer": "#5fafff",    # Sky Blue (lighter than pure blue)
+    "architect": "#9370db",   # Medium Purple
+    "ai_status": "bold #00ff00",
+    "user_prompt": "bold #00afd7", # Deep Sky Blue / Soft Cyan
+    "unavailable": "#d78700",
+    "contrast": "#bbbbbb",
 }
+
+LIGHT_THEME = {
+    "info": "#00008b",        # Navy Blue
+    "warning": "#d78700",     # Orange
+    "error": "#cd0000",       # Dark Red
+    "success": "#006400",     # Dark Green
+    "debug": "#777777",
+    "header": "bold #00008b",
+    "key": "bold #00008b",
+    "border": "#00008b",
+    "pass": "bold #006400",
+    "fail": "bold #cd0000",
+    "engineer": "#00008b",
+    "architect": "#8b008b",   # Dark Magenta
+    "ai_status": "bold #006400",
+    "user_prompt": "bold #00008b",
+    "unavailable": "#666666",
+    "contrast": "#777777",
+}
+
+_global_active_styles = STYLES.copy()
 
 def _get_console():
     local = _get_local()
@@ -171,7 +194,7 @@ def connpy_theme():
     local = _get_local()
     if local.theme is None:
         from rich.theme import Theme
-        local.theme = Theme(STYLES)
+        local.theme = Theme(_global_active_styles)
     return local.theme
 
 def apply_theme(user_styles=None):
@@ -179,6 +202,7 @@ def apply_theme(user_styles=None):
     Updates the global console themes with user-defined styles.
     If a style is missing in user_styles, it falls back to the default in STYLES.
     """
+    global _global_active_styles
     local = _get_local()
     from rich.theme import Theme
     
@@ -190,6 +214,7 @@ def apply_theme(user_styles=None):
             if key in active_styles:
                 active_styles[key] = value
                 
+    _global_active_styles = active_styles
     local.theme = Theme(active_styles)
     if local.console:
         local.console.push_theme(local.theme)
@@ -202,10 +227,15 @@ def _format_multiline(tag, message, style=None):
     message = str(message)
     lines = message.splitlines()
     if not lines:
-        return f"[{style}]\\[{tag}][/{style}]" if style else f"\\[{tag}]"
+        if style:
+            return f"[{style}]\\[{tag}][/{style}]"
+        return f"\\[{tag}]"
     
     # Apply style to the tag if provided
     styled_tag = f"[{style}]\\[{tag}][/{style}]" if style else f"\\[{tag}]"
+    if style:
+        # Include brackets in the styling
+        styled_tag = f"[{style}]\\[{tag}][/{style}]"
     formatted = [f"{styled_tag} {lines[0]}"]
     
     # Indent subsequent lines
@@ -462,7 +492,7 @@ class _ThemeProxy:
         local = _get_local()
         if local.theme is None:
             from rich.theme import Theme
-            local.theme = Theme(STYLES)
+            local.theme = Theme(_global_active_styles)
         return getattr(local.theme, name)
 
 connpy_theme = _ThemeProxy()

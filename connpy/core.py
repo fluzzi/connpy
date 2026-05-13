@@ -36,8 +36,6 @@ def copilot_terminal_mode():
         termios.tcsetattr(fd, termios.TCSANOW, new_settings)
         
         yield
-    except Exception:
-        yield
     finally:
         try:
             termios.tcsetattr(fd, termios.TCSANOW, old_settings)
@@ -610,20 +608,24 @@ class node:
 
         async def handler(buffer, node_info, stream, child_fd, cmd_byte_positions=None):
             try:
-                interface = CopilotInterface(config, history=getattr(stream, 'copilot_history', None))
+                interface = CopilotInterface(
+                    config, 
+                    history=getattr(stream, 'copilot_history', None),
+                    session_state=getattr(stream, 'copilot_state', None)
+                )
                 # Save history back to stream for persistence in current session
                 stream.copilot_history = interface.history
+                stream.copilot_state = interface.session_state
                 
                 ai_service = AIService(config)
                 
-                async def on_ai_call(active_buffer, question, chunk_callback):
+                async def on_ai_call(active_buffer, question, chunk_callback, merged_node_info):
                     return await ai_service.aask_copilot(
-                        active_buffer, 
-                        question, 
-                        node_info=node_info, 
+                        active_buffer,
+                        question,
+                        node_info=merged_node_info,
                         chunk_callback=chunk_callback
                     )
-
                 # Get raw bytes from BytesIO
                 raw_bytes = self.mylog.getvalue()
                 
@@ -637,12 +639,16 @@ class node:
                 
                 try:
                     with copilot_terminal_mode():
-                        action, commands, custom_cmd = await interface.run_session(
-                            raw_bytes=raw_bytes,
-                            cmd_byte_positions=cmd_byte_positions,
-                            node_info=node_info,
-                            on_ai_call=on_ai_call
-                        )
+                        while True:
+                            action, commands, custom_cmd = await interface.run_session(
+                                raw_bytes=raw_bytes,
+                                cmd_byte_positions=cmd_byte_positions,
+                                node_info=node_info,
+                                on_ai_call=on_ai_call
+                            )
+                            if action == "continue":
+                                continue
+                            break
                 finally:
                     # Reiniciar el lector de la terminal para volver al modo interactivo SSH/Telnet
                     if hasattr(stream, 'start_reading'):

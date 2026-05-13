@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.6">
+<meta name="generator" content="pdoc3 0.11.5">
 <title>connpy.cli.forms API documentation</title>
 <meta name="description" content="">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
@@ -249,11 +249,183 @@ el.replaceWith(d);
         if &#34;tags&#34; in answer and not answer[&#34;tags&#34;].startswith(&#34;@&#34;) and answer[&#34;tags&#34;]:
             answer[&#34;tags&#34;] = ast.literal_eval(answer[&#34;tags&#34;])
             
-        return answer</code></pre>
+        return answer
+
+    def mcp_wizard(self, mcp_servers):
+        &#34;&#34;&#34;Interactive wizard to manage MCP servers.&#34;&#34;&#34;
+        from .helpers import theme
+        
+        while True:
+            options = [
+                (&#34;List Configured Servers&#34;, &#34;list&#34;),
+                (&#34;Add/Update Server&#34;, &#34;add&#34;),
+                (&#34;Enable/Disable Server&#34;, &#34;toggle&#34;),
+                (&#34;Remove Server&#34;, &#34;remove&#34;),
+                (&#34;Back&#34;, &#34;exit&#34;)
+            ]
+            
+            questions = [
+                inquirer.List(&#34;action&#34;, message=&#34;MCP Configuration&#34;, choices=options)
+            ]
+            
+            answers = inquirer.prompt(questions, theme=theme)
+            if not answers or answers[&#34;action&#34;] == &#34;exit&#34;:
+                return None
+                
+            action = answers[&#34;action&#34;]
+            
+            if action == &#34;list&#34;:
+                if not mcp_servers:
+                    print(&#34;\nNo MCP servers configured.\n&#34;)
+                else:
+                    return {&#34;action&#34;: &#34;list&#34;}
+            
+            elif action == &#34;add&#34;:
+                questions = [
+                    inquirer.Text(&#34;name&#34;, message=&#34;Server Name (identifier)&#34;),
+                    inquirer.Text(&#34;url&#34;, message=&#34;SSE URL (e.g., http://localhost:8000/sse)&#34;),
+                    inquirer.Confirm(&#34;enabled&#34;, message=&#34;Enabled?&#34;, default=True),
+                    inquirer.Text(&#34;auto_load_os&#34;, message=&#34;Auto-load on specific OS (blank for any)&#34;)
+                ]
+                answers = inquirer.prompt(questions, theme=theme)
+                if answers:
+                    return {
+                        &#34;action&#34;: &#34;add&#34;,
+                        &#34;name&#34;: answers[&#34;name&#34;],
+                        &#34;url&#34;: answers[&#34;url&#34;],
+                        &#34;enabled&#34;: answers[&#34;enabled&#34;],
+                        &#34;os&#34;: answers[&#34;auto_load_os&#34;]
+                    }
+            
+            elif action == &#34;toggle&#34;:
+                if not mcp_servers:
+                    print(&#34;\nNo servers to toggle.\n&#34;)
+                    continue
+                
+                choices = []
+                for name, cfg in mcp_servers.items():
+                    status = &#34;[Enabled]&#34; if cfg.get(&#34;enabled&#34;, True) else &#34;[Disabled]&#34;
+                    choices.append((f&#34;{name} {status}&#34;, name))
+                
+                questions = [
+                    inquirer.List(&#34;name&#34;, message=&#34;Select server to toggle&#34;, choices=choices + [(&#34;Cancel&#34;, None)])
+                ]
+                answers = inquirer.prompt(questions, theme=theme)
+                if answers and answers[&#34;name&#34;]:
+                    current = mcp_servers[answers[&#34;name&#34;]].get(&#34;enabled&#34;, True)
+                    return {
+                        &#34;action&#34;: &#34;update&#34;,
+                        &#34;name&#34;: answers[&#34;name&#34;],
+                        &#34;enabled&#34;: not current
+                    }
+            
+            elif action == &#34;remove&#34;:
+                if not mcp_servers:
+                    print(&#34;\nNo servers to remove.\n&#34;)
+                    continue
+                    
+                questions = [
+                    inquirer.List(&#34;name&#34;, message=&#34;Select server to remove&#34;, choices=list(mcp_servers.keys()) + [&#34;Cancel&#34;])
+                ]
+                answers = inquirer.prompt(questions, theme=theme)
+                if answers and answers[&#34;name&#34;] != &#34;Cancel&#34;:
+                    return {&#34;action&#34;: &#34;remove&#34;, &#34;name&#34;: answers[&#34;name&#34;]}
+        return None</code></pre>
 </details>
 <div class="desc"></div>
 <h3>Methods</h3>
 <dl>
+<dt id="connpy.cli.forms.Forms.mcp_wizard"><code class="name flex">
+<span>def <span class="ident">mcp_wizard</span></span>(<span>self, mcp_servers)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def mcp_wizard(self, mcp_servers):
+    &#34;&#34;&#34;Interactive wizard to manage MCP servers.&#34;&#34;&#34;
+    from .helpers import theme
+    
+    while True:
+        options = [
+            (&#34;List Configured Servers&#34;, &#34;list&#34;),
+            (&#34;Add/Update Server&#34;, &#34;add&#34;),
+            (&#34;Enable/Disable Server&#34;, &#34;toggle&#34;),
+            (&#34;Remove Server&#34;, &#34;remove&#34;),
+            (&#34;Back&#34;, &#34;exit&#34;)
+        ]
+        
+        questions = [
+            inquirer.List(&#34;action&#34;, message=&#34;MCP Configuration&#34;, choices=options)
+        ]
+        
+        answers = inquirer.prompt(questions, theme=theme)
+        if not answers or answers[&#34;action&#34;] == &#34;exit&#34;:
+            return None
+            
+        action = answers[&#34;action&#34;]
+        
+        if action == &#34;list&#34;:
+            if not mcp_servers:
+                print(&#34;\nNo MCP servers configured.\n&#34;)
+            else:
+                return {&#34;action&#34;: &#34;list&#34;}
+        
+        elif action == &#34;add&#34;:
+            questions = [
+                inquirer.Text(&#34;name&#34;, message=&#34;Server Name (identifier)&#34;),
+                inquirer.Text(&#34;url&#34;, message=&#34;SSE URL (e.g., http://localhost:8000/sse)&#34;),
+                inquirer.Confirm(&#34;enabled&#34;, message=&#34;Enabled?&#34;, default=True),
+                inquirer.Text(&#34;auto_load_os&#34;, message=&#34;Auto-load on specific OS (blank for any)&#34;)
+            ]
+            answers = inquirer.prompt(questions, theme=theme)
+            if answers:
+                return {
+                    &#34;action&#34;: &#34;add&#34;,
+                    &#34;name&#34;: answers[&#34;name&#34;],
+                    &#34;url&#34;: answers[&#34;url&#34;],
+                    &#34;enabled&#34;: answers[&#34;enabled&#34;],
+                    &#34;os&#34;: answers[&#34;auto_load_os&#34;]
+                }
+        
+        elif action == &#34;toggle&#34;:
+            if not mcp_servers:
+                print(&#34;\nNo servers to toggle.\n&#34;)
+                continue
+            
+            choices = []
+            for name, cfg in mcp_servers.items():
+                status = &#34;[Enabled]&#34; if cfg.get(&#34;enabled&#34;, True) else &#34;[Disabled]&#34;
+                choices.append((f&#34;{name} {status}&#34;, name))
+            
+            questions = [
+                inquirer.List(&#34;name&#34;, message=&#34;Select server to toggle&#34;, choices=choices + [(&#34;Cancel&#34;, None)])
+            ]
+            answers = inquirer.prompt(questions, theme=theme)
+            if answers and answers[&#34;name&#34;]:
+                current = mcp_servers[answers[&#34;name&#34;]].get(&#34;enabled&#34;, True)
+                return {
+                    &#34;action&#34;: &#34;update&#34;,
+                    &#34;name&#34;: answers[&#34;name&#34;],
+                    &#34;enabled&#34;: not current
+                }
+        
+        elif action == &#34;remove&#34;:
+            if not mcp_servers:
+                print(&#34;\nNo servers to remove.\n&#34;)
+                continue
+                
+            questions = [
+                inquirer.List(&#34;name&#34;, message=&#34;Select server to remove&#34;, choices=list(mcp_servers.keys()) + [&#34;Cancel&#34;])
+            ]
+            answers = inquirer.prompt(questions, theme=theme)
+            if answers and answers[&#34;name&#34;] != &#34;Cancel&#34;:
+                return {&#34;action&#34;: &#34;remove&#34;, &#34;name&#34;: answers[&#34;name&#34;]}
+    return None</code></pre>
+</details>
+<div class="desc"><p>Interactive wizard to manage MCP servers.</p></div>
+</dd>
 <dt id="connpy.cli.forms.Forms.questions_bulk"><code class="name flex">
 <span>def <span class="ident">questions_bulk</span></span>(<span>self, nodes='', hosts='')</span>
 </code></dt>
@@ -505,6 +677,7 @@ el.replaceWith(d);
 <li>
 <h4><code><a title="connpy.cli.forms.Forms" href="#connpy.cli.forms.Forms">Forms</a></code></h4>
 <ul class="">
+<li><code><a title="connpy.cli.forms.Forms.mcp_wizard" href="#connpy.cli.forms.Forms.mcp_wizard">mcp_wizard</a></code></li>
 <li><code><a title="connpy.cli.forms.Forms.questions_bulk" href="#connpy.cli.forms.Forms.questions_bulk">questions_bulk</a></code></li>
 <li><code><a title="connpy.cli.forms.Forms.questions_edit" href="#connpy.cli.forms.Forms.questions_edit">questions_edit</a></code></li>
 <li><code><a title="connpy.cli.forms.Forms.questions_nodes" href="#connpy.cli.forms.Forms.questions_nodes">questions_nodes</a></code></li>
@@ -517,7 +690,7 @@ el.replaceWith(d);
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
 </footer>
 </body>
 </html>

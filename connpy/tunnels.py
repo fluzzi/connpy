@@ -162,13 +162,19 @@ class RemoteStream:
                     if req.cols > 0 and req.rows > 0:
                         if self.resize_callback:
                             self._loop.call_soon_threadsafe(self.resize_callback, req.rows, req.cols)
+                    # Copilot dispatching
+                    copilot_msg = {}
                     if getattr(req, "copilot_question", ""):
-                        self._loop.call_soon_threadsafe(self.copilot_queue.put_nowait, {
+                        copilot_msg.update({
                             "question": req.copilot_question,
-                            "context_buffer": getattr(req, "copilot_context_buffer", "")
+                            "context_buffer": getattr(req, "copilot_context_buffer", ""),
+                            "node_info_json": getattr(req, "copilot_node_info_json", "")
                         })
                     if getattr(req, "copilot_action", ""):
-                        self._loop.call_soon_threadsafe(self.copilot_queue.put_nowait, {"action": req.copilot_action})
+                        copilot_msg["action"] = req.copilot_action
+                    
+                    if copilot_msg:
+                        self._loop.call_soon_threadsafe(self.copilot_queue.put_nowait, copilot_msg)
                     if req.stdin_data:
                         self._loop.call_soon_threadsafe(self._reader_queue.put_nowait, req.stdin_data)
             except Exception:

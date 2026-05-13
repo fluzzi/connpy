@@ -164,3 +164,7 @@ connpy_roadmap.md
 MULTI_USER_PLAN.md
 COPILOT_PLAN.md
 ARCHITECTURAL_DEBT_REFACTOR.md
+
+#themes
+nord.yml
+theme.py

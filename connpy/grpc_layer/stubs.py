@@ -51,16 +51,22 @@ class NodeStub:
         pause_generator()
         
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
-        interface = CopilotInterface(self.config, history=getattr(self, 'copilot_history', None))
+        interface = CopilotInterface(
+            self.config, 
+            history=getattr(self, 'copilot_history', None),
+            session_state=getattr(self, 'copilot_state', None)
+        )
         self.copilot_history = interface.history
+        self.copilot_state = interface.session_state
         
         node_info = json.loads(res.copilot_node_info_json) if res.copilot_node_info_json else {}
 
-        async def on_ai_call_remote(active_buffer, question, chunk_callback):
+        async def on_ai_call_remote(active_buffer, question, chunk_callback, merged_node_info):
             # Send request to server
             request_queue.put(connpy_pb2.InteractRequest(
                 copilot_question=question, 
-                copilot_context_buffer=active_buffer
+                copilot_context_buffer=active_buffer,
+                copilot_node_info_json=json.dumps(merged_node_info)
             ))
             # Wait for chunks from server
             while True:
@@ -76,12 +82,20 @@ class NodeStub:
 
         # Wrap in async loop
         async def run_remote_copilot():
-            return await interface.run_session(
-                raw_bytes=bytes(client_buffer_bytes),
-                cmd_byte_positions=cmd_byte_positions,
-                node_info=node_info,
-                on_ai_call=on_ai_call_remote
-            )
+            while True:
+                action, commands, custom_cmd = await interface.run_session(
+                    raw_bytes=bytes(client_buffer_bytes),
+                    cmd_byte_positions=cmd_byte_positions,
+                    node_info=node_info,
+                    on_ai_call=on_ai_call_remote
+                )
+                
+                if action == "continue":
+                    # Send continue signal to server to loop back for another question
+                    request_queue.put(connpy_pb2.InteractRequest(copilot_action="continue"))
+                    continue
+                
+                return action, commands, custom_cmd
         
         with copilot_terminal_mode():
             action, commands, custom_cmd = asyncio.run(run_remote_copilot())

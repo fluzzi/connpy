@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.6">
+<meta name="generator" content="pdoc3 0.11.5">
 <title>connpy.grpc_layer.stubs API documentation</title>
 <meta name="description" content="">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
@@ -200,21 +200,33 @@ el.replaceWith(d);
                 
                 if response.debug_message:
                     if debug:
+                        if live_display:
+                            try: live_display.stop()
+                            except: pass
                         if status:
                             try: status.stop()
                             except: pass
                         printer.console.print(Text.from_ansi(response.debug_message))
-                        if status:
+                        if live_display:
+                            try: live_display.start()
+                            except: pass
+                        elif status:
                             try: status.start()
                             except: pass
                     continue
                 
                 if response.important_message:
+                    if live_display:
+                        try: live_display.stop()
+                        except: pass
                     if status:
                         try: status.stop()
                         except: pass
                     printer.console.print(Text.from_ansi(response.important_message))
-                    if status:
+                    if live_display:
+                        try: live_display.start()
+                        except: pass
+                    elif status:
                         try: status.start()
                         except: pass
                     continue
@@ -223,14 +235,33 @@ el.replaceWith(d);
                     if response.text_chunk:
                         full_content += response.text_chunk
                         
-                        if status and not debug:
-                            # Update the spinner line with a preview of the response
-                            preview = full_content.replace(&#34;\n&#34;, &#34; &#34;).strip()
-                            if len(preview) &gt; 60: preview = preview[:57] + &#34;...&#34;
-                            status.update(f&#34;[ai_status]{preview}&#34;)
+                        if not live_display:
+                            if status:
+                                try: status.stop()
+                                except: pass
+                            
+                            from rich.console import Console as RichConsole
+                            from ..printer import connpy_theme, get_original_stdout
+                            stable_console = RichConsole(theme=connpy_theme, file=get_original_stdout())
+                            
+                            # We default to Engineer title during stream, final result will correct it if needed
+                            live_display = Live(
+                                Panel(Markdown(full_content), title=&#34;[bold engineer]Network Engineer[/bold engineer]&#34;, border_style=&#34;engineer&#34;, expand=False),
+                                console=stable_console,
+                                refresh_per_second=8,
+                                transient=False
+                            )
+                            live_display.start()
+                        else:
+                            live_display.update(
+                                Panel(Markdown(full_content), title=&#34;[bold engineer]Network Engineer[/bold engineer]&#34;, border_style=&#34;engineer&#34;, expand=False)
+                            )
                     continue
                 
                 if response.is_final:
+                    if live_display:
+                        try: live_display.stop()
+                        except: pass
                     # Final stop for status to ensure it disappears before the panel
                     if status:
                         try: status.stop()
@@ -242,10 +273,13 @@ el.replaceWith(d);
                     role_label = &#34;Network Architect&#34; if responder == &#34;architect&#34; else &#34;Network Engineer&#34;
                     title = f&#34;[bold {alias}]{role_label}[/bold {alias}]&#34;
                     
-                    # Always print the final Panel
                     content_to_print = full_content or final_result.get(&#34;response&#34;, &#34;&#34;)
                     if content_to_print:
-                        printer.console.print(Panel(Markdown(content_to_print), title=title, border_style=alias, expand=False))
+                        if live_display:
+                            # Re-render the final frame with correct title/colors
+                            live_display.update(Panel(Markdown(content_to_print), title=title, border_style=alias, expand=False))
+                        else:
+                            printer.console.print(Panel(Markdown(content_to_print), title=title, border_style=alias, expand=False))
                     break
         except Exception as e:
             # Check if it was a gRPC error that we should let handle_errors catch
@@ -276,6 +310,17 @@ el.replaceWith(d);
     def configure_provider(self, provider, model=None, api_key=None):
         req = connpy_pb2.ProviderRequest(provider=provider, model=model or &#34;&#34;, api_key=api_key or &#34;&#34;)
         self.stub.configure_provider(req)
+
+    @handle_errors
+    def configure_mcp(self, name, url=None, enabled=True, auto_load_on_os=None, remove=False):
+        req = connpy_pb2.MCPRequest(
+            name=name,
+            url=url or &#34;&#34;,
+            enabled=enabled,
+            auto_load_on_os=auto_load_on_os or &#34;&#34;,
+            remove=remove
+        )
+        self.stub.configure_mcp(req)
 
     @handle_errors
     def load_session_data(self, session_id):
@@ -393,21 +438,33 @@ def ask(self, input_text, dryrun=False, chat_history=None, session_id=None, debu
             
             if response.debug_message:
                 if debug:
+                    if live_display:
+                        try: live_display.stop()
+                        except: pass
                     if status:
                         try: status.stop()
                         except: pass
                     printer.console.print(Text.from_ansi(response.debug_message))
-                    if status:
+                    if live_display:
+                        try: live_display.start()
+                        except: pass
+                    elif status:
                         try: status.start()
                         except: pass
                 continue
             
             if response.important_message:
+                if live_display:
+                    try: live_display.stop()
+                    except: pass
                 if status:
                     try: status.stop()
                     except: pass
                 printer.console.print(Text.from_ansi(response.important_message))
-                if status:
+                if live_display:
+                    try: live_display.start()
+                    except: pass
+                elif status:
                     try: status.start()
                     except: pass
                 continue
@@ -416,14 +473,33 @@ def ask(self, input_text, dryrun=False, chat_history=None, session_id=None, debu
                 if response.text_chunk:
                     full_content += response.text_chunk
                     
-                    if status and not debug:
-                        # Update the spinner line with a preview of the response
-                        preview = full_content.replace(&#34;\n&#34;, &#34; &#34;).strip()
-                        if len(preview) &gt; 60: preview = preview[:57] + &#34;...&#34;
-                        status.update(f&#34;[ai_status]{preview}&#34;)
+                    if not live_display:
+                        if status:
+                            try: status.stop()
+                            except: pass
+                        
+                        from rich.console import Console as RichConsole
+                        from ..printer import connpy_theme, get_original_stdout
+                        stable_console = RichConsole(theme=connpy_theme, file=get_original_stdout())
+                        
+                        # We default to Engineer title during stream, final result will correct it if needed
+                        live_display = Live(
+                            Panel(Markdown(full_content), title=&#34;[bold engineer]Network Engineer[/bold engineer]&#34;, border_style=&#34;engineer&#34;, expand=False),
+                            console=stable_console,
+                            refresh_per_second=8,
+                            transient=False
+                        )
+                        live_display.start()
+                    else:
+                        live_display.update(
+                            Panel(Markdown(full_content), title=&#34;[bold engineer]Network Engineer[/bold engineer]&#34;, border_style=&#34;engineer&#34;, expand=False)
+                        )
                 continue
             
             if response.is_final:
+                if live_display:
+                    try: live_display.stop()
+                    except: pass
                 # Final stop for status to ensure it disappears before the panel
                 if status:
                     try: status.stop()
@@ -435,10 +511,13 @@ def ask(self, input_text, dryrun=False, chat_history=None, session_id=None, debu
                 role_label = &#34;Network Architect&#34; if responder == &#34;architect&#34; else &#34;Network Engineer&#34;
                 title = f&#34;[bold {alias}]{role_label}[/bold {alias}]&#34;
                 
-                # Always print the final Panel
                 content_to_print = full_content or final_result.get(&#34;response&#34;, &#34;&#34;)
                 if content_to_print:
-                    printer.console.print(Panel(Markdown(content_to_print), title=title, border_style=alias, expand=False))
+                    if live_display:
+                        # Re-render the final frame with correct title/colors
+                        live_display.update(Panel(Markdown(content_to_print), title=title, border_style=alias, expand=False))
+                    else:
+                        printer.console.print(Panel(Markdown(content_to_print), title=title, border_style=alias, expand=False))
                 break
     except Exception as e:
         # Check if it was a gRPC error that we should let handle_errors catch
@@ -452,6 +531,27 @@ def ask(self, input_text, dryrun=False, chat_history=None, session_id=None, debu
         final_result[&#34;streamed&#34;] = True
         
     return final_result</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.AIStub.configure_mcp"><code class="name flex">
+<span>def <span class="ident">configure_mcp</span></span>(<span>self, name, url=None, enabled=True, auto_load_on_os=None, remove=False)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def configure_mcp(self, name, url=None, enabled=True, auto_load_on_os=None, remove=False):
+    req = connpy_pb2.MCPRequest(
+        name=name,
+        url=url or &#34;&#34;,
+        enabled=enabled,
+        auto_load_on_os=auto_load_on_os or &#34;&#34;,
+        remove=remove
+    )
+    self.stub.configure_mcp(req)</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -924,15 +1024,98 @@ def set_reserved_names(self, names):
         self.remote_host = remote_host
         self.config = config
 
+    def _handle_remote_copilot(self, res, request_queue, response_queue, client_buffer_bytes, cmd_byte_positions, pause_generator, resume_generator, old_tty):
+        import json, asyncio, termios, sys, tty, queue
+        from ..core import copilot_terminal_mode
+        from . import connpy_pb2
+
+        pause_generator()
+        
+        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+        interface = CopilotInterface(
+            self.config, 
+            history=getattr(self, &#39;copilot_history&#39;, None),
+            session_state=getattr(self, &#39;copilot_state&#39;, None)
+        )
+        self.copilot_history = interface.history
+        self.copilot_state = interface.session_state
+        
+        node_info = json.loads(res.copilot_node_info_json) if res.copilot_node_info_json else {}
+
+        async def on_ai_call_remote(active_buffer, question, chunk_callback, merged_node_info):
+            # Send request to server
+            request_queue.put(connpy_pb2.InteractRequest(
+                copilot_question=question, 
+                copilot_context_buffer=active_buffer,
+                copilot_node_info_json=json.dumps(merged_node_info)
+            ))
+            # Wait for chunks from server
+            while True:
+                try:
+                    chunk_res = response_queue.get(timeout=0.1)
+                    if chunk_res is None: return {&#34;error&#34;: &#34;Server disconnected&#34;}
+                    if chunk_res.copilot_stream_chunk:
+                        chunk_callback(chunk_res.copilot_stream_chunk)
+                    elif chunk_res.copilot_response_json:
+                        return json.loads(chunk_res.copilot_response_json)
+                except queue.Empty:
+                    await asyncio.sleep(0.05)
+
+        # Wrap in async loop
+        async def run_remote_copilot():
+            while True:
+                action, commands, custom_cmd = await interface.run_session(
+                    raw_bytes=bytes(client_buffer_bytes),
+                    cmd_byte_positions=cmd_byte_positions,
+                    node_info=node_info,
+                    on_ai_call=on_ai_call_remote
+                )
+                
+                if action == &#34;continue&#34;:
+                    # Send continue signal to server to loop back for another question
+                    request_queue.put(connpy_pb2.InteractRequest(copilot_action=&#34;continue&#34;))
+                    continue
+                
+                return action, commands, custom_cmd
+        
+        with copilot_terminal_mode():
+            action, commands, custom_cmd = asyncio.run(run_remote_copilot())
+        
+        # Prepare final action for server
+        action_sent = &#34;cancel&#34;
+        if action == &#34;send_all&#34; and commands:
+            # In remote mode, send the selected commands as a custom block
+            # so the server executes exactly what the user picked (e.g., selection &#39;1&#39;)
+            action_sent = f&#34;custom:{chr(10).join(commands)}&#34;
+        elif action == &#34;custom&#34; and custom_cmd:
+            action_sent = f&#34;custom:{chr(10).join(custom_cmd)}&#34;
+        request_queue.put(connpy_pb2.InteractRequest(copilot_action=action_sent))
+        resume_generator()
+        tty.setraw(sys.stdin.fileno())
+
     @handle_errors
     def connect_node(self, unique_id, sftp=False, debug=False, logger=None):
         import sys
         import select
         import tty
         import termios
+        import queue
         import os
         import threading
         
+        request_queue = queue.Queue()
+        client_buffer_bytes = bytearray()
+        cmd_byte_positions = [(0, None)]
+        pause_stdin = [False]
+        wake_r, wake_w = os.pipe()
+
+        def pause_generator():
+            pause_stdin[0] = True
+            os.write(wake_w, b&#39;\x00&#39;)
+
+        def resume_generator():
+            pause_stdin[0] = False
+
         def request_generator():
             cols, rows = 80, 24
             try:
@@ -946,12 +1129,31 @@ def set_reserved_names(self, names):
             )
             
             while True:
-                r, _, _ = select.select([sys.stdin.fileno()], [], [])
-                if r:
+                try:
+                    while True:
+                        req = request_queue.get_nowait()
+                        if req is None:
+                            return
+                        yield req
+                except queue.Empty:
+                    pass
+
+                if pause_stdin[0]:
+                    import time
+                    time.sleep(0.05)
+                    continue
+
+                r, _, _ = select.select([sys.stdin.fileno(), wake_r], [], [], 0.05)
+                if wake_r in r:
+                    os.read(wake_r, 1)
+                    continue
+                if sys.stdin.fileno() in r and not pause_stdin[0]:
                     try:
                         data = os.read(sys.stdin.fileno(), 1024)
                         if not data:
                             break
+                        if b&#39;\r&#39; in data or b&#39;\n&#39; in data:
+                            cmd_byte_positions.append((len(client_buffer_bytes), None))
                         yield connpy_pb2.InteractRequest(stdin_data=data)
                     except OSError:
                         break
@@ -969,30 +1171,77 @@ def set_reserved_names(self, names):
 
         old_tty = termios.tcgetattr(sys.stdin)
         try:
+            import time
             tty.setraw(sys.stdin.fileno())
             response_iterator = self.stub.interact_node(request_generator())
             
-            # First response is connection status
+            import queue
+            response_queue = queue.Queue()
+            
+            def response_consumer():
+                try:
+                    for r in response_iterator:
+                        response_queue.put(r)
+                except Exception:
+                    pass
+                response_queue.put(None)
+                
+            t_consumer = threading.Thread(target=response_consumer, daemon=True)
+            t_consumer.start()
+            
+            # First phase: Wait for connection status, print early data
             try:
-                first_res = next(response_iterator)
-                if first_res.success:
-                    # Connection established on server, show success message
-                    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
-                    printer.success(conn_msg)
-                    tty.setraw(sys.stdin.fileno())
-                else:
-                    # Connection failed on server
-                    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
-                    printer.error(f&#34;Connection failed: {first_res.error_message}&#34;)
-                    return
-            except StopIteration:
+                while True:
+                    res = response_queue.get()
+                    if res is None:
+                        return
+                    if res.stdout_data:
+                        data = res.stdout_data
+                        if debug:
+                            data = data.replace(b&#39;\x1b[H\x1b[2J&#39;, b&#39;&#39;).replace(b&#39;\x1bc&#39;, b&#39;&#39;).replace(b&#39;\x1b[3J&#39;, b&#39;&#39;)
+                        os.write(sys.stdout.fileno(), data)
+                    
+                    if res.success:
+                        # Connection established on server, show success message
+                        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+                        printer.success(conn_msg)
+                        pause_stdin[0] = False
+                        tty.setraw(sys.stdin.fileno())
+                        break
+                    
+                    if res.error_message:
+                        # Connection failed on server
+                        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+                        printer.error(f&#34;Connection failed: {res.error_message}&#34;)
+                        return
+            except queue.Empty:
                 return
             
-            for res in response_iterator:
+            # Second phase: Stream active session
+            # Clear screen filter is only applied before success (Phase 1).
+            # Once the user has a prompt, Ctrl+L must work normally.
+            while True:
+                res = response_queue.get()
+                if res is None:
+                    break
+                if res.copilot_prompt:
+                    self._handle_remote_copilot(
+                        res, request_queue, response_queue, 
+                        client_buffer_bytes, cmd_byte_positions, 
+                        pause_generator, resume_generator, old_tty
+                    )
+                    continue
+
+                if res.copilot_injected_command:
+                    cmd_byte_positions.append((len(client_buffer_bytes), res.copilot_injected_command))
+
                 if res.stdout_data:
                     os.write(sys.stdout.fileno(), res.stdout_data)
+                    client_buffer_bytes.extend(res.stdout_data)
         finally:
             termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+            os.close(wake_r)
+            os.close(wake_w)
 
     @handle_errors
     def connect_dynamic(self, connection_params, debug=False):
@@ -1000,10 +1249,23 @@ def set_reserved_names(self, names):
         import select
         import tty
         import termios
+        import queue
         import os
         import json
         
         params_json = json.dumps(connection_params)
+        request_queue = queue.Queue()
+        client_buffer_bytes = bytearray()
+        cmd_byte_positions = [(0, None)]
+        pause_stdin = [False]
+        wake_r, wake_w = os.pipe()
+
+        def pause_generator():
+            pause_stdin[0] = True
+            os.write(wake_w, b&#39;\x00&#39;)
+
+        def resume_generator():
+            pause_stdin[0] = False
         
         def request_generator():
             cols, rows = 80, 24
@@ -1019,12 +1281,31 @@ def set_reserved_names(self, names):
             )
             
             while True:
-                r, _, _ = select.select([sys.stdin.fileno()], [], [])
-                if r:
+                try:
+                    while True:
+                        req = request_queue.get_nowait()
+                        if req is None:
+                            return
+                        yield req
+                except queue.Empty:
+                    pass
+
+                if pause_stdin[0]:
+                    import time
+                    time.sleep(0.05)
+                    continue
+
+                r, _, _ = select.select([sys.stdin.fileno(), wake_r], [], [], 0.05)
+                if wake_r in r:
+                    os.read(wake_r, 1)
+                    continue
+                if sys.stdin.fileno() in r and not pause_stdin[0]:
                     try:
                         data = os.read(sys.stdin.fileno(), 1024)
                         if not data:
                             break
+                        if b&#39;\r&#39; in data or b&#39;\n&#39; in data:
+                            cmd_byte_positions.append((len(client_buffer_bytes), None))
                         yield connpy_pb2.InteractRequest(stdin_data=data)
                     except OSError:
                         break
@@ -1043,30 +1324,75 @@ def set_reserved_names(self, names):
 
         old_tty = termios.tcgetattr(sys.stdin)
         try:
+            import time
             tty.setraw(sys.stdin.fileno())
             response_iterator = self.stub.interact_node(request_generator())
             
-            # First response is connection status
+            import queue
+            response_queue = queue.Queue()
+            
+            def response_consumer():
+                try:
+                    for r in response_iterator:
+                        response_queue.put(r)
+                except Exception:
+                    pass
+                response_queue.put(None)
+                
+            t_consumer = threading.Thread(target=response_consumer, daemon=True)
+            t_consumer.start()
+            
+            # First phase: Wait for connection status, print early data
             try:
-                first_res = next(response_iterator)
-                if first_res.success:
-                    # Connection established on server, show success message
-                    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
-                    printer.success(conn_msg)
-                    tty.setraw(sys.stdin.fileno())
-                else:
-                    # Connection failed on server
-                    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
-                    printer.error(f&#34;Connection failed: {first_res.error_message}&#34;)
-                    return
-            except StopIteration:
+                while True:
+                    res = response_queue.get()
+                    if res is None:
+                        return
+                    if res.stdout_data:
+                        data = res.stdout_data
+                        if debug:
+                            data = data.replace(b&#39;\x1b[H\x1b[2J&#39;, b&#39;&#39;).replace(b&#39;\x1bc&#39;, b&#39;&#39;).replace(b&#39;\x1b[3J&#39;, b&#39;&#39;)
+                        os.write(sys.stdout.fileno(), data)
+                    
+                    if res.success:
+                        # Connection established on server, show success message
+                        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+                        printer.success(conn_msg)
+                        pause_stdin[0] = False
+                        tty.setraw(sys.stdin.fileno())
+                        break
+                    
+                    if res.error_message:
+                        # Connection failed on server
+                        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+                        printer.error(f&#34;Connection failed: {res.error_message}&#34;)
+                        return
+            except queue.Empty:
                 return
                 
-            for res in response_iterator:
+            # Second phase: Stream active session
+            while True:
+                res = response_queue.get()
+                if res is None:
+                    break
+                if res.copilot_prompt:
+                    self._handle_remote_copilot(
+                        res, request_queue, response_queue, 
+                        client_buffer_bytes, cmd_byte_positions, 
+                        pause_generator, resume_generator, old_tty
+                    )
+                    continue
+
+                if res.copilot_injected_command:
+                    cmd_byte_positions.append((len(client_buffer_bytes), res.copilot_injected_command))
+
                 if res.stdout_data:
                     os.write(sys.stdout.fileno(), res.stdout_data)
+                    client_buffer_bytes.extend(res.stdout_data)
         finally:
             termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+            os.close(wake_r)
+            os.close(wake_w)
 
     @MethodHook
     @handle_errors
@@ -1220,10 +1546,23 @@ def connect_dynamic(self, connection_params, debug=False):
     import select
     import tty
     import termios
+    import queue
     import os
     import json
     
     params_json = json.dumps(connection_params)
+    request_queue = queue.Queue()
+    client_buffer_bytes = bytearray()
+    cmd_byte_positions = [(0, None)]
+    pause_stdin = [False]
+    wake_r, wake_w = os.pipe()
+
+    def pause_generator():
+        pause_stdin[0] = True
+        os.write(wake_w, b&#39;\x00&#39;)
+
+    def resume_generator():
+        pause_stdin[0] = False
     
     def request_generator():
         cols, rows = 80, 24
@@ -1239,12 +1578,31 @@ def connect_dynamic(self, connection_params, debug=False):
         )
         
         while True:
-            r, _, _ = select.select([sys.stdin.fileno()], [], [])
-            if r:
+            try:
+                while True:
+                    req = request_queue.get_nowait()
+                    if req is None:
+                        return
+                    yield req
+            except queue.Empty:
+                pass
+
+            if pause_stdin[0]:
+                import time
+                time.sleep(0.05)
+                continue
+
+            r, _, _ = select.select([sys.stdin.fileno(), wake_r], [], [], 0.05)
+            if wake_r in r:
+                os.read(wake_r, 1)
+                continue
+            if sys.stdin.fileno() in r and not pause_stdin[0]:
                 try:
                     data = os.read(sys.stdin.fileno(), 1024)
                     if not data:
                         break
+                    if b&#39;\r&#39; in data or b&#39;\n&#39; in data:
+                        cmd_byte_positions.append((len(client_buffer_bytes), None))
                     yield connpy_pb2.InteractRequest(stdin_data=data)
                 except OSError:
                     break
@@ -1263,30 +1621,75 @@ def connect_dynamic(self, connection_params, debug=False):
 
     old_tty = termios.tcgetattr(sys.stdin)
     try:
+        import time
         tty.setraw(sys.stdin.fileno())
         response_iterator = self.stub.interact_node(request_generator())
         
-        # First response is connection status
+        import queue
+        response_queue = queue.Queue()
+        
+        def response_consumer():
+            try:
+                for r in response_iterator:
+                    response_queue.put(r)
+            except Exception:
+                pass
+            response_queue.put(None)
+            
+        t_consumer = threading.Thread(target=response_consumer, daemon=True)
+        t_consumer.start()
+        
+        # First phase: Wait for connection status, print early data
         try:
-            first_res = next(response_iterator)
-            if first_res.success:
-                # Connection established on server, show success message
-                termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
-                printer.success(conn_msg)
-                tty.setraw(sys.stdin.fileno())
-            else:
-                # Connection failed on server
-                termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
-                printer.error(f&#34;Connection failed: {first_res.error_message}&#34;)
-                return
-        except StopIteration:
+            while True:
+                res = response_queue.get()
+                if res is None:
+                    return
+                if res.stdout_data:
+                    data = res.stdout_data
+                    if debug:
+                        data = data.replace(b&#39;\x1b[H\x1b[2J&#39;, b&#39;&#39;).replace(b&#39;\x1bc&#39;, b&#39;&#39;).replace(b&#39;\x1b[3J&#39;, b&#39;&#39;)
+                    os.write(sys.stdout.fileno(), data)
+                
+                if res.success:
+                    # Connection established on server, show success message
+                    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+                    printer.success(conn_msg)
+                    pause_stdin[0] = False
+                    tty.setraw(sys.stdin.fileno())
+                    break
+                
+                if res.error_message:
+                    # Connection failed on server
+                    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+                    printer.error(f&#34;Connection failed: {res.error_message}&#34;)
+                    return
+        except queue.Empty:
             return
             
-        for res in response_iterator:
+        # Second phase: Stream active session
+        while True:
+            res = response_queue.get()
+            if res is None:
+                break
+            if res.copilot_prompt:
+                self._handle_remote_copilot(
+                    res, request_queue, response_queue, 
+                    client_buffer_bytes, cmd_byte_positions, 
+                    pause_generator, resume_generator, old_tty
+                )
+                continue
+
+            if res.copilot_injected_command:
+                cmd_byte_positions.append((len(client_buffer_bytes), res.copilot_injected_command))
+
             if res.stdout_data:
                 os.write(sys.stdout.fileno(), res.stdout_data)
+                client_buffer_bytes.extend(res.stdout_data)
     finally:
-        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)</code></pre>
+        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+        os.close(wake_r)
+        os.close(wake_w)</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -1304,9 +1707,23 @@ def connect_node(self, unique_id, sftp=False, debug=False, logger=None):
     import select
     import tty
     import termios
+    import queue
     import os
     import threading
     
+    request_queue = queue.Queue()
+    client_buffer_bytes = bytearray()
+    cmd_byte_positions = [(0, None)]
+    pause_stdin = [False]
+    wake_r, wake_w = os.pipe()
+
+    def pause_generator():
+        pause_stdin[0] = True
+        os.write(wake_w, b&#39;\x00&#39;)
+
+    def resume_generator():
+        pause_stdin[0] = False
+
     def request_generator():
         cols, rows = 80, 24
         try:
@@ -1320,12 +1737,31 @@ def connect_node(self, unique_id, sftp=False, debug=False, logger=None):
         )
         
         while True:
-            r, _, _ = select.select([sys.stdin.fileno()], [], [])
-            if r:
+            try:
+                while True:
+                    req = request_queue.get_nowait()
+                    if req is None:
+                        return
+                    yield req
+            except queue.Empty:
+                pass
+
+            if pause_stdin[0]:
+                import time
+                time.sleep(0.05)
+                continue
+
+            r, _, _ = select.select([sys.stdin.fileno(), wake_r], [], [], 0.05)
+            if wake_r in r:
+                os.read(wake_r, 1)
+                continue
+            if sys.stdin.fileno() in r and not pause_stdin[0]:
                 try:
                     data = os.read(sys.stdin.fileno(), 1024)
                     if not data:
                         break
+                    if b&#39;\r&#39; in data or b&#39;\n&#39; in data:
+                        cmd_byte_positions.append((len(client_buffer_bytes), None))
                     yield connpy_pb2.InteractRequest(stdin_data=data)
                 except OSError:
                     break
@@ -1343,30 +1779,77 @@ def connect_node(self, unique_id, sftp=False, debug=False, logger=None):
 
     old_tty = termios.tcgetattr(sys.stdin)
     try:
+        import time
         tty.setraw(sys.stdin.fileno())
         response_iterator = self.stub.interact_node(request_generator())
         
-        # First response is connection status
+        import queue
+        response_queue = queue.Queue()
+        
+        def response_consumer():
+            try:
+                for r in response_iterator:
+                    response_queue.put(r)
+            except Exception:
+                pass
+            response_queue.put(None)
+            
+        t_consumer = threading.Thread(target=response_consumer, daemon=True)
+        t_consumer.start()
+        
+        # First phase: Wait for connection status, print early data
         try:
-            first_res = next(response_iterator)
-            if first_res.success:
-                # Connection established on server, show success message
-                termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
-                printer.success(conn_msg)
-                tty.setraw(sys.stdin.fileno())
-            else:
-                # Connection failed on server
-                termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
-                printer.error(f&#34;Connection failed: {first_res.error_message}&#34;)
-                return
-        except StopIteration:
+            while True:
+                res = response_queue.get()
+                if res is None:
+                    return
+                if res.stdout_data:
+                    data = res.stdout_data
+                    if debug:
+                        data = data.replace(b&#39;\x1b[H\x1b[2J&#39;, b&#39;&#39;).replace(b&#39;\x1bc&#39;, b&#39;&#39;).replace(b&#39;\x1b[3J&#39;, b&#39;&#39;)
+                    os.write(sys.stdout.fileno(), data)
+                
+                if res.success:
+                    # Connection established on server, show success message
+                    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+                    printer.success(conn_msg)
+                    pause_stdin[0] = False
+                    tty.setraw(sys.stdin.fileno())
+                    break
+                
+                if res.error_message:
+                    # Connection failed on server
+                    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+                    printer.error(f&#34;Connection failed: {res.error_message}&#34;)
+                    return
+        except queue.Empty:
             return
         
-        for res in response_iterator:
+        # Second phase: Stream active session
+        # Clear screen filter is only applied before success (Phase 1).
+        # Once the user has a prompt, Ctrl+L must work normally.
+        while True:
+            res = response_queue.get()
+            if res is None:
+                break
+            if res.copilot_prompt:
+                self._handle_remote_copilot(
+                    res, request_queue, response_queue, 
+                    client_buffer_bytes, cmd_byte_positions, 
+                    pause_generator, resume_generator, old_tty
+                )
+                continue
+
+            if res.copilot_injected_command:
+                cmd_byte_positions.append((len(client_buffer_bytes), res.copilot_injected_command))
+
             if res.stdout_data:
                 os.write(sys.stdout.fileno(), res.stdout_data)
+                client_buffer_bytes.extend(res.stdout_data)
     finally:
-        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)</code></pre>
+        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+        os.close(wake_r)
+        os.close(wake_w)</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -2036,6 +2519,7 @@ def stop_api(self):
 <h4><code><a title="connpy.grpc_layer.stubs.AIStub" href="#connpy.grpc_layer.stubs.AIStub">AIStub</a></code></h4>
 <ul class="two-column">
 <li><code><a title="connpy.grpc_layer.stubs.AIStub.ask" href="#connpy.grpc_layer.stubs.AIStub.ask">ask</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.AIStub.configure_mcp" href="#connpy.grpc_layer.stubs.AIStub.configure_mcp">configure_mcp</a></code></li>
 <li><code><a title="connpy.grpc_layer.stubs.AIStub.configure_provider" href="#connpy.grpc_layer.stubs.AIStub.configure_provider">configure_provider</a></code></li>
 <li><code><a title="connpy.grpc_layer.stubs.AIStub.confirm" href="#connpy.grpc_layer.stubs.AIStub.confirm">confirm</a></code></li>
 <li><code><a title="connpy.grpc_layer.stubs.AIStub.delete_session" href="#connpy.grpc_layer.stubs.AIStub.delete_session">delete_session</a></code></li>
@@ -2130,7 +2614,7 @@ def stop_api(self):
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
 </footer>
 </body>
 </html>

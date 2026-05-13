@@ -3,9 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.6">
+<meta name="generator" content="pdoc3 0.11.5">
 <title>connpy API documentation</title>
-<meta name="description" content="Connection manager …">
+<meta name="description" content="&lt;p align=&#34;center&#34;&gt;
+&lt;img src=&#34;https://nginx.gederico.dynu.net/images/CONNPY-resized.png&#34; alt=&#34;App Logo&#34;&gt;
+&lt;/p&gt; …">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
@@ -36,478 +38,149 @@ el.replaceWith(d);
 <h1 class="title">Package <code>connpy</code></h1>
 </header>
 <section id="section-intro">
-<h2 id="connection-manager">Connection manager</h2>
-<p>Connpy is a SSH, SFTP, Telnet, kubectl, Docker pod, and AWS SSM connection manager and automation module for Linux, Mac, and Docker.</p>
-<h3 id="features">Features</h3>
-<pre><code>- Manage connections using SSH, SFTP, Telnet, kubectl, Docker exec, and AWS SSM.
-- Set contexts to manage specific nodes from specific contexts (work/home/clients/etc).
-- You can generate profiles and reference them from nodes using @profilename so you don't
-  need to edit multiple nodes when changing passwords or other information.
-- Nodes can be stored on @folder or @subfolder@folder to organize your devices. They can
-  be referenced using node@subfolder@folder or node@folder.
-- If you have too many nodes, get a completion script using: conn config --completion.
-  Or use fzf by installing pyfzf and running conn config --fzf true.
-- Create in bulk, copy, move, export, and import nodes for easy management.
-- Run automation scripts on network devices.
-- Use AI with a multi-agent system (Engineer/Architect) to help you manage your devices.
-  Supports any LLM provider via litellm (OpenAI, Anthropic, Google, etc.).
-- Add plugins with your own scripts, and execute them remotely.
-- Fully decoupled gRPC Client/Server architecture.
-- Unified UI with syntax highlighting and theming.
-- Much more!
+<p align="center">
+<img src="https://nginx.gederico.dynu.net/images/CONNPY-resized.png" alt="App Logo">
+</p>
+<h1 id="connpy">Connpy</h1>
+<p><a href="https://pypi.org/pypi/connpy/"><img alt="" src="https://img.shields.io/pypi/v/connpy.svg?style=flat-square"></a>
+<a href="https://pypi.org/pypi/connpy/"><img alt="" src="https://img.shields.io/pypi/pyversions/connpy.svg?style=flat-square"></a>
+<a href="https://github.com/fluzzi/connpy/blob/main/LICENSE"><img alt="" src="https://img.shields.io/pypi/l/connpy.svg?style=flat-square"></a>
+<a href="https://pypi.org/pypi/connpy/"><img alt="" src="https://img.shields.io/pypi/dm/connpy.svg?style=flat-square"></a></p>
+<p><strong>Connpy</strong> is a powerful Connection Manager and Network Automation Platform for Linux, Mac, and Docker. It provides a unified interface for <strong>SSH, SFTP, Telnet, kubectl, Docker pods, and AWS SSM</strong>.</p>
+<p>The v6 release introduces the <strong>AI Copilot</strong>, an interactive terminal assistant that understands your network context and helps you manage your infrastructure more intelligently.</p>
+<h2 id="ai-copilot-new-in-v6">🤖 AI Copilot (New in v6)</h2>
+<p>The AI Copilot is deeply integrated into your terminal workflow:
+- <strong>Terminal Context Awareness</strong>: The Copilot can "see" your screen output, helping you diagnose errors or analyze command results in real-time.
+- <strong>Hybrid Multi-Agent System</strong>: Automatically escalates complex tasks between the <strong>Network Engineer</strong> (execution) and the <strong>Network Architect</strong> (strategy).
+- <strong>MCP Integration</strong>: Dynamically load tools from external providers (6WIND, AWS, etc.) via the Model Context Protocol.
+- <strong>Interactive Chat</strong>: Launch with <code>conn <a title="connpy.ai" href="#connpy.ai">ai</a></code> for a collaborative troubleshooting session.</p>
+<h2 id="core-features">Core Features</h2>
+<ul>
+<li><strong>Multi-Protocol</strong>: Native support for SSH, SFTP, Telnet, kubectl, Docker exec, and AWS SSM.</li>
+<li><strong>Context Management</strong>: Set regex-based contexts to manage specific nodes across different environments (work, home, clients).</li>
+<li><strong>Advanced Inventory</strong>:<ul>
+<li>Organize nodes in folders (<code>@folder</code>) and subfolders (<code>@subfolder@folder</code>).</li>
+<li>Use Global Profiles (<code>@profilename</code>) to manage shared credentials easily.</li>
+<li>Bulk creation, copying, moving, and export/import of nodes.</li>
+</ul>
+</li>
+<li><strong>Modern UI</strong>: High-performance terminal experience with <code>prompt-toolkit</code>, including:<ul>
+<li>Fuzzy search integration with <code>fzf</code>.</li>
+<li>Advanced tab completion.</li>
+<li>Syntax highlighting and customizable themes.</li>
+</ul>
+</li>
+<li><strong>Automation Engine</strong>: Run parallel tasks and playbooks on multiple devices with variable support.</li>
+<li><strong>Plugin System</strong>: Build and execute custom Python scripts locally or on a remote gRPC server.</li>
+<li><strong>gRPC Architecture</strong>: Fully decoupled Client/Server model for distributed management.</li>
+<li><strong>Privacy &amp; Sync</strong>: Local-first encrypted storage (RSA/OAEP) with optional Google Drive backup.</li>
+</ul>
+<h2 id="installation">Installation</h2>
+<pre><code class="language-bash">pip install connpy
 </code></pre>
-<h3 id="usage">Usage</h3>
-<pre><code>usage: conn [-h] [--add | --del | --mod | --show | --debug] [node|folder] [--sftp]
-       conn {profile,move,mv,copy,cp,list,ls,bulk,export,import,ai,run,api,plugin,config,sync,context} ...
+<h3 id="run-it-in-windowslinux-using-docker">Run it in Windows/Linux using Docker</h3>
+<pre><code class="language-bash">git clone https://github.com/fluzzi/connpy
+cd connpy
+docker compose build
 
-positional arguments:
-  node|folder        node[@subfolder][@folder]
-                     Connect to specific node or show all matching nodes
-                     [@subfolder][@folder]
-                     Show all available connections globally or in specified path
+# Run it like a native app (completely silent)
+docker compose --log-level ERROR run --rm --remove-orphans connpy-app [command]
 
-options:
-  -h, --help         show this help message and exit
-  -v, --version      Show version
-  -a, --add          Add new node[@subfolder][@folder] or [@subfolder]@folder
-  -r, --del, --rm    Delete node[@subfolder][@folder] or [@subfolder]@folder
-  -e, --mod, --edit  Modify node[@subfolder][@folder]
-  -s, --show         Show node[@subfolder][@folder]
-  -d, --debug        Display all conections steps
-  -t, --sftp         Connects using sftp instead of ssh
-  --service-mode     Set the backend service mode (local or remote)
-  --remote           Connect to a remote connpy service via gRPC
-  --theme            UI Output theme (dark, light, or path)
-
-Commands:
-  profile         Manage profiles
-  move(mv)        Move node
-  copy(cp)        Copy node
-  list(ls)        List profiles, nodes or folders
-  bulk            Add nodes in bulk
-  export          Export connection folder to Yaml file
-  import          Import connection folder to config from Yaml file
-  ai              Make request to an AI
-  run             Run scripts or commands on nodes
-  api             Start and stop connpy api
-  plugin          Manage plugins
-  config          Manage app config
-  sync            Sync config with Google
-  context         Manage contexts with regex matching
+# Pro Tip: Add this alias for a 100% native experience from any folder
+alias conn='docker compose -f /path/to/connpy/docker-compose.yml --log-level ERROR run --rm --remove-orphans connpy-app'
 </code></pre>
-<h3 id="manage-profiles">Manage profiles</h3>
-<pre><code>usage: conn profile [-h] (--add | --del | --mod | --show) profile
-
-positional arguments:
-  profile        Name of profile to manage
-
-options:
-  -h, --help         show this help message and exit
-  -a, --add          Add new profile
-  -r, --del, --rm    Delete profile
-  -e, --mod, --edit  Modify profile
-  -s, --show         Show profile
-
+<hr>
+<h2 id="privacy-integration">🔒 Privacy &amp; Integration</h2>
+<h3 id="privacy-policy">Privacy Policy</h3>
+<p>Connpy is committed to protecting your privacy:
+- <strong>Local Storage</strong>: All server addresses, usernames, and passwords are encrypted and stored <strong>only</strong> on your machine. No data is transmitted to our servers.
+- <strong>Data Access</strong>: Data is used solely for managing and automating your connections.</p>
+<h3 id="google-integration">Google Integration</h3>
+<p>Used strictly for backup:
+- <strong>Backup</strong>: Sync your encrypted configuration with your Google Drive account.
+- <strong>Scoped Access</strong>: Connpy only accesses its own backup files.</p>
+<hr>
+<h2 id="usage">Usage</h2>
+<pre><code class="language-bash">usage: conn [-h] [--add | --del | --mod | --show | --debug] [node|folder] [--sftp]
+       conn {profile,move,copy,list,bulk,export,import,ai,run,api,plugin,config,sync,context} ...
 </code></pre>
-<h3 id="examples">Examples</h3>
-<pre><code>   #Add new profile
-   conn profile --add office-user
-   #Add new folder
-   conn --add @office
-   #Add new subfolder
-   conn --add @datacenter@office
-   #Add node to subfolder
-   conn --add server@datacenter@office
-   #Add node to folder
-   conn --add pc@office
-   #Show node information
-   conn --show server@datacenter@office
-   #Connect to nodes
-   conn pc@office
-   conn server
-   #Create and set new context
-   conn context -a office .*@office
-   conn context --set office
-   #Run a command in a node
-   conn run server ls -la
+<h3 id="basic-examples">Basic Examples:</h3>
+<pre><code class="language-bash"># Add a folder and subfolder
+conn --add @office
+conn --add @datacenter@office
+
+# Add a node with a profile
+conn --add server1@datacenter@office --profile @myuser
+
+# Connect to a node (fuzzy match)
+conn server1
+
+# Start the AI Copilot
+conn ai
+
+# Run a command on all nodes in a folder
+conn run @office &quot;uptime&quot;
 </code></pre>
+<hr>
 <h2 id="plugin-requirements-for-connpy">Plugin Requirements for Connpy</h2>
 <h3 id="remote-plugin-execution">Remote Plugin Execution</h3>
 <p>When Connpy operates in remote mode, plugins are executed <strong>transparently on the server</strong>:
 - The client automatically downloads the plugin source code (<code>Parser</code> class context) to generate the local <code>argparse</code> structure and provide autocompletion.
-- The execution phase (<code>Entrypoint</code> class) is redirected via gRPC streams to execute in the server's memory, ensuring the plugin runs securely against the server's inventory without passing sensitive data to the client.
-- You can manage remote plugins using the <code>--remote</code> flag (e.g. <code>connpy plugin --add myplugin script.py --remote</code>).</p>
+- The execution phase (<code>Entrypoint</code> class) is redirected via gRPC streams to execute in the server's memory.
+- You can manage remote plugins using the <code>--remote</code> flag.</p>
 <h3 id="general-structure">General Structure</h3>
 <ul>
-<li>The plugin script must be a Python file.</li>
-<li>Only the following top-level elements are allowed in the plugin script:</li>
-<li>Class definitions</li>
-<li>Function definitions</li>
-<li>Import statements</li>
-<li>The <code>if __name__ == "__main__":</code> block for standalone execution</li>
-<li>Pass statements</li>
-</ul>
-<h3 id="specific-class-requirements">Specific Class Requirements</h3>
-<ul>
-<li>The plugin script must define specific classes with particular attributes and methods. Each class serves a distinct role within the plugin's architecture:</li>
-<li><strong>Class <code>Parser</code></strong>:<ul>
-<li><strong>Purpose</strong>: Handles parsing of command-line arguments.</li>
-<li><strong>Requirements</strong>:</li>
-<li>Must contain only one method: <code>__init__</code>.</li>
-<li>The <code>__init__</code> method must initialize at least one attribute:<ul>
-<li><code>self.parser</code>: An instance of <code>argparse.ArgumentParser</code>.</li>
-</ul>
-</li>
-</ul>
-</li>
-<li><strong>Class <code>Entrypoint</code></strong>:<ul>
-<li><strong>Purpose</strong>: Acts as the entry point for plugin execution, utilizing parsed arguments and integrating with the main application.</li>
-<li><strong>Requirements</strong>:</li>
-<li>Must have an <code>__init__</code> method that accepts exactly three parameters besides <code>self</code>:<ul>
-<li><code>args</code>: Arguments passed to the plugin.</li>
-<li>The parser instance (typically <code>self.parser</code> from the <code>Parser</code> class).</li>
-<li>The Connapp instance to interact with the Connpy app.</li>
-</ul>
-</li>
-</ul>
-</li>
-<li><strong>Class <code>Preload</code></strong>:<ul>
-<li><strong>Purpose</strong>: Performs any necessary preliminary setup or configuration independent of the main parsing and entry logic.</li>
-</ul>
-</li>
-<li><strong>Requirements</strong>:<ul>
-<li>Contains at least an <code>__init__</code> method that accepts parameter connapp besides <code>self</code>.</li>
-</ul>
-</li>
-</ul>
-<h3 id="class-dependencies-and-combinations">Class Dependencies and Combinations</h3>
-<ul>
-<li><strong>Dependencies</strong>:</li>
-<li><code>Parser</code> and <code>Entrypoint</code> are interdependent and must both be present if one is included.</li>
-<li><code>Preload</code> is independent and may exist alone or alongside the other classes.</li>
-<li><strong>Valid Combinations</strong>:</li>
-<li><code>Parser</code> and <code>Entrypoint</code> together.</li>
-<li><code>Preload</code> alone.</li>
-<li>All three classes (<code>Parser</code>, <code>Entrypoint</code>, <code>Preload</code>).</li>
+<li>The plugin script must define specific classes:</li>
+<li><strong>Class <code>Parser</code></strong>: Handles <code>argparse.ArgumentParser</code> initialization.</li>
+<li><strong>Class <code>Entrypoint</code></strong>: Main execution logic (receives <code>args</code>, <code>parser</code>, and <code>connapp</code>).</li>
+<li><strong>Class <code>Preload</code></strong>: (Optional) For modifying core app behavior or registering hooks.</li>
 </ul>
 <h3 id="preload-modifications-and-hooks">Preload Modifications and Hooks</h3>
-<p>In the <code>Preload</code> class of the plugin system, you have the ability to customize the behavior of existing classes and methods within the application through a robust hooking system. This documentation explains how to use the <code>modify</code>, <code>register_pre_hook</code>, and <code>register_post_hook</code> methods to tailor plugin functionality to your needs.</p>
-<h4 id="modifying-classes-with-modify">Modifying Classes with <code>modify</code></h4>
-<p>The <code>modify</code> method allows you to alter instances of a class at the time they are created or after their creation. This is particularly useful for setting or modifying configuration settings, altering default behaviors, or adding new functionalities to existing classes without changing the original class definitions.</p>
-<ul>
-<li><strong>Usage</strong>: Modify a class to include additional configurations or changes</li>
-<li><strong>Modify Method Signature</strong>:</li>
-<li><code>modify(modification_method)</code>: A function that is invoked with an instance of the class as its argument. This function should perform any modifications directly on this instance.</li>
-<li><strong>Modification Method Signature</strong>:</li>
-<li><strong>Arguments</strong>:<ul>
-<li><code>cls</code>:
-This function accepts a single argument, the class instance, which it then modifies.</li>
-</ul>
-</li>
-<li><strong>Modifiable Classes</strong>:<ul>
-<li><code>connapp.config</code></li>
-<li><code>connapp.node</code></li>
-<li><code>connapp.nodes</code></li>
-<li><code>connapp.ai</code></li>
-</ul>
-</li>
-<li>
-<p>```python
-def modify_config(cls):
-# Example modification: adding a new attribute or modifying an existing one
-cls.new_attribute = 'New Value'</p>
-<p>class Preload:
-def <strong>init</strong>(self, connapp):
-# Applying modification to the config class instance
-connapp.config.modify(modify_config)
-```</p>
-</li>
-</ul>
-<h4 id="implementing-method-hooks">Implementing Method Hooks</h4>
-<p>There are 2 methods that allows you to define custom logic to be executed before (<code>register_pre_hook</code>) or after (<code>register_post_hook</code>) the main logic of a method. This is particularly useful for logging, auditing, preprocessing inputs, postprocessing outputs or adding functionalities.</p>
-<ul>
-<li><strong>Usage</strong>: Register hooks to methods to execute additional logic before or after the main method execution.</li>
-<li><strong>Registration Methods Signature</strong>:</li>
-<li><code>register_pre_hook(pre_hook_method)</code>: A function that is invoked before the main method is executed. This function should do preprocessing of the arguments.</li>
-<li><code>register_post_hook(post_hook_method)</code>: A function that is invoked after the main method is executed. This function should do postprocessing of the outputs.</li>
-<li><strong>Method Signatures for Pre-Hooks</strong></li>
-<li><code>pre_hook_method(*args, **kwargs)</code></li>
-<li><strong>Arguments</strong>:<ul>
-<li><code>*args</code>, <code>**kwargs</code>: The arguments and keyword arguments that will be passed to the method being hooked. The pre-hook function has the opportunity to inspect and modify these arguments before they are passed to the main method.</li>
-</ul>
-</li>
-<li><strong>Return</strong>:<ul>
-<li>Must return a tuple <code>(args, kwargs)</code>, which will be used as the new arguments for the main method. If the original arguments are not modified, the function should return them as received.</li>
-</ul>
-</li>
-<li><strong>Method Signatures for Post-Hooks</strong>:</li>
-<li><code>post_hook_method(*args, **kwargs)</code></li>
-<li><strong>Arguments</strong>:<ul>
-<li><code>*args</code>, <code>**kwargs</code>: The arguments and keyword arguments that were passed to the main method.</li>
-<li><code>kwargs["result"]</code>: The value returned by the main method. This allows the post-hook to inspect and even alter the result before it is returned to the original caller.</li>
-</ul>
-</li>
-<li><strong>Return</strong>:<ul>
-<li>Can return a modified result, which will replace the original result of the main method, or simply return <code>kwargs["result"]</code> to return the original method result.
-</li>
-</ul>
-</li>
-<li>
-<p>```python
-def pre_processing_hook(<em>args, </em>*kwargs):
-print("Pre-processing logic here")
-# Modify arguments or perform any checks
-return args, kwargs
-# Return modified or unmodified args and kwargs</p>
-<p>def post_processing_hook(<em>args, </em>*kwargs):
-print("Post-processing logic here")
-# Modify the result or perform any final logging or cleanup
-return kwargs["result"]
-# Return the modified or unmodified result</p>
-<p>class Preload:
-def <strong>init</strong>(self, connapp):
-# Registering a pre-hook
-connapp.ai.some_method.register_pre_hook(pre_processing_hook)</p>
-<pre><code>    # Registering a post-hook
-    connapp.node.another_method.register_post_hook(post_processing_hook)
-</code></pre>
-<p>```</p>
-</li>
-</ul>
-<h3 id="executable-block">Executable Block</h3>
-<ul>
-<li>The plugin script can include an executable block:</li>
-<li><code>if __name__ == "__main__":</code></li>
-<li>This block allows the plugin to be run as a standalone script for testing or independent use.</li>
-</ul>
+<p>You can customize the behavior of core classes using hooks:
+- <strong><code>modify(method)</code></strong>: Alter class instances (e.g., <code>connapp.config</code>, <code>connapp.ai</code>).
+- <strong><code>register_pre_hook(method)</code></strong>: Logic to run before a method execution.
+- <strong><code>register_post_hook(method)</code></strong>: Logic to run after a method execution.</p>
 <h3 id="command-completion-support">Command Completion Support</h3>
-<p>Plugins can provide intelligent <strong>tab completion</strong> by defining autocompletion logic. There are two supported methods, with the tree-based approach being the most modern and recommended.</p>
-<h4 id="1-tree-based-completion-recommended">1. Tree-based Completion (Recommended)</h4>
-<p>Define a function called <code>_connpy_tree</code> that returns a declarative navigation tree. This method is highly efficient, supports complex state loops, and is very simple to implement for most use cases.</p>
-<pre><code class="language-python">def _connpy_tree(info=None):
-    nodes = info.get(&quot;nodes&quot;, [])
-    return {
-        &quot;__exclude_used__&quot;: True,  # Filter out words already typed
-        &quot;__extra__&quot;: nodes,        # Suggest nodes at this level
-        &quot;--format&quot;: [&quot;json&quot;, &quot;yaml&quot;, &quot;table&quot;], # Fixed suggestions
-        &quot;*&quot;: {                     # Wildcard matches any positional word
-            &quot;interface1&quot;: None,
-            &quot;interface2&quot;: None,
-            &quot;--verbose&quot;: None
-        }
-    }
-</code></pre>
-<ul>
-<li><strong>Keys</strong>: Literal completions (exact matches).</li>
-<li><strong><code>*</code> Key</strong>: A wildcard that matches any positional word typed by the user.</li>
-<li><strong><code>__extra__</code></strong>: A list or a callable <code>(words) -&gt; list</code> that adds dynamic suggestions.</li>
-<li><strong><code>__exclude_used__</code></strong>: (Boolean) If True, automatically filters out words already present in the command line.</li>
-</ul>
-<h4 id="2-legacy-function-based-completion">2. Legacy Function-based Completion</h4>
-<p>For backward compatibility or highly custom logic, you can define <code>_connpy_completion</code>.</p>
-<pre><code class="language-python">def _connpy_completion(wordsnumber, words, info=None):
-    if wordsnumber == 3:
-        return [&quot;--help&quot;, &quot;--verbose&quot;, &quot;start&quot;, &quot;stop&quot;]
-
-    elif wordsnumber == 4 and words[2] == &quot;start&quot;:
-        return info[&quot;nodes&quot;]  # Suggest node names
-
-    return []
-</code></pre>
-<table>
-<thead>
-<tr>
-<th>Parameter</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>wordsnumber</code></td>
-<td>Integer indicating the total number of words on the command line. For plugins, this typically starts at 3.</td>
-</tr>
-<tr>
-<td><code>words</code></td>
-<td>A list of tokens (words) already typed. <code>words[0]</code> is always the name of the plugin.</td>
-</tr>
-<tr>
-<td><code>info</code></td>
-<td>A dictionary of structured context data (<code><a title="connpy.nodes" href="#connpy.nodes">nodes</a></code>, <code>folders</code>, <code>profiles</code>, <code>config</code>).</td>
-</tr>
-</tbody>
-</table>
-<blockquote>
-<p>In this example, if the user types <code><a title="connpy" href="#connpy">connpy</a> myplugin start </code> and presses Tab, it will suggest node names.</p>
-</blockquote>
-<h3 id="handling-unknown-arguments">Handling Unknown Arguments</h3>
-<p>Plugins can choose to accept and process unknown arguments that are <strong>not explicitly defined</strong> in the parser. To enable this behavior, the plugin must define the following hidden argument in its <code>Parser</code> class:</p>
-<pre><code>self.parser.add_argument(
-    &quot;--unknown-args&quot;,
-    action=&quot;store_true&quot;,
-    default=True,
-    help=argparse.SUPPRESS
-)
-</code></pre>
-<h4 id="behavior">Behavior:</h4>
-<ul>
-<li>When this argument is present, Connpy will parse the known arguments and capture any extra (unknown) ones.</li>
-<li>These unknown arguments will be passed to the plugin as <code>args.unknown_args</code> inside the <code>Entrypoint</code>.</li>
-<li>If the user does not pass any unknown arguments, <code>args.unknown_args</code> will contain the default value (<code>True</code>, unless overridden).</li>
-</ul>
-<h4 id="example">Example:</h4>
-<p>If a plugin accepts unknown tcpdump flags like this:</p>
-<pre><code>connpy myplugin -nn -s0
-</code></pre>
-<p>And defines the hidden <code>--unknown-args</code> flag as shown above, then:</p>
-<ul>
-<li><code>args.unknown_args</code> inside <code>Entrypoint.__init__()</code> will be: <code>['-nn', '-s0']</code></li>
-</ul>
-<blockquote>
-<p>This allows the plugin to receive and process arguments intended for external tools (e.g., <code>tcpdump</code>) without argparse raising an error.</p>
-</blockquote>
-<h4 id="note">Note:</h4>
-<p>If a plugin does <strong>not</strong> define <code>--unknown-args</code>, any extra arguments passed will cause argparse to fail with an unrecognized arguments error.</p>
-<h3 id="script-verification">Script Verification</h3>
-<ul>
-<li>The <code>verify_script</code> method in <code>plugins.py</code> is used to check the plugin script's compliance with these standards.</li>
-<li>Non-compliant scripts will be rejected to ensure consistency and proper functionality within the plugin system.</li>
-<li></li>
-</ul>
-<h3 id="example-script">Example Script</h3>
-<p>For a practical example of how to write a compatible plugin script, please refer to the following example:</p>
-<p><a href="https://github.com/fluzzi/awspy">Example Plugin Script</a></p>
-<p>This script demonstrates the required structure and implementation details according to the plugin system's standards.</p>
-<h2 id="grpc-service-architecture">gRPC Service Architecture</h2>
-<p>Connpy features a completely decoupled gRPC Client/Server architecture. You can run Connpy as a standalone background service and connect to it remotely via the CLI or other clients.</p>
-<h3 id="1-start-the-server">1. Start the Server</h3>
-<p>Start the gRPC service by running:</p>
-<pre><code class="language-bash">connpy api -s 50051
-</code></pre>
-<p>The server will handle all configurations, connections, AI sessions, and plugin execution locally on the machine it runs on.</p>
-<h3 id="2-connect-the-client">2. Connect the Client</h3>
-<p>Configure your local CLI client to connect to the remote server:</p>
-<pre><code class="language-bash">connpy config --service-mode remote
-connpy config --remote-host localhost:50051
-</code></pre>
-<p>Once configured, all commands (<code><a title="connpy" href="#connpy">connpy</a> <a title="connpy.node" href="#connpy.node">node</a></code>, <code><a title="connpy" href="#connpy">connpy</a> list</code>, <code><a title="connpy" href="#connpy">connpy</a> <a title="connpy.ai" href="#connpy.ai">ai</a></code>, etc.) will execute transparently on the remote server via thin-client proxies. You can revert back to standalone execution at any time by running <code>connpy config --service-mode local</code>.</p>
-<h3 id="programmatic-access-grpc-soa">Programmatic Access (gRPC &amp; SOA)</h3>
-<p>Developers can build their own applications using the Connpy backend by utilizing the <code>ServiceProvider</code>:</p>
-<pre><code class="language-python">from connpy.services.provider import ServiceProvider
-services = ServiceProvider(config, mode=&quot;remote&quot;, remote_host=&quot;localhost:50051&quot;)
-nodes = services.nodes.list_nodes()
-</code></pre>
-<h2 id="automation-module">Automation module</h2>
-<p>The automation module</p>
-<h3 id="standalone-module">Standalone module</h3>
-<pre><code>import connpy
-router = connpy.node(&quot;uniqueName&quot;,&quot;ip/host&quot;, user=&quot;user&quot;, password=&quot;pass&quot;)
-router.run([&quot;term len 0&quot;,&quot;show run&quot;])
+<p>Plugins can provide intelligent tab completion:
+1. <strong>Tree-based Completion (Recommended)</strong>: Define <code>_connpy_tree(info)</code> returning a navigation dictionary.
+2. <strong>Legacy Completion</strong>: Define <code>_connpy_completion(wordsnumber, words, info)</code>.</p>
+<hr>
+<h2 id="grpc-service-architecture">⚙️ gRPC Service Architecture</h2>
+<p>Connpy can operate in a decoupled mode:
+1. <strong>Start the API (Server)</strong>: <code>conn api -s 50051</code>
+2. <strong>Configure the Client</strong>:
+<code>bash
+conn config --service-mode remote
+conn config --remote-host localhost:50051</code>
+All inventory management and execution will now happen on the server.</p>
+<hr>
+<h2 id="automation-module-api">🐍 Automation Module (API)</h2>
+<p>You can use <code><a title="connpy" href="#connpy">connpy</a></code> as a Python library for your own scripts.</p>
+<h3 id="basic-execution">Basic Execution</h3>
+<pre><code class="language-python">import connpy
+router = connpy.node(&quot;uniqueName&quot;, &quot;1.1.1.1&quot;, user=&quot;admin&quot;)
+router.run([&quot;show ip int brief&quot;])
 print(router.output)
-hasip = router.test(&quot;show ip int brief&quot;,&quot;1.1.1.1&quot;)
-if hasip:
-    print(&quot;Router has ip 1.1.1.1&quot;)
-else:
-    print(&quot;router does not have ip 1.1.1.1&quot;)
 </code></pre>
-<h3 id="using-manager-configuration">Using manager configuration</h3>
-<pre><code>import connpy
-conf = connpy.configfile()
-device = conf.getitem(&quot;server@office&quot;)
-server = connpy.node(&quot;unique name&quot;, **device, config=conf)
-result = server.run([&quot;cd /&quot;, &quot;ls -la&quot;])
-print(result)
-</code></pre>
-<h3 id="running-parallel-tasks">Running parallel tasks</h3>
-<pre><code>import connpy
-conf = connpy.configfile()
-#You can get the nodes from the config from a folder and fitlering in it
-nodes = conf.getitem(&quot;@office&quot;, [&quot;router1&quot;, &quot;router2&quot;, &quot;router3&quot;])
-#You can also get each node individually:
-nodes = {}
-nodes[&quot;router1&quot;] = conf.getitem(&quot;router1@office&quot;)
-nodes[&quot;router2&quot;] = conf.getitem(&quot;router2@office&quot;)
-nodes[&quot;router10&quot;] = conf.getitem(&quot;router10@datacenter&quot;)
-#Also, you can create the nodes manually:
-nodes = {}
-nodes[&quot;router1&quot;] = {&quot;host&quot;: &quot;1.1.1.1&quot;, &quot;user&quot;: &quot;user&quot;, &quot;password&quot;: &quot;pass1&quot;}
-nodes[&quot;router2&quot;] = {&quot;host&quot;: &quot;1.1.1.2&quot;, &quot;user&quot;: &quot;user&quot;, &quot;password&quot;: &quot;pass2&quot;}
-nodes[&quot;router3&quot;] = {&quot;host&quot;: &quot;1.1.1.2&quot;, &quot;user&quot;: &quot;user&quot;, &quot;password&quot;: &quot;pass3&quot;}
-#Finally you run some tasks on the nodes
-mynodes = connpy.nodes(nodes, config = conf)
-result = mynodes.test([&quot;show ip int br&quot;], &quot;1.1.1.2&quot;)
-for i in result:
-    print(&quot;---&quot; + i + &quot;---&quot;)
-    print(result[i])
-    print()
-# Or for one specific node
-mynodes.router1.run([&quot;term len 0&quot;. &quot;show run&quot;], folder = &quot;/home/user/logs&quot;)
-</code></pre>
-<h3 id="using-variables">Using variables</h3>
-<pre><code>import connpy
+<h3 id="parallel-tasks-with-variables">Parallel Tasks with Variables</h3>
+<pre><code class="language-python">import connpy
 config = connpy.configfile()
-nodes = config.getitem(&quot;@office&quot;, [&quot;router1&quot;, &quot;router2&quot;, &quot;router3&quot;])
-commands = []
-commands.append(&quot;config t&quot;)
-commands.append(&quot;interface lo {id}&quot;)
-commands.append(&quot;ip add {ip} {mask}&quot;)
-commands.append(&quot;end&quot;)
-variables = {}
-variables[&quot;router1@office&quot;] = {&quot;ip&quot;: &quot;10.57.57.1&quot;}
-variables[&quot;router2@office&quot;] = {&quot;ip&quot;: &quot;10.57.57.2&quot;}
-variables[&quot;router3@office&quot;] = {&quot;ip&quot;: &quot;10.57.57.3&quot;}
-variables[&quot;__global__&quot;] = {&quot;id&quot;: &quot;57&quot;}
-variables[&quot;__global__&quot;][&quot;mask&quot;] =  &quot;255.255.255.255&quot;
-expected = &quot;!&quot;
-routers = connpy.nodes(nodes, config = config)
-routers.run(commands, variables)
-routers.test(&quot;ping {ip}&quot;, expected, variables)
-for key in routers.result:
-    print(key, ' ---&gt; ', (&quot;pass&quot; if routers.result[key] else &quot;fail&quot;))
-</code></pre>
-<h3 id="using-ai">Using AI</h3>
-<pre><code>import connpy
-conf = connpy.configfile()
-# Uses models and API keys from config, or override them:
-myai = connpy.ai(conf, engineer_model=&quot;gemini/gemini-2.5-flash&quot;, engineer_api_key=&quot;your-key&quot;)
-result = myai.ask(&quot;go to router1 and show me the running configuration&quot;)
-print(result[&quot;response&quot;])
-# Streaming is enabled by default for CLI, disable for programmatic use:
-result = myai.ask(&quot;show interfaces on all routers&quot;, stream=False)
-print(result[&quot;response&quot;])
-</code></pre>
-<h4 id="ai-plugin-tool-registration">AI Plugin Tool Registration</h4>
-<p>Plugins can register custom tools with the AI system using <code>register_ai_tool()</code> in their <code>Preload</code> class:</p>
-<pre><code>def _register_my_tools(ai_instance):
-    tool_def = {
-        &quot;type&quot;: &quot;function&quot;,
-        &quot;function&quot;: {
-            &quot;name&quot;: &quot;my_custom_tool&quot;,
-            &quot;description&quot;: &quot;Does something useful.&quot;,
-            &quot;parameters&quot;: {
-                &quot;type&quot;: &quot;object&quot;,
-                &quot;properties&quot;: {&quot;query&quot;: {&quot;type&quot;: &quot;string&quot;}},
-                &quot;required&quot;: [&quot;query&quot;]
-            }
-        }
-    }
-    ai_instance.register_ai_tool(
-        tool_definition=tool_def,
-        handler=my_handler_function,
-        target=&quot;engineer&quot;,  # or &quot;architect&quot; or &quot;both&quot;
-        engineer_prompt=&quot;- My tool: does X.&quot;,
-        architect_prompt=&quot;  * My tool (my_custom_tool).&quot;
-    )
+nodes = config.getitem(&quot;@office&quot;, [&quot;router1&quot;, &quot;router2&quot;])
+routers = connpy.nodes(nodes, config=config)
 
-class Preload:
-    def __init__(self, connapp):
-        connapp.ai.modify(_register_my_tools)
+variables = {
+    &quot;router1@office&quot;: {&quot;id&quot;: &quot;1&quot;},
+    &quot;__global__&quot;: {&quot;mask&quot;: &quot;255.255.255.0&quot;}
+}
+routers.run([&quot;interface lo{id}&quot;, &quot;ip address 10.0.0.{id} {mask}&quot;], variables)
 </code></pre>
-<h2 id="developer-notes-soa-architecture">Developer Notes (SOA Architecture)</h2>
-<p>As of version 2.0, Connpy has migrated to a <strong>Service-Oriented Architecture (SOA)</strong>:
-- <strong><code>connpy/cli/</code></strong>: Contains all CLI handlers. These are responsible for argument parsing, user interaction (via <code>inquirer</code>), and visual output (via <code>printer</code>).
-- <strong><code>connpy/services/</code></strong>: Contains pure logic services (Node, Profile, Execution, etc.).
-- <strong>Zero-Print Policy</strong>: Services must never use <code>print()</code>. All output must be returned as data structures or generators to the caller (CLI handlers).
-- <strong>ServiceProvider</strong>: Access services via <code>connapp.services</code>. This allows transparent switching between local and remote (gRPC) backends without modifying CLI logic.</p>
+<h3 id="ai-programmatic-use">AI Programmatic Use</h3>
+<pre><code class="language-python">import connpy
+myai = connpy.ai(connpy.configfile())
+response = myai.ask(&quot;What is the status of the BGP neighbors in the office?&quot;)
+</code></pre>
+<hr>
+<p><em>For detailed developer notes and plugin hooks documentation, see the <a href="https://fluzzi.github.io/connpy/">Documentation</a>.</em></p>
 </section>
 <section>
 <h2 class="section-title" id="header-submodules">Sub-modules</h2>
@@ -517,6 +190,10 @@ class Preload:
 <div class="desc"></div>
 </dd>
 <dt><code class="name"><a title="connpy.grpc_layer" href="grpc_layer/index.html">connpy.grpc_layer</a></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt><code class="name"><a title="connpy.mcp_client" href="mcp_client.html">connpy.mcp_client</a></code></dt>
 <dd>
 <div class="desc"></div>
 </dd>
@@ -533,6 +210,10 @@ class Preload:
 <div class="desc"></div>
 </dd>
 <dt><code class="name"><a title="connpy.tunnels" href="tunnels.html">connpy.tunnels</a></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt><code class="name"><a title="connpy.utils" href="utils.html">connpy.utils</a></code></dt>
 <dd>
 <div class="desc"></div>
 </dd>
@@ -969,7 +650,7 @@ class ai:
         aiconfig = self.config.config.get(&#34;ai&#34;, {})
         
         # Modelos (Prioridad: Argumento -&gt; Config -&gt; Default)
-        self.engineer_model = engineer_model or aiconfig.get(&#34;engineer_model&#34;) or &#34;gemini/gemini-3.1-flash-lite-preview&#34;
+        self.engineer_model = engineer_model or aiconfig.get(&#34;engineer_model&#34;) or &#34;gemini/gemini-3.1-flash-lite&#34;
         self.architect_model = architect_model or aiconfig.get(&#34;architect_model&#34;) or &#34;anthropic/claude-sonnet-4-6&#34;
         
         # API Keys (Prioridad: Argumento -&gt; Config)
@@ -995,6 +676,9 @@ class ai:
         self.tool_status_formatters = {}      # {&#34;tool_name&#34;: formatter_callable}
         self.engineer_prompt_extensions = []  # Extra text for engineer prompt
         self.architect_prompt_extensions = [] # Extra text for architect prompt
+        
+        # MCP Manager
+        self.mcp_manager = MCPClientManager(self.config)
 
         # Long-term memory
         self.memory_path = os.path.join(self.config.defaultdir, &#34;ai_memory.md&#34;)
@@ -1180,7 +864,7 @@ class ai:
                             raise KeyboardInterrupt
                         chunk_callback(delta.content)
 
-                    if not debug and not chunk_callback:
+                    if not chunk_callback:
                         if not is_streaming_text:
                             # Stop spinner definitively
                             if status:
@@ -1188,9 +872,15 @@ class ai:
                                     status.stop()
                                 except Exception:
                                     pass
+                            
+                            # Create a stable, direct Console to bypass _ConsoleProxy recreation bugs
+                            from rich.console import Console as RichConsole
+                            from .printer import connpy_theme, get_original_stdout
+                            stable_console = RichConsole(theme=connpy_theme, file=get_original_stdout())
+                            
                             live_display = Live(
                                 Panel(Markdown(full_content), title=title, border_style=border, expand=False),
-                                console=self.console,
+                                console=stable_console,
                                 refresh_per_second=8,
                                 transient=False
                             )
@@ -1212,7 +902,10 @@ class ai:
                     )
                 except Exception:
                     pass
-                live_display.stop()
+                try:
+                    live_display.stop()
+                except Exception:
+                    pass
         
         # Rebuild complete response from chunks
         try:
@@ -1520,7 +1213,7 @@ class ai:
                     self.console.print(&#34;[pass]✓ Trust Mode Enabled. All future commands in this session will execute without confirmation.[/pass]&#34;)
                 elif user_resp_lower in [&#39;y&#39;, &#39;yes&#39;]:
                     self.console.print(&#34;[pass]✓ Executing...[/pass]&#34;)
-                elif user_resp_lower in [&#39;n&#39;, &#39;no&#39;, &#39;&#39;]:
+                elif user_resp_lower in [&#39;n&#39;, &#39;no&#39;, &#39;&#39;, &#39;cancel&#39;]:
                     self.console.print(&#34;[fail]✗ Execution rejected by user.[/fail]&#34;)
                     return &#34;Error: User rejected execution.&#34;
                 else:
@@ -1616,6 +1309,10 @@ class ai:
                             cmd_str = cmds[0] if cmds else &#34;&#34;
                             status.update(f&#34;[ai_status]Engineer: [CMD] {cmd_str}&#34;)
                         elif fn == &#34;get_node_info&#34;: status.update(f&#34;[ai_status]Engineer: [INSPECT] {args.get(&#39;node_name&#39;,&#39;&#39;)}&#34;)
+                        elif fn.startswith(&#34;mcp_&#34;):
+                            server = fn.split(&#34;__&#34;)[0].replace(&#34;mcp_&#34;, &#34;&#34;)
+                            tool = fn.split(&#34;__&#34;)[1] if &#34;__&#34; in fn else fn
+                            status.update(f&#34;[ai_status]Engineer: [MCP:{server}] {tool}&#34;)
                         elif fn in self.tool_status_formatters: status.update(self.tool_status_formatters[fn](args))
 
                     if debug:
@@ -1624,6 +1321,8 @@ class ai:
                     if fn == &#34;list_nodes&#34;: obs = self.list_nodes_tool(**args)
                     elif fn == &#34;run_commands&#34;: obs = self.run_commands_tool(**args, status=status)
                     elif fn == &#34;get_node_info&#34;: obs = self.get_node_info_tool(**args)
+                    elif fn.startswith(&#34;mcp_&#34;):
+                        obs = run_ai_async(self.mcp_manager.call_tool(fn, args)).result(timeout=60)
                     elif fn in self.external_tool_handlers: obs = self.external_tool_handlers[fn](self, **args)
                     else: obs = f&#34;Error: Unknown tool &#39;{fn}&#39;.&#34;
                     
@@ -1644,14 +1343,22 @@ class ai:
         except Exception as e:
             return f&#34;Engineer failed: {str(e)}&#34;, usage
 
-    def _get_engineer_tools(self):
+    def _get_engineer_tools(self, os_filter: str = None):
         &#34;&#34;&#34;Define tools available to the Engineer.&#34;&#34;&#34;
         base_tools = [
-            {&#34;type&#34;: &#34;function&#34;, &#34;function&#34;: {&#34;name&#34;: &#34;list_nodes&#34;, &#34;description&#34;: &#34;Lists available nodes in the inventory.&#34;, &#34;parameters&#34;: {&#34;type&#34;: &#34;object&#34;, &#34;properties&#34;: {&#34;filter_pattern&#34;: {&#34;type&#34;: &#34;string&#34;, &#34;description&#34;: &#34;Regex to filter nodes (e.g. &#39;.*&#39;, &#39;border.*&#39;).&#34;}}}}},
-            {&#34;type&#34;: &#34;function&#34;, &#34;function&#34;: {&#34;name&#34;: &#34;run_commands&#34;, &#34;description&#34;: &#34;Runs one or more commands on matched nodes. MANDATORY: You MUST call &#39;list_nodes&#39; first to verify the target list.&#34;, &#34;parameters&#34;: {&#34;type&#34;: &#34;object&#34;, &#34;properties&#34;: {&#34;nodes_filter&#34;: {&#34;type&#34;: &#34;string&#34;, &#34;description&#34;: &#34;Exact node name or verified filter pattern.&#34;}, &#34;commands&#34;: {&#34;type&#34;: &#34;array&#34;, &#34;items&#34;: {&#34;type&#34;: &#34;string&#34;}, &#34;description&#34;: &#34;List of commands (e.g. [&#39;show ip route&#39;, &#39;show int desc&#39;]).&#34;}}, &#34;required&#34;: [&#34;nodes_filter&#34;, &#34;commands&#34;]}}},
-            {&#34;type&#34;: &#34;function&#34;, &#34;function&#34;: {&#34;name&#34;: &#34;get_node_info&#34;, &#34;description&#34;: &#34;Gets full metadata for a specific node.&#34;, &#34;parameters&#34;: {&#34;type&#34;: &#34;object&#34;, &#34;properties&#34;: {&#34;node_name&#34;: {&#34;type&#34;: &#34;string&#34;}}, &#34;required&#34;: [&#34;node_name&#34;]}}}
+            {&#34;type&#34;: &#34;function&#34;, &#34;function&#34;: {&#34;name&#34;: &#34;list_nodes&#34;, &#34;description&#34;: &#34;[Universal Platform] Lists available nodes in the inventory.&#34;, &#34;parameters&#34;: {&#34;type&#34;: &#34;object&#34;, &#34;properties&#34;: {&#34;filter_pattern&#34;: {&#34;type&#34;: &#34;string&#34;, &#34;description&#34;: &#34;Regex to filter nodes (e.g. &#39;.*&#39;, &#39;border.*&#39;).&#34;}}}}},
+            {&#34;type&#34;: &#34;function&#34;, &#34;function&#34;: {&#34;name&#34;: &#34;run_commands&#34;, &#34;description&#34;: &#34;[Universal Platform] Runs one or more commands on matched nodes. MANDATORY: You MUST call &#39;list_nodes&#39; first to verify the target list.&#34;, &#34;parameters&#34;: {&#34;type&#34;: &#34;object&#34;, &#34;properties&#34;: {&#34;nodes_filter&#34;: {&#34;type&#34;: &#34;string&#34;, &#34;description&#34;: &#34;Exact node name or verified filter pattern.&#34;}, &#34;commands&#34;: {&#34;type&#34;: &#34;array&#34;, &#34;items&#34;: {&#34;type&#34;: &#34;string&#34;}, &#34;description&#34;: &#34;List of commands (e.g. [&#39;show ip route&#39;, &#39;show int desc&#39;]).&#34;}}, &#34;required&#34;: [&#34;nodes_filter&#34;, &#34;commands&#34;]}}},
+            {&#34;type&#34;: &#34;function&#34;, &#34;function&#34;: {&#34;name&#34;: &#34;get_node_info&#34;, &#34;description&#34;: &#34;[Universal Platform] Gets full metadata for a specific node.&#34;, &#34;parameters&#34;: {&#34;type&#34;: &#34;object&#34;, &#34;properties&#34;: {&#34;node_name&#34;: {&#34;type&#34;: &#34;string&#34;}}, &#34;required&#34;: [&#34;node_name&#34;]}}}
         ]
         
+        # Add dynamic tools from MCP
+        try:
+            mcp_tools = run_ai_async(self.mcp_manager.get_tools_for_llm(os_filter=os_filter)).result(timeout=10)
+            base_tools.extend(mcp_tools)
+        except Exception as e:
+            # Silently fail for LLM tools
+            pass
+
         if self.architect_key:
             base_tools.extend([
                 {&#34;type&#34;: &#34;function&#34;, &#34;function&#34;: {&#34;name&#34;: &#34;consult_architect&#34;, &#34;description&#34;: &#34;Ask the Strategic Reasoning Engine for advice on complex design, architecture, or troubleshooting decisions. You remain in control and will present the response to the user. Use this for: configuration planning, design validation, complex troubleshooting.&#34;, &#34;parameters&#34;: {&#34;type&#34;: &#34;object&#34;, &#34;properties&#34;: {&#34;question&#34;: {&#34;type&#34;: &#34;string&#34;, &#34;description&#34;: &#34;Strategic question or decision needed.&#34;}, &#34;technical_summary&#34;: {&#34;type&#34;: &#34;string&#34;, &#34;description&#34;: &#34;Technical findings and context gathered so far.&#34;}}, &#34;required&#34;: [&#34;question&#34;, &#34;technical_summary&#34;]}}},
@@ -1898,7 +1605,7 @@ class ai:
                 streamed_response = False
                 try:
                     safe_messages = self._sanitize_messages(messages)
-                    if stream and chunk_callback:
+                    if stream:
                         response, streamed_response = self._stream_completion(
                             model=model, messages=safe_messages, tools=tools, api_key=key,
                             status=status, label=label, debug=debug, num_retries=3,
@@ -1937,8 +1644,8 @@ class ai:
                 if msg_dict.get(&#34;tool_calls&#34;) and msg_dict.get(&#34;content&#34;) == &#34;&#34;: msg_dict[&#34;content&#34;] = None
                 messages.append(msg_dict)
 
-                if debug and resp_msg.content:
-                    # In CLI debug mode, only print intermediate reasoning if there are tool calls.
+                if debug and resp_msg.content and not streamed_response:
+                    # In CLI debug mode, only print intermediate reasoning if there are tool calls AND it wasn&#39;t already streamed.
                     # If there are no tool calls, this content is the final answer and will be printed by the caller.
                     if resp_msg.tool_calls:
                         if status:
@@ -2045,6 +1752,8 @@ class ai:
                     elif fn == &#34;run_commands&#34;: obs = self.run_commands_tool(**args, status=status)
                     elif fn == &#34;get_node_info&#34;: obs = self.get_node_info_tool(**args)
                     elif fn == &#34;manage_memory_tool&#34;: obs = self.manage_memory_tool(**args)
+                    elif fn.startswith(&#34;mcp_&#34;):
+                        obs = run_ai_async(self.mcp_manager.call_tool(fn, args)).result(timeout=60)
                     elif fn in self.external_tool_handlers: obs = self.external_tool_handlers[fn](self, **args)
                     else: obs = f&#34;Error: {fn} unknown.&#34;
 
@@ -2112,6 +1821,275 @@ class ai:
         }
 
     @MethodHook
+    async def aask_copilot(self, terminal_buffer, user_question, node_info=None, chunk_callback=None):
+        import json
+        import re
+        from litellm import acompletion
+        import asyncio
+        import warnings
+        import aiohttp
+        
+        # Suppress unawaited coroutine warnings from LiteLLM&#39;s internal streaming logic during sudden cancellation
+        warnings.filterwarnings(&#34;ignore&#34;, message=&#34;coroutine &#39;.*async_streaming.*&#39; was never awaited&#34;, category=RuntimeWarning)
+        
+        node_info = node_info or {}
+        os_info = node_info.get(&#34;os&#34;, &#34;unknown&#34;)
+        node_name = node_info.get(&#34;name&#34;, &#34;unknown&#34;)
+        persona = node_info.get(&#34;persona&#34;, &#34;engineer&#34;)
+        memories = node_info.get(&#34;memories&#34;, [])
+        
+        vendor_reference = &#34;&#34;
+        if os_info and os_info != &#34;unknown&#34;:
+            try:
+                os_filename = os_info.lower().replace(&#34; &#34;, &#34;_&#34;)
+                ref_path = os.path.join(self.config.defaultdir, &#34;ai_references&#34;, f&#34;{os_filename}.md&#34;)
+                if os.path.exists(ref_path):
+                    with open(ref_path, &#34;r&#34;) as f:
+                        vendor_reference = f.read().strip()
+            except Exception:
+                pass
+        
+        if persona == &#34;architect&#34;:
+            system_prompt = f&#34;&#34;&#34;Role: NETWORK ARCHITECT. You act as a senior strategic advisor during a live SSH session.
+Rules:
+1. Answer the user&#39;s question directly based on the Terminal Context.
+2. Focus on the &#34;why&#34; and &#34;how&#34;. Analyze topologies, design patterns, and validate configurations.
+3. Do NOT provide commands to execute unless specifically requested. Instead, explain the consequences and best practices.
+4. Keep your guide concise and authoritative.
+5. You MUST output your response in the following strict format:
+&lt;guide&gt;
+Your brief tactical guide in markdown.
+&lt;/guide&gt;
+&lt;commands&gt;
+&lt;/commands&gt;
+&lt;risk&gt;
+low
+&lt;/risk&gt;
+6. Risk level is usually &#34;low&#34; for read-only/no commands.
+
+Terminal Context:
+{terminal_buffer}
+
+Device OS: {os_info}
+Node: {node_name}&#34;&#34;&#34;
+        else:
+            system_prompt = f&#34;&#34;&#34;Role: TERMINAL COPILOT. You assist a network engineer during a live SSH session.
+Rules:
+1. Answer the user&#39;s question directly based on the Terminal Context.
+2. If the user asks you to analyze, parse, or extract data from the Terminal Context, DO IT directly in the &lt;guide&gt; section (you can use markdown tables or lists). Do NOT just give them a command to do it themselves.
+3. If the user wants to execute an action, provide the required CLI commands inside a &lt;commands&gt; block, one command per line. If no commands are needed, leave it empty or omit the block.
+4. ULTRA-CONCISE. Keep your guide to the point.
+5. You MUST output your response in the following strict format:
+&lt;guide&gt;
+Your brief tactical guide in markdown. 3-4 sentences max.
+&lt;/guide&gt;
+&lt;commands&gt;
+command 1
+command 2
+&lt;/commands&gt;
+&lt;risk&gt;
+low, high, or destructive
+&lt;/risk&gt;
+6. Risk level: &#34;low&#34; for read-only/no commands, &#34;high&#34; for config changes, &#34;destructive&#34; for potentially dangerous ops.
+
+Terminal Context:
+{terminal_buffer}
+
+Device OS: {os_info}
+Node: {node_name}&#34;&#34;&#34;
+        
+        if vendor_reference:
+            system_prompt += f&#34;\n\nVendor Command Reference:\n{vendor_reference}&#34;
+
+        if memories:
+            system_prompt += &#34;\n\nSession Memory (Important Facts):\n&#34;
+            for m in memories:
+                system_prompt += f&#34;- {m}\n&#34;
+
+        # Fetch MCP tools for the current OS
+        mcp_tools = []
+        try:
+            mcp_tools = await self.mcp_manager.get_tools_for_llm(os_filter=os_info)
+        except Exception:
+            pass
+            
+        if mcp_tools:
+            system_prompt += f&#34;\n\nAvailable MCP Tools: {&#39;, &#39;.join([t[&#39;function&#39;][&#39;name&#39;] for t in mcp_tools])}&#34;
+            system_prompt += &#34;\nUse these tools to validate syntax or find exact commands if needed before providing the final guide.&#34;
+
+        messages = [
+            {&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: system_prompt},
+            {&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: user_question}
+        ]
+
+        iteration = 0
+        max_iterations = 5 # Allow up to 5 iterations for tool usage
+        
+        # Use models based on persona
+        current_model = self.architect_model if persona == &#34;architect&#34; else self.engineer_model
+        current_key = self.architect_key if persona == &#34;architect&#34; else self.engineer_key
+
+        try:
+            while iteration &lt; max_iterations:
+                iteration += 1
+                response = await acompletion(
+                    model=current_model,
+                    messages=messages,
+                    tools=mcp_tools if mcp_tools else None,
+                    api_key=current_key,
+                    stream=True
+                )
+                
+                full_content = &#34;&#34;
+                streamed_guide = &#34;&#34;
+                tool_calls = []
+                
+                async for chunk in response:
+                    delta = chunk.choices[0].delta
+                    
+                    # Accumulate tool calls
+                    if hasattr(delta, &#39;tool_calls&#39;) and delta.tool_calls:
+                        for tc in delta.tool_calls:
+                            idx = tc.index
+                            if idx &gt;= len(tool_calls):
+                                tool_calls.append({&#34;id&#34;: tc.id, &#34;type&#34;: &#34;function&#34;, &#34;function&#34;: {&#34;name&#34;: tc.function.name or &#34;&#34;, &#34;arguments&#34;: tc.function.arguments or &#34;&#34;}})
+                            else:
+                                if tc.id: tool_calls[idx][&#34;id&#34;] = tc.id
+                                if tc.function.name: tool_calls[idx][&#34;function&#34;][&#34;name&#34;] = tc.function.name
+                                if tc.function.arguments: tool_calls[idx][&#34;function&#34;][&#34;arguments&#34;] += tc.function.arguments
+
+                    if hasattr(delta, &#39;content&#39;) and delta.content:
+                        full_content += delta.content
+                        
+                        if chunk_callback and not tool_calls: # Only stream if not using tools
+                            start_idx = full_content.find(&#34;&lt;guide&gt;&#34;)
+                            if start_idx != -1:
+                                after_start = full_content[start_idx + 7:]
+                                end_idx = after_start.find(&#34;&lt;/guide&gt;&#34;)
+                                
+                                if end_idx != -1:
+                                    current_guide = after_start[:end_idx]
+                                else:
+                                    current_guide = after_start
+                                    if current_guide.endswith(&#34;&lt;&#34;): current_guide = current_guide[:-1]
+                                    elif current_guide.endswith(&#34;&lt;/&#34;): current_guide = current_guide[:-2]
+                                    elif current_guide.endswith(&#34;&lt;/g&#34;): current_guide = current_guide[:-3]
+                                    elif current_guide.endswith(&#34;&lt;/gu&#34;): current_guide = current_guide[:-4]
+                                    elif current_guide.endswith(&#34;&lt;/gui&#34;): current_guide = current_guide[:-5]
+                                    elif current_guide.endswith(&#34;&lt;/guid&#34;): current_guide = current_guide[:-6]
+                                    elif current_guide.endswith(&#34;&lt;/guide&#34;): current_guide = current_guide[:-7]
+                                
+                                new_text = current_guide[len(streamed_guide):]
+                                if new_text:
+                                    chunk_callback(new_text)
+                                    streamed_guide += new_text
+
+                if not tool_calls:
+                    break
+                    
+                # Execute tool calls
+                messages.append({&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: full_content or None, &#34;tool_calls&#34;: tool_calls})
+                for tc in tool_calls:
+                    fn = tc[&#34;function&#34;][&#34;name&#34;]
+                    args = json.loads(tc[&#34;function&#34;][&#34;arguments&#34;])
+                    
+                    if &#34;mcp_&#34; in fn:
+                        try:
+                            obs = await asyncio.wait_for(self.mcp_manager.call_tool(fn, args), timeout=30.0)
+                        except Exception as e:
+                            obs = f&#34;Error calling MCP tool: {e}&#34;
+                    else:
+                        obs = f&#34;Error: Tool {fn} not allowed in Copilot.&#34;
+                        
+                    messages.append({&#34;tool_call_id&#34;: tc[&#34;id&#34;], &#34;role&#34;: &#34;tool&#34;, &#34;name&#34;: fn, &#34;content&#34;: self._truncate(str(obs))})
+
+            # If we hit the limit and it was still using tools, force a final answer
+            if tool_calls and iteration &gt;= max_iterations:
+                messages.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;Tool limit reached. Provide your final tactical guide now based on the findings.&#34;})
+                response = await acompletion(
+                    model=self.engineer_model,
+                    messages=messages,
+                    tools=None,
+                    api_key=self.engineer_key,
+                    stream=True
+                )
+                
+                full_content = &#34;&#34;
+                streamed_guide = &#34;&#34;
+                async for chunk in response:
+                    delta = chunk.choices[0].delta
+                    if hasattr(delta, &#39;content&#39;) and delta.content:
+                        full_content += delta.content
+                        if chunk_callback:
+                            start_idx = full_content.find(&#34;&lt;guide&gt;&#34;)
+                            if start_idx != -1:
+                                after_start = full_content[start_idx + 7:]
+                                end_idx = after_start.find(&#34;&lt;/guide&gt;&#34;)
+                                if end_idx != -1:
+                                    current_guide = after_start[:end_idx]
+                                else:
+                                    current_guide = after_start
+                                    if current_guide.endswith(&#34;&lt;&#34;): current_guide = current_guide[:-1]
+                                    elif current_guide.endswith(&#34;&lt;/&#34;): current_guide = current_guide[:-2]
+                                    elif current_guide.endswith(&#34;&lt;/g&#34;): current_guide = current_guide[:-3]
+                                    elif current_guide.endswith(&#34;&lt;/gu&#34;): current_guide = current_guide[:-4]
+                                    elif current_guide.endswith(&#34;&lt;/gui&#34;): current_guide = current_guide[:-5]
+                                    elif current_guide.endswith(&#34;&lt;/guid&#34;): current_guide = current_guide[:-6]
+                                    elif current_guide.endswith(&#34;&lt;/guide&#34;): current_guide = current_guide[:-7]
+                                new_text = current_guide[len(streamed_guide):]
+                                if new_text:
+                                    chunk_callback(new_text)
+                                    streamed_guide += new_text
+
+            guide = &#34;&#34;
+            commands = []
+            risk_level = &#34;low&#34;
+            
+            guide_match = re.search(r&#34;&lt;guide&gt;(.*?)&lt;/guide&gt;&#34;, full_content, re.DOTALL)
+            if guide_match:
+                guide = guide_match.group(1).strip()
+                
+            cmd_match = re.search(r&#34;&lt;commands&gt;(.*?)&lt;/commands&gt;&#34;, full_content, re.DOTALL)
+            if cmd_match:
+                cmds_raw = cmd_match.group(1).strip()
+                if cmds_raw:
+                    commands = [c.strip() for c in cmds_raw.split(&#39;\n&#39;) if c.strip()]
+                    
+            risk_match = re.search(r&#34;&lt;risk&gt;(.*?)&lt;/risk&gt;&#34;, full_content, re.DOTALL)
+            if risk_match:
+                risk_level = risk_match.group(1).strip().lower()
+
+            if not guide and full_content and not (&#34;&lt;guide&gt;&#34; in full_content):
+                guide = full_content.strip()
+
+            return {
+                &#34;commands&#34;: commands,
+                &#34;guide&#34;: guide,
+                &#34;risk_level&#34;: risk_level,
+                &#34;error&#34;: None
+            }
+            
+        except asyncio.CancelledError:
+            # Client cancelled the request via gRPC or local interrupt
+            if &#39;response&#39; in locals():
+                try:
+                    if hasattr(response, &#39;aclose&#39;):
+                        # Fire and forget the close to avoid blocking the cancel
+                        asyncio.create_task(response.aclose())
+                    elif hasattr(response, &#39;close&#39;):
+                        response.close()
+                except Exception:
+                    pass
+            return None
+        except Exception as e:
+            return {
+                &#34;commands&#34;: [],
+                &#34;guide&#34;: &#34;&#34;,
+                &#34;risk_level&#34;: &#34;low&#34;,
+                &#34;error&#34;: str(e)
+            }
+
+    @MethodHook
     def confirm(self, user_input): return True</code></pre>
 </details>
 <div class="desc"><p>Hybrid Multi-Agent System: Selective Escalation with Role Persistence.</p></div>
@@ -2119,7 +2097,7 @@ class ai:
 <dl>
 <dt id="connpy.ai.SAFE_COMMANDS"><code class="name">var <span class="ident">SAFE_COMMANDS</span></code></dt>
 <dd>
-<div class="desc"><p>The type of the None singleton.</p></div>
+<div class="desc"></div>
 </dd>
 </dl>
 <h3>Instance variables</h3>
@@ -2159,6 +2137,285 @@ def engineer_system_prompt(self):
 </dl>
 <h3>Methods</h3>
 <dl>
+<dt id="connpy.ai.aask_copilot"><code class="name flex">
+<span>async def <span class="ident">aask_copilot</span></span>(<span>self, terminal_buffer, user_question, node_info=None, chunk_callback=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">    @MethodHook
+    async def aask_copilot(self, terminal_buffer, user_question, node_info=None, chunk_callback=None):
+        import json
+        import re
+        from litellm import acompletion
+        import asyncio
+        import warnings
+        import aiohttp
+        
+        # Suppress unawaited coroutine warnings from LiteLLM&#39;s internal streaming logic during sudden cancellation
+        warnings.filterwarnings(&#34;ignore&#34;, message=&#34;coroutine &#39;.*async_streaming.*&#39; was never awaited&#34;, category=RuntimeWarning)
+        
+        node_info = node_info or {}
+        os_info = node_info.get(&#34;os&#34;, &#34;unknown&#34;)
+        node_name = node_info.get(&#34;name&#34;, &#34;unknown&#34;)
+        persona = node_info.get(&#34;persona&#34;, &#34;engineer&#34;)
+        memories = node_info.get(&#34;memories&#34;, [])
+        
+        vendor_reference = &#34;&#34;
+        if os_info and os_info != &#34;unknown&#34;:
+            try:
+                os_filename = os_info.lower().replace(&#34; &#34;, &#34;_&#34;)
+                ref_path = os.path.join(self.config.defaultdir, &#34;ai_references&#34;, f&#34;{os_filename}.md&#34;)
+                if os.path.exists(ref_path):
+                    with open(ref_path, &#34;r&#34;) as f:
+                        vendor_reference = f.read().strip()
+            except Exception:
+                pass
+        
+        if persona == &#34;architect&#34;:
+            system_prompt = f&#34;&#34;&#34;Role: NETWORK ARCHITECT. You act as a senior strategic advisor during a live SSH session.
+Rules:
+1. Answer the user&#39;s question directly based on the Terminal Context.
+2. Focus on the &#34;why&#34; and &#34;how&#34;. Analyze topologies, design patterns, and validate configurations.
+3. Do NOT provide commands to execute unless specifically requested. Instead, explain the consequences and best practices.
+4. Keep your guide concise and authoritative.
+5. You MUST output your response in the following strict format:
+&lt;guide&gt;
+Your brief tactical guide in markdown.
+&lt;/guide&gt;
+&lt;commands&gt;
+&lt;/commands&gt;
+&lt;risk&gt;
+low
+&lt;/risk&gt;
+6. Risk level is usually &#34;low&#34; for read-only/no commands.
+
+Terminal Context:
+{terminal_buffer}
+
+Device OS: {os_info}
+Node: {node_name}&#34;&#34;&#34;
+        else:
+            system_prompt = f&#34;&#34;&#34;Role: TERMINAL COPILOT. You assist a network engineer during a live SSH session.
+Rules:
+1. Answer the user&#39;s question directly based on the Terminal Context.
+2. If the user asks you to analyze, parse, or extract data from the Terminal Context, DO IT directly in the &lt;guide&gt; section (you can use markdown tables or lists). Do NOT just give them a command to do it themselves.
+3. If the user wants to execute an action, provide the required CLI commands inside a &lt;commands&gt; block, one command per line. If no commands are needed, leave it empty or omit the block.
+4. ULTRA-CONCISE. Keep your guide to the point.
+5. You MUST output your response in the following strict format:
+&lt;guide&gt;
+Your brief tactical guide in markdown. 3-4 sentences max.
+&lt;/guide&gt;
+&lt;commands&gt;
+command 1
+command 2
+&lt;/commands&gt;
+&lt;risk&gt;
+low, high, or destructive
+&lt;/risk&gt;
+6. Risk level: &#34;low&#34; for read-only/no commands, &#34;high&#34; for config changes, &#34;destructive&#34; for potentially dangerous ops.
+
+Terminal Context:
+{terminal_buffer}
+
+Device OS: {os_info}
+Node: {node_name}&#34;&#34;&#34;
+        
+        if vendor_reference:
+            system_prompt += f&#34;\n\nVendor Command Reference:\n{vendor_reference}&#34;
+
+        if memories:
+            system_prompt += &#34;\n\nSession Memory (Important Facts):\n&#34;
+            for m in memories:
+                system_prompt += f&#34;- {m}\n&#34;
+
+        # Fetch MCP tools for the current OS
+        mcp_tools = []
+        try:
+            mcp_tools = await self.mcp_manager.get_tools_for_llm(os_filter=os_info)
+        except Exception:
+            pass
+            
+        if mcp_tools:
+            system_prompt += f&#34;\n\nAvailable MCP Tools: {&#39;, &#39;.join([t[&#39;function&#39;][&#39;name&#39;] for t in mcp_tools])}&#34;
+            system_prompt += &#34;\nUse these tools to validate syntax or find exact commands if needed before providing the final guide.&#34;
+
+        messages = [
+            {&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: system_prompt},
+            {&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: user_question}
+        ]
+
+        iteration = 0
+        max_iterations = 5 # Allow up to 5 iterations for tool usage
+        
+        # Use models based on persona
+        current_model = self.architect_model if persona == &#34;architect&#34; else self.engineer_model
+        current_key = self.architect_key if persona == &#34;architect&#34; else self.engineer_key
+
+        try:
+            while iteration &lt; max_iterations:
+                iteration += 1
+                response = await acompletion(
+                    model=current_model,
+                    messages=messages,
+                    tools=mcp_tools if mcp_tools else None,
+                    api_key=current_key,
+                    stream=True
+                )
+                
+                full_content = &#34;&#34;
+                streamed_guide = &#34;&#34;
+                tool_calls = []
+                
+                async for chunk in response:
+                    delta = chunk.choices[0].delta
+                    
+                    # Accumulate tool calls
+                    if hasattr(delta, &#39;tool_calls&#39;) and delta.tool_calls:
+                        for tc in delta.tool_calls:
+                            idx = tc.index
+                            if idx &gt;= len(tool_calls):
+                                tool_calls.append({&#34;id&#34;: tc.id, &#34;type&#34;: &#34;function&#34;, &#34;function&#34;: {&#34;name&#34;: tc.function.name or &#34;&#34;, &#34;arguments&#34;: tc.function.arguments or &#34;&#34;}})
+                            else:
+                                if tc.id: tool_calls[idx][&#34;id&#34;] = tc.id
+                                if tc.function.name: tool_calls[idx][&#34;function&#34;][&#34;name&#34;] = tc.function.name
+                                if tc.function.arguments: tool_calls[idx][&#34;function&#34;][&#34;arguments&#34;] += tc.function.arguments
+
+                    if hasattr(delta, &#39;content&#39;) and delta.content:
+                        full_content += delta.content
+                        
+                        if chunk_callback and not tool_calls: # Only stream if not using tools
+                            start_idx = full_content.find(&#34;&lt;guide&gt;&#34;)
+                            if start_idx != -1:
+                                after_start = full_content[start_idx + 7:]
+                                end_idx = after_start.find(&#34;&lt;/guide&gt;&#34;)
+                                
+                                if end_idx != -1:
+                                    current_guide = after_start[:end_idx]
+                                else:
+                                    current_guide = after_start
+                                    if current_guide.endswith(&#34;&lt;&#34;): current_guide = current_guide[:-1]
+                                    elif current_guide.endswith(&#34;&lt;/&#34;): current_guide = current_guide[:-2]
+                                    elif current_guide.endswith(&#34;&lt;/g&#34;): current_guide = current_guide[:-3]
+                                    elif current_guide.endswith(&#34;&lt;/gu&#34;): current_guide = current_guide[:-4]
+                                    elif current_guide.endswith(&#34;&lt;/gui&#34;): current_guide = current_guide[:-5]
+                                    elif current_guide.endswith(&#34;&lt;/guid&#34;): current_guide = current_guide[:-6]
+                                    elif current_guide.endswith(&#34;&lt;/guide&#34;): current_guide = current_guide[:-7]
+                                
+                                new_text = current_guide[len(streamed_guide):]
+                                if new_text:
+                                    chunk_callback(new_text)
+                                    streamed_guide += new_text
+
+                if not tool_calls:
+                    break
+                    
+                # Execute tool calls
+                messages.append({&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: full_content or None, &#34;tool_calls&#34;: tool_calls})
+                for tc in tool_calls:
+                    fn = tc[&#34;function&#34;][&#34;name&#34;]
+                    args = json.loads(tc[&#34;function&#34;][&#34;arguments&#34;])
+                    
+                    if &#34;mcp_&#34; in fn:
+                        try:
+                            obs = await asyncio.wait_for(self.mcp_manager.call_tool(fn, args), timeout=30.0)
+                        except Exception as e:
+                            obs = f&#34;Error calling MCP tool: {e}&#34;
+                    else:
+                        obs = f&#34;Error: Tool {fn} not allowed in Copilot.&#34;
+                        
+                    messages.append({&#34;tool_call_id&#34;: tc[&#34;id&#34;], &#34;role&#34;: &#34;tool&#34;, &#34;name&#34;: fn, &#34;content&#34;: self._truncate(str(obs))})
+
+            # If we hit the limit and it was still using tools, force a final answer
+            if tool_calls and iteration &gt;= max_iterations:
+                messages.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;Tool limit reached. Provide your final tactical guide now based on the findings.&#34;})
+                response = await acompletion(
+                    model=self.engineer_model,
+                    messages=messages,
+                    tools=None,
+                    api_key=self.engineer_key,
+                    stream=True
+                )
+                
+                full_content = &#34;&#34;
+                streamed_guide = &#34;&#34;
+                async for chunk in response:
+                    delta = chunk.choices[0].delta
+                    if hasattr(delta, &#39;content&#39;) and delta.content:
+                        full_content += delta.content
+                        if chunk_callback:
+                            start_idx = full_content.find(&#34;&lt;guide&gt;&#34;)
+                            if start_idx != -1:
+                                after_start = full_content[start_idx + 7:]
+                                end_idx = after_start.find(&#34;&lt;/guide&gt;&#34;)
+                                if end_idx != -1:
+                                    current_guide = after_start[:end_idx]
+                                else:
+                                    current_guide = after_start
+                                    if current_guide.endswith(&#34;&lt;&#34;): current_guide = current_guide[:-1]
+                                    elif current_guide.endswith(&#34;&lt;/&#34;): current_guide = current_guide[:-2]
+                                    elif current_guide.endswith(&#34;&lt;/g&#34;): current_guide = current_guide[:-3]
+                                    elif current_guide.endswith(&#34;&lt;/gu&#34;): current_guide = current_guide[:-4]
+                                    elif current_guide.endswith(&#34;&lt;/gui&#34;): current_guide = current_guide[:-5]
+                                    elif current_guide.endswith(&#34;&lt;/guid&#34;): current_guide = current_guide[:-6]
+                                    elif current_guide.endswith(&#34;&lt;/guide&#34;): current_guide = current_guide[:-7]
+                                new_text = current_guide[len(streamed_guide):]
+                                if new_text:
+                                    chunk_callback(new_text)
+                                    streamed_guide += new_text
+
+            guide = &#34;&#34;
+            commands = []
+            risk_level = &#34;low&#34;
+            
+            guide_match = re.search(r&#34;&lt;guide&gt;(.*?)&lt;/guide&gt;&#34;, full_content, re.DOTALL)
+            if guide_match:
+                guide = guide_match.group(1).strip()
+                
+            cmd_match = re.search(r&#34;&lt;commands&gt;(.*?)&lt;/commands&gt;&#34;, full_content, re.DOTALL)
+            if cmd_match:
+                cmds_raw = cmd_match.group(1).strip()
+                if cmds_raw:
+                    commands = [c.strip() for c in cmds_raw.split(&#39;\n&#39;) if c.strip()]
+                    
+            risk_match = re.search(r&#34;&lt;risk&gt;(.*?)&lt;/risk&gt;&#34;, full_content, re.DOTALL)
+            if risk_match:
+                risk_level = risk_match.group(1).strip().lower()
+
+            if not guide and full_content and not (&#34;&lt;guide&gt;&#34; in full_content):
+                guide = full_content.strip()
+
+            return {
+                &#34;commands&#34;: commands,
+                &#34;guide&#34;: guide,
+                &#34;risk_level&#34;: risk_level,
+                &#34;error&#34;: None
+            }
+            
+        except asyncio.CancelledError:
+            # Client cancelled the request via gRPC or local interrupt
+            if &#39;response&#39; in locals():
+                try:
+                    if hasattr(response, &#39;aclose&#39;):
+                        # Fire and forget the close to avoid blocking the cancel
+                        asyncio.create_task(response.aclose())
+                    elif hasattr(response, &#39;close&#39;):
+                        response.close()
+                except Exception:
+                    pass
+            return None
+        except Exception as e:
+            return {
+                &#34;commands&#34;: [],
+                &#34;guide&#34;: &#34;&#34;,
+                &#34;risk_level&#34;: &#34;low&#34;,
+                &#34;error&#34;: str(e)
+            }</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
 <dt id="connpy.ai.ask"><code class="name flex">
 <span>def <span class="ident">ask</span></span>(<span>self,<br>user_input,<br>dryrun=False,<br>chat_history=None,<br>status=None,<br>debug=False,<br>stream=True,<br>session_id=None,<br>chunk_callback=None)</span>
 </code></dt>
@@ -2271,7 +2528,7 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
             streamed_response = False
             try:
                 safe_messages = self._sanitize_messages(messages)
-                if stream and chunk_callback:
+                if stream:
                     response, streamed_response = self._stream_completion(
                         model=model, messages=safe_messages, tools=tools, api_key=key,
                         status=status, label=label, debug=debug, num_retries=3,
@@ -2310,8 +2567,8 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
             if msg_dict.get(&#34;tool_calls&#34;) and msg_dict.get(&#34;content&#34;) == &#34;&#34;: msg_dict[&#34;content&#34;] = None
             messages.append(msg_dict)
 
-            if debug and resp_msg.content:
-                # In CLI debug mode, only print intermediate reasoning if there are tool calls.
+            if debug and resp_msg.content and not streamed_response:
+                # In CLI debug mode, only print intermediate reasoning if there are tool calls AND it wasn&#39;t already streamed.
                 # If there are no tool calls, this content is the final answer and will be printed by the caller.
                 if resp_msg.tool_calls:
                     if status:
@@ -2418,6 +2675,8 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
                 elif fn == &#34;run_commands&#34;: obs = self.run_commands_tool(**args, status=status)
                 elif fn == &#34;get_node_info&#34;: obs = self.get_node_info_tool(**args)
                 elif fn == &#34;manage_memory_tool&#34;: obs = self.manage_memory_tool(**args)
+                elif fn.startswith(&#34;mcp_&#34;):
+                    obs = run_ai_async(self.mcp_manager.call_tool(fn, args)).result(timeout=60)
                 elif fn in self.external_tool_handlers: obs = self.external_tool_handlers[fn](self, **args)
                 else: obs = f&#34;Error: {fn} unknown.&#34;
 
@@ -2775,7 +3034,7 @@ def confirm(self, user_input): return True</code></pre>
                 self.console.print(&#34;[pass]✓ Trust Mode Enabled. All future commands in this session will execute without confirmation.[/pass]&#34;)
             elif user_resp_lower in [&#39;y&#39;, &#39;yes&#39;]:
                 self.console.print(&#34;[pass]✓ Executing...[/pass]&#34;)
-            elif user_resp_lower in [&#39;n&#39;, &#39;no&#39;, &#39;&#39;]:
+            elif user_resp_lower in [&#39;n&#39;, &#39;no&#39;, &#39;&#39;, &#39;cancel&#39;]:
                 self.console.print(&#34;[fail]✗ Execution rejected by user.[/fail]&#34;)
                 return &#34;Error: User rejected execution.&#34;
             else:
@@ -3746,6 +4005,7 @@ class node:
                               
             - jumphost (str): Reference another node to be used as a jumphost
         &#39;&#39;&#39;
+        self.config = config
         if config == &#39;&#39;:
             self.idletime = 0
             self.key = None
@@ -3903,61 +4163,29 @@ class node:
 
     @MethodHook
     def _logclean(self, logfile, var = False):
-        # Remove special ascii characters and process terminal cursor movements to clean logs.
+        &#34;&#34;&#34;Remove special ascii characters and process terminal cursor movements to clean logs.&#34;&#34;&#34;
+        from .utils import log_cleaner
+        
         if var == False:
-            t = open(logfile, &#34;r&#34;).read()
+            try:
+                with open(logfile, &#34;r&#34;) as f:
+                    t = f.read()
+            except:
+                return
         else:
             t = logfile
             
-        lines = t.split(&#39;\n&#39;)
-        cleaned_lines = []
-        
-        # Regex to capture: ANSI sequences, control characters (\r, \b, etc), and plain text chunks
-        token_re = re.compile(r&#39;(\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/ ]*[@-~])|\r|\b|\x7f|[\x00-\x1F]|[^\x1B\r\b\x7f\x00-\x1F]+)&#39;)
-        
-        for line in lines:
-            buffer = []
-            cursor = 0
-            
-            for token in token_re.findall(line):
-                if token == &#39;\r&#39;:
-                    cursor = 0
-                elif token in (&#39;\b&#39;, &#39;\x7f&#39;):
-                    if cursor &gt; 0:
-                        cursor -= 1
-                elif token == &#39;\x1B[D&#39;: # Left Arrow
-                    if cursor &gt; 0:
-                        cursor -= 1
-                elif token == &#39;\x1B[C&#39;: # Right Arrow
-                    if cursor &lt; len(buffer):
-                        cursor += 1
-                elif token == &#39;\x1B[K&#39;: # Clear to end of line
-                    buffer = buffer[:cursor]
-                elif token.startswith(&#39;\x1B&#39;):
-                    # Ignore other ANSI sequences (colors, etc)
-                    continue
-                elif len(token) == 1 and ord(token) &lt; 32:
-                    # Ignore other non-printable control chars
-                    continue
-                else:
-                    # Regular printable text
-                    for char in token:
-                        if cursor == len(buffer):
-                            buffer.append(char)
-                        else:
-                            buffer[cursor] = char
-                        cursor += 1
-            cleaned_lines.append(&#34;&#34;.join(buffer))
-            
-        t = &#34;\n&#34;.join(cleaned_lines).replace(&#39;\n\n&#39;, &#39;\n&#39;).strip()
+        result = log_cleaner(t)
 
         if var == False:
-            d = open(logfile, &#34;w&#34;)
-            d.write(t)
-            d.close()
+            try:
+                with open(logfile, &#34;w&#34;) as f:
+                    f.write(result)
+            except:
+                pass
             return
         else:
-            return t
+            return result
 
     @MethodHook
     def _savelog(self):
@@ -4000,14 +4228,17 @@ class node:
             port_str = f&#34;:{self.port}&#34; if self.port and self.protocol not in [&#34;ssm&#34;, &#34;kubectl&#34;, &#34;docker&#34;] else &#34;&#34;
             logger(&#34;success&#34;, f&#34;Connected to {self.unique} at {self.host}{port_str} via: {self.protocol}&#34;)
 
+        # Always initialize self.mylog to capture terminal context for the AI Copilot
+        if not hasattr(self, &#39;mylog&#39;):
+            self.mylog = io.BytesIO()
+            
+        if not async_mode:
+            self.child.logfile_read = self.mylog
+            
+        # Only start disk-logging tasks if logfile is configured
         if &#39;logfile&#39; in dir(self):
-            # Initialize self.mylog
-            if not &#39;mylog&#39; in dir(self):
-                self.mylog = io.BytesIO()
             if not async_mode:
-                self.child.logfile_read = self.mylog
-                
-                # Start the _savelog thread
+                # Start the _savelog thread (sync mode)
                 log_thread = threading.Thread(target=self._savelog)
                 log_thread.daemon = True
                 log_thread.start()
@@ -4019,14 +4250,15 @@ class node:
             x.start()
         if debug:
             if &#39;mylog&#39; in dir(self):
-                print(self.mylog.getvalue().decode())
+                if not async_mode:
+                    print(self.mylog.getvalue().decode())
 
     def _teardown_interact_environment(self):
         if &#39;logfile&#39; in dir(self) and hasattr(self, &#39;mylog&#39;):
             with open(self.logfile, &#34;w&#34;) as f:
                 f.write(self._logclean(self.mylog.getvalue().decode(), True))
 
-    async def _async_interact_loop(self, local_stream, resize_callback):
+    async def _async_interact_loop(self, local_stream, resize_callback, copilot_handler=None):
         local_stream.setup(resize_callback=resize_callback)
         try:
             child_fd = self.child.child_fd
@@ -4061,9 +4293,14 @@ class node:
             loop = asyncio.get_running_loop()
             child_reader_queue = asyncio.Queue()
             
+            # Track command byte positions for copilot context navigation
+            # Each entry is (byte_position, command_text_or_None)
+            cmd_byte_positions = [(0, None)]
+            
             def _child_read_ready():
                 try:
-                    data = os.read(child_fd, 4096)
+                    # Increase buffer to 64KB for better high-speed handling
+                    data = os.read(child_fd, 65536)
                     if data:
                         child_reader_queue.put_nowait(data)
                     else:
@@ -4081,11 +4318,39 @@ class node:
                     data = await local_stream.read()
                     if not data:
                         break
-                    try:
-                        os.write(child_fd, data)
-                    except OSError:
-                        break
-                    self.lastinput = time()
+                    
+                    # Copilot interception
+                    if copilot_handler and b&#39;\x00&#39; in data:
+                        # Build node info from available metadata and ensure values are strings (not bytes)
+                        def to_str(val):
+                            if isinstance(val, bytes):
+                                return val.decode(errors=&#39;replace&#39;)
+                            return str(val) if val is not None else &#34;unknown&#34;
+                            
+                        node_info = {
+                            &#34;name&#34;: to_str(getattr(self, &#39;unique&#39;, &#39;unknown&#39;)), 
+                            &#34;host&#34;: to_str(getattr(self, &#39;host&#39;, &#39;unknown&#39;))
+                        }
+                        if isinstance(getattr(self, &#39;tags&#39;, None), dict):
+                            node_info[&#34;os&#34;] = to_str(self.tags.get(&#34;os&#34;, &#34;unknown&#34;))
+                            node_info[&#34;prompt&#34;] = to_str(self.tags.get(&#34;prompt&#34;, r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;))
+                        
+                        # Invoke copilot (async callback handles UI)
+                        await copilot_handler(self.mylog.getvalue(), node_info, local_stream, child_fd, cmd_byte_positions)
+                        continue
+                    
+                    # Remove any stray \x00 bytes and forward normally
+                    clean_data = data.replace(b&#39;\x00&#39;, b&#39;&#39;)
+                    if clean_data:
+                        # Track command boundaries when user hits Enter
+                        if hasattr(self, &#39;mylog&#39;) and (b&#39;\r&#39; in clean_data or b&#39;\n&#39; in clean_data):
+                            cmd_byte_positions.append((self.mylog.tell(), None))
+                            
+                        try:
+                            os.write(child_fd, clean_data)
+                        except OSError:
+                            break
+                        self.lastinput = time()
                     
             async def egress_task():
                 # Continue stripping newlines from the live stream until we hit real text
@@ -4094,18 +4359,41 @@ class node:
                     data = await child_reader_queue.get()
                     if not data:
                         break
-                        
-                    if skip_newlines:
-                        stripped = data.lstrip(b&#39;\r\n&#39;)
-                        if stripped:
-                            skip_newlines = False
-                            data = stripped
-                        else:
-                            continue
-                            
-                    await local_stream.write(data)
-                    if hasattr(self, &#39;mylog&#39;):
-                        self.mylog.write(data)
+                    
+                    # Batching Optimization: Drain the queue to batch writes during high-volume bursts
+                    # Helps the terminal parse ANSI faster and reduces syscalls.
+                    chunks = [data]
+                    while not child_reader_queue.empty():
+                        try:
+                            extra = child_reader_queue.get_nowait()
+                            if not extra:
+                                chunks.append(b&#39;&#39;) # Re-put EOF later or handle it
+                                break
+                            chunks.append(extra)
+                        except asyncio.QueueEmpty:
+                            break
+                    
+                    has_eof = chunks[-1] == b&#39;&#39;
+                    if has_eof:
+                        chunks.pop()
+                    
+                    if chunks:
+                        combined_data = b&#39;&#39;.join(chunks)
+                        if skip_newlines:
+                            stripped = combined_data.lstrip(b&#39;\r\n&#39;)
+                            if stripped:
+                                skip_newlines = False
+                                combined_data = stripped
+                            else:
+                                if has_eof: break
+                                continue
+                                
+                        await local_stream.write(combined_data)
+                        if hasattr(self, &#39;mylog&#39;):
+                            self.mylog.write(combined_data)
+                    
+                    if has_eof:
+                        break
                         
             async def keepalive_task():
                 while True:
@@ -4124,16 +4412,17 @@ class node:
                     current_size = self.mylog.tell()
                     if current_size != prev_size:
                         try:
+                            # Move heavy log cleaning to a thread to avoid freezing the interaction loop
+                            raw_log = self.mylog.getvalue().decode(errors=&#39;replace&#39;)
+                            cleaned_log = await asyncio.to_thread(self._logclean, raw_log, True)
                             with open(self.logfile, &#34;w&#34;) as f:
-                                f.write(self._logclean(self.mylog.getvalue().decode(), True))
+                                f.write(cleaned_log)
                             prev_size = current_size
                         except Exception:
                             pass
 
             try:
-                # gather runs until any task completes (or we just let them run until EOF breaks them)
-                # Ingress breaks on user EOF. Egress breaks on child EOF. 
-                # We want to exit if either happens, so return_exceptions=False, but we need to cancel the others.
+                # We wait for either the user (ingress) or the child (egress) to finish
                 tasks = [
                     asyncio.create_task(ingress_task()),
                     asyncio.create_task(egress_task())
@@ -4142,9 +4431,34 @@ class node:
                     tasks.append(asyncio.create_task(keepalive_task()))
                 if hasattr(self, &#39;logfile&#39;) and hasattr(self, &#39;mylog&#39;):
                     tasks.append(asyncio.create_task(savelog_task()))
-                done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-                for p in pending:
-                    p.cancel()
+                
+                done, pending = await asyncio.wait(
+                    [tasks[0], tasks[1]], 
+                    return_when=asyncio.FIRST_COMPLETED
+                )
+                
+                # If ingress finished first (user quit), give egress a small window to catch up 
+                # on the remaining output in the queue.
+                if tasks[0] in done and tasks[1] not in done:
+                    try:
+                        await asyncio.wait_for(tasks[1], timeout=0.2)
+                    except (asyncio.TimeoutError, asyncio.CancelledError):
+                        pass
+                
+                for t in tasks:
+                    if t not in done:
+                        t.cancel()
+                    
+                # Final log sync on thread to avoid losing last lines
+                if hasattr(self, &#39;logfile&#39;) and hasattr(self, &#39;mylog&#39;):
+                    try:
+                        raw_log = self.mylog.getvalue().decode(errors=&#39;replace&#39;)
+                        cleaned_log = await asyncio.to_thread(self._logclean, raw_log, True)
+                        with open(self.logfile, &#34;w&#34;) as f:
+                            f.write(cleaned_log)
+                    except Exception:
+                        pass
+
             finally:
                 loop.remove_reader(child_fd)
                 try:
@@ -4175,7 +4489,10 @@ class node:
                     except Exception:
                         pass
                 
-                asyncio.run(self._async_interact_loop(local_stream, resize_callback))
+                # Build local copilot handler
+                copilot_handler = self._build_local_copilot_handler()
+                
+                asyncio.run(self._async_interact_loop(local_stream, resize_callback, copilot_handler=copilot_handler))
             finally:
                 self._teardown_interact_environment()
         else:
@@ -4185,6 +4502,93 @@ class node:
                 printer.error(f&#34;Connection failed: {str(connect)}&#34;)
             sys.exit(1)
 
+    def _build_local_copilot_handler(self):
+        &#34;&#34;&#34;Build copilot handler for local CLI sessions using rich for rendering.&#34;&#34;&#34;
+        config = getattr(self, &#39;config&#39;, None) if hasattr(self, &#39;config&#39;) else None
+        return self._copilot_handler(config)
+
+    def _copilot_handler(self, config):
+        &#34;&#34;&#34;Unified copilot handler for local session.&#34;&#34;&#34;
+        from .cli.terminal_ui import CopilotInterface
+        from .services.ai_service import AIService
+        import asyncio
+        import os
+
+        async def handler(buffer, node_info, stream, child_fd, cmd_byte_positions=None):
+            try:
+                interface = CopilotInterface(
+                    config, 
+                    history=getattr(stream, &#39;copilot_history&#39;, None),
+                    session_state=getattr(stream, &#39;copilot_state&#39;, None)
+                )
+                # Save history back to stream for persistence in current session
+                stream.copilot_history = interface.history
+                stream.copilot_state = interface.session_state
+                
+                ai_service = AIService(config)
+                
+                async def on_ai_call(active_buffer, question, chunk_callback, merged_node_info):
+                    return await ai_service.aask_copilot(
+                        active_buffer,
+                        question,
+                        node_info=merged_node_info,
+                        chunk_callback=chunk_callback
+                    )
+                # Get raw bytes from BytesIO
+                raw_bytes = self.mylog.getvalue()
+                
+                # Detener el lector de la terminal para que prompt_toolkit (en run_session) 
+                # tenga control exclusivo del stdin sin interferencias de LocalStream.
+                if hasattr(stream, &#39;stop_reading&#39;):
+                    stream.stop_reading()
+                elif hasattr(stream, &#39;_loop&#39;) and hasattr(stream, &#39;stdin_fd&#39;):
+                    # Fallback si no tiene el método (en LocalStream)
+                    stream._loop.remove_reader(stream.stdin_fd)
+                
+                try:
+                    with copilot_terminal_mode():
+                        while True:
+                            action, commands, custom_cmd = await interface.run_session(
+                                raw_bytes=raw_bytes,
+                                cmd_byte_positions=cmd_byte_positions,
+                                node_info=node_info,
+                                on_ai_call=on_ai_call
+                            )
+                            if action == &#34;continue&#34;:
+                                continue
+                            break
+                finally:
+                    # Reiniciar el lector de la terminal para volver al modo interactivo SSH/Telnet
+                    if hasattr(stream, &#39;start_reading&#39;):
+                        stream.start_reading()
+                    elif hasattr(stream, &#39;_loop&#39;) and hasattr(stream, &#39;stdin_fd&#39;):
+                        stream._loop.add_reader(stream.stdin_fd, stream._read_ready)
+                
+                if action in (&#34;send_all&#34;, &#34;custom&#34;):
+                    cmds_to_send = commands if action == &#34;send_all&#34; else custom_cmd
+                    
+                    if cmds_to_send:
+                        os.write(child_fd, b&#39;\x15&#39;) # Ctrl+U
+                        await asyncio.sleep(0.1)
+                        
+                        # Prepend screen length command to avoid pagination
+                        if &#34;screen_length_command&#34; in self.tags:
+                            cmds_to_send.insert(0, self.tags[&#34;screen_length_command&#34;])
+
+                        for cmd in cmds_to_send:
+                            if cmd_byte_positions is not None:
+                                cmd_byte_positions.append((self.mylog.tell(), cmd))
+                            os.write(child_fd, (cmd + &#34;\n&#34;).encode())
+                            await asyncio.sleep(0.8)
+                else:
+                    os.write(child_fd, b&#39;\x15\r&#39;)
+            except Exception as e:
+                import traceback
+                print(f&#34;\n[ERROR in Copilot Handler] {e}&#34;, flush=True)
+                traceback.print_exc()
+                os.write(child_fd, b&#39;\x15\r&#39;)
+
+        return handler
 
     @MethodHook
     def run(self, commands, vars = None,*, folder = &#39;&#39;, prompt = r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;, stdout = False, timeout = 10, logger = None):
@@ -4246,7 +4650,6 @@ class node:
             if &#34;prompt&#34; in self.tags:
                 prompt = self.tags[&#34;prompt&#34;]
             expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
-
             output = &#39;&#39;
             status = &#39;&#39;
             if not isinstance(commands, list):
@@ -4357,7 +4760,6 @@ class node:
             if &#34;prompt&#34; in self.tags:
                 prompt = self.tags[&#34;prompt&#34;]
             expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
-
             output = &#39;&#39;
             if not isinstance(commands, list):
                 commands = [commands]
@@ -4423,15 +4825,18 @@ class node:
     @MethodHook
     def _generate_ssh_sftp_cmd(self):
         cmd = self.protocol
-        if self.idletime &gt; 0:
-            cmd += &#34; -o ServerAliveInterval=&#34; + str(self.idletime)
         if self.port:
             if self.protocol == &#34;ssh&#34;:
                 cmd += &#34; -p &#34; + self.port
             elif self.protocol == &#34;sftp&#34;:
                 cmd += &#34; -P &#34; + self.port
         if self.options:
-            cmd += &#34; &#34; + self.options
+            opts = self.options
+            if self.protocol == &#34;sftp&#34;:
+                # Strip SSH-only flags that sftp doesn&#39;t support
+                opts = re.sub(r&#39;(?&lt;!\S)-[XxtTAaNf]\b&#39;, &#39;&#39;, opts).strip()
+            if opts:
+                cmd += &#34; &#34; + opts
         if self.jumphost:
             cmd += &#34; &#34; + self.jumphost
         user_host = f&#34;{self.user}@{self.host}&#34; if self.user else self.host
@@ -4459,6 +4864,19 @@ class node:
         cmd = f&#34;docker {self.options} exec -it {self.host}&#34;
         docker_command = self.tags.get(&#34;docker_command&#34;, &#34;/bin/bash&#34;) if isinstance(self.tags, dict) else &#34;/bin/bash&#34;
         cmd += f&#34; {docker_command}&#34;
+        return cmd
+
+    @MethodHook
+    def _generate_ssm_cmd(self):
+        region = self.tags.get(&#34;region&#34;, &#34;&#34;) if isinstance(self.tags, dict) else &#34;&#34;
+        profile = self.tags.get(&#34;profile&#34;, &#34;&#34;) if isinstance(self.tags, dict) else &#34;&#34;
+        cmd = f&#34;aws ssm start-session --target {self.host}&#34;
+        if region:
+            cmd += f&#34; --region {region}&#34;
+        if profile:
+            cmd += f&#34; --profile {profile}&#34;
+        if self.options:
+            cmd += f&#34; {self.options}&#34;
         return cmd
 
     @MethodHook
@@ -4546,6 +4964,7 @@ class node:
                 if logger:
                     logger(&#34;debug&#34;, f&#34;Command:\n{cmd}&#34;)
                 self.mylog = io.BytesIO()
+                self.mylog.write(f&#34;[i] [DEBUG] Command:\r\n    {cmd}\r\n&#34;.encode())
                 child.logfile_read = self.mylog
 
 
@@ -4681,7 +5100,10 @@ def interact(self, debug=False, logger=None):
                 except Exception:
                     pass
             
-            asyncio.run(self._async_interact_loop(local_stream, resize_callback))
+            # Build local copilot handler
+            copilot_handler = self._build_local_copilot_handler()
+            
+            asyncio.run(self._async_interact_loop(local_stream, resize_callback, copilot_handler=copilot_handler))
         finally:
             self._teardown_interact_environment()
     else:
@@ -4762,7 +5184,6 @@ def run(self, commands, vars = None,*, folder = &#39;&#39;, prompt = r&#39;&gt;$
         if &#34;prompt&#34; in self.tags:
             prompt = self.tags[&#34;prompt&#34;]
         expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
-
         output = &#39;&#39;
         status = &#39;&#39;
         if not isinstance(commands, list):
@@ -4914,7 +5335,6 @@ def test(self, commands, expected, vars = None,*, folder = &#39;&#39;, prompt = 
         if &#34;prompt&#34; in self.tags:
             prompt = self.tags[&#34;prompt&#34;]
         expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
-
         output = &#39;&#39;
         if not isinstance(commands, list):
             commands = [commands]
@@ -5682,57 +6102,38 @@ def test(self, commands, expected, vars = None,*, folder = None, prompt = None, 
 <nav id="sidebar">
 <div class="toc">
 <ul>
-<li><a href="#connection-manager">Connection manager</a><ul>
-<li><a href="#features">Features</a></li>
-<li><a href="#usage">Usage</a></li>
-<li><a href="#manage-profiles">Manage profiles</a></li>
-<li><a href="#examples">Examples</a></li>
+<li><a href="#connpy">Connpy</a><ul>
+<li><a href="#ai-copilot-new-in-v6">🤖 AI Copilot (New in v6)</a></li>
+<li><a href="#core-features">Core Features</a></li>
+<li><a href="#installation">Installation</a><ul>
+<li><a href="#run-it-in-windowslinux-using-docker">Run it in Windows/Linux using Docker</a></li>
+</ul>
+</li>
+<li><a href="#privacy-integration">🔒 Privacy &amp; Integration</a><ul>
+<li><a href="#privacy-policy">Privacy Policy</a></li>
+<li><a href="#google-integration">Google Integration</a></li>
+</ul>
+</li>
+<li><a href="#usage">Usage</a><ul>
+<li><a href="#basic-examples">Basic Examples:</a></li>
 </ul>
 </li>
 <li><a href="#plugin-requirements-for-connpy">Plugin Requirements for Connpy</a><ul>
 <li><a href="#remote-plugin-execution">Remote Plugin Execution</a></li>
 <li><a href="#general-structure">General Structure</a></li>
-<li><a href="#specific-class-requirements">Specific Class Requirements</a></li>
-<li><a href="#class-dependencies-and-combinations">Class Dependencies and Combinations</a></li>
-<li><a href="#preload-modifications-and-hooks">Preload Modifications and Hooks</a><ul>
-<li><a href="#modifying-classes-with-modify">Modifying Classes with modify</a></li>
-<li><a href="#implementing-method-hooks">Implementing Method Hooks</a></li>
+<li><a href="#preload-modifications-and-hooks">Preload Modifications and Hooks</a></li>
+<li><a href="#command-completion-support">Command Completion Support</a></li>
 </ul>
 </li>
-<li><a href="#executable-block">Executable Block</a></li>
-<li><a href="#command-completion-support">Command Completion Support</a><ul>
-<li><a href="#1-tree-based-completion-recommended">1. Tree-based Completion (Recommended)</a></li>
-<li><a href="#2-legacy-function-based-completion">2. Legacy Function-based Completion</a></li>
-</ul>
-</li>
-<li><a href="#handling-unknown-arguments">Handling Unknown Arguments</a><ul>
-<li><a href="#behavior">Behavior:</a></li>
-<li><a href="#example">Example:</a></li>
-<li><a href="#note">Note:</a></li>
-</ul>
-</li>
-<li><a href="#script-verification">Script Verification</a></li>
-<li><a href="#example-script">Example Script</a></li>
-</ul>
-</li>
-<li><a href="#grpc-service-architecture">gRPC Service Architecture</a><ul>
-<li><a href="#1-start-the-server">1. Start the Server</a></li>
-<li><a href="#2-connect-the-client">2. Connect the Client</a></li>
-<li><a href="#programmatic-access-grpc-soa">Programmatic Access (gRPC &amp; SOA)</a></li>
-</ul>
-</li>
-<li><a href="#automation-module">Automation module</a><ul>
-<li><a href="#standalone-module">Standalone module</a></li>
-<li><a href="#using-manager-configuration">Using manager configuration</a></li>
-<li><a href="#running-parallel-tasks">Running parallel tasks</a></li>
-<li><a href="#using-variables">Using variables</a></li>
-<li><a href="#using-ai">Using AI</a><ul>
-<li><a href="#ai-plugin-tool-registration">AI Plugin Tool Registration</a></li>
+<li><a href="#grpc-service-architecture">⚙️ gRPC Service Architecture</a></li>
+<li><a href="#automation-module-api">🐍 Automation Module (API)</a><ul>
+<li><a href="#basic-execution">Basic Execution</a></li>
+<li><a href="#parallel-tasks-with-variables">Parallel Tasks with Variables</a></li>
+<li><a href="#ai-programmatic-use">AI Programmatic Use</a></li>
 </ul>
 </li>
 </ul>
 </li>
-<li><a href="#developer-notes-soa-architecture">Developer Notes (SOA Architecture)</a></li>
 </ul>
 </div>
 <ul id="index">
@@ -5740,10 +6141,12 @@ def test(self, commands, expected, vars = None,*, folder = None, prompt = None, 
 <ul>
 <li><code><a title="connpy.cli" href="cli/index.html">connpy.cli</a></code></li>
 <li><code><a title="connpy.grpc_layer" href="grpc_layer/index.html">connpy.grpc_layer</a></code></li>
+<li><code><a title="connpy.mcp_client" href="mcp_client.html">connpy.mcp_client</a></code></li>
 <li><code><a title="connpy.proto" href="proto/index.html">connpy.proto</a></code></li>
 <li><code><a title="connpy.services" href="services/index.html">connpy.services</a></code></li>
 <li><code><a title="connpy.tests" href="tests/index.html">connpy.tests</a></code></li>
 <li><code><a title="connpy.tunnels" href="tunnels.html">connpy.tunnels</a></code></li>
+<li><code><a title="connpy.utils" href="utils.html">connpy.utils</a></code></li>
 </ul>
 </li>
 <li><h3><a href="#header-classes">Classes</a></h3>
@@ -5758,6 +6161,7 @@ def test(self, commands, expected, vars = None,*, folder = None, prompt = None, 
 <h4><code><a title="connpy.ai" href="#connpy.ai">ai</a></code></h4>
 <ul class="">
 <li><code><a title="connpy.ai.SAFE_COMMANDS" href="#connpy.ai.SAFE_COMMANDS">SAFE_COMMANDS</a></code></li>
+<li><code><a title="connpy.ai.aask_copilot" href="#connpy.ai.aask_copilot">aask_copilot</a></code></li>
 <li><code><a title="connpy.ai.architect_system_prompt" href="#connpy.ai.architect_system_prompt">architect_system_prompt</a></code></li>
 <li><code><a title="connpy.ai.ask" href="#connpy.ai.ask">ask</a></code></li>
 <li><code><a title="connpy.ai.confirm" href="#connpy.ai.confirm">confirm</a></code></li>
@@ -5803,7 +6207,7 @@ def test(self, commands, expected, vars = None,*, folder = None, prompt = None, 
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
 </footer>
 </body>
 </html>

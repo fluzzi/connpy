@@ -118,7 +118,7 @@ class ai:
         aiconfig = self.config.config.get("ai", {})
         
         # Modelos (Prioridad: Argumento -> Config -> Default)
-        self.engineer_model = engineer_model or aiconfig.get("engineer_model") or "gemini/gemini-3.1-flash-lite-preview"
+        self.engineer_model = engineer_model or aiconfig.get("engineer_model") or "gemini/gemini-3.1-flash-lite"
         self.architect_model = architect_model or aiconfig.get("architect_model") or "anthropic/claude-sonnet-4-6"
         
         # API Keys (Prioridad: Argumento -> Config)
@@ -1303,6 +1303,8 @@ class ai:
         node_info = node_info or {}
         os_info = node_info.get("os", "unknown")
         node_name = node_info.get("name", "unknown")
+        persona = node_info.get("persona", "engineer")
+        memories = node_info.get("memories", [])
         
         vendor_reference = ""
         if os_info and os_info != "unknown":
@@ -1315,7 +1317,31 @@ class ai:
             except Exception:
                 pass
         
-        system_prompt = f"""Role: TERMINAL COPILOT. You assist a network engineer during a live SSH session.
+        if persona == "architect":
+            system_prompt = f"""Role: NETWORK ARCHITECT. You act as a senior strategic advisor during a live SSH session.
+Rules:
+1. Answer the user's question directly based on the Terminal Context.
+2. Focus on the "why" and "how". Analyze topologies, design patterns, and validate configurations.
+3. Do NOT provide commands to execute unless specifically requested. Instead, explain the consequences and best practices.
+4. Keep your guide concise and authoritative.
+5. You MUST output your response in the following strict format:
+<guide>
+Your brief tactical guide in markdown.
+</guide>
+<commands>
+</commands>
+<risk>
+low
+</risk>
+6. Risk level is usually "low" for read-only/no commands.
+
+Terminal Context:
+{terminal_buffer}
+
+Device OS: {os_info}
+Node: {node_name}"""
+        else:
+            system_prompt = f"""Role: TERMINAL COPILOT. You assist a network engineer during a live SSH session.
 Rules:
 1. Answer the user's question directly based on the Terminal Context.
 2. If the user asks you to analyze, parse, or extract data from the Terminal Context, DO IT directly in the <guide> section (you can use markdown tables or lists). Do NOT just give them a command to do it themselves.
@@ -1343,6 +1369,11 @@ Node: {node_name}"""
         if vendor_reference:
             system_prompt += f"\n\nVendor Command Reference:\n{vendor_reference}"
 
+        if memories:
+            system_prompt += "\n\nSession Memory (Important Facts):\n"
+            for m in memories:
+                system_prompt += f"- {m}\n"
+
         # Fetch MCP tools for the current OS
         mcp_tools = []
         try:
@@ -1362,14 +1393,18 @@ Node: {node_name}"""
         iteration = 0
         max_iterations = 5 # Allow up to 5 iterations for tool usage
         
+        # Use models based on persona
+        current_model = self.architect_model if persona == "architect" else self.engineer_model
+        current_key = self.architect_key if persona == "architect" else self.engineer_key
+
         try:
             while iteration < max_iterations:
                 iteration += 1
                 response = await acompletion(
-                    model=self.engineer_model,
+                    model=current_model,
                     messages=messages,
                     tools=mcp_tools if mcp_tools else None,
-                    api_key=self.engineer_key,
+                    api_key=current_key,
                     stream=True
                 )
                 

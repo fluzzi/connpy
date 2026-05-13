@@ -70,6 +70,10 @@ class ConfigService(BaseService):
         if not isinstance(user_styles, dict):
             raise InvalidConfigurationError("Theme file must be a YAML dictionary.")
             
+        # Support both direct styles and nested under 'theme' key
+        if "theme" in user_styles and isinstance(user_styles["theme"], dict):
+            user_styles = user_styles["theme"]
+            
         # Filter for valid styles only (prevent junk in config)
         valid_styles = {k: v for k, v in user_styles.items() if k in STYLES}
         
