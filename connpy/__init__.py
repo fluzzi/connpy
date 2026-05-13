@@ -54,10 +54,10 @@ cd connpy
 docker compose build
 
 # Run it like a native app (completely silent)
-docker compose --log-level ERROR run --rm --remove-orphans connpy-app [command]
+docker compose run --rm --remove-orphans connpy-app [command]
 
 # Pro Tip: Add this alias for a 100% native experience from any folder
-alias conn='docker compose -f /path/to/connpy/docker-compose.yml --log-level ERROR run --rm --remove-orphans connpy-app'
+alias conn='docker compose -f /path/to/connpy/docker-compose.yml run --rm --remove-orphans connpy-app'
 ```
 
 ---
