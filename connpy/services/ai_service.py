@@ -20,6 +20,7 @@ class AIService(BaseService):
         except Exception:
             prompt_re = re.compile(re.sub(r'(?<!\\)\$', '', default_prompt))
             
+        parsed_positions = []
         if cmd_byte_positions and len(cmd_byte_positions) >= 1:
             for i in range(1, len(cmd_byte_positions)):
                 pos, known_cmd = cmd_byte_positions[i]
@@ -31,7 +32,7 @@ class AIService(BaseService):
                     prev_lines = [l for l in prev_cleaned.split('\n') if l.strip()]
                     prompt_text = prev_lines[-1].strip() if prev_lines else ""
                     preview = f"{prompt_text}{known_cmd}" if prompt_text else known_cmd
-                    blocks.append((pos, preview[:80]))
+                    parsed_positions.append({"pos": pos, "type": "VALID_CMD", "preview": preview[:80]})
                 else:
                     chunk = raw_bytes[prev_pos:pos]
                     cleaned = log_cleaner(chunk.decode(errors='replace'))
@@ -43,19 +44,38 @@ class AIService(BaseService):
                         if match:
                             cmd_text = preview[match.end():].strip()
                             if cmd_text:
-                                blocks.append((pos, preview[:80]))
+                                parsed_positions.append({"pos": pos, "type": "VALID_CMD", "preview": preview[:80]})
+                            else:
+                                parsed_positions.append({"pos": pos, "type": "EMPTY_PROMPT", "preview": ""})
+                        else:
+                            parsed_positions.append({"pos": pos, "type": "SCROLLING", "preview": ""})
+                    else:
+                        parsed_positions.append({"pos": pos, "type": "SCROLLING", "preview": ""})
 
-        # Always ensure there is a final block representing the current prompt
-        # Find the start of the last line in the raw buffer to avoid selecting everything 
-        # when no commands have been executed yet.
         last_newline = raw_bytes.rfind(b'\n')
         current_prompt_pos = last_newline + 1 if last_newline != -1 else 0
-        
+        current_end = len(raw_bytes)
+
+        for i, item in enumerate(parsed_positions):
+            if item["type"] == "VALID_CMD":
+                start_pos = item["pos"]
+                preview = item["preview"]
+                
+                # Find the end position: next VALID_CMD or EMPTY_PROMPT
+                end_pos = current_prompt_pos
+                for j in range(i + 1, len(parsed_positions)):
+                    next_item = parsed_positions[j]
+                    if next_item["type"] in ("VALID_CMD", "EMPTY_PROMPT"):
+                        end_pos = next_item["pos"]
+                        break
+                
+                blocks.append((start_pos, end_pos, preview))
+
+        # Always ensure there is a final block representing the current prompt
         if not blocks:
-            blocks.append((current_prompt_pos, last_line[:80] if last_line else "CURRENT CONTEXT"))
+            blocks.append((current_prompt_pos, current_end, last_line[:80] if last_line else "CURRENT CONTEXT"))
         elif blocks[-1][0] < current_prompt_pos:
-            # If the last command block ends before the current prompt, add the prompt block
-            blocks.append((current_prompt_pos, last_line[:80] if last_line else "CURRENT CONTEXT"))
+            blocks.append((current_prompt_pos, current_end, last_line[:80] if last_line else "CURRENT CONTEXT"))
 
         return blocks
 

@@ -131,9 +131,8 @@ class CopilotInterface:
                 if state['context_mode'] == self.mode_lines:
                     return '\n'.join(buffer.split('\n')[-state['context_lines']:])
                 idx = max(0, state['total_cmds'] - state['context_cmd'])
-                start, preview = blocks[idx]
-                if state['context_mode'] == self.mode_single and idx + 1 < state['total_cmds']:
-                    end = blocks[idx + 1][0]
+                start, end, preview = blocks[idx]
+                if state['context_mode'] == self.mode_single:
                     active_raw = raw_bytes[start:end]
                 else:
                     active_raw = raw_bytes[start:]
@@ -175,7 +174,7 @@ class CopilotInterface:
                     base_str = f'\u25b6 Ctrl+\u2191/\u2193 adjusts by 50 lines  [Tab: {m_label}]'
                 else:
                     idx = max(0, state['total_cmds'] - state['context_cmd'])
-                    desc = blocks[idx][1]
+                    desc = blocks[idx][2]
                     base_str = f'\u25b6 {desc}  [Tab: {m_label}]'
                 
                 # Wrap base_str in a style to maintain consistency and avoid glitches
@@ -302,10 +301,11 @@ class CopilotInterface:
                 # Use persona from overrides (one-shot) or from session state
                 active_persona = merged_node_info.get('persona', self.session_state.get('persona', 'engineer'))
                 persona_color = self._get_theme_color(active_persona, fallback="cyan")
+                persona_title = "Network Architect" if active_persona == "architect" else "Network Engineer"
                 
                 active_buffer = get_active_buffer()
                 live_text = "Thinking..."
-                panel = Panel(live_text, title=f"[bold {persona_color}]Copilot Guide[/bold {persona_color}]", border_style=persona_color)
+                panel = Panel(live_text, title=f"[bold {persona_color}]{persona_title}[/bold {persona_color}]", border_style=persona_color)
                 
                 def on_chunk(text):
                     nonlocal live_text
@@ -314,7 +314,7 @@ class CopilotInterface:
                 
                 with Live(panel, console=self.console, refresh_per_second=10) as live:
                     def update_live(t):
-                        live.update(Panel(Markdown(t), title=f"[bold {persona_color}]Copilot Guide[/bold {persona_color}]", border_style=persona_color))
+                        live.update(Panel(Markdown(t), title=f"[bold {persona_color}]{persona_title}[/bold {persona_color}]", border_style=persona_color))
 
                     wrapped_chunk = lambda t: (on_chunk(t), update_live(live_text))
                     
@@ -334,7 +334,7 @@ class CopilotInterface:
 
                 # 4. Handle result
                 if live_text == "Thinking..." and result.get("guide"):
-                    self.console.print(Panel(Markdown(result["guide"]), title=f"[bold {persona_color}]Copilot Guide[/bold {persona_color}]", border_style=persona_color))
+                    self.console.print(Panel(Markdown(result["guide"]), title=f"[bold {persona_color}]{persona_title}[/bold {persona_color}]", border_style=persona_color))
 
                 commands = result.get("commands", [])
                 if not commands:
