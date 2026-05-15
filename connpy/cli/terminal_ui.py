@@ -57,9 +57,10 @@ class CopilotInterface:
 
     async def run_session(self, 
                           raw_bytes: bytes, 
-                          cmd_byte_positions: List[tuple], 
                           node_info: dict,
-                          on_ai_call: Callable):
+                          on_ai_call: Callable,
+                          cmd_byte_positions: List[tuple] = None, 
+                          blocks: List[tuple] = None):
         """
         Runs the interactive Copilot session.
         on_ai_call: async function(active_buffer, question) -> result_dict
@@ -69,9 +70,11 @@ class CopilotInterface:
         try:
             # Prepare UI state
             buffer = log_cleaner(raw_bytes.decode(errors='replace'))
-            blocks = self.ai_service.build_context_blocks(raw_bytes, cmd_byte_positions, node_info)
-            last_line = buffer.split('\n')[-1].strip() if buffer.strip() else "(prompt)"
-            blocks.append((len(raw_bytes), last_line[:80]))
+            
+            # Use pre-calculated blocks if provided (remote mode), otherwise calculate locally (local mode)
+            if blocks is None:
+                last_line = buffer.split('\n')[-1].strip() if buffer.strip() else "(prompt)"
+                blocks = self.ai_service.build_context_blocks(raw_bytes, cmd_byte_positions, node_info, last_line=last_line)
             
             state = {
                 'context_cmd': 1,
@@ -88,7 +91,7 @@ class CopilotInterface:
             self.console.print("") # Salto de línea real
             self.console.print(Rule(title="[bold cyan] AI TERMINAL COPILOT [/bold cyan]", style="cyan"))
             self.console.print(Panel(
-                "[dim]Type your question. Enter to send, Escape/Ctrl+C to cancel.\n"
+                "[dim]Type your question. Enter to send, Escape/Ctrl+C to cancel. Type / for commands.\n"
                 "Tab to change context mode. Ctrl+\u2191/\u2193 to adjust context. \u2191\u2193 for question history.[/dim]",
                 border_style="cyan"
             ))

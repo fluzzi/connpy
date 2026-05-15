@@ -43,7 +43,7 @@ class NodeStub:
         self.remote_host = remote_host
         self.config = config
 
-    def _handle_remote_copilot(self, res, request_queue, response_queue, client_buffer_bytes, cmd_byte_positions, pause_generator, resume_generator, old_tty):
+    def _handle_remote_copilot(self, res, request_queue, response_queue, client_buffer_bytes, pause_generator, resume_generator, old_tty):
         import json, asyncio, termios, sys, tty, queue
         from ..core import copilot_terminal_mode
         from . import connpy_pb2
@@ -51,6 +51,10 @@ class NodeStub:
         pause_generator()
         
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+        
+        node_info = json.loads(res.copilot_node_info_json) if res.copilot_node_info_json else {}
+        blocks = node_info.get("context_blocks", [])
+
         interface = CopilotInterface(
             self.config, 
             history=getattr(self, 'copilot_history', None),
@@ -58,8 +62,6 @@ class NodeStub:
         )
         self.copilot_history = interface.history
         self.copilot_state = interface.session_state
-        
-        node_info = json.loads(res.copilot_node_info_json) if res.copilot_node_info_json else {}
 
         async def on_ai_call_remote(active_buffer, question, chunk_callback, merged_node_info):
             # Send request to server
@@ -85,9 +87,9 @@ class NodeStub:
             while True:
                 action, commands, custom_cmd = await interface.run_session(
                     raw_bytes=bytes(client_buffer_bytes),
-                    cmd_byte_positions=cmd_byte_positions,
                     node_info=node_info,
-                    on_ai_call=on_ai_call_remote
+                    on_ai_call=on_ai_call_remote,
+                    blocks=blocks
                 )
                 
                 if action == "continue":
@@ -124,7 +126,6 @@ class NodeStub:
         
         request_queue = queue.Queue()
         client_buffer_bytes = bytearray()
-        cmd_byte_positions = [(0, None)]
         pause_stdin = [False]
         wake_r, wake_w = os.pipe()
 
@@ -171,8 +172,6 @@ class NodeStub:
                         data = os.read(sys.stdin.fileno(), 1024)
                         if not data:
                             break
-                        if b'\r' in data or b'\n' in data:
-                            cmd_byte_positions.append((len(client_buffer_bytes), None))
                         yield connpy_pb2.InteractRequest(stdin_data=data)
                     except OSError:
                         break
@@ -246,13 +245,10 @@ class NodeStub:
                 if res.copilot_prompt:
                     self._handle_remote_copilot(
                         res, request_queue, response_queue, 
-                        client_buffer_bytes, cmd_byte_positions, 
+                        client_buffer_bytes, 
                         pause_generator, resume_generator, old_tty
                     )
                     continue
-
-                if res.copilot_injected_command:
-                    cmd_byte_positions.append((len(client_buffer_bytes), res.copilot_injected_command))
 
                 if res.stdout_data:
                     os.write(sys.stdout.fileno(), res.stdout_data)
@@ -275,7 +271,6 @@ class NodeStub:
         params_json = json.dumps(connection_params)
         request_queue = queue.Queue()
         client_buffer_bytes = bytearray()
-        cmd_byte_positions = [(0, None)]
         pause_stdin = [False]
         wake_r, wake_w = os.pipe()
 
@@ -323,8 +318,6 @@ class NodeStub:
                         data = os.read(sys.stdin.fileno(), 1024)
                         if not data:
                             break
-                        if b'\r' in data or b'\n' in data:
-                            cmd_byte_positions.append((len(client_buffer_bytes), None))
                         yield connpy_pb2.InteractRequest(stdin_data=data)
                     except OSError:
                         break
@@ -397,13 +390,10 @@ class NodeStub:
                 if res.copilot_prompt:
                     self._handle_remote_copilot(
                         res, request_queue, response_queue, 
-                        client_buffer_bytes, cmd_byte_positions, 
+                        client_buffer_bytes, 
                         pause_generator, resume_generator, old_tty
                     )
                     continue
-
-                if res.copilot_injected_command:
-                    cmd_byte_positions.append((len(client_buffer_bytes), res.copilot_injected_command))
 
                 if res.stdout_data:
                     os.write(sys.stdout.fileno(), res.stdout_data)

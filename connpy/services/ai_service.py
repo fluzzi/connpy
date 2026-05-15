@@ -6,10 +6,10 @@ from connpy.utils import log_cleaner
 class AIService(BaseService):
     """Business logic for interacting with AI agents and LLM configurations."""
 
-    def build_context_blocks(self, raw_bytes: bytes, cmd_byte_positions: list, node_info: dict) -> list:
+    def build_context_blocks(self, raw_bytes: bytes, cmd_byte_positions: list, node_info: dict, last_line: str = "") -> list:
         """Identifies command blocks in the terminal history."""
         blocks = []
-        if not (cmd_byte_positions and len(cmd_byte_positions) >= 2 and raw_bytes):
+        if not raw_bytes:
             return blocks
             
         default_prompt = r'>$|#$|\$$|>.$|#.$|\$.$'
@@ -20,29 +20,43 @@ class AIService(BaseService):
         except Exception:
             prompt_re = re.compile(re.sub(r'(?<!\\)\$', '', default_prompt))
             
-        for i in range(1, len(cmd_byte_positions)):
-            pos, known_cmd = cmd_byte_positions[i]
-            prev_pos = cmd_byte_positions[i-1][0]
-            
-            if known_cmd:
-                prev_chunk = raw_bytes[prev_pos:pos]
-                prev_cleaned = log_cleaner(prev_chunk.decode(errors='replace'))
-                prev_lines = [l for l in prev_cleaned.split('\n') if l.strip()]
-                prompt_text = prev_lines[-1].strip() if prev_lines else ""
-                preview = f"{prompt_text}{known_cmd}" if prompt_text else known_cmd
-                blocks.append((pos, preview[:80]))
-            else:
-                chunk = raw_bytes[prev_pos:pos]
-                cleaned = log_cleaner(chunk.decode(errors='replace'))
-                lines = [l for l in cleaned.split('\n') if l.strip()]
-                preview = lines[-1].strip() if lines else ""
+        if cmd_byte_positions and len(cmd_byte_positions) >= 1:
+            for i in range(1, len(cmd_byte_positions)):
+                pos, known_cmd = cmd_byte_positions[i]
+                prev_pos = cmd_byte_positions[i-1][0]
                 
-                if preview:
-                    match = prompt_re.search(preview)
-                    if match:
-                        cmd_text = preview[match.end():].strip()
-                        if cmd_text:
-                            blocks.append((pos, preview[:80]))
+                if known_cmd:
+                    prev_chunk = raw_bytes[prev_pos:pos]
+                    prev_cleaned = log_cleaner(prev_chunk.decode(errors='replace'))
+                    prev_lines = [l for l in prev_cleaned.split('\n') if l.strip()]
+                    prompt_text = prev_lines[-1].strip() if prev_lines else ""
+                    preview = f"{prompt_text}{known_cmd}" if prompt_text else known_cmd
+                    blocks.append((pos, preview[:80]))
+                else:
+                    chunk = raw_bytes[prev_pos:pos]
+                    cleaned = log_cleaner(chunk.decode(errors='replace'))
+                    lines = [l for l in cleaned.split('\n') if l.strip()]
+                    preview = lines[-1].strip() if lines else ""
+                    
+                    if preview:
+                        match = prompt_re.search(preview)
+                        if match:
+                            cmd_text = preview[match.end():].strip()
+                            if cmd_text:
+                                blocks.append((pos, preview[:80]))
+
+        # Always ensure there is a final block representing the current prompt
+        # Find the start of the last line in the raw buffer to avoid selecting everything 
+        # when no commands have been executed yet.
+        last_newline = raw_bytes.rfind(b'\n')
+        current_prompt_pos = last_newline + 1 if last_newline != -1 else 0
+        
+        if not blocks:
+            blocks.append((current_prompt_pos, last_line[:80] if last_line else "CURRENT CONTEXT"))
+        elif blocks[-1][0] < current_prompt_pos:
+            # If the last command block ends before the current prompt, add the prompt block
+            blocks.append((current_prompt_pos, last_line[:80] if last_line else "CURRENT CONTEXT"))
+
         return blocks
 
     def process_copilot_input(self, input_text: str, session_state: dict) -> dict:

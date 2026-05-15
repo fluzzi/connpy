@@ -211,6 +211,7 @@ class node:
         self.output = ""
         self.status = 1
         self.result = {}
+        self.cmd_byte_positions = [(0, None)]
 
     @MethodHook
     def _passtx(self, passwords, *, keyfile=None):
@@ -385,9 +386,9 @@ class node:
             loop = asyncio.get_running_loop()
             child_reader_queue = asyncio.Queue()
             
-            # Track command byte positions for copilot context navigation
+            # Reset and track command byte positions for copilot context navigation
             # Each entry is (byte_position, command_text_or_None)
-            cmd_byte_positions = [(0, None)]
+            self.cmd_byte_positions = [(self.mylog.tell() if hasattr(self, 'mylog') else 0, None)]
             
             def _child_read_ready():
                 try:
@@ -428,7 +429,7 @@ class node:
                             node_info["prompt"] = to_str(self.tags.get("prompt", r'>$|#$|\$$|>.$|#.$|\$.$'))
                         
                         # Invoke copilot (async callback handles UI)
-                        await copilot_handler(self.mylog.getvalue(), node_info, local_stream, child_fd, cmd_byte_positions)
+                        await copilot_handler(self.mylog.getvalue(), node_info, local_stream, child_fd, self.cmd_byte_positions)
                         continue
                     
                     # Remove any stray \x00 bytes and forward normally
@@ -436,10 +437,9 @@ class node:
                     if clean_data:
                         # Track command boundaries when user hits Enter
                         if hasattr(self, 'mylog') and (b'\r' in clean_data or b'\n' in clean_data):
-                            cmd_byte_positions.append((self.mylog.tell(), None))
-                            
-                        try:
-                            os.write(child_fd, clean_data)
+                            self.cmd_byte_positions.append((self.mylog.tell(), None))
+
+                        try:                            os.write(child_fd, clean_data)
                         except OSError:
                             break
                         self.lastinput = time()
@@ -561,6 +561,45 @@ class node:
         finally:
             local_stream.teardown()
 
+    @MethodHook
+    async def inject_commands(self, commands, child_fd, on_inject=None):
+        """
+        Inject a list of commands into the node's PTY.
+        Handles screen_length_command, history tracking and delays.
+        """
+        if not commands:
+            return
+
+        # 0. Clear line
+        os.write(child_fd, b'\x15')
+        await asyncio.sleep(0.1)
+
+        # 1. Prepare list (prepend screen_length if exists)
+        slc = self.tags.get("screen_length_command") if hasattr(self, 'tags') and isinstance(self.tags, dict) else None
+        
+        to_send = list(commands)
+        if slc and slc not in to_send: # avoid duplicates if already there
+             to_send.insert(0, slc)
+
+        # 2. Inject one by one
+        for cmd in to_send:
+            # Register in node's official history (SKIP if it's the administrative screen length command)
+            if cmd != slc and hasattr(self, 'cmd_byte_positions') and self.cmd_byte_positions is not None:
+                log_pos = self.mylog.tell() if hasattr(self, 'mylog') else 0
+                self.cmd_byte_positions.append((log_pos, cmd))
+            
+            # Write physically to PTY
+            os.write(child_fd, (cmd + "\n").encode())
+            
+            # Notify (e.g., for gRPC or logs) - SKIP for administrative SLC
+            if on_inject and cmd != slc:
+                if asyncio.iscoroutinefunction(on_inject):
+                    await on_inject(cmd)
+                else:
+                    on_inject(cmd)
+            
+            # Delay to avoid overwhelming the router
+            await asyncio.sleep(0.8)
 
     @MethodHook
     def interact(self, debug=False, logger=None):
@@ -642,7 +681,7 @@ class node:
                         while True:
                             action, commands, custom_cmd = await interface.run_session(
                                 raw_bytes=raw_bytes,
-                                cmd_byte_positions=cmd_byte_positions,
+                                cmd_byte_positions=self.cmd_byte_positions,
                                 node_info=node_info,
                                 on_ai_call=on_ai_call
                             )
@@ -658,20 +697,7 @@ class node:
                 
                 if action in ("send_all", "custom"):
                     cmds_to_send = commands if action == "send_all" else custom_cmd
-                    
-                    if cmds_to_send:
-                        os.write(child_fd, b'\x15') # Ctrl+U
-                        await asyncio.sleep(0.1)
-                        
-                        # Prepend screen length command to avoid pagination
-                        if "screen_length_command" in self.tags:
-                            cmds_to_send.insert(0, self.tags["screen_length_command"])
-
-                        for cmd in cmds_to_send:
-                            if cmd_byte_positions is not None:
-                                cmd_byte_positions.append((self.mylog.tell(), cmd))
-                            os.write(child_fd, (cmd + "\n").encode())
-                            await asyncio.sleep(0.8)
+                    await self.inject_commands(cmds_to_send, child_fd)
                 else:
                     os.write(child_fd, b'\x15\r')
             except Exception as e:

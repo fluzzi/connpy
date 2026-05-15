@@ -205,6 +205,7 @@ class ai:
             - COMPLETE MISSIONS: Execute ALL steps of a mission before reporting back.
             - DIAGRAM: Use ASCII art or Unicode box-drawing characters directly in your responses to visualize topologies or paths when helpful.
             - EVIDENCE: Include 'Key Snippets' from tool outputs. Be token-efficient.
+            - LANGUAGE: You MUST respond in the same language used by the user in their question or instruction.
             - NO WANDERING: Do not speculate. If stuck, report attempts.
             - SAFETY: When you use 'run_commands' with configuration commands, the system automatically prompts the user for confirmation. Just execute - don't ask permission first.
 {architect_instructions}
@@ -222,6 +223,7 @@ class ai:
             - ENGINEER CAPABILITIES: Your Engineer can:
                 * Filter nodes (list_nodes), Run CLI commands (run_commands), Get metadata (get_node_info).
             - ANALYSIS: Review technical findings to identify patterns or design failures.
+            - LANGUAGE: You MUST respond in the same language used by the user in their question or instruction.
             - MEMORY: Update long-term facts ONLY when the user explicitly requests it.
             
             CRITICAL - EFFICIENT DELEGATION:
@@ -1334,6 +1336,7 @@ Your brief tactical guide in markdown.
 low
 </risk>
 6. Risk level is usually "low" for read-only/no commands.
+7. You MUST respond in the same language used by the user in their question.
 
 Terminal Context:
 {terminal_buffer}
@@ -1359,6 +1362,7 @@ command 2
 low, high, or destructive
 </risk>
 6. Risk level: "low" for read-only/no commands, "high" for config changes, "destructive" for potentially dangerous ops.
+7. You MUST respond in the same language used by the user in their question.
 
 Terminal Context:
 {terminal_buffer}
