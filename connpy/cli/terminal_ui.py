@@ -173,7 +173,6 @@ class CopilotInterface:
                     base_str = f'\u25b6 Ctrl+\u2191/\u2193 adjusts by 50 lines  [Tab: {m_label}]'
                 else:
                     idx = max(0, state['total_cmds'] - state['context_cmd'])
-                    import re
                     
                     def clean_preview(text):
                         # Limpia saltos de línea y el prompt inicial (todo hasta #, > o $) para que quede solo el comando
@@ -339,7 +338,6 @@ class CopilotInterface:
                 live_text = ""
                 first_chunk = True
                 
-                import sys
                 from rich.rule import Rule
                 from rich.status import Status
                 from connpy.printer import IncrementalMarkdownParser
