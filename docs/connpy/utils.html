@@ -75,14 +75,34 @@ el.replaceWith(d);
             elif token in (&#39;\b&#39;, &#39;\x7f&#39;):
                 if cursor &gt; 0:
                     cursor -= 1
-            elif token == &#39;\x1B[D&#39;: # Left Arrow
-                if cursor &gt; 0:
-                    cursor -= 1
-            elif token == &#39;\x1B[C&#39;: # Right Arrow
-                if cursor &lt; len(buffer):
-                    cursor += 1
-            elif token == &#39;\x1B[K&#39;: # Clear to end of line
-                buffer = buffer[:cursor]
+            elif token.startswith(&#39;\x1B[&#39;) and len(token) &gt;= 3:
+                # Parse CSI: \x1B[ &lt;params&gt; &lt;final_char&gt;
+                final = token[-1]
+                param_str = token[2:-1]
+                n = int(param_str) if param_str.isdigit() else 1
+
+                if final == &#39;D&#39;:   # CUB – Cursor Back
+                    cursor = max(0, cursor - n)
+                elif final == &#39;C&#39;: # CUF – Cursor Forward
+                    cursor = min(len(buffer), cursor + n)
+                elif final == &#39;K&#39;: # EL  – Erase in Line
+                    if n == 0 or param_str == &#39;&#39;:      # Clear to end
+                        buffer = buffer[:cursor]
+                    elif n == 1:                         # Clear to start
+                        buffer[:cursor] = [&#39; &#39;] * cursor
+                    elif n == 2:                         # Clear entire line
+                        buffer = []
+                        cursor = 0
+                elif final == &#39;G&#39;: # CHA – Cursor Horizontal Absolute (1-indexed)
+                    cursor = max(0, n - 1)
+                    # Pad buffer if cursor is beyond current length
+                    if cursor &gt; len(buffer):
+                        buffer.extend([&#39; &#39;] * (cursor - len(buffer)))
+                elif final == &#39;P&#39;: # DCH – Delete Characters
+                    del buffer[cursor:cursor + n]
+                elif final == &#39;@&#39;: # ICH – Insert Characters
+                    buffer[cursor:cursor] = [&#39; &#39;] * n
+                # All other CSI sequences are silently discarded
             elif token.startswith(&#39;\x1B&#39;):
                 continue
             elif len(token) == 1 and ord(token) &lt; 32:

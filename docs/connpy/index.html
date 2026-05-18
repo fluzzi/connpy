@@ -737,6 +737,7 @@ class ai:
             - COMPLETE MISSIONS: Execute ALL steps of a mission before reporting back.
             - DIAGRAM: Use ASCII art or Unicode box-drawing characters directly in your responses to visualize topologies or paths when helpful.
             - EVIDENCE: Include &#39;Key Snippets&#39; from tool outputs. Be token-efficient.
+            - LANGUAGE: You MUST respond in the same language used by the user in their question or instruction.
             - NO WANDERING: Do not speculate. If stuck, report attempts.
             - SAFETY: When you use &#39;run_commands&#39; with configuration commands, the system automatically prompts the user for confirmation. Just execute - don&#39;t ask permission first.
 {architect_instructions}
@@ -754,6 +755,7 @@ class ai:
             - ENGINEER CAPABILITIES: Your Engineer can:
                 * Filter nodes (list_nodes), Run CLI commands (run_commands), Get metadata (get_node_info).
             - ANALYSIS: Review technical findings to identify patterns or design failures.
+            - LANGUAGE: You MUST respond in the same language used by the user in their question or instruction.
             - MEMORY: Update long-term facts ONLY when the user explicitly requests it.
             
             CRITICAL - EFFICIENT DELEGATION:
@@ -829,7 +831,6 @@ class ai:
         - response: reconstructed ModelResponse (same as non-streaming)
         - streamed: True if text was rendered to console during streaming
         &#34;&#34;&#34;
-        from rich.live import Live
 
         stream_resp = completion(model=model, messages=messages, tools=tools, api_key=api_key, stream=True, **kwargs)
 
@@ -837,7 +838,7 @@ class ai:
         full_content = &#34;&#34;
         is_streaming_text = False
         has_tool_calls = False
-        live_display = None
+        header_printed = False
 
         # Determine styling based on current brain
         role_label = &#34;Network Architect&#34; if &#34;architect&#34; in label.lower() else &#34;Network Engineer&#34;
@@ -866,7 +867,6 @@ class ai:
 
                     if not chunk_callback:
                         if not is_streaming_text:
-                            # Stop spinner definitively
                             if status:
                                 try:
                                     status.stop()
@@ -875,35 +875,28 @@ class ai:
                             
                             # Create a stable, direct Console to bypass _ConsoleProxy recreation bugs
                             from rich.console import Console as RichConsole
-                            from .printer import connpy_theme, get_original_stdout
+                            from rich.rule import Rule
+                            from .printer import connpy_theme, get_original_stdout, IncrementalMarkdownParser
                             stable_console = RichConsole(theme=connpy_theme, file=get_original_stdout())
                             
-                            live_display = Live(
-                                Panel(Markdown(full_content), title=title, border_style=border, expand=False),
-                                console=stable_console,
-                                refresh_per_second=8,
-                                transient=False
-                            )
-                            live_display.start()
+                            stable_console.print(Rule(f&#34;[bold {border}]{title}[/bold {border}]&#34;, style=border))
+                            header_printed = True
+                            md_parser = IncrementalMarkdownParser(console=stable_console)
                             is_streaming_text = True
-                        else:
-                            live_display.update(
-                                Panel(Markdown(full_content), title=title, border_style=border, expand=False)
-                            )
+                        
+                        md_parser.feed(delta.content)
         except Exception as e:
             if not chunks:
                 raise
         finally:
-            if live_display:
-                # Render final state with complete content
+            if header_printed:
                 try:
-                    live_display.update(
-                        Panel(Markdown(full_content), title=title, border_style=border, expand=False)
-                    )
-                except Exception:
-                    pass
-                try:
-                    live_display.stop()
+                    md_parser.flush()
+                    from rich.console import Console as RichConsole
+                    from rich.rule import Rule
+                    from .printer import connpy_theme, get_original_stdout
+                    stable_console = RichConsole(theme=connpy_theme, file=get_original_stdout())
+                    stable_console.print(Rule(style=border))
                 except Exception:
                     pass
         
@@ -1852,11 +1845,13 @@ class ai:
         if persona == &#34;architect&#34;:
             system_prompt = f&#34;&#34;&#34;Role: NETWORK ARCHITECT. You act as a senior strategic advisor during a live SSH session.
 Rules:
-1. Answer the user&#39;s question directly based on the Terminal Context.
-2. Focus on the &#34;why&#34; and &#34;how&#34;. Analyze topologies, design patterns, and validate configurations.
-3. Do NOT provide commands to execute unless specifically requested. Instead, explain the consequences and best practices.
-4. Keep your guide concise and authoritative.
-5. You MUST output your response in the following strict format:
+1. MANDATORY: You MUST respond in the same language used by the user in their question.
+2. Answer the user&#39;s question directly and EXCLUSIVELY based on the Terminal Context. 
+3. NO HALLUCINATIONS. The Terminal Context is a live buffer. If it contains only a shell prompt (like &#39;iol#&#39; or &#39;admin@vrouter&gt;&#39;) and no command output, it means YOU DON&#39;T HAVE DATA. In this case, YOU MUST NOT invent any information.
+4. Focus on the &#34;why&#34; and &#34;how&#34;. Analyze topologies, design patterns, and validate configurations.
+5. Do NOT provide commands to execute unless specifically requested. Instead, explain the consequences and best practices.
+6. Keep your guide concise and authoritative.
+7. You MUST output your response in the following strict format:
 &lt;guide&gt;
 Your brief tactical guide in markdown.
 &lt;/guide&gt;
@@ -1865,7 +1860,7 @@ Your brief tactical guide in markdown.
 &lt;risk&gt;
 low
 &lt;/risk&gt;
-6. Risk level is usually &#34;low&#34; for read-only/no commands.
+8. Risk level is usually &#34;low&#34; for read-only/no commands.
 
 Terminal Context:
 {terminal_buffer}
@@ -1875,11 +1870,13 @@ Node: {node_name}&#34;&#34;&#34;
         else:
             system_prompt = f&#34;&#34;&#34;Role: TERMINAL COPILOT. You assist a network engineer during a live SSH session.
 Rules:
-1. Answer the user&#39;s question directly based on the Terminal Context.
-2. If the user asks you to analyze, parse, or extract data from the Terminal Context, DO IT directly in the &lt;guide&gt; section (you can use markdown tables or lists). Do NOT just give them a command to do it themselves.
-3. If the user wants to execute an action, provide the required CLI commands inside a &lt;commands&gt; block, one command per line. If no commands are needed, leave it empty or omit the block.
-4. ULTRA-CONCISE. Keep your guide to the point.
-5. You MUST output your response in the following strict format:
+1. MANDATORY: You MUST respond in the same language used by the user in their question.
+2. EXTREMELY IMPORTANT: Answer EXCLUSIVELY based on the provided Terminal Context. 
+3. NO HALLUCINATIONS. The Terminal Context is a live buffer. If it contains only a shell prompt (like &#39;iol#&#39; or &#39;admin@vrouter&gt;&#39;) and no command output, it means YOU DON&#39;T HAVE DATA. In this case, YOU MUST NOT invent any information. Instead, explicitly state that you don&#39;t see the data and offer the correct CLI commands to retrieve it.
+4. If the user asks you to analyze, parse, or extract data from the Terminal Context, DO IT directly in the &lt;guide&gt; section (you can use markdown tables or lists). Do NOT just give them a command to do it themselves.
+5. If the user wants to execute an action, provide the required CLI commands inside a &lt;commands&gt; block, one command per line. If no commands are needed, leave it empty or omit the block.
+6. ULTRA-CONCISE. Keep your guide to the point.
+7. You MUST output your response in the following strict format:
 &lt;guide&gt;
 Your brief tactical guide in markdown. 3-4 sentences max.
 &lt;/guide&gt;
@@ -1890,7 +1887,7 @@ command 2
 &lt;risk&gt;
 low, high, or destructive
 &lt;/risk&gt;
-6. Risk level: &#34;low&#34; for read-only/no commands, &#34;high&#34; for config changes, &#34;destructive&#34; for potentially dangerous ops.
+8. Risk level: &#34;low&#34; for read-only/no commands, &#34;high&#34; for config changes, &#34;destructive&#34; for potentially dangerous ops.
 
 Terminal Context:
 {terminal_buffer}
@@ -1932,6 +1929,7 @@ Node: {node_name}&#34;&#34;&#34;
         try:
             while iteration &lt; max_iterations:
                 iteration += 1
+
                 response = await acompletion(
                     model=current_model,
                     messages=messages,
@@ -2177,11 +2175,13 @@ def engineer_system_prompt(self):
         if persona == &#34;architect&#34;:
             system_prompt = f&#34;&#34;&#34;Role: NETWORK ARCHITECT. You act as a senior strategic advisor during a live SSH session.
 Rules:
-1. Answer the user&#39;s question directly based on the Terminal Context.
-2. Focus on the &#34;why&#34; and &#34;how&#34;. Analyze topologies, design patterns, and validate configurations.
-3. Do NOT provide commands to execute unless specifically requested. Instead, explain the consequences and best practices.
-4. Keep your guide concise and authoritative.
-5. You MUST output your response in the following strict format:
+1. MANDATORY: You MUST respond in the same language used by the user in their question.
+2. Answer the user&#39;s question directly and EXCLUSIVELY based on the Terminal Context. 
+3. NO HALLUCINATIONS. The Terminal Context is a live buffer. If it contains only a shell prompt (like &#39;iol#&#39; or &#39;admin@vrouter&gt;&#39;) and no command output, it means YOU DON&#39;T HAVE DATA. In this case, YOU MUST NOT invent any information.
+4. Focus on the &#34;why&#34; and &#34;how&#34;. Analyze topologies, design patterns, and validate configurations.
+5. Do NOT provide commands to execute unless specifically requested. Instead, explain the consequences and best practices.
+6. Keep your guide concise and authoritative.
+7. You MUST output your response in the following strict format:
 &lt;guide&gt;
 Your brief tactical guide in markdown.
 &lt;/guide&gt;
@@ -2190,7 +2190,7 @@ Your brief tactical guide in markdown.
 &lt;risk&gt;
 low
 &lt;/risk&gt;
-6. Risk level is usually &#34;low&#34; for read-only/no commands.
+8. Risk level is usually &#34;low&#34; for read-only/no commands.
 
 Terminal Context:
 {terminal_buffer}
@@ -2200,11 +2200,13 @@ Node: {node_name}&#34;&#34;&#34;
         else:
             system_prompt = f&#34;&#34;&#34;Role: TERMINAL COPILOT. You assist a network engineer during a live SSH session.
 Rules:
-1. Answer the user&#39;s question directly based on the Terminal Context.
-2. If the user asks you to analyze, parse, or extract data from the Terminal Context, DO IT directly in the &lt;guide&gt; section (you can use markdown tables or lists). Do NOT just give them a command to do it themselves.
-3. If the user wants to execute an action, provide the required CLI commands inside a &lt;commands&gt; block, one command per line. If no commands are needed, leave it empty or omit the block.
-4. ULTRA-CONCISE. Keep your guide to the point.
-5. You MUST output your response in the following strict format:
+1. MANDATORY: You MUST respond in the same language used by the user in their question.
+2. EXTREMELY IMPORTANT: Answer EXCLUSIVELY based on the provided Terminal Context. 
+3. NO HALLUCINATIONS. The Terminal Context is a live buffer. If it contains only a shell prompt (like &#39;iol#&#39; or &#39;admin@vrouter&gt;&#39;) and no command output, it means YOU DON&#39;T HAVE DATA. In this case, YOU MUST NOT invent any information. Instead, explicitly state that you don&#39;t see the data and offer the correct CLI commands to retrieve it.
+4. If the user asks you to analyze, parse, or extract data from the Terminal Context, DO IT directly in the &lt;guide&gt; section (you can use markdown tables or lists). Do NOT just give them a command to do it themselves.
+5. If the user wants to execute an action, provide the required CLI commands inside a &lt;commands&gt; block, one command per line. If no commands are needed, leave it empty or omit the block.
+6. ULTRA-CONCISE. Keep your guide to the point.
+7. You MUST output your response in the following strict format:
 &lt;guide&gt;
 Your brief tactical guide in markdown. 3-4 sentences max.
 &lt;/guide&gt;
@@ -2215,7 +2217,7 @@ command 2
 &lt;risk&gt;
 low, high, or destructive
 &lt;/risk&gt;
-6. Risk level: &#34;low&#34; for read-only/no commands, &#34;high&#34; for config changes, &#34;destructive&#34; for potentially dangerous ops.
+8. Risk level: &#34;low&#34; for read-only/no commands, &#34;high&#34; for config changes, &#34;destructive&#34; for potentially dangerous ops.
 
 Terminal Context:
 {terminal_buffer}
@@ -2257,6 +2259,7 @@ Node: {node_name}&#34;&#34;&#34;
         try:
             while iteration &lt; max_iterations:
                 iteration += 1
+
                 response = await acompletion(
                     model=current_model,
                     messages=messages,
@@ -4119,6 +4122,7 @@ class node:
         self.output = &#34;&#34;
         self.status = 1
         self.result = {}
+        self.cmd_byte_positions = [(0, None)]
 
     @MethodHook
     def _passtx(self, passwords, *, keyfile=None):
@@ -4293,9 +4297,9 @@ class node:
             loop = asyncio.get_running_loop()
             child_reader_queue = asyncio.Queue()
             
-            # Track command byte positions for copilot context navigation
+            # Reset and track command byte positions for copilot context navigation
             # Each entry is (byte_position, command_text_or_None)
-            cmd_byte_positions = [(0, None)]
+            self.cmd_byte_positions = [(self.mylog.tell() if hasattr(self, &#39;mylog&#39;) else 0, None)]
             
             def _child_read_ready():
                 try:
@@ -4336,7 +4340,7 @@ class node:
                             node_info[&#34;prompt&#34;] = to_str(self.tags.get(&#34;prompt&#34;, r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;))
                         
                         # Invoke copilot (async callback handles UI)
-                        await copilot_handler(self.mylog.getvalue(), node_info, local_stream, child_fd, cmd_byte_positions)
+                        await copilot_handler(self.mylog.getvalue(), node_info, local_stream, child_fd, self.cmd_byte_positions)
                         continue
                     
                     # Remove any stray \x00 bytes and forward normally
@@ -4344,10 +4348,9 @@ class node:
                     if clean_data:
                         # Track command boundaries when user hits Enter
                         if hasattr(self, &#39;mylog&#39;) and (b&#39;\r&#39; in clean_data or b&#39;\n&#39; in clean_data):
-                            cmd_byte_positions.append((self.mylog.tell(), None))
-                            
-                        try:
-                            os.write(child_fd, clean_data)
+                            self.cmd_byte_positions.append((self.mylog.tell(), None))
+
+                        try:                            os.write(child_fd, clean_data)
                         except OSError:
                             break
                         self.lastinput = time()
@@ -4469,6 +4472,45 @@ class node:
         finally:
             local_stream.teardown()
 
+    @MethodHook
+    async def inject_commands(self, commands, child_fd, on_inject=None):
+        &#34;&#34;&#34;
+        Inject a list of commands into the node&#39;s PTY.
+        Handles screen_length_command, history tracking and delays.
+        &#34;&#34;&#34;
+        if not commands:
+            return
+
+        # 0. Clear line
+        os.write(child_fd, b&#39;\x15&#39;)
+        await asyncio.sleep(0.1)
+
+        # 1. Prepare list (prepend screen_length if exists)
+        slc = self.tags.get(&#34;screen_length_command&#34;) if hasattr(self, &#39;tags&#39;) and isinstance(self.tags, dict) else None
+        
+        to_send = list(commands)
+        if slc and slc not in to_send: # avoid duplicates if already there
+             to_send.insert(0, slc)
+
+        # 2. Inject one by one
+        for cmd in to_send:
+            # Register in node&#39;s official history (SKIP if it&#39;s the administrative screen length command)
+            if cmd != slc and hasattr(self, &#39;cmd_byte_positions&#39;) and self.cmd_byte_positions is not None:
+                log_pos = self.mylog.tell() if hasattr(self, &#39;mylog&#39;) else 0
+                self.cmd_byte_positions.append((log_pos, cmd))
+            
+            # Write physically to PTY
+            os.write(child_fd, (cmd + &#34;\n&#34;).encode())
+            
+            # Notify (e.g., for gRPC or logs) - SKIP for administrative SLC
+            if on_inject and cmd != slc:
+                if asyncio.iscoroutinefunction(on_inject):
+                    await on_inject(cmd)
+                else:
+                    on_inject(cmd)
+            
+            # Delay to avoid overwhelming the router
+            await asyncio.sleep(0.8)
 
     @MethodHook
     def interact(self, debug=False, logger=None):
@@ -4550,7 +4592,7 @@ class node:
                         while True:
                             action, commands, custom_cmd = await interface.run_session(
                                 raw_bytes=raw_bytes,
-                                cmd_byte_positions=cmd_byte_positions,
+                                cmd_byte_positions=self.cmd_byte_positions,
                                 node_info=node_info,
                                 on_ai_call=on_ai_call
                             )
@@ -4558,6 +4600,7 @@ class node:
                                 continue
                             break
                 finally:
+                    print(&#34;\033[2m Returning to session...\033[0m&#34;, flush=True)
                     # Reiniciar el lector de la terminal para volver al modo interactivo SSH/Telnet
                     if hasattr(stream, &#39;start_reading&#39;):
                         stream.start_reading()
@@ -4566,20 +4609,7 @@ class node:
                 
                 if action in (&#34;send_all&#34;, &#34;custom&#34;):
                     cmds_to_send = commands if action == &#34;send_all&#34; else custom_cmd
-                    
-                    if cmds_to_send:
-                        os.write(child_fd, b&#39;\x15&#39;) # Ctrl+U
-                        await asyncio.sleep(0.1)
-                        
-                        # Prepend screen length command to avoid pagination
-                        if &#34;screen_length_command&#34; in self.tags:
-                            cmds_to_send.insert(0, self.tags[&#34;screen_length_command&#34;])
-
-                        for cmd in cmds_to_send:
-                            if cmd_byte_positions is not None:
-                                cmd_byte_positions.append((self.mylog.tell(), cmd))
-                            os.write(child_fd, (cmd + &#34;\n&#34;).encode())
-                            await asyncio.sleep(0.8)
+                    await self.inject_commands(cmds_to_send, child_fd)
                 else:
                     os.write(child_fd, b&#39;\x15\r&#39;)
             except Exception as e:
@@ -5073,6 +5103,57 @@ class node:
 </code></pre></div>
 <h3>Methods</h3>
 <dl>
+<dt id="connpy.node.inject_commands"><code class="name flex">
+<span>async def <span class="ident">inject_commands</span></span>(<span>self, commands, child_fd, on_inject=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@MethodHook
+async def inject_commands(self, commands, child_fd, on_inject=None):
+    &#34;&#34;&#34;
+    Inject a list of commands into the node&#39;s PTY.
+    Handles screen_length_command, history tracking and delays.
+    &#34;&#34;&#34;
+    if not commands:
+        return
+
+    # 0. Clear line
+    os.write(child_fd, b&#39;\x15&#39;)
+    await asyncio.sleep(0.1)
+
+    # 1. Prepare list (prepend screen_length if exists)
+    slc = self.tags.get(&#34;screen_length_command&#34;) if hasattr(self, &#39;tags&#39;) and isinstance(self.tags, dict) else None
+    
+    to_send = list(commands)
+    if slc and slc not in to_send: # avoid duplicates if already there
+         to_send.insert(0, slc)
+
+    # 2. Inject one by one
+    for cmd in to_send:
+        # Register in node&#39;s official history (SKIP if it&#39;s the administrative screen length command)
+        if cmd != slc and hasattr(self, &#39;cmd_byte_positions&#39;) and self.cmd_byte_positions is not None:
+            log_pos = self.mylog.tell() if hasattr(self, &#39;mylog&#39;) else 0
+            self.cmd_byte_positions.append((log_pos, cmd))
+        
+        # Write physically to PTY
+        os.write(child_fd, (cmd + &#34;\n&#34;).encode())
+        
+        # Notify (e.g., for gRPC or logs) - SKIP for administrative SLC
+        if on_inject and cmd != slc:
+            if asyncio.iscoroutinefunction(on_inject):
+                await on_inject(cmd)
+            else:
+                on_inject(cmd)
+        
+        # Delay to avoid overwhelming the router
+        await asyncio.sleep(0.8)</code></pre>
+</details>
+<div class="desc"><p>Inject a list of commands into the node's PTY.
+Handles screen_length_command, history tracking and delays.</p></div>
+</dd>
 <dt id="connpy.node.interact"><code class="name flex">
 <span>def <span class="ident">interact</span></span>(<span>self, debug=False, logger=None)</span>
 </code></dt>
@@ -6189,6 +6270,7 @@ def test(self, commands, expected, vars = None,*, folder = None, prompt = None, 
 <li>
 <h4><code><a title="connpy.node" href="#connpy.node">node</a></code></h4>
 <ul class="">
+<li><code><a title="connpy.node.inject_commands" href="#connpy.node.inject_commands">inject_commands</a></code></li>
 <li><code><a title="connpy.node.interact" href="#connpy.node.interact">interact</a></code></li>
 <li><code><a title="connpy.node.run" href="#connpy.node.run">run</a></code></li>
 <li><code><a title="connpy.node.test" href="#connpy.node.test">test</a></code></li>

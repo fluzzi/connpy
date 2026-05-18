@@ -90,9 +90,10 @@ el.replaceWith(d);
 
     async def run_session(self, 
                           raw_bytes: bytes, 
-                          cmd_byte_positions: List[tuple], 
                           node_info: dict,
-                          on_ai_call: Callable):
+                          on_ai_call: Callable,
+                          cmd_byte_positions: List[tuple] = None, 
+                          blocks: List[tuple] = None):
         &#34;&#34;&#34;
         Runs the interactive Copilot session.
         on_ai_call: async function(active_buffer, question) -&gt; result_dict
@@ -102,9 +103,11 @@ el.replaceWith(d);
         try:
             # Prepare UI state
             buffer = log_cleaner(raw_bytes.decode(errors=&#39;replace&#39;))
-            blocks = self.ai_service.build_context_blocks(raw_bytes, cmd_byte_positions, node_info)
-            last_line = buffer.split(&#39;\n&#39;)[-1].strip() if buffer.strip() else &#34;(prompt)&#34;
-            blocks.append((len(raw_bytes), last_line[:80]))
+            
+            # Use pre-calculated blocks if provided (remote mode), otherwise calculate locally (local mode)
+            if blocks is None:
+                last_line = buffer.split(&#39;\n&#39;)[-1].strip() if buffer.strip() else &#34;(prompt)&#34;
+                blocks = self.ai_service.build_context_blocks(raw_bytes, cmd_byte_positions, node_info, last_line=last_line)
             
             state = {
                 &#39;context_cmd&#39;: 1,
@@ -121,7 +124,7 @@ el.replaceWith(d);
             self.console.print(&#34;&#34;) # Salto de línea real
             self.console.print(Rule(title=&#34;[bold cyan] AI TERMINAL COPILOT [/bold cyan]&#34;, style=&#34;cyan&#34;))
             self.console.print(Panel(
-                &#34;[dim]Type your question. Enter to send, Escape/Ctrl+C to cancel.\n&#34;
+                &#34;[dim]Type your question. Enter to send, Escape/Ctrl+C to cancel. Type / for commands.\n&#34;
                 &#34;Tab to change context mode. Ctrl+\u2191/\u2193 to adjust context. \u2191\u2193 for question history.[/dim]&#34;,
                 border_style=&#34;cyan&#34;
             ))
@@ -161,9 +164,8 @@ el.replaceWith(d);
                 if state[&#39;context_mode&#39;] == self.mode_lines:
                     return &#39;\n&#39;.join(buffer.split(&#39;\n&#39;)[-state[&#39;context_lines&#39;]:])
                 idx = max(0, state[&#39;total_cmds&#39;] - state[&#39;context_cmd&#39;])
-                start, preview = blocks[idx]
-                if state[&#39;context_mode&#39;] == self.mode_single and idx + 1 &lt; state[&#39;total_cmds&#39;]:
-                    end = blocks[idx + 1][0]
+                start, end, preview = blocks[idx]
+                if state[&#39;context_mode&#39;] == self.mode_single:
                     active_raw = raw_bytes[start:end]
                 else:
                     active_raw = raw_bytes[start:]
@@ -205,7 +207,40 @@ el.replaceWith(d);
                     base_str = f&#39;\u25b6 Ctrl+\u2191/\u2193 adjusts by 50 lines  [Tab: {m_label}]&#39;
                 else:
                     idx = max(0, state[&#39;total_cmds&#39;] - state[&#39;context_cmd&#39;])
-                    desc = blocks[idx][1]
+                    import re
+                    
+                    def clean_preview(text):
+                        # Limpia saltos de línea y el prompt inicial (todo hasta #, &gt; o $) para que quede solo el comando
+                        original = text.strip().replace(&#39;\r&#39;, &#39;&#39;).replace(&#39;\n&#39;, &#39; &#39;)
+                        cleaned = re.sub(r&#39;^.*?[#&gt;\$]\s*&#39;, &#39;&#39;, original)
+                        # Si limpiar el prompt nos deja con un string vacío (ej: era solo &#34;iol#&#34;), devolvemos el original
+                        return cleaned if cleaned else original
+
+                    if state[&#39;context_mode&#39;] == self.mode_range:
+                        range_blocks = blocks[idx:]
+                        # Si hay más de un bloque, el último es siempre el prompt vacío/actual. Lo omitimos visualmente.
+                        if len(range_blocks) &gt; 1:
+                            range_blocks = range_blocks[:-1]
+                            
+                        # Limpiar y truncar comandos muy largos para que no rompan la UI
+                        previews = []
+                        for b in range_blocks:
+                            p = clean_preview(b[2])
+                            if p:
+                                # Truncar comandos individuales largos
+                                if len(p) &gt; 25: p = p[:22] + &#34;...&#34;
+                                previews.append(p)
+                        
+                        if not previews:
+                            desc = clean_preview(blocks[idx][2])
+                        elif len(previews) &lt;= 3:
+                            desc = &#34; + &#34;.join(previews)
+                        else:
+                            desc = f&#34;{previews[0]} + {previews[1]} + {previews[2]} ... (+{len(previews)-3})&#34;
+                    else:
+                        # Modo SINGLE original
+                        desc = clean_preview(blocks[idx][2])
+                        
                     base_str = f&#39;\u25b6 {desc}  [Tab: {m_label}]&#39;
                 
                 # Wrap base_str in a style to maintain consistency and avoid glitches
@@ -332,39 +367,67 @@ el.replaceWith(d);
                 # Use persona from overrides (one-shot) or from session state
                 active_persona = merged_node_info.get(&#39;persona&#39;, self.session_state.get(&#39;persona&#39;, &#39;engineer&#39;))
                 persona_color = self._get_theme_color(active_persona, fallback=&#34;cyan&#34;)
+                persona_title = &#34;Network Architect&#34; if active_persona == &#34;architect&#34; else &#34;Network Engineer&#34;
                 
                 active_buffer = get_active_buffer()
-                live_text = &#34;Thinking...&#34;
-                panel = Panel(live_text, title=f&#34;[bold {persona_color}]Copilot Guide[/bold {persona_color}]&#34;, border_style=persona_color)
+                live_text = &#34;&#34;
+                first_chunk = True
+                
+                import sys
+                from rich.rule import Rule
+                from rich.status import Status
+                from connpy.printer import IncrementalMarkdownParser
+                
+                md_parser = IncrementalMarkdownParser(console=self.console)
+                
+                status_spinner = Status(
+                    f&#34;[bold {persona_color}]{persona_title}:[/bold {persona_color}] [dim]Thinking...[/dim]&#34;,
+                    console=self.console,
+                    spinner=&#34;dots&#34;
+                )
+                status_spinner.start()
                 
                 def on_chunk(text):
-                    nonlocal live_text
-                    if live_text == &#34;Thinking...&#34;: live_text = &#34;&#34;
+                    nonlocal live_text, first_chunk
+                    if first_chunk:
+                        status_spinner.stop()
+                        # Print header rule before first chunk arrives
+                        self.console.print(Rule(
+                            f&#34;[bold {persona_color}]{persona_title}[/bold {persona_color}]&#34;,
+                            style=persona_color
+                        ))
+                        first_chunk = False
                     live_text += text
+                    md_parser.feed(text)
                 
-                with Live(panel, console=self.console, refresh_per_second=10) as live:
-                    def update_live(t):
-                        live.update(Panel(Markdown(t), title=f&#34;[bold {persona_color}]Copilot Guide[/bold {persona_color}]&#34;, border_style=persona_color))
+                # Check for interruption during AI call
+                ai_task = asyncio.create_task(on_ai_call(active_buffer, clean_question, on_chunk, merged_node_info))
+                
+                try:
+                    while not ai_task.done():
+                        await asyncio.sleep(0.05)
+                    result = await ai_task
+                except asyncio.CancelledError:
+                    status_spinner.stop()
+                    return &#34;cancel&#34;, None, None
+                
+                # Ensure spinner is stopped if no chunks arrived
+                if first_chunk:
+                    status_spinner.stop()
 
-                    wrapped_chunk = lambda t: (on_chunk(t), update_live(live_text))
-                    
-                    # Check for interruption during AI call
-                    ai_task = asyncio.create_task(on_ai_call(active_buffer, clean_question, wrapped_chunk, merged_node_info))
-                    
-                    try:
-                        while not ai_task.done():
-                            await asyncio.sleep(0.05)
-                        result = await ai_task
-                    except asyncio.CancelledError:
-                        return &#34;cancel&#34;, None, None
-
+                # Close the streamed output with a Rule
+                if not first_chunk:
+                    md_parser.flush()
+                    self.console.print(Rule(style=persona_color))
+                
                 if not result or result.get(&#34;error&#34;):
-                    if result and result.get(&#34;error&#34;): self.console.print(f&#34;[red]Error: {result[&#39;error&#39;]}[/red]&#34;)
+                    if first_chunk and result and result.get(&#34;error&#34;):
+                        self.console.print(f&#34;[red]Error: {result[&#39;error&#39;]}[/red]&#34;)
                     return &#34;cancel&#34;, None, None
 
-                # 4. Handle result
-                if live_text == &#34;Thinking...&#34; and result.get(&#34;guide&#34;):
-                    self.console.print(Panel(Markdown(result[&#34;guide&#34;]), title=f&#34;[bold {persona_color}]Copilot Guide[/bold {persona_color}]&#34;, border_style=persona_color))
+                # If no chunks were streamed but we have a guide, print it as a panel
+                if first_chunk and result and result.get(&#34;guide&#34;):
+                    self.console.print(Panel(Markdown(result[&#34;guide&#34;]), title=f&#34;[bold {persona_color}]{persona_title}[/bold {persona_color}]&#34;, border_style=persona_color))
 
                 commands = result.get(&#34;commands&#34;, [])
                 if not commands:
@@ -466,14 +529,13 @@ el.replaceWith(d);
             return &#34;cancel&#34;, None, None
 
         finally:
-            state[&#39;cancelled&#39;] = True
-            self.console.print(&#34;[dim]Returning to session...[/dim]&#34;)</code></pre>
+            state[&#39;cancelled&#39;] = True</code></pre>
 </details>
 <div class="desc"></div>
 <h3>Methods</h3>
 <dl>
 <dt id="connpy.cli.terminal_ui.CopilotInterface.run_session"><code class="name flex">
-<span>async def <span class="ident">run_session</span></span>(<span>self,<br>raw_bytes: bytes,<br>cmd_byte_positions: List[tuple],<br>node_info: dict,<br>on_ai_call: Callable)</span>
+<span>async def <span class="ident">run_session</span></span>(<span>self,<br>raw_bytes: bytes,<br>node_info: dict,<br>on_ai_call: Callable,<br>cmd_byte_positions: List[tuple] = None,<br>blocks: List[tuple] = None)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -482,9 +544,10 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">async def run_session(self, 
                       raw_bytes: bytes, 
-                      cmd_byte_positions: List[tuple], 
                       node_info: dict,
-                      on_ai_call: Callable):
+                      on_ai_call: Callable,
+                      cmd_byte_positions: List[tuple] = None, 
+                      blocks: List[tuple] = None):
     &#34;&#34;&#34;
     Runs the interactive Copilot session.
     on_ai_call: async function(active_buffer, question) -&gt; result_dict
@@ -494,9 +557,11 @@ el.replaceWith(d);
     try:
         # Prepare UI state
         buffer = log_cleaner(raw_bytes.decode(errors=&#39;replace&#39;))
-        blocks = self.ai_service.build_context_blocks(raw_bytes, cmd_byte_positions, node_info)
-        last_line = buffer.split(&#39;\n&#39;)[-1].strip() if buffer.strip() else &#34;(prompt)&#34;
-        blocks.append((len(raw_bytes), last_line[:80]))
+        
+        # Use pre-calculated blocks if provided (remote mode), otherwise calculate locally (local mode)
+        if blocks is None:
+            last_line = buffer.split(&#39;\n&#39;)[-1].strip() if buffer.strip() else &#34;(prompt)&#34;
+            blocks = self.ai_service.build_context_blocks(raw_bytes, cmd_byte_positions, node_info, last_line=last_line)
         
         state = {
             &#39;context_cmd&#39;: 1,
@@ -513,7 +578,7 @@ el.replaceWith(d);
         self.console.print(&#34;&#34;) # Salto de línea real
         self.console.print(Rule(title=&#34;[bold cyan] AI TERMINAL COPILOT [/bold cyan]&#34;, style=&#34;cyan&#34;))
         self.console.print(Panel(
-            &#34;[dim]Type your question. Enter to send, Escape/Ctrl+C to cancel.\n&#34;
+            &#34;[dim]Type your question. Enter to send, Escape/Ctrl+C to cancel. Type / for commands.\n&#34;
             &#34;Tab to change context mode. Ctrl+\u2191/\u2193 to adjust context. \u2191\u2193 for question history.[/dim]&#34;,
             border_style=&#34;cyan&#34;
         ))
@@ -553,9 +618,8 @@ el.replaceWith(d);
             if state[&#39;context_mode&#39;] == self.mode_lines:
                 return &#39;\n&#39;.join(buffer.split(&#39;\n&#39;)[-state[&#39;context_lines&#39;]:])
             idx = max(0, state[&#39;total_cmds&#39;] - state[&#39;context_cmd&#39;])
-            start, preview = blocks[idx]
-            if state[&#39;context_mode&#39;] == self.mode_single and idx + 1 &lt; state[&#39;total_cmds&#39;]:
-                end = blocks[idx + 1][0]
+            start, end, preview = blocks[idx]
+            if state[&#39;context_mode&#39;] == self.mode_single:
                 active_raw = raw_bytes[start:end]
             else:
                 active_raw = raw_bytes[start:]
@@ -597,7 +661,40 @@ el.replaceWith(d);
                 base_str = f&#39;\u25b6 Ctrl+\u2191/\u2193 adjusts by 50 lines  [Tab: {m_label}]&#39;
             else:
                 idx = max(0, state[&#39;total_cmds&#39;] - state[&#39;context_cmd&#39;])
-                desc = blocks[idx][1]
+                import re
+                
+                def clean_preview(text):
+                    # Limpia saltos de línea y el prompt inicial (todo hasta #, &gt; o $) para que quede solo el comando
+                    original = text.strip().replace(&#39;\r&#39;, &#39;&#39;).replace(&#39;\n&#39;, &#39; &#39;)
+                    cleaned = re.sub(r&#39;^.*?[#&gt;\$]\s*&#39;, &#39;&#39;, original)
+                    # Si limpiar el prompt nos deja con un string vacío (ej: era solo &#34;iol#&#34;), devolvemos el original
+                    return cleaned if cleaned else original
+
+                if state[&#39;context_mode&#39;] == self.mode_range:
+                    range_blocks = blocks[idx:]
+                    # Si hay más de un bloque, el último es siempre el prompt vacío/actual. Lo omitimos visualmente.
+                    if len(range_blocks) &gt; 1:
+                        range_blocks = range_blocks[:-1]
+                        
+                    # Limpiar y truncar comandos muy largos para que no rompan la UI
+                    previews = []
+                    for b in range_blocks:
+                        p = clean_preview(b[2])
+                        if p:
+                            # Truncar comandos individuales largos
+                            if len(p) &gt; 25: p = p[:22] + &#34;...&#34;
+                            previews.append(p)
+                    
+                    if not previews:
+                        desc = clean_preview(blocks[idx][2])
+                    elif len(previews) &lt;= 3:
+                        desc = &#34; + &#34;.join(previews)
+                    else:
+                        desc = f&#34;{previews[0]} + {previews[1]} + {previews[2]} ... (+{len(previews)-3})&#34;
+                else:
+                    # Modo SINGLE original
+                    desc = clean_preview(blocks[idx][2])
+                    
                 base_str = f&#39;\u25b6 {desc}  [Tab: {m_label}]&#39;
             
             # Wrap base_str in a style to maintain consistency and avoid glitches
@@ -724,39 +821,67 @@ el.replaceWith(d);
             # Use persona from overrides (one-shot) or from session state
             active_persona = merged_node_info.get(&#39;persona&#39;, self.session_state.get(&#39;persona&#39;, &#39;engineer&#39;))
             persona_color = self._get_theme_color(active_persona, fallback=&#34;cyan&#34;)
+            persona_title = &#34;Network Architect&#34; if active_persona == &#34;architect&#34; else &#34;Network Engineer&#34;
             
             active_buffer = get_active_buffer()
-            live_text = &#34;Thinking...&#34;
-            panel = Panel(live_text, title=f&#34;[bold {persona_color}]Copilot Guide[/bold {persona_color}]&#34;, border_style=persona_color)
+            live_text = &#34;&#34;
+            first_chunk = True
+            
+            import sys
+            from rich.rule import Rule
+            from rich.status import Status
+            from connpy.printer import IncrementalMarkdownParser
+            
+            md_parser = IncrementalMarkdownParser(console=self.console)
+            
+            status_spinner = Status(
+                f&#34;[bold {persona_color}]{persona_title}:[/bold {persona_color}] [dim]Thinking...[/dim]&#34;,
+                console=self.console,
+                spinner=&#34;dots&#34;
+            )
+            status_spinner.start()
             
             def on_chunk(text):
-                nonlocal live_text
-                if live_text == &#34;Thinking...&#34;: live_text = &#34;&#34;
+                nonlocal live_text, first_chunk
+                if first_chunk:
+                    status_spinner.stop()
+                    # Print header rule before first chunk arrives
+                    self.console.print(Rule(
+                        f&#34;[bold {persona_color}]{persona_title}[/bold {persona_color}]&#34;,
+                        style=persona_color
+                    ))
+                    first_chunk = False
                 live_text += text
+                md_parser.feed(text)
             
-            with Live(panel, console=self.console, refresh_per_second=10) as live:
-                def update_live(t):
-                    live.update(Panel(Markdown(t), title=f&#34;[bold {persona_color}]Copilot Guide[/bold {persona_color}]&#34;, border_style=persona_color))
+            # Check for interruption during AI call
+            ai_task = asyncio.create_task(on_ai_call(active_buffer, clean_question, on_chunk, merged_node_info))
+            
+            try:
+                while not ai_task.done():
+                    await asyncio.sleep(0.05)
+                result = await ai_task
+            except asyncio.CancelledError:
+                status_spinner.stop()
+                return &#34;cancel&#34;, None, None
+            
+            # Ensure spinner is stopped if no chunks arrived
+            if first_chunk:
+                status_spinner.stop()
 
-                wrapped_chunk = lambda t: (on_chunk(t), update_live(live_text))
-                
-                # Check for interruption during AI call
-                ai_task = asyncio.create_task(on_ai_call(active_buffer, clean_question, wrapped_chunk, merged_node_info))
-                
-                try:
-                    while not ai_task.done():
-                        await asyncio.sleep(0.05)
-                    result = await ai_task
-                except asyncio.CancelledError:
-                    return &#34;cancel&#34;, None, None
-
+            # Close the streamed output with a Rule
+            if not first_chunk:
+                md_parser.flush()
+                self.console.print(Rule(style=persona_color))
+            
             if not result or result.get(&#34;error&#34;):
-                if result and result.get(&#34;error&#34;): self.console.print(f&#34;[red]Error: {result[&#39;error&#39;]}[/red]&#34;)
+                if first_chunk and result and result.get(&#34;error&#34;):
+                    self.console.print(f&#34;[red]Error: {result[&#39;error&#39;]}[/red]&#34;)
                 return &#34;cancel&#34;, None, None
 
-            # 4. Handle result
-            if live_text == &#34;Thinking...&#34; and result.get(&#34;guide&#34;):
-                self.console.print(Panel(Markdown(result[&#34;guide&#34;]), title=f&#34;[bold {persona_color}]Copilot Guide[/bold {persona_color}]&#34;, border_style=persona_color))
+            # If no chunks were streamed but we have a guide, print it as a panel
+            if first_chunk and result and result.get(&#34;guide&#34;):
+                self.console.print(Panel(Markdown(result[&#34;guide&#34;]), title=f&#34;[bold {persona_color}]{persona_title}[/bold {persona_color}]&#34;, border_style=persona_color))
 
             commands = result.get(&#34;commands&#34;, [])
             if not commands:
@@ -858,8 +983,7 @@ el.replaceWith(d);
         return &#34;cancel&#34;, None, None
 
     finally:
-        state[&#39;cancelled&#39;] = True
-        self.console.print(&#34;[dim]Returning to session...[/dim]&#34;)</code></pre>
+        state[&#39;cancelled&#39;] = True</code></pre>
 </details>
 <div class="desc"><p>Runs the interactive Copilot session.
 on_ai_call: async function(active_buffer, question) -&gt; result_dict</p></div>

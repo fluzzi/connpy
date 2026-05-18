@@ -113,10 +113,10 @@ el.replaceWith(d);
 <pre><code class="python">class AIService(BaseService):
     &#34;&#34;&#34;Business logic for interacting with AI agents and LLM configurations.&#34;&#34;&#34;
 
-    def build_context_blocks(self, raw_bytes: bytes, cmd_byte_positions: list, node_info: dict) -&gt; list:
+    def build_context_blocks(self, raw_bytes: bytes, cmd_byte_positions: list, node_info: dict, last_line: str = &#34;&#34;) -&gt; list:
         &#34;&#34;&#34;Identifies command blocks in the terminal history.&#34;&#34;&#34;
         blocks = []
-        if not (cmd_byte_positions and len(cmd_byte_positions) &gt;= 2 and raw_bytes):
+        if not raw_bytes:
             return blocks
             
         default_prompt = r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;
@@ -127,29 +127,63 @@ el.replaceWith(d);
         except Exception:
             prompt_re = re.compile(re.sub(r&#39;(?&lt;!\\)\$&#39;, &#39;&#39;, default_prompt))
             
-        for i in range(1, len(cmd_byte_positions)):
-            pos, known_cmd = cmd_byte_positions[i]
-            prev_pos = cmd_byte_positions[i-1][0]
-            
-            if known_cmd:
-                prev_chunk = raw_bytes[prev_pos:pos]
-                prev_cleaned = log_cleaner(prev_chunk.decode(errors=&#39;replace&#39;))
-                prev_lines = [l for l in prev_cleaned.split(&#39;\n&#39;) if l.strip()]
-                prompt_text = prev_lines[-1].strip() if prev_lines else &#34;&#34;
-                preview = f&#34;{prompt_text}{known_cmd}&#34; if prompt_text else known_cmd
-                blocks.append((pos, preview[:80]))
-            else:
-                chunk = raw_bytes[prev_pos:pos]
-                cleaned = log_cleaner(chunk.decode(errors=&#39;replace&#39;))
-                lines = [l for l in cleaned.split(&#39;\n&#39;) if l.strip()]
-                preview = lines[-1].strip() if lines else &#34;&#34;
+        parsed_positions = []
+        if cmd_byte_positions and len(cmd_byte_positions) &gt;= 1:
+            for i in range(1, len(cmd_byte_positions)):
+                pos, known_cmd = cmd_byte_positions[i]
+                prev_pos = cmd_byte_positions[i-1][0]
                 
-                if preview:
-                    match = prompt_re.search(preview)
-                    if match:
-                        cmd_text = preview[match.end():].strip()
-                        if cmd_text:
-                            blocks.append((pos, preview[:80]))
+                if known_cmd:
+                    prev_chunk = raw_bytes[prev_pos:pos]
+                    prev_cleaned = log_cleaner(prev_chunk.decode(errors=&#39;replace&#39;))
+                    prev_lines = [l for l in prev_cleaned.split(&#39;\n&#39;) if l.strip()]
+                    prompt_text = prev_lines[-1].strip() if prev_lines else &#34;&#34;
+                    preview = f&#34;{prompt_text}{known_cmd}&#34; if prompt_text else known_cmd
+                    parsed_positions.append({&#34;pos&#34;: pos, &#34;type&#34;: &#34;VALID_CMD&#34;, &#34;preview&#34;: preview[:80]})
+                else:
+                    chunk = raw_bytes[prev_pos:pos]
+                    cleaned = log_cleaner(chunk.decode(errors=&#39;replace&#39;))
+                    lines = [l for l in cleaned.split(&#39;\n&#39;) if l.strip()]
+                    preview = lines[-1].strip() if lines else &#34;&#34;
+                    
+                    if preview:
+                        match = prompt_re.search(preview)
+                        if match:
+                            cmd_text = preview[match.end():].strip()
+                            if cmd_text:
+                                parsed_positions.append({&#34;pos&#34;: pos, &#34;type&#34;: &#34;VALID_CMD&#34;, &#34;preview&#34;: preview[:80]})
+                            else:
+                                parsed_positions.append({&#34;pos&#34;: pos, &#34;type&#34;: &#34;EMPTY_PROMPT&#34;, &#34;preview&#34;: &#34;&#34;})
+                        else:
+                            parsed_positions.append({&#34;pos&#34;: pos, &#34;type&#34;: &#34;SCROLLING&#34;, &#34;preview&#34;: &#34;&#34;})
+                    else:
+                        parsed_positions.append({&#34;pos&#34;: pos, &#34;type&#34;: &#34;SCROLLING&#34;, &#34;preview&#34;: &#34;&#34;})
+
+        last_newline = raw_bytes.rfind(b&#39;\n&#39;)
+        current_prompt_pos = last_newline + 1 if last_newline != -1 else 0
+        current_end = len(raw_bytes)
+
+        for i, item in enumerate(parsed_positions):
+            if item[&#34;type&#34;] == &#34;VALID_CMD&#34;:
+                start_pos = item[&#34;pos&#34;]
+                preview = item[&#34;preview&#34;]
+                
+                # Find the end position: next VALID_CMD or EMPTY_PROMPT
+                end_pos = current_prompt_pos
+                for j in range(i + 1, len(parsed_positions)):
+                    next_item = parsed_positions[j]
+                    if next_item[&#34;type&#34;] in (&#34;VALID_CMD&#34;, &#34;EMPTY_PROMPT&#34;):
+                        end_pos = next_item[&#34;pos&#34;]
+                        break
+                
+                blocks.append((start_pos, end_pos, preview))
+
+        # Always ensure there is a final block representing the current prompt
+        if not blocks:
+            blocks.append((current_prompt_pos, current_end, last_line[:80] if last_line else &#34;CURRENT CONTEXT&#34;))
+        elif blocks[-1][0] &lt; current_prompt_pos:
+            blocks.append((current_prompt_pos, current_end, last_line[:80] if last_line else &#34;CURRENT CONTEXT&#34;))
+
         return blocks
 
     def process_copilot_input(self, input_text: str, session_state: dict) -&gt; dict:
@@ -372,17 +406,17 @@ el.replaceWith(d);
 <div class="desc"><p>Ask the AI copilot for terminal assistance.</p></div>
 </dd>
 <dt id="connpy.services.AIService.build_context_blocks"><code class="name flex">
-<span>def <span class="ident">build_context_blocks</span></span>(<span>self, raw_bytes: bytes, cmd_byte_positions: list, node_info: dict) ‑> list</span>
+<span>def <span class="ident">build_context_blocks</span></span>(<span>self,<br>raw_bytes: bytes,<br>cmd_byte_positions: list,<br>node_info: dict,<br>last_line: str = '') ‑> list</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def build_context_blocks(self, raw_bytes: bytes, cmd_byte_positions: list, node_info: dict) -&gt; list:
+<pre><code class="python">def build_context_blocks(self, raw_bytes: bytes, cmd_byte_positions: list, node_info: dict, last_line: str = &#34;&#34;) -&gt; list:
     &#34;&#34;&#34;Identifies command blocks in the terminal history.&#34;&#34;&#34;
     blocks = []
-    if not (cmd_byte_positions and len(cmd_byte_positions) &gt;= 2 and raw_bytes):
+    if not raw_bytes:
         return blocks
         
     default_prompt = r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;
@@ -393,29 +427,63 @@ el.replaceWith(d);
     except Exception:
         prompt_re = re.compile(re.sub(r&#39;(?&lt;!\\)\$&#39;, &#39;&#39;, default_prompt))
         
-    for i in range(1, len(cmd_byte_positions)):
-        pos, known_cmd = cmd_byte_positions[i]
-        prev_pos = cmd_byte_positions[i-1][0]
-        
-        if known_cmd:
-            prev_chunk = raw_bytes[prev_pos:pos]
-            prev_cleaned = log_cleaner(prev_chunk.decode(errors=&#39;replace&#39;))
-            prev_lines = [l for l in prev_cleaned.split(&#39;\n&#39;) if l.strip()]
-            prompt_text = prev_lines[-1].strip() if prev_lines else &#34;&#34;
-            preview = f&#34;{prompt_text}{known_cmd}&#34; if prompt_text else known_cmd
-            blocks.append((pos, preview[:80]))
-        else:
-            chunk = raw_bytes[prev_pos:pos]
-            cleaned = log_cleaner(chunk.decode(errors=&#39;replace&#39;))
-            lines = [l for l in cleaned.split(&#39;\n&#39;) if l.strip()]
-            preview = lines[-1].strip() if lines else &#34;&#34;
+    parsed_positions = []
+    if cmd_byte_positions and len(cmd_byte_positions) &gt;= 1:
+        for i in range(1, len(cmd_byte_positions)):
+            pos, known_cmd = cmd_byte_positions[i]
+            prev_pos = cmd_byte_positions[i-1][0]
             
-            if preview:
-                match = prompt_re.search(preview)
-                if match:
-                    cmd_text = preview[match.end():].strip()
-                    if cmd_text:
-                        blocks.append((pos, preview[:80]))
+            if known_cmd:
+                prev_chunk = raw_bytes[prev_pos:pos]
+                prev_cleaned = log_cleaner(prev_chunk.decode(errors=&#39;replace&#39;))
+                prev_lines = [l for l in prev_cleaned.split(&#39;\n&#39;) if l.strip()]
+                prompt_text = prev_lines[-1].strip() if prev_lines else &#34;&#34;
+                preview = f&#34;{prompt_text}{known_cmd}&#34; if prompt_text else known_cmd
+                parsed_positions.append({&#34;pos&#34;: pos, &#34;type&#34;: &#34;VALID_CMD&#34;, &#34;preview&#34;: preview[:80]})
+            else:
+                chunk = raw_bytes[prev_pos:pos]
+                cleaned = log_cleaner(chunk.decode(errors=&#39;replace&#39;))
+                lines = [l for l in cleaned.split(&#39;\n&#39;) if l.strip()]
+                preview = lines[-1].strip() if lines else &#34;&#34;
+                
+                if preview:
+                    match = prompt_re.search(preview)
+                    if match:
+                        cmd_text = preview[match.end():].strip()
+                        if cmd_text:
+                            parsed_positions.append({&#34;pos&#34;: pos, &#34;type&#34;: &#34;VALID_CMD&#34;, &#34;preview&#34;: preview[:80]})
+                        else:
+                            parsed_positions.append({&#34;pos&#34;: pos, &#34;type&#34;: &#34;EMPTY_PROMPT&#34;, &#34;preview&#34;: &#34;&#34;})
+                    else:
+                        parsed_positions.append({&#34;pos&#34;: pos, &#34;type&#34;: &#34;SCROLLING&#34;, &#34;preview&#34;: &#34;&#34;})
+                else:
+                    parsed_positions.append({&#34;pos&#34;: pos, &#34;type&#34;: &#34;SCROLLING&#34;, &#34;preview&#34;: &#34;&#34;})
+
+    last_newline = raw_bytes.rfind(b&#39;\n&#39;)
+    current_prompt_pos = last_newline + 1 if last_newline != -1 else 0
+    current_end = len(raw_bytes)
+
+    for i, item in enumerate(parsed_positions):
+        if item[&#34;type&#34;] == &#34;VALID_CMD&#34;:
+            start_pos = item[&#34;pos&#34;]
+            preview = item[&#34;preview&#34;]
+            
+            # Find the end position: next VALID_CMD or EMPTY_PROMPT
+            end_pos = current_prompt_pos
+            for j in range(i + 1, len(parsed_positions)):
+                next_item = parsed_positions[j]
+                if next_item[&#34;type&#34;] in (&#34;VALID_CMD&#34;, &#34;EMPTY_PROMPT&#34;):
+                    end_pos = next_item[&#34;pos&#34;]
+                    break
+            
+            blocks.append((start_pos, end_pos, preview))
+
+    # Always ensure there is a final block representing the current prompt
+    if not blocks:
+        blocks.append((current_prompt_pos, current_end, last_line[:80] if last_line else &#34;CURRENT CONTEXT&#34;))
+    elif blocks[-1][0] &lt; current_prompt_pos:
+        blocks.append((current_prompt_pos, current_end, last_line[:80] if last_line else &#34;CURRENT CONTEXT&#34;))
+
     return blocks</code></pre>
 </details>
 <div class="desc"><p>Identifies command blocks in the terminal history.</p></div>

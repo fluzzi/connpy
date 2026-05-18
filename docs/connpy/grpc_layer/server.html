@@ -807,14 +807,33 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
                     import json
                     import asyncio
                     import os
+                    from ..services.ai_service import AIService
+                    
+                    service = AIService(self.service.config)
 
                     if node_info is None:
                         node_info = {}
+                    
+                    # Calculate real command blocks from history using the central service
+                    raw_bytes = n.mylog.getvalue() if hasattr(n, &#39;mylog&#39;) else buffer
+                    if not isinstance(raw_bytes, bytes):
+                        raw_bytes = str(raw_bytes).encode()
+                    
+                    from connpy.utils import log_cleaner
+                    last_line = log_cleaner(raw_bytes.decode(errors=&#39;replace&#39;)).split(&#39;\n&#39;)[-1].strip()
+                    blocks = service.build_context_blocks(raw_bytes, n.cmd_byte_positions, node_info, last_line=last_line)
+                    node_info[&#34;context_blocks&#34;] = blocks
 
                     node_info_json = json.dumps(node_info)
                     
                     # Convert buffer to string if it&#39;s bytes for the preview
                     preview_str = buffer[-200:].decode(errors=&#39;replace&#39;) if isinstance(buffer, bytes) else str(buffer)[-200:]
+                    
+                    # Generate a unique session ID for this copilot interaction to prevent race conditions
+                    import uuid
+                    copilot_session_id = str(uuid.uuid4())
+                    node_info[&#34;session_id&#34;] = copilot_session_id
+                    node_info_json = json.dumps(node_info)
                     
                     # 1. Send prompt to client
                     response_queue.put(connpy_pb2.InteractResponse(
@@ -824,6 +843,13 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
                     ))
 
                     while True:
+                        # 0. Drain the queue of any stale messages before starting a new interaction
+                        while not remote_stream.copilot_queue.empty():
+                            try:
+                                remote_stream.copilot_queue.get_nowait()
+                            except:
+                                break
+
                         # 2. Await the question from client via the copilot_queue
                         import threading
                         def preload_ai_deps():
@@ -836,8 +862,17 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
                         try:
                             req_data = await asyncio.wait_for(remote_stream.copilot_queue.get(), timeout=120)
                             if not req_data: return
-                            if &#34;question&#34; not in req_data or not req_data[&#34;question&#34;] or req_data[&#34;question&#34;] == &#34;CANCEL&#34; or req_data.get(&#34;action&#34;) == &#34;cancel&#34;:
-                                os.write(child_fd, b&#39;\x15\r&#39;)
+                            
+                            # Validate session ID if provided by client (skip validation if not provided for CLI compatibility)
+                            req_session_id = req_data.get(&#34;session_id&#34;)
+                            if req_session_id and req_session_id != copilot_session_id:
+                                continue # Ignore stale request from a previous session
+
+                            if &#34;question&#34; not in req_data or not req_data[&#34;question&#34;] or req_data[&#34;question&#34;] == &#34;CANCEL&#34; or req_data.get(&#34;action&#34;) in (&#34;cancel&#34;, &#34;web_cancel&#34;):
+                                if req_data.get(&#34;action&#34;) == &#34;web_cancel&#34;:
+                                    os.write(child_fd, b&#39;\x05&#39;)
+                                else:
+                                    os.write(child_fd, b&#39;\x15\r&#39;)
                                 return
                             question = req_data[&#34;question&#34;]
                             
@@ -864,9 +899,6 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
                             return
                             
                         # 3. Call AI Service with streaming
-                        from ..services.ai_service import AIService
-                        service = AIService(self.service.config)
-                        
                         def chunk_callback(chunk_text):
                             if chunk_text:
                                 response_queue.put(connpy_pb2.InteractResponse(
@@ -887,8 +919,11 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
                         if wait_action_task in done:
                             req_data = wait_action_task.result()
                             ai_task.cancel()
-                            if req_data.get(&#34;action&#34;) == &#34;cancel&#34; or req_data.get(&#34;question&#34;) == &#34;CANCEL&#34;:
-                                os.write(child_fd, b&#39;\x15\r&#39;)
+                            if req_data.get(&#34;action&#34;) in (&#34;cancel&#34;, &#34;web_cancel&#34;) or req_data.get(&#34;question&#34;) == &#34;CANCEL&#34;:
+                                if req_data.get(&#34;action&#34;) == &#34;web_cancel&#34;:
+                                    os.write(child_fd, b&#39;\x05&#39;)
+                                else:
+                                    os.write(child_fd, b&#39;\x15\r&#39;)
                                 return
                             continue # Loop back instead of returning to keep session alive
                         else:
@@ -912,45 +947,27 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
                             if action == &#34;continue&#34;:
                                 continue # Loop back for next question
                                 
-                            if action == &#34;cancel&#34;:
-                                os.write(child_fd, b&#39;\x15\r&#39;)
+                            if action in (&#34;cancel&#34;, &#34;web_cancel&#34;):
+                                if action == &#34;web_cancel&#34;:
+                                    os.write(child_fd, b&#39;\x05&#39;)
+                                else:
+                                    os.write(child_fd, b&#39;\x15\r&#39;)
                                 return
                         except asyncio.TimeoutError:
                             os.write(child_fd, b&#39;\x15\r&#39;)
                             return
                             
+                        def on_inject(cmd):
+                            response_queue.put(connpy_pb2.InteractResponse(copilot_injected_command=cmd))
+
                         if action == &#34;send_all&#34;:
                             commands = result.get(&#34;commands&#34;, [])
-                            os.write(child_fd, b&#39;\x15&#39;) # Ctrl+U to clear line
-                            await asyncio.sleep(0.1)
-
-                            # Prepend screen length command to avoid pagination
-                            if &#34;screen_length_command&#34; in n.tags:
-                                os.write(child_fd, (n.tags[&#34;screen_length_command&#34;] + &#34;\n&#34;).encode())
-                                response_queue.put(connpy_pb2.InteractResponse(copilot_injected_command=n.tags[&#34;screen_length_command&#34;]))
-                                await asyncio.sleep(0.8)
-
-                            for cmd in commands:
-                                os.write(child_fd, (cmd + &#34;\n&#34;).encode())
-                                response_queue.put(connpy_pb2.InteractResponse(copilot_injected_command=cmd))
-                                await asyncio.sleep(0.8)
+                            await n.inject_commands(commands, child_fd, on_inject=on_inject)
                             return
                         elif action.startswith(&#34;custom:&#34;):
-                            custom_cmds = action[7:]
-                            os.write(child_fd, b&#39;\x15&#39;)
-                            await asyncio.sleep(0.1)
-                            
-                            # Prepend screen length command to avoid pagination
-                            if &#34;screen_length_command&#34; in n.tags:
-                                os.write(child_fd, (n.tags[&#34;screen_length_command&#34;] + &#34;\n&#34;).encode())
-                                response_queue.put(connpy_pb2.InteractResponse(copilot_injected_command=n.tags[&#34;screen_length_command&#34;]))
-                                await asyncio.sleep(0.8)
-
-                            for cmd in custom_cmds.split(&#39;\n&#39;):
-                                if cmd.strip():
-                                    os.write(child_fd, (cmd.strip() + &#34;\n&#34;).encode())
-                                    response_queue.put(connpy_pb2.InteractResponse(copilot_injected_command=cmd.strip()))
-                                    await asyncio.sleep(0.8)
+                            custom_cmds_raw = action[7:]
+                            custom_cmds = [cmd.strip() for cmd in custom_cmds_raw.split(&#39;\n&#39;) if cmd.strip()]
+                            await n.inject_commands(custom_cmds, child_fd, on_inject=on_inject)
                             return
                         else:
                             os.write(child_fd, b&#39;\x15\r&#39;)
