@@ -102,6 +102,7 @@ class NodeStub:
         with copilot_terminal_mode():
             action, commands, custom_cmd = asyncio.run(run_remote_copilot())
         
+        print("\033[2m Returning to session...\033[0m", flush=True)
         # Prepare final action for server
         action_sent = "cancel"
         if action == "send_all" and commands:
@@ -726,7 +727,6 @@ class AIStub:
         import queue
         from rich.prompt import Prompt
         from rich.text import Text
-        from rich.live import Live
         from rich.panel import Panel
         from rich.markdown import Markdown
         
@@ -757,7 +757,7 @@ class AIStub:
         responses = self.stub.ask(request_generator())
         
         full_content = ""
-        live_display = None
+        header_printed = False
         final_result = {"response": "", "chat_history": []}
 
         # Background thread to pull responses from gRPC into a local queue
@@ -822,69 +822,53 @@ class AIStub:
                 
                 if response.debug_message:
                     if debug:
-                        if live_display:
-                            try: live_display.stop()
-                            except: pass
                         if status:
                             try: status.stop()
                             except: pass
                         printer.console.print(Text.from_ansi(response.debug_message))
-                        if live_display:
-                            try: live_display.start()
-                            except: pass
-                        elif status:
+                        if status:
                             try: status.start()
                             except: pass
                     continue
                 
                 if response.important_message:
-                    if live_display:
-                        try: live_display.stop()
-                        except: pass
                     if status:
                         try: status.stop()
                         except: pass
                     printer.console.print(Text.from_ansi(response.important_message))
-                    if live_display:
-                        try: live_display.start()
-                        except: pass
-                    elif status:
+                    if status:
                         try: status.start()
                         except: pass
                     continue
 
                 if not response.is_final:
                     if response.text_chunk:
-                        full_content += response.text_chunk
-                        
-                        if not live_display:
+                        if not header_printed:
                             if status:
                                 try: status.stop()
                                 except: pass
                             
                             from rich.console import Console as RichConsole
-                            from ..printer import connpy_theme, get_original_stdout
+                            from rich.rule import Rule
+                            from ..printer import connpy_theme, get_original_stdout, IncrementalMarkdownParser
                             stable_console = RichConsole(theme=connpy_theme, file=get_original_stdout())
                             
-                            # We default to Engineer title during stream, final result will correct it if needed
-                            live_display = Live(
-                                Panel(Markdown(full_content), title="[bold engineer]Network Engineer[/bold engineer]", border_style="engineer", expand=False),
-                                console=stable_console,
-                                refresh_per_second=8,
-                                transient=False
-                            )
-                            live_display.start()
-                        else:
-                            live_display.update(
-                                Panel(Markdown(full_content), title="[bold engineer]Network Engineer[/bold engineer]", border_style="engineer", expand=False)
-                            )
+                            # Print header on first chunk
+                            stable_console.print(Rule("[bold engineer]Network Engineer[/bold engineer]", style="engineer"))
+                            header_printed = True
+                            
+                            # Initialize parser
+                            md_parser = IncrementalMarkdownParser(console=stable_console)
+                        
+                        full_content += response.text_chunk
+                        md_parser.feed(response.text_chunk)
                     continue
                 
                 if response.is_final:
-                    if live_display:
-                        try: live_display.stop()
-                        except: pass
-                    # Final stop for status to ensure it disappears before the panel
+                    if header_printed:
+                        from rich.rule import Rule
+                        md_parser.flush()
+                        
                     if status:
                         try: status.stop()
                         except: pass
@@ -895,13 +879,14 @@ class AIStub:
                     role_label = "Network Architect" if responder == "architect" else "Network Engineer"
                     title = f"[bold {alias}]{role_label}[/bold {alias}]"
                     
-                    content_to_print = full_content or final_result.get("response", "")
-                    if content_to_print:
-                        if live_display:
-                            # Re-render the final frame with correct title/colors
-                            live_display.update(Panel(Markdown(content_to_print), title=title, border_style=alias, expand=False))
-                        else:
-                            printer.console.print(Panel(Markdown(content_to_print), title=title, border_style=alias, expand=False))
+                    if header_printed:
+                        from rich.console import Console as RichConsole
+                        from ..printer import connpy_theme, get_original_stdout
+                        stable_console = RichConsole(theme=connpy_theme, file=get_original_stdout())
+                        stable_console.print(Rule(style=alias))
+                    elif not full_content and final_result.get("response"):
+                        # If nothing streamed but we have response (e.g. error or direct guide)
+                        printer.console.print(Panel(Markdown(final_result["response"]), title=title, border_style=alias, expand=False))
                     break
         except Exception as e:
             # Check if it was a gRPC error that we should let handle_errors catch

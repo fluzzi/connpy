@@ -689,6 +689,7 @@ class node:
                                 continue
                             break
                 finally:
+                    print("\033[2m Returning to session...\033[0m", flush=True)
                     # Reiniciar el lector de la terminal para volver al modo interactivo SSH/Telnet
                     if hasattr(stream, 'start_reading'):
                         stream.start_reading()

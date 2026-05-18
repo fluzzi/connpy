@@ -15,7 +15,17 @@ class ThreadLocalStream:
     def write(self, data):
         stream = self._get_stream()
         if stream:
-            stream.write(data)
+            import time
+            retries = 0
+            while True:
+                try:
+                    stream.write(data)
+                    break
+                except BlockingIOError:
+                    if retries > 50:
+                        raise
+                    time.sleep(0.01)
+                    retries += 1
     
     def flush(self):
         stream = self._get_stream()
@@ -496,3 +506,74 @@ class _ThemeProxy:
         return getattr(local.theme, name)
 
 connpy_theme = _ThemeProxy()
+
+class BlockMarkdownRenderer:
+    """
+    Block-buffered streaming markdown renderer.
+    Accumulates text until block boundaries are detected,
+    then renders complete blocks using Rich's Markdown.
+    """
+    def __init__(self, console=None):
+        from rich.console import Console as RichConsole
+        from .printer import connpy_theme, get_original_stdout
+        self._console = console or RichConsole(
+            theme=connpy_theme, file=get_original_stdout()
+        )
+        self._line_buf = ""        # chars waiting for \n
+        self._block_lines = []     # complete lines for current block
+        self._in_code_block = False
+
+    def feed(self, text):
+        self._line_buf += text
+        while '\n' in self._line_buf:
+            idx = self._line_buf.index('\n')
+            line = self._line_buf[:idx + 1]
+            self._line_buf = self._line_buf[idx + 1:]
+            self._process_line(line)
+
+    def flush(self):
+        if self._line_buf:
+            self._block_lines.append(self._line_buf)
+            self._line_buf = ""
+        self._flush_block()
+
+    def _process_line(self, line):
+        stripped = line.strip()
+        
+        if stripped.startswith('```'):
+            if not self._in_code_block:
+                # Flush accumulated text before code block
+                self._flush_block()
+                self._in_code_block = True
+                self._block_lines.append(line)
+            else:
+                # Include closing fence and flush code block
+                self._block_lines.append(line)
+                self._in_code_block = False
+                self._flush_block()
+            return
+
+        if self._in_code_block:
+            self._block_lines.append(line)
+            return
+
+        # Blank line = paragraph break
+        if stripped == '':
+            self._block_lines.append(line)
+            self._flush_block()
+            return
+
+        self._block_lines.append(line)
+
+    def _flush_block(self):
+        if not self._block_lines:
+            return
+        block_text = ''.join(self._block_lines).strip()
+        self._block_lines = []
+        if not block_text:
+            return
+        from rich.markdown import Markdown
+        self._console.print(Markdown(block_text))
+
+# Alias for backward compatibility
+IncrementalMarkdownParser = BlockMarkdownRenderer

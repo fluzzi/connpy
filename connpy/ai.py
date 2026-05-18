@@ -299,7 +299,6 @@ class ai:
         - response: reconstructed ModelResponse (same as non-streaming)
         - streamed: True if text was rendered to console during streaming
         """
-        from rich.live import Live
 
         stream_resp = completion(model=model, messages=messages, tools=tools, api_key=api_key, stream=True, **kwargs)
 
@@ -307,7 +306,7 @@ class ai:
         full_content = ""
         is_streaming_text = False
         has_tool_calls = False
-        live_display = None
+        header_printed = False
 
         # Determine styling based on current brain
         role_label = "Network Architect" if "architect" in label.lower() else "Network Engineer"
@@ -336,7 +335,6 @@ class ai:
 
                     if not chunk_callback:
                         if not is_streaming_text:
-                            # Stop spinner definitively
                             if status:
                                 try:
                                     status.stop()
@@ -345,35 +343,28 @@ class ai:
                             
                             # Create a stable, direct Console to bypass _ConsoleProxy recreation bugs
                             from rich.console import Console as RichConsole
-                            from .printer import connpy_theme, get_original_stdout
+                            from rich.rule import Rule
+                            from .printer import connpy_theme, get_original_stdout, IncrementalMarkdownParser
                             stable_console = RichConsole(theme=connpy_theme, file=get_original_stdout())
                             
-                            live_display = Live(
-                                Panel(Markdown(full_content), title=title, border_style=border, expand=False),
-                                console=stable_console,
-                                refresh_per_second=8,
-                                transient=False
-                            )
-                            live_display.start()
+                            stable_console.print(Rule(f"[bold {border}]{title}[/bold {border}]", style=border))
+                            header_printed = True
+                            md_parser = IncrementalMarkdownParser(console=stable_console)
                             is_streaming_text = True
-                        else:
-                            live_display.update(
-                                Panel(Markdown(full_content), title=title, border_style=border, expand=False)
-                            )
+                        
+                        md_parser.feed(delta.content)
         except Exception as e:
             if not chunks:
                 raise
         finally:
-            if live_display:
-                # Render final state with complete content
+            if header_printed:
                 try:
-                    live_display.update(
-                        Panel(Markdown(full_content), title=title, border_style=border, expand=False)
-                    )
-                except Exception:
-                    pass
-                try:
-                    live_display.stop()
+                    md_parser.flush()
+                    from rich.console import Console as RichConsole
+                    from rich.rule import Rule
+                    from .printer import connpy_theme, get_original_stdout
+                    stable_console = RichConsole(theme=connpy_theme, file=get_original_stdout())
+                    stable_console.print(Rule(style=border))
                 except Exception:
                     pass
         

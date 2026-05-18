@@ -12,7 +12,6 @@ from textwrap import dedent
 from rich.console import Console
 from rich.panel import Panel
 from rich.markdown import Markdown
-from rich.live import Live
 from prompt_toolkit import PromptSession
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.formatted_text import HTML
@@ -174,7 +173,40 @@ class CopilotInterface:
                     base_str = f'\u25b6 Ctrl+\u2191/\u2193 adjusts by 50 lines  [Tab: {m_label}]'
                 else:
                     idx = max(0, state['total_cmds'] - state['context_cmd'])
-                    desc = blocks[idx][2]
+                    import re
+                    
+                    def clean_preview(text):
+                        # Limpia saltos de línea y el prompt inicial (todo hasta #, > o $) para que quede solo el comando
+                        original = text.strip().replace('\r', '').replace('\n', ' ')
+                        cleaned = re.sub(r'^.*?[#>\$]\s*', '', original)
+                        # Si limpiar el prompt nos deja con un string vacío (ej: era solo "iol#"), devolvemos el original
+                        return cleaned if cleaned else original
+
+                    if state['context_mode'] == self.mode_range:
+                        range_blocks = blocks[idx:]
+                        # Si hay más de un bloque, el último es siempre el prompt vacío/actual. Lo omitimos visualmente.
+                        if len(range_blocks) > 1:
+                            range_blocks = range_blocks[:-1]
+                            
+                        # Limpiar y truncar comandos muy largos para que no rompan la UI
+                        previews = []
+                        for b in range_blocks:
+                            p = clean_preview(b[2])
+                            if p:
+                                # Truncar comandos individuales largos
+                                if len(p) > 25: p = p[:22] + "..."
+                                previews.append(p)
+                        
+                        if not previews:
+                            desc = clean_preview(blocks[idx][2])
+                        elif len(previews) <= 3:
+                            desc = " + ".join(previews)
+                        else:
+                            desc = f"{previews[0]} + {previews[1]} + {previews[2]} ... (+{len(previews)-3})"
+                    else:
+                        # Modo SINGLE original
+                        desc = clean_preview(blocks[idx][2])
+                        
                     base_str = f'\u25b6 {desc}  [Tab: {m_label}]'
                 
                 # Wrap base_str in a style to maintain consistency and avoid glitches
@@ -304,36 +336,63 @@ class CopilotInterface:
                 persona_title = "Network Architect" if active_persona == "architect" else "Network Engineer"
                 
                 active_buffer = get_active_buffer()
-                live_text = "Thinking..."
-                panel = Panel(live_text, title=f"[bold {persona_color}]{persona_title}[/bold {persona_color}]", border_style=persona_color)
+                live_text = ""
+                first_chunk = True
+                
+                import sys
+                from rich.rule import Rule
+                from rich.status import Status
+                from connpy.printer import IncrementalMarkdownParser
+                
+                md_parser = IncrementalMarkdownParser(console=self.console)
+                
+                status_spinner = Status(
+                    f"[bold {persona_color}]{persona_title}:[/bold {persona_color}] [dim]Thinking...[/dim]",
+                    console=self.console,
+                    spinner="dots"
+                )
+                status_spinner.start()
                 
                 def on_chunk(text):
-                    nonlocal live_text
-                    if live_text == "Thinking...": live_text = ""
+                    nonlocal live_text, first_chunk
+                    if first_chunk:
+                        status_spinner.stop()
+                        # Print header rule before first chunk arrives
+                        self.console.print(Rule(
+                            f"[bold {persona_color}]{persona_title}[/bold {persona_color}]",
+                            style=persona_color
+                        ))
+                        first_chunk = False
                     live_text += text
+                    md_parser.feed(text)
                 
-                with Live(panel, console=self.console, refresh_per_second=10) as live:
-                    def update_live(t):
-                        live.update(Panel(Markdown(t), title=f"[bold {persona_color}]{persona_title}[/bold {persona_color}]", border_style=persona_color))
+                # Check for interruption during AI call
+                ai_task = asyncio.create_task(on_ai_call(active_buffer, clean_question, on_chunk, merged_node_info))
+                
+                try:
+                    while not ai_task.done():
+                        await asyncio.sleep(0.05)
+                    result = await ai_task
+                except asyncio.CancelledError:
+                    status_spinner.stop()
+                    return "cancel", None, None
+                
+                # Ensure spinner is stopped if no chunks arrived
+                if first_chunk:
+                    status_spinner.stop()
 
-                    wrapped_chunk = lambda t: (on_chunk(t), update_live(live_text))
-                    
-                    # Check for interruption during AI call
-                    ai_task = asyncio.create_task(on_ai_call(active_buffer, clean_question, wrapped_chunk, merged_node_info))
-                    
-                    try:
-                        while not ai_task.done():
-                            await asyncio.sleep(0.05)
-                        result = await ai_task
-                    except asyncio.CancelledError:
-                        return "cancel", None, None
-
+                # Close the streamed output with a Rule
+                if not first_chunk:
+                    md_parser.flush()
+                    self.console.print(Rule(style=persona_color))
+                
                 if not result or result.get("error"):
-                    if result and result.get("error"): self.console.print(f"[red]Error: {result['error']}[/red]")
+                    if first_chunk and result and result.get("error"):
+                        self.console.print(f"[red]Error: {result['error']}[/red]")
                     return "cancel", None, None
 
-                # 4. Handle result
-                if live_text == "Thinking..." and result.get("guide"):
+                # If no chunks were streamed but we have a guide, print it as a panel
+                if first_chunk and result and result.get("guide"):
                     self.console.print(Panel(Markdown(result["guide"]), title=f"[bold {persona_color}]{persona_title}[/bold {persona_color}]", border_style=persona_color))
 
                 commands = result.get("commands", [])
@@ -437,5 +496,4 @@ class CopilotInterface:
 
         finally:
             state['cancelled'] = True
-            self.console.print("[dim]Returning to session...[/dim]")
 
