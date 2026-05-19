@@ -375,7 +375,9 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
 
                 asyncio.run(n._async_interact_loop(remote_stream, resize_callback, copilot_handler=remote_copilot_handler))
             except Exception as e:
-                pass
+                import traceback
+                print(f"[ERROR in run_async_loop] {e}")
+                traceback.print_exc()
             finally:
                 n._teardown_interact_environment()
                 response_queue.put(None)  # Signal EOF

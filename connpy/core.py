@@ -315,8 +315,11 @@ class node:
 
 
     def _setup_interact_environment(self, debug=False, logger=None, async_mode=False):
-        size = re.search('columns=([0-9]+).*lines=([0-9]+)',str(os.get_terminal_size()))
-        self.child.setwinsize(int(size.group(2)),int(size.group(1)))
+        try:
+            size = re.search('columns=([0-9]+).*lines=([0-9]+)',str(os.get_terminal_size()))
+            self.child.setwinsize(int(size.group(2)),int(size.group(1)))
+        except OSError:
+            pass
         if logger:
             port_str = f":{self.port}" if self.port and self.protocol not in ["ssm", "kubectl", "docker"] else ""
             logger("success", f"Connected to {self.unique} at {self.host}{port_str} via: {self.protocol}")
