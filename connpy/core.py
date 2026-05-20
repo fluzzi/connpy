@@ -440,9 +440,16 @@ class node:
                     if clean_data:
                         # Track command boundaries when user hits Enter
                         if hasattr(self, 'mylog') and (b'\r' in clean_data or b'\n' in clean_data):
-                            self.cmd_byte_positions.append((self.mylog.tell(), None))
+                            # Introduce a tiny 20ms delay to allow late-arriving tab-completion bytes 
+                            # to be written to mylog before finalizing the boundary marker.
+                            async def delayed_marker():
+                                await asyncio.sleep(0.02)
+                                if hasattr(self, 'mylog'):
+                                    self.cmd_byte_positions.append((self.mylog.tell(), None))
+                            asyncio.create_task(delayed_marker())
 
-                        try:                            os.write(child_fd, clean_data)
+                        try:
+                            os.write(child_fd, clean_data)
                         except OSError:
                             break
                         self.lastinput = time()

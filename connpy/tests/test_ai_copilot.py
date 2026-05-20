@@ -158,3 +158,38 @@ def test_ingress_task_interception():
         assert called_copilot
         
     asyncio.run(run_test())
+
+def test_build_context_blocks_horizontal_scrolling():
+    from connpy.services.ai_service import AIService
+    svc = AIService(None)
+    
+    node_info = {"prompt": "RP/0/RP0/CPU0:xrd#"}
+    part1 = 'RP/0/RP0/CPU0:xrd#s show interfaces * | inc "rate|is up|escr|test1|test2|test3|test4|test5|teest8|test7|t$'
+    part2 = '|escr|test1|test2|test3|test4|test5|teest8|test7|te                                 s998"show interfaces * | inc "rate|is up|escr|test1|test2|test3|test4|test5|teest8|test7|$'
+    
+    # Test with \r (classic IOS)
+    raw_bytes = (part1 + '\r' + part2).encode()
+    cmd_byte_positions = [(0, None), (len(raw_bytes), None)]
+    
+    blocks = svc.build_context_blocks(raw_bytes, cmd_byte_positions, node_info)
+    assert len(blocks) >= 1
+    start, end, preview = blocks[0]
+    assert "RP/0/RP0/CPU0:xrd# s show interfaces * | inc" in preview
+
+def test_build_context_blocks_horizontal_scrolling_ansi():
+    """Test with CSI cursor repositioning (\\x1B[1G) instead of raw \\r, as used by Cisco IOS XR."""
+    from connpy.services.ai_service import AIService
+    svc = AIService(None)
+    
+    node_info = {"prompt": "RP/0/RP0/CPU0:xrd#"}
+    part1 = 'RP/0/RP0/CPU0:xrd#s show interfaces * | inc "rate|is up|escr|test1|test2|test3|test4|test5|teest8|test7|t'
+    part2 = '$|escr|test1|test2|test3|test4|test5|teest8|test7|te                                 s998"show interfaces * | inc "rate|is up|escr|test1|test2|test3|test4|test5|teest8|test7|$'
+    
+    # Test with \x1B[1G (CSI Cursor Horizontal Absolute - IOS XR)
+    raw_bytes = (part1 + '\x1b[1G' + part2).encode()
+    cmd_byte_positions = [(0, None), (len(raw_bytes), None)]
+    
+    blocks = svc.build_context_blocks(raw_bytes, cmd_byte_positions, node_info)
+    assert len(blocks) >= 1
+    start, end, preview = blocks[0]
+    assert "RP/0/RP0/CPU0:xrd# s show interfaces * | inc" in preview
