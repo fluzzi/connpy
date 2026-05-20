@@ -281,6 +281,7 @@ class connapp:
         aiparser.add_argument("--debug", action="store_true", help="Show AI reasoning and tool calls")
         aiparser.add_argument("-y", "--trust", action="store_true", help="Trust AI to execute unsafe commands without confirmation")
         aiparser.add_argument("--list", "--list-sessions", dest="list_sessions", action="store_true", help="List saved AI sessions")
+        aiparser.add_argument("--all", action="store_true", help="Show all sessions without limit")
         aiparser.add_argument("--session", nargs=1, help="Resume a specific AI session by ID")
         aiparser.add_argument("--resume", action="store_true", help="Resume the most recent AI session")
         aiparser.add_argument("--delete", "--delete-session", dest="delete_session", nargs=1, help="Delete an AI session by ID")

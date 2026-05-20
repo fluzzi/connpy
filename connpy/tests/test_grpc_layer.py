@@ -120,6 +120,7 @@ class TestGRPCIntegration:
         connpy_pb2_grpc.add_ConfigServiceServicer_to_server(server.ConfigServicer(populated_config), srv)
         connpy_pb2_grpc.add_ExecutionServiceServicer_to_server(server.ExecutionServicer(populated_config), srv)
         connpy_pb2_grpc.add_ImportExportServiceServicer_to_server(server.ImportExportServicer(populated_config), srv)
+        connpy_pb2_grpc.add_AIServiceServicer_to_server(server.AIServicer(populated_config), srv)
         
         port = srv.add_insecure_port('127.0.0.1:0')
         srv.start()
@@ -142,6 +143,10 @@ class TestGRPCIntegration:
     @pytest.fixture
     def config_stub(self, channel):
         return stubs.ConfigStub(channel, "localhost")
+
+    @pytest.fixture
+    def ai_stub(self, channel):
+        return stubs.AIStub(channel, "localhost")
 
     def test_list_nodes_integration(self, node_stub):
         nodes = node_stub.list_nodes()
@@ -169,6 +174,12 @@ class TestGRPCIntegration:
         config_stub.update_setting("idletime", 99)
         settings = config_stub.get_settings()
         assert settings["idletime"] == 99
+
+    def test_list_mcp_servers_integration(self, ai_stub):
+        ai_stub.configure_mcp("test-mcp", url="http://localhost:8080", enabled=True)
+        servers = ai_stub.list_mcp_servers()
+        assert "test-mcp" in servers
+        assert servers["test-mcp"]["url"] == "http://localhost:8080"
 
     def test_add_delete_node_integration(self, node_stub):
         node_stub.add_node("integration-test-node", {"host": "9.9.9.9"})

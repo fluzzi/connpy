@@ -167,11 +167,14 @@ class AIService(BaseService):
         return await asyncio.wrap_future(future)
 
 
-    def list_sessions(self):
-        """Return a list of all saved AI sessions."""
+    def list_sessions(self, limit=None):
+        """Return a list of saved AI sessions, optionally limited."""
         from connpy.ai import ai
         agent = ai(self.config)
-        return agent._get_sessions()
+        sessions = agent._get_sessions()
+        if limit and len(sessions) > limit:
+            return sessions[:limit], len(sessions)
+        return sessions, len(sessions)
 
     def delete_session(self, session_id):
         """Delete an AI session by ID."""
@@ -227,6 +230,11 @@ class AIService(BaseService):
         ai_settings["mcp_servers"] = mcp_servers
         self.config.config["ai"] = ai_settings
         self.config._saveconfig(self.config.file)
+
+    def list_mcp_servers(self) -> dict:
+        """Get the configured MCP servers."""
+        ai_settings = self.config.config.get("ai", {})
+        return ai_settings.get("mcp_servers", {})
 
     def load_session_data(self, session_id):
         """Load a session's raw data by ID."""

@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-from . import connpy_pb2 as connpy_dot_proto_dot_connpy__pb2
+from . import connpy_pb2 as connpy__pb2
 from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 
 GRPC_GENERATED_VERSION = '1.80.0'
@@ -19,7 +19,7 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + ' but the generated code in connpy/proto/connpy_pb2_grpc.py depends on'
+        + ' but the generated code in connpy_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
@@ -37,23 +37,23 @@ class NodeServiceStub(object):
         """
         self.list_nodes = channel.unary_unary(
                 '/connpy.NodeService/list_nodes',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.FilterRequest.SerializeToString,
-                response_deserializer=connpy_dot_proto_dot_connpy__pb2.ValueResponse.FromString,
+                request_serializer=connpy__pb2.FilterRequest.SerializeToString,
+                response_deserializer=connpy__pb2.ValueResponse.FromString,
                 _registered_method=True)
         self.list_folders = channel.unary_unary(
                 '/connpy.NodeService/list_folders',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.FilterRequest.SerializeToString,
-                response_deserializer=connpy_dot_proto_dot_connpy__pb2.ValueResponse.FromString,
+                request_serializer=connpy__pb2.FilterRequest.SerializeToString,
+                response_deserializer=connpy__pb2.ValueResponse.FromString,
                 _registered_method=True)
         self.get_node_details = channel.unary_unary(
                 '/connpy.NodeService/get_node_details',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.IdRequest.SerializeToString,
-                response_deserializer=connpy_dot_proto_dot_connpy__pb2.StructResponse.FromString,
+                request_serializer=connpy__pb2.IdRequest.SerializeToString,
+                response_deserializer=connpy__pb2.StructResponse.FromString,
                 _registered_method=True)
         self.explode_unique = channel.unary_unary(
                 '/connpy.NodeService/explode_unique',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.IdRequest.SerializeToString,
-                response_deserializer=connpy_dot_proto_dot_connpy__pb2.ValueResponse.FromString,
+                request_serializer=connpy__pb2.IdRequest.SerializeToString,
+                response_deserializer=connpy__pb2.ValueResponse.FromString,
                 _registered_method=True)
         self.generate_cache = channel.unary_unary(
                 '/connpy.NodeService/generate_cache',
@@ -62,53 +62,53 @@ class NodeServiceStub(object):
                 _registered_method=True)
         self.add_node = channel.unary_unary(
                 '/connpy.NodeService/add_node',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.NodeRequest.SerializeToString,
+                request_serializer=connpy__pb2.NodeRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
         self.update_node = channel.unary_unary(
                 '/connpy.NodeService/update_node',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.NodeRequest.SerializeToString,
+                request_serializer=connpy__pb2.NodeRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
         self.delete_node = channel.unary_unary(
                 '/connpy.NodeService/delete_node',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.DeleteRequest.SerializeToString,
+                request_serializer=connpy__pb2.DeleteRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
         self.move_node = channel.unary_unary(
                 '/connpy.NodeService/move_node',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.MoveRequest.SerializeToString,
+                request_serializer=connpy__pb2.MoveRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
         self.bulk_add = channel.unary_unary(
                 '/connpy.NodeService/bulk_add',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.BulkRequest.SerializeToString,
+                request_serializer=connpy__pb2.BulkRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
         self.validate_parent_folder = channel.unary_unary(
                 '/connpy.NodeService/validate_parent_folder',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.IdRequest.SerializeToString,
+                request_serializer=connpy__pb2.IdRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
         self.set_reserved_names = channel.unary_unary(
                 '/connpy.NodeService/set_reserved_names',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.ListRequest.SerializeToString,
+                request_serializer=connpy__pb2.ListRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
         self.interact_node = channel.stream_stream(
                 '/connpy.NodeService/interact_node',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.InteractRequest.SerializeToString,
-                response_deserializer=connpy_dot_proto_dot_connpy__pb2.InteractResponse.FromString,
+                request_serializer=connpy__pb2.InteractRequest.SerializeToString,
+                response_deserializer=connpy__pb2.InteractResponse.FromString,
                 _registered_method=True)
         self.full_replace = channel.unary_unary(
                 '/connpy.NodeService/full_replace',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.FullReplaceRequest.SerializeToString,
+                request_serializer=connpy__pb2.FullReplaceRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
         self.get_inventory = channel.unary_unary(
                 '/connpy.NodeService/get_inventory',
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-                response_deserializer=connpy_dot_proto_dot_connpy__pb2.FullReplaceRequest.FromString,
+                response_deserializer=connpy__pb2.FullReplaceRequest.FromString,
                 _registered_method=True)
 
 
@@ -210,23 +210,23 @@ def add_NodeServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'list_nodes': grpc.unary_unary_rpc_method_handler(
                     servicer.list_nodes,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.FilterRequest.FromString,
-                    response_serializer=connpy_dot_proto_dot_connpy__pb2.ValueResponse.SerializeToString,
+                    request_deserializer=connpy__pb2.FilterRequest.FromString,
+                    response_serializer=connpy__pb2.ValueResponse.SerializeToString,
             ),
             'list_folders': grpc.unary_unary_rpc_method_handler(
                     servicer.list_folders,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.FilterRequest.FromString,
-                    response_serializer=connpy_dot_proto_dot_connpy__pb2.ValueResponse.SerializeToString,
+                    request_deserializer=connpy__pb2.FilterRequest.FromString,
+                    response_serializer=connpy__pb2.ValueResponse.SerializeToString,
             ),
             'get_node_details': grpc.unary_unary_rpc_method_handler(
                     servicer.get_node_details,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.IdRequest.FromString,
-                    response_serializer=connpy_dot_proto_dot_connpy__pb2.StructResponse.SerializeToString,
+                    request_deserializer=connpy__pb2.IdRequest.FromString,
+                    response_serializer=connpy__pb2.StructResponse.SerializeToString,
             ),
             'explode_unique': grpc.unary_unary_rpc_method_handler(
                     servicer.explode_unique,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.IdRequest.FromString,
-                    response_serializer=connpy_dot_proto_dot_connpy__pb2.ValueResponse.SerializeToString,
+                    request_deserializer=connpy__pb2.IdRequest.FromString,
+                    response_serializer=connpy__pb2.ValueResponse.SerializeToString,
             ),
             'generate_cache': grpc.unary_unary_rpc_method_handler(
                     servicer.generate_cache,
@@ -235,53 +235,53 @@ def add_NodeServiceServicer_to_server(servicer, server):
             ),
             'add_node': grpc.unary_unary_rpc_method_handler(
                     servicer.add_node,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.NodeRequest.FromString,
+                    request_deserializer=connpy__pb2.NodeRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
             'update_node': grpc.unary_unary_rpc_method_handler(
                     servicer.update_node,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.NodeRequest.FromString,
+                    request_deserializer=connpy__pb2.NodeRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
             'delete_node': grpc.unary_unary_rpc_method_handler(
                     servicer.delete_node,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.DeleteRequest.FromString,
+                    request_deserializer=connpy__pb2.DeleteRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
             'move_node': grpc.unary_unary_rpc_method_handler(
                     servicer.move_node,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.MoveRequest.FromString,
+                    request_deserializer=connpy__pb2.MoveRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
             'bulk_add': grpc.unary_unary_rpc_method_handler(
                     servicer.bulk_add,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.BulkRequest.FromString,
+                    request_deserializer=connpy__pb2.BulkRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
             'validate_parent_folder': grpc.unary_unary_rpc_method_handler(
                     servicer.validate_parent_folder,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.IdRequest.FromString,
+                    request_deserializer=connpy__pb2.IdRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
             'set_reserved_names': grpc.unary_unary_rpc_method_handler(
                     servicer.set_reserved_names,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.ListRequest.FromString,
+                    request_deserializer=connpy__pb2.ListRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
             'interact_node': grpc.stream_stream_rpc_method_handler(
                     servicer.interact_node,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.InteractRequest.FromString,
-                    response_serializer=connpy_dot_proto_dot_connpy__pb2.InteractResponse.SerializeToString,
+                    request_deserializer=connpy__pb2.InteractRequest.FromString,
+                    response_serializer=connpy__pb2.InteractResponse.SerializeToString,
             ),
             'full_replace': grpc.unary_unary_rpc_method_handler(
                     servicer.full_replace,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.FullReplaceRequest.FromString,
+                    request_deserializer=connpy__pb2.FullReplaceRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
             'get_inventory': grpc.unary_unary_rpc_method_handler(
                     servicer.get_inventory,
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
-                    response_serializer=connpy_dot_proto_dot_connpy__pb2.FullReplaceRequest.SerializeToString,
+                    response_serializer=connpy__pb2.FullReplaceRequest.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -309,8 +309,8 @@ class NodeService(object):
             request,
             target,
             '/connpy.NodeService/list_nodes',
-            connpy_dot_proto_dot_connpy__pb2.FilterRequest.SerializeToString,
-            connpy_dot_proto_dot_connpy__pb2.ValueResponse.FromString,
+            connpy__pb2.FilterRequest.SerializeToString,
+            connpy__pb2.ValueResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -336,8 +336,8 @@ class NodeService(object):
             request,
             target,
             '/connpy.NodeService/list_folders',
-            connpy_dot_proto_dot_connpy__pb2.FilterRequest.SerializeToString,
-            connpy_dot_proto_dot_connpy__pb2.ValueResponse.FromString,
+            connpy__pb2.FilterRequest.SerializeToString,
+            connpy__pb2.ValueResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -363,8 +363,8 @@ class NodeService(object):
             request,
             target,
             '/connpy.NodeService/get_node_details',
-            connpy_dot_proto_dot_connpy__pb2.IdRequest.SerializeToString,
-            connpy_dot_proto_dot_connpy__pb2.StructResponse.FromString,
+            connpy__pb2.IdRequest.SerializeToString,
+            connpy__pb2.StructResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -390,8 +390,8 @@ class NodeService(object):
             request,
             target,
             '/connpy.NodeService/explode_unique',
-            connpy_dot_proto_dot_connpy__pb2.IdRequest.SerializeToString,
-            connpy_dot_proto_dot_connpy__pb2.ValueResponse.FromString,
+            connpy__pb2.IdRequest.SerializeToString,
+            connpy__pb2.ValueResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -444,7 +444,7 @@ class NodeService(object):
             request,
             target,
             '/connpy.NodeService/add_node',
-            connpy_dot_proto_dot_connpy__pb2.NodeRequest.SerializeToString,
+            connpy__pb2.NodeRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options,
             channel_credentials,
@@ -471,7 +471,7 @@ class NodeService(object):
             request,
             target,
             '/connpy.NodeService/update_node',
-            connpy_dot_proto_dot_connpy__pb2.NodeRequest.SerializeToString,
+            connpy__pb2.NodeRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options,
             channel_credentials,
@@ -498,7 +498,7 @@ class NodeService(object):
             request,
             target,
             '/connpy.NodeService/delete_node',
-            connpy_dot_proto_dot_connpy__pb2.DeleteRequest.SerializeToString,
+            connpy__pb2.DeleteRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options,
             channel_credentials,
@@ -525,7 +525,7 @@ class NodeService(object):
             request,
             target,
             '/connpy.NodeService/move_node',
-            connpy_dot_proto_dot_connpy__pb2.MoveRequest.SerializeToString,
+            connpy__pb2.MoveRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options,
             channel_credentials,
@@ -552,7 +552,7 @@ class NodeService(object):
             request,
             target,
             '/connpy.NodeService/bulk_add',
-            connpy_dot_proto_dot_connpy__pb2.BulkRequest.SerializeToString,
+            connpy__pb2.BulkRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options,
             channel_credentials,
@@ -579,7 +579,7 @@ class NodeService(object):
             request,
             target,
             '/connpy.NodeService/validate_parent_folder',
-            connpy_dot_proto_dot_connpy__pb2.IdRequest.SerializeToString,
+            connpy__pb2.IdRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options,
             channel_credentials,
@@ -606,7 +606,7 @@ class NodeService(object):
             request,
             target,
             '/connpy.NodeService/set_reserved_names',
-            connpy_dot_proto_dot_connpy__pb2.ListRequest.SerializeToString,
+            connpy__pb2.ListRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options,
             channel_credentials,
@@ -633,8 +633,8 @@ class NodeService(object):
             request_iterator,
             target,
             '/connpy.NodeService/interact_node',
-            connpy_dot_proto_dot_connpy__pb2.InteractRequest.SerializeToString,
-            connpy_dot_proto_dot_connpy__pb2.InteractResponse.FromString,
+            connpy__pb2.InteractRequest.SerializeToString,
+            connpy__pb2.InteractResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -660,7 +660,7 @@ class NodeService(object):
             request,
             target,
             '/connpy.NodeService/full_replace',
-            connpy_dot_proto_dot_connpy__pb2.FullReplaceRequest.SerializeToString,
+            connpy__pb2.FullReplaceRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options,
             channel_credentials,
@@ -688,7 +688,7 @@ class NodeService(object):
             target,
             '/connpy.NodeService/get_inventory',
             google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-            connpy_dot_proto_dot_connpy__pb2.FullReplaceRequest.FromString,
+            connpy__pb2.FullReplaceRequest.FromString,
             options,
             channel_credentials,
             insecure,
@@ -711,32 +711,32 @@ class ProfileServiceStub(object):
         """
         self.list_profiles = channel.unary_unary(
                 '/connpy.ProfileService/list_profiles',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.FilterRequest.SerializeToString,
-                response_deserializer=connpy_dot_proto_dot_connpy__pb2.ValueResponse.FromString,
+                request_serializer=connpy__pb2.FilterRequest.SerializeToString,
+                response_deserializer=connpy__pb2.ValueResponse.FromString,
                 _registered_method=True)
         self.get_profile = channel.unary_unary(
                 '/connpy.ProfileService/get_profile',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.ProfileRequest.SerializeToString,
-                response_deserializer=connpy_dot_proto_dot_connpy__pb2.StructResponse.FromString,
+                request_serializer=connpy__pb2.ProfileRequest.SerializeToString,
+                response_deserializer=connpy__pb2.StructResponse.FromString,
                 _registered_method=True)
         self.add_profile = channel.unary_unary(
                 '/connpy.ProfileService/add_profile',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.NodeRequest.SerializeToString,
+                request_serializer=connpy__pb2.NodeRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
         self.resolve_node_data = channel.unary_unary(
                 '/connpy.ProfileService/resolve_node_data',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.StructRequest.SerializeToString,
-                response_deserializer=connpy_dot_proto_dot_connpy__pb2.StructResponse.FromString,
+                request_serializer=connpy__pb2.StructRequest.SerializeToString,
+                response_deserializer=connpy__pb2.StructResponse.FromString,
                 _registered_method=True)
         self.delete_profile = channel.unary_unary(
                 '/connpy.ProfileService/delete_profile',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.IdRequest.SerializeToString,
+                request_serializer=connpy__pb2.IdRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
         self.update_profile = channel.unary_unary(
                 '/connpy.ProfileService/update_profile',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.NodeRequest.SerializeToString,
+                request_serializer=connpy__pb2.NodeRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
 
@@ -785,32 +785,32 @@ def add_ProfileServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'list_profiles': grpc.unary_unary_rpc_method_handler(
                     servicer.list_profiles,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.FilterRequest.FromString,
-                    response_serializer=connpy_dot_proto_dot_connpy__pb2.ValueResponse.SerializeToString,
+                    request_deserializer=connpy__pb2.FilterRequest.FromString,
+                    response_serializer=connpy__pb2.ValueResponse.SerializeToString,
             ),
             'get_profile': grpc.unary_unary_rpc_method_handler(
                     servicer.get_profile,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.ProfileRequest.FromString,
-                    response_serializer=connpy_dot_proto_dot_connpy__pb2.StructResponse.SerializeToString,
+                    request_deserializer=connpy__pb2.ProfileRequest.FromString,
+                    response_serializer=connpy__pb2.StructResponse.SerializeToString,
             ),
             'add_profile': grpc.unary_unary_rpc_method_handler(
                     servicer.add_profile,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.NodeRequest.FromString,
+                    request_deserializer=connpy__pb2.NodeRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
             'resolve_node_data': grpc.unary_unary_rpc_method_handler(
                     servicer.resolve_node_data,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.StructRequest.FromString,
-                    response_serializer=connpy_dot_proto_dot_connpy__pb2.StructResponse.SerializeToString,
+                    request_deserializer=connpy__pb2.StructRequest.FromString,
+                    response_serializer=connpy__pb2.StructResponse.SerializeToString,
             ),
             'delete_profile': grpc.unary_unary_rpc_method_handler(
                     servicer.delete_profile,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.IdRequest.FromString,
+                    request_deserializer=connpy__pb2.IdRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
             'update_profile': grpc.unary_unary_rpc_method_handler(
                     servicer.update_profile,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.NodeRequest.FromString,
+                    request_deserializer=connpy__pb2.NodeRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
     }
@@ -839,8 +839,8 @@ class ProfileService(object):
             request,
             target,
             '/connpy.ProfileService/list_profiles',
-            connpy_dot_proto_dot_connpy__pb2.FilterRequest.SerializeToString,
-            connpy_dot_proto_dot_connpy__pb2.ValueResponse.FromString,
+            connpy__pb2.FilterRequest.SerializeToString,
+            connpy__pb2.ValueResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -866,8 +866,8 @@ class ProfileService(object):
             request,
             target,
             '/connpy.ProfileService/get_profile',
-            connpy_dot_proto_dot_connpy__pb2.ProfileRequest.SerializeToString,
-            connpy_dot_proto_dot_connpy__pb2.StructResponse.FromString,
+            connpy__pb2.ProfileRequest.SerializeToString,
+            connpy__pb2.StructResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -893,7 +893,7 @@ class ProfileService(object):
             request,
             target,
             '/connpy.ProfileService/add_profile',
-            connpy_dot_proto_dot_connpy__pb2.NodeRequest.SerializeToString,
+            connpy__pb2.NodeRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options,
             channel_credentials,
@@ -920,8 +920,8 @@ class ProfileService(object):
             request,
             target,
             '/connpy.ProfileService/resolve_node_data',
-            connpy_dot_proto_dot_connpy__pb2.StructRequest.SerializeToString,
-            connpy_dot_proto_dot_connpy__pb2.StructResponse.FromString,
+            connpy__pb2.StructRequest.SerializeToString,
+            connpy__pb2.StructResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -947,7 +947,7 @@ class ProfileService(object):
             request,
             target,
             '/connpy.ProfileService/delete_profile',
-            connpy_dot_proto_dot_connpy__pb2.IdRequest.SerializeToString,
+            connpy__pb2.IdRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options,
             channel_credentials,
@@ -974,7 +974,7 @@ class ProfileService(object):
             request,
             target,
             '/connpy.ProfileService/update_profile',
-            connpy_dot_proto_dot_connpy__pb2.NodeRequest.SerializeToString,
+            connpy__pb2.NodeRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options,
             channel_credentials,
@@ -999,32 +999,32 @@ class ConfigServiceStub(object):
         self.get_settings = channel.unary_unary(
                 '/connpy.ConfigService/get_settings',
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-                response_deserializer=connpy_dot_proto_dot_connpy__pb2.StructResponse.FromString,
+                response_deserializer=connpy__pb2.StructResponse.FromString,
                 _registered_method=True)
         self.get_default_dir = channel.unary_unary(
                 '/connpy.ConfigService/get_default_dir',
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-                response_deserializer=connpy_dot_proto_dot_connpy__pb2.StringResponse.FromString,
+                response_deserializer=connpy__pb2.StringResponse.FromString,
                 _registered_method=True)
         self.set_config_folder = channel.unary_unary(
                 '/connpy.ConfigService/set_config_folder',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.StringRequest.SerializeToString,
+                request_serializer=connpy__pb2.StringRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
         self.update_setting = channel.unary_unary(
                 '/connpy.ConfigService/update_setting',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.UpdateRequest.SerializeToString,
+                request_serializer=connpy__pb2.UpdateRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
         self.encrypt_password = channel.unary_unary(
                 '/connpy.ConfigService/encrypt_password',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.StringRequest.SerializeToString,
-                response_deserializer=connpy_dot_proto_dot_connpy__pb2.StringResponse.FromString,
+                request_serializer=connpy__pb2.StringRequest.SerializeToString,
+                response_deserializer=connpy__pb2.StringResponse.FromString,
                 _registered_method=True)
         self.apply_theme_from_file = channel.unary_unary(
                 '/connpy.ConfigService/apply_theme_from_file',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.StringRequest.SerializeToString,
-                response_deserializer=connpy_dot_proto_dot_connpy__pb2.StructResponse.FromString,
+                request_serializer=connpy__pb2.StringRequest.SerializeToString,
+                response_deserializer=connpy__pb2.StructResponse.FromString,
                 _registered_method=True)
 
 
@@ -1073,32 +1073,32 @@ def add_ConfigServiceServicer_to_server(servicer, server):
             'get_settings': grpc.unary_unary_rpc_method_handler(
                     servicer.get_settings,
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
-                    response_serializer=connpy_dot_proto_dot_connpy__pb2.StructResponse.SerializeToString,
+                    response_serializer=connpy__pb2.StructResponse.SerializeToString,
             ),
             'get_default_dir': grpc.unary_unary_rpc_method_handler(
                     servicer.get_default_dir,
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
-                    response_serializer=connpy_dot_proto_dot_connpy__pb2.StringResponse.SerializeToString,
+                    response_serializer=connpy__pb2.StringResponse.SerializeToString,
             ),
             'set_config_folder': grpc.unary_unary_rpc_method_handler(
                     servicer.set_config_folder,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.StringRequest.FromString,
+                    request_deserializer=connpy__pb2.StringRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
             'update_setting': grpc.unary_unary_rpc_method_handler(
                     servicer.update_setting,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.UpdateRequest.FromString,
+                    request_deserializer=connpy__pb2.UpdateRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
             'encrypt_password': grpc.unary_unary_rpc_method_handler(
                     servicer.encrypt_password,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.StringRequest.FromString,
-                    response_serializer=connpy_dot_proto_dot_connpy__pb2.StringResponse.SerializeToString,
+                    request_deserializer=connpy__pb2.StringRequest.FromString,
+                    response_serializer=connpy__pb2.StringResponse.SerializeToString,
             ),
             'apply_theme_from_file': grpc.unary_unary_rpc_method_handler(
                     servicer.apply_theme_from_file,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.StringRequest.FromString,
-                    response_serializer=connpy_dot_proto_dot_connpy__pb2.StructResponse.SerializeToString,
+                    request_deserializer=connpy__pb2.StringRequest.FromString,
+                    response_serializer=connpy__pb2.StructResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -1127,7 +1127,7 @@ class ConfigService(object):
             target,
             '/connpy.ConfigService/get_settings',
             google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-            connpy_dot_proto_dot_connpy__pb2.StructResponse.FromString,
+            connpy__pb2.StructResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -1154,7 +1154,7 @@ class ConfigService(object):
             target,
             '/connpy.ConfigService/get_default_dir',
             google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-            connpy_dot_proto_dot_connpy__pb2.StringResponse.FromString,
+            connpy__pb2.StringResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -1180,7 +1180,7 @@ class ConfigService(object):
             request,
             target,
             '/connpy.ConfigService/set_config_folder',
-            connpy_dot_proto_dot_connpy__pb2.StringRequest.SerializeToString,
+            connpy__pb2.StringRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options,
             channel_credentials,
@@ -1207,7 +1207,7 @@ class ConfigService(object):
             request,
             target,
             '/connpy.ConfigService/update_setting',
-            connpy_dot_proto_dot_connpy__pb2.UpdateRequest.SerializeToString,
+            connpy__pb2.UpdateRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options,
             channel_credentials,
@@ -1234,8 +1234,8 @@ class ConfigService(object):
             request,
             target,
             '/connpy.ConfigService/encrypt_password',
-            connpy_dot_proto_dot_connpy__pb2.StringRequest.SerializeToString,
-            connpy_dot_proto_dot_connpy__pb2.StringResponse.FromString,
+            connpy__pb2.StringRequest.SerializeToString,
+            connpy__pb2.StringResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -1261,8 +1261,8 @@ class ConfigService(object):
             request,
             target,
             '/connpy.ConfigService/apply_theme_from_file',
-            connpy_dot_proto_dot_connpy__pb2.StringRequest.SerializeToString,
-            connpy_dot_proto_dot_connpy__pb2.StructResponse.FromString,
+            connpy__pb2.StringRequest.SerializeToString,
+            connpy__pb2.StructResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -1286,26 +1286,26 @@ class PluginServiceStub(object):
         self.list_plugins = channel.unary_unary(
                 '/connpy.PluginService/list_plugins',
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-                response_deserializer=connpy_dot_proto_dot_connpy__pb2.ValueResponse.FromString,
+                response_deserializer=connpy__pb2.ValueResponse.FromString,
                 _registered_method=True)
         self.add_plugin = channel.unary_unary(
                 '/connpy.PluginService/add_plugin',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.PluginRequest.SerializeToString,
+                request_serializer=connpy__pb2.PluginRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
         self.delete_plugin = channel.unary_unary(
                 '/connpy.PluginService/delete_plugin',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.IdRequest.SerializeToString,
+                request_serializer=connpy__pb2.IdRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
         self.enable_plugin = channel.unary_unary(
                 '/connpy.PluginService/enable_plugin',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.IdRequest.SerializeToString,
+                request_serializer=connpy__pb2.IdRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
         self.disable_plugin = channel.unary_unary(
                 '/connpy.PluginService/disable_plugin',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.IdRequest.SerializeToString,
+                request_serializer=connpy__pb2.IdRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
 
@@ -1349,26 +1349,26 @@ def add_PluginServiceServicer_to_server(servicer, server):
             'list_plugins': grpc.unary_unary_rpc_method_handler(
                     servicer.list_plugins,
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
-                    response_serializer=connpy_dot_proto_dot_connpy__pb2.ValueResponse.SerializeToString,
+                    response_serializer=connpy__pb2.ValueResponse.SerializeToString,
             ),
             'add_plugin': grpc.unary_unary_rpc_method_handler(
                     servicer.add_plugin,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.PluginRequest.FromString,
+                    request_deserializer=connpy__pb2.PluginRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
             'delete_plugin': grpc.unary_unary_rpc_method_handler(
                     servicer.delete_plugin,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.IdRequest.FromString,
+                    request_deserializer=connpy__pb2.IdRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
             'enable_plugin': grpc.unary_unary_rpc_method_handler(
                     servicer.enable_plugin,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.IdRequest.FromString,
+                    request_deserializer=connpy__pb2.IdRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
             'disable_plugin': grpc.unary_unary_rpc_method_handler(
                     servicer.disable_plugin,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.IdRequest.FromString,
+                    request_deserializer=connpy__pb2.IdRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
     }
@@ -1398,7 +1398,7 @@ class PluginService(object):
             target,
             '/connpy.PluginService/list_plugins',
             google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-            connpy_dot_proto_dot_connpy__pb2.ValueResponse.FromString,
+            connpy__pb2.ValueResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -1424,7 +1424,7 @@ class PluginService(object):
             request,
             target,
             '/connpy.PluginService/add_plugin',
-            connpy_dot_proto_dot_connpy__pb2.PluginRequest.SerializeToString,
+            connpy__pb2.PluginRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options,
             channel_credentials,
@@ -1451,7 +1451,7 @@ class PluginService(object):
             request,
             target,
             '/connpy.PluginService/delete_plugin',
-            connpy_dot_proto_dot_connpy__pb2.IdRequest.SerializeToString,
+            connpy__pb2.IdRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options,
             channel_credentials,
@@ -1478,7 +1478,7 @@ class PluginService(object):
             request,
             target,
             '/connpy.PluginService/enable_plugin',
-            connpy_dot_proto_dot_connpy__pb2.IdRequest.SerializeToString,
+            connpy__pb2.IdRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options,
             channel_credentials,
@@ -1505,7 +1505,7 @@ class PluginService(object):
             request,
             target,
             '/connpy.PluginService/disable_plugin',
-            connpy_dot_proto_dot_connpy__pb2.IdRequest.SerializeToString,
+            connpy__pb2.IdRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options,
             channel_credentials,
@@ -1529,23 +1529,23 @@ class ExecutionServiceStub(object):
         """
         self.run_commands = channel.unary_stream(
                 '/connpy.ExecutionService/run_commands',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.RunRequest.SerializeToString,
-                response_deserializer=connpy_dot_proto_dot_connpy__pb2.NodeRunResult.FromString,
+                request_serializer=connpy__pb2.RunRequest.SerializeToString,
+                response_deserializer=connpy__pb2.NodeRunResult.FromString,
                 _registered_method=True)
         self.test_commands = channel.unary_stream(
                 '/connpy.ExecutionService/test_commands',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.TestRequest.SerializeToString,
-                response_deserializer=connpy_dot_proto_dot_connpy__pb2.NodeRunResult.FromString,
+                request_serializer=connpy__pb2.TestRequest.SerializeToString,
+                response_deserializer=connpy__pb2.NodeRunResult.FromString,
                 _registered_method=True)
         self.run_cli_script = channel.unary_unary(
                 '/connpy.ExecutionService/run_cli_script',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.ScriptRequest.SerializeToString,
-                response_deserializer=connpy_dot_proto_dot_connpy__pb2.StructResponse.FromString,
+                request_serializer=connpy__pb2.ScriptRequest.SerializeToString,
+                response_deserializer=connpy__pb2.StructResponse.FromString,
                 _registered_method=True)
         self.run_yaml_playbook = channel.unary_unary(
                 '/connpy.ExecutionService/run_yaml_playbook',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.ScriptRequest.SerializeToString,
-                response_deserializer=connpy_dot_proto_dot_connpy__pb2.StructResponse.FromString,
+                request_serializer=connpy__pb2.ScriptRequest.SerializeToString,
+                response_deserializer=connpy__pb2.StructResponse.FromString,
                 _registered_method=True)
 
 
@@ -1581,23 +1581,23 @@ def add_ExecutionServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'run_commands': grpc.unary_stream_rpc_method_handler(
                     servicer.run_commands,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.RunRequest.FromString,
-                    response_serializer=connpy_dot_proto_dot_connpy__pb2.NodeRunResult.SerializeToString,
+                    request_deserializer=connpy__pb2.RunRequest.FromString,
+                    response_serializer=connpy__pb2.NodeRunResult.SerializeToString,
             ),
             'test_commands': grpc.unary_stream_rpc_method_handler(
                     servicer.test_commands,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.TestRequest.FromString,
-                    response_serializer=connpy_dot_proto_dot_connpy__pb2.NodeRunResult.SerializeToString,
+                    request_deserializer=connpy__pb2.TestRequest.FromString,
+                    response_serializer=connpy__pb2.NodeRunResult.SerializeToString,
             ),
             'run_cli_script': grpc.unary_unary_rpc_method_handler(
                     servicer.run_cli_script,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.ScriptRequest.FromString,
-                    response_serializer=connpy_dot_proto_dot_connpy__pb2.StructResponse.SerializeToString,
+                    request_deserializer=connpy__pb2.ScriptRequest.FromString,
+                    response_serializer=connpy__pb2.StructResponse.SerializeToString,
             ),
             'run_yaml_playbook': grpc.unary_unary_rpc_method_handler(
                     servicer.run_yaml_playbook,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.ScriptRequest.FromString,
-                    response_serializer=connpy_dot_proto_dot_connpy__pb2.StructResponse.SerializeToString,
+                    request_deserializer=connpy__pb2.ScriptRequest.FromString,
+                    response_serializer=connpy__pb2.StructResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -1625,8 +1625,8 @@ class ExecutionService(object):
             request,
             target,
             '/connpy.ExecutionService/run_commands',
-            connpy_dot_proto_dot_connpy__pb2.RunRequest.SerializeToString,
-            connpy_dot_proto_dot_connpy__pb2.NodeRunResult.FromString,
+            connpy__pb2.RunRequest.SerializeToString,
+            connpy__pb2.NodeRunResult.FromString,
             options,
             channel_credentials,
             insecure,
@@ -1652,8 +1652,8 @@ class ExecutionService(object):
             request,
             target,
             '/connpy.ExecutionService/test_commands',
-            connpy_dot_proto_dot_connpy__pb2.TestRequest.SerializeToString,
-            connpy_dot_proto_dot_connpy__pb2.NodeRunResult.FromString,
+            connpy__pb2.TestRequest.SerializeToString,
+            connpy__pb2.NodeRunResult.FromString,
             options,
             channel_credentials,
             insecure,
@@ -1679,8 +1679,8 @@ class ExecutionService(object):
             request,
             target,
             '/connpy.ExecutionService/run_cli_script',
-            connpy_dot_proto_dot_connpy__pb2.ScriptRequest.SerializeToString,
-            connpy_dot_proto_dot_connpy__pb2.StructResponse.FromString,
+            connpy__pb2.ScriptRequest.SerializeToString,
+            connpy__pb2.StructResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -1706,8 +1706,8 @@ class ExecutionService(object):
             request,
             target,
             '/connpy.ExecutionService/run_yaml_playbook',
-            connpy_dot_proto_dot_connpy__pb2.ScriptRequest.SerializeToString,
-            connpy_dot_proto_dot_connpy__pb2.StructResponse.FromString,
+            connpy__pb2.ScriptRequest.SerializeToString,
+            connpy__pb2.StructResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -1730,17 +1730,17 @@ class ImportExportServiceStub(object):
         """
         self.export_to_file = channel.unary_unary(
                 '/connpy.ImportExportService/export_to_file',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.ExportRequest.SerializeToString,
+                request_serializer=connpy__pb2.ExportRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
         self.import_from_file = channel.unary_unary(
                 '/connpy.ImportExportService/import_from_file',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.StringRequest.SerializeToString,
+                request_serializer=connpy__pb2.StringRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
         self.set_reserved_names = channel.unary_unary(
                 '/connpy.ImportExportService/set_reserved_names',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.ListRequest.SerializeToString,
+                request_serializer=connpy__pb2.ListRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
 
@@ -1771,17 +1771,17 @@ def add_ImportExportServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'export_to_file': grpc.unary_unary_rpc_method_handler(
                     servicer.export_to_file,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.ExportRequest.FromString,
+                    request_deserializer=connpy__pb2.ExportRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
             'import_from_file': grpc.unary_unary_rpc_method_handler(
                     servicer.import_from_file,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.StringRequest.FromString,
+                    request_deserializer=connpy__pb2.StringRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
             'set_reserved_names': grpc.unary_unary_rpc_method_handler(
                     servicer.set_reserved_names,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.ListRequest.FromString,
+                    request_deserializer=connpy__pb2.ListRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
     }
@@ -1810,7 +1810,7 @@ class ImportExportService(object):
             request,
             target,
             '/connpy.ImportExportService/export_to_file',
-            connpy_dot_proto_dot_connpy__pb2.ExportRequest.SerializeToString,
+            connpy__pb2.ExportRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options,
             channel_credentials,
@@ -1837,7 +1837,7 @@ class ImportExportService(object):
             request,
             target,
             '/connpy.ImportExportService/import_from_file',
-            connpy_dot_proto_dot_connpy__pb2.StringRequest.SerializeToString,
+            connpy__pb2.StringRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options,
             channel_credentials,
@@ -1864,7 +1864,7 @@ class ImportExportService(object):
             request,
             target,
             '/connpy.ImportExportService/set_reserved_names',
-            connpy_dot_proto_dot_connpy__pb2.ListRequest.SerializeToString,
+            connpy__pb2.ListRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options,
             channel_credentials,
@@ -1888,43 +1888,48 @@ class AIServiceStub(object):
         """
         self.ask = channel.stream_stream(
                 '/connpy.AIService/ask',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.AskRequest.SerializeToString,
-                response_deserializer=connpy_dot_proto_dot_connpy__pb2.AIResponse.FromString,
+                request_serializer=connpy__pb2.AskRequest.SerializeToString,
+                response_deserializer=connpy__pb2.AIResponse.FromString,
                 _registered_method=True)
         self.confirm = channel.unary_unary(
                 '/connpy.AIService/confirm',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.StringRequest.SerializeToString,
-                response_deserializer=connpy_dot_proto_dot_connpy__pb2.BoolResponse.FromString,
+                request_serializer=connpy__pb2.StringRequest.SerializeToString,
+                response_deserializer=connpy__pb2.BoolResponse.FromString,
                 _registered_method=True)
         self.ask_copilot = channel.unary_unary(
                 '/connpy.AIService/ask_copilot',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.CopilotRequest.SerializeToString,
-                response_deserializer=connpy_dot_proto_dot_connpy__pb2.CopilotResponse.FromString,
+                request_serializer=connpy__pb2.CopilotRequest.SerializeToString,
+                response_deserializer=connpy__pb2.CopilotResponse.FromString,
                 _registered_method=True)
         self.list_sessions = channel.unary_unary(
                 '/connpy.AIService/list_sessions',
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-                response_deserializer=connpy_dot_proto_dot_connpy__pb2.ValueResponse.FromString,
+                response_deserializer=connpy__pb2.ValueResponse.FromString,
                 _registered_method=True)
         self.delete_session = channel.unary_unary(
                 '/connpy.AIService/delete_session',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.StringRequest.SerializeToString,
+                request_serializer=connpy__pb2.StringRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
         self.configure_provider = channel.unary_unary(
                 '/connpy.AIService/configure_provider',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.ProviderRequest.SerializeToString,
+                request_serializer=connpy__pb2.ProviderRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
         self.configure_mcp = channel.unary_unary(
                 '/connpy.AIService/configure_mcp',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.MCPRequest.SerializeToString,
+                request_serializer=connpy__pb2.MCPRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                _registered_method=True)
+        self.list_mcp_servers = channel.unary_unary(
+                '/connpy.AIService/list_mcp_servers',
+                request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+                response_deserializer=connpy__pb2.ValueResponse.FromString,
                 _registered_method=True)
         self.load_session_data = channel.unary_unary(
                 '/connpy.AIService/load_session_data',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.StringRequest.SerializeToString,
-                response_deserializer=connpy_dot_proto_dot_connpy__pb2.StructResponse.FromString,
+                request_serializer=connpy__pb2.StringRequest.SerializeToString,
+                response_deserializer=connpy__pb2.StructResponse.FromString,
                 _registered_method=True)
 
 
@@ -1973,6 +1978,12 @@ class AIServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def list_mcp_servers(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def load_session_data(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -1984,43 +1995,48 @@ def add_AIServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'ask': grpc.stream_stream_rpc_method_handler(
                     servicer.ask,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.AskRequest.FromString,
-                    response_serializer=connpy_dot_proto_dot_connpy__pb2.AIResponse.SerializeToString,
+                    request_deserializer=connpy__pb2.AskRequest.FromString,
+                    response_serializer=connpy__pb2.AIResponse.SerializeToString,
             ),
             'confirm': grpc.unary_unary_rpc_method_handler(
                     servicer.confirm,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.StringRequest.FromString,
-                    response_serializer=connpy_dot_proto_dot_connpy__pb2.BoolResponse.SerializeToString,
+                    request_deserializer=connpy__pb2.StringRequest.FromString,
+                    response_serializer=connpy__pb2.BoolResponse.SerializeToString,
             ),
             'ask_copilot': grpc.unary_unary_rpc_method_handler(
                     servicer.ask_copilot,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.CopilotRequest.FromString,
-                    response_serializer=connpy_dot_proto_dot_connpy__pb2.CopilotResponse.SerializeToString,
+                    request_deserializer=connpy__pb2.CopilotRequest.FromString,
+                    response_serializer=connpy__pb2.CopilotResponse.SerializeToString,
             ),
             'list_sessions': grpc.unary_unary_rpc_method_handler(
                     servicer.list_sessions,
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
-                    response_serializer=connpy_dot_proto_dot_connpy__pb2.ValueResponse.SerializeToString,
+                    response_serializer=connpy__pb2.ValueResponse.SerializeToString,
             ),
             'delete_session': grpc.unary_unary_rpc_method_handler(
                     servicer.delete_session,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.StringRequest.FromString,
+                    request_deserializer=connpy__pb2.StringRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
             'configure_provider': grpc.unary_unary_rpc_method_handler(
                     servicer.configure_provider,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.ProviderRequest.FromString,
+                    request_deserializer=connpy__pb2.ProviderRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
             'configure_mcp': grpc.unary_unary_rpc_method_handler(
                     servicer.configure_mcp,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.MCPRequest.FromString,
+                    request_deserializer=connpy__pb2.MCPRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            ),
+            'list_mcp_servers': grpc.unary_unary_rpc_method_handler(
+                    servicer.list_mcp_servers,
+                    request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                    response_serializer=connpy__pb2.ValueResponse.SerializeToString,
             ),
             'load_session_data': grpc.unary_unary_rpc_method_handler(
                     servicer.load_session_data,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.StringRequest.FromString,
-                    response_serializer=connpy_dot_proto_dot_connpy__pb2.StructResponse.SerializeToString,
+                    request_deserializer=connpy__pb2.StringRequest.FromString,
+                    response_serializer=connpy__pb2.StructResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -2048,8 +2064,8 @@ class AIService(object):
             request_iterator,
             target,
             '/connpy.AIService/ask',
-            connpy_dot_proto_dot_connpy__pb2.AskRequest.SerializeToString,
-            connpy_dot_proto_dot_connpy__pb2.AIResponse.FromString,
+            connpy__pb2.AskRequest.SerializeToString,
+            connpy__pb2.AIResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -2075,8 +2091,8 @@ class AIService(object):
             request,
             target,
             '/connpy.AIService/confirm',
-            connpy_dot_proto_dot_connpy__pb2.StringRequest.SerializeToString,
-            connpy_dot_proto_dot_connpy__pb2.BoolResponse.FromString,
+            connpy__pb2.StringRequest.SerializeToString,
+            connpy__pb2.BoolResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -2102,8 +2118,8 @@ class AIService(object):
             request,
             target,
             '/connpy.AIService/ask_copilot',
-            connpy_dot_proto_dot_connpy__pb2.CopilotRequest.SerializeToString,
-            connpy_dot_proto_dot_connpy__pb2.CopilotResponse.FromString,
+            connpy__pb2.CopilotRequest.SerializeToString,
+            connpy__pb2.CopilotResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -2130,7 +2146,7 @@ class AIService(object):
             target,
             '/connpy.AIService/list_sessions',
             google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-            connpy_dot_proto_dot_connpy__pb2.ValueResponse.FromString,
+            connpy__pb2.ValueResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -2156,7 +2172,7 @@ class AIService(object):
             request,
             target,
             '/connpy.AIService/delete_session',
-            connpy_dot_proto_dot_connpy__pb2.StringRequest.SerializeToString,
+            connpy__pb2.StringRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options,
             channel_credentials,
@@ -2183,7 +2199,7 @@ class AIService(object):
             request,
             target,
             '/connpy.AIService/configure_provider',
-            connpy_dot_proto_dot_connpy__pb2.ProviderRequest.SerializeToString,
+            connpy__pb2.ProviderRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options,
             channel_credentials,
@@ -2210,8 +2226,35 @@ class AIService(object):
             request,
             target,
             '/connpy.AIService/configure_mcp',
-            connpy_dot_proto_dot_connpy__pb2.MCPRequest.SerializeToString,
+            connpy__pb2.MCPRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def list_mcp_servers(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/connpy.AIService/list_mcp_servers',
+            google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            connpy__pb2.ValueResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -2237,8 +2280,8 @@ class AIService(object):
             request,
             target,
             '/connpy.AIService/load_session_data',
-            connpy_dot_proto_dot_connpy__pb2.StringRequest.SerializeToString,
-            connpy_dot_proto_dot_connpy__pb2.StructResponse.FromString,
+            connpy__pb2.StringRequest.SerializeToString,
+            connpy__pb2.StructResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -2261,12 +2304,12 @@ class SystemServiceStub(object):
         """
         self.start_api = channel.unary_unary(
                 '/connpy.SystemService/start_api',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.IntRequest.SerializeToString,
+                request_serializer=connpy__pb2.IntRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
         self.debug_api = channel.unary_unary(
                 '/connpy.SystemService/debug_api',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.IntRequest.SerializeToString,
+                request_serializer=connpy__pb2.IntRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
         self.stop_api = channel.unary_unary(
@@ -2276,13 +2319,13 @@ class SystemServiceStub(object):
                 _registered_method=True)
         self.restart_api = channel.unary_unary(
                 '/connpy.SystemService/restart_api',
-                request_serializer=connpy_dot_proto_dot_connpy__pb2.IntRequest.SerializeToString,
+                request_serializer=connpy__pb2.IntRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
         self.get_api_status = channel.unary_unary(
                 '/connpy.SystemService/get_api_status',
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-                response_deserializer=connpy_dot_proto_dot_connpy__pb2.BoolResponse.FromString,
+                response_deserializer=connpy__pb2.BoolResponse.FromString,
                 _registered_method=True)
 
 
@@ -2324,12 +2367,12 @@ def add_SystemServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'start_api': grpc.unary_unary_rpc_method_handler(
                     servicer.start_api,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.IntRequest.FromString,
+                    request_deserializer=connpy__pb2.IntRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
             'debug_api': grpc.unary_unary_rpc_method_handler(
                     servicer.debug_api,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.IntRequest.FromString,
+                    request_deserializer=connpy__pb2.IntRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
             'stop_api': grpc.unary_unary_rpc_method_handler(
@@ -2339,13 +2382,13 @@ def add_SystemServiceServicer_to_server(servicer, server):
             ),
             'restart_api': grpc.unary_unary_rpc_method_handler(
                     servicer.restart_api,
-                    request_deserializer=connpy_dot_proto_dot_connpy__pb2.IntRequest.FromString,
+                    request_deserializer=connpy__pb2.IntRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
             'get_api_status': grpc.unary_unary_rpc_method_handler(
                     servicer.get_api_status,
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
-                    response_serializer=connpy_dot_proto_dot_connpy__pb2.BoolResponse.SerializeToString,
+                    response_serializer=connpy__pb2.BoolResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -2373,7 +2416,7 @@ class SystemService(object):
             request,
             target,
             '/connpy.SystemService/start_api',
-            connpy_dot_proto_dot_connpy__pb2.IntRequest.SerializeToString,
+            connpy__pb2.IntRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options,
             channel_credentials,
@@ -2400,7 +2443,7 @@ class SystemService(object):
             request,
             target,
             '/connpy.SystemService/debug_api',
-            connpy_dot_proto_dot_connpy__pb2.IntRequest.SerializeToString,
+            connpy__pb2.IntRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options,
             channel_credentials,
@@ -2454,7 +2497,7 @@ class SystemService(object):
             request,
             target,
             '/connpy.SystemService/restart_api',
-            connpy_dot_proto_dot_connpy__pb2.IntRequest.SerializeToString,
+            connpy__pb2.IntRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options,
             channel_credentials,
@@ -2482,7 +2525,7 @@ class SystemService(object):
             target,
             '/connpy.SystemService/get_api_status',
             google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-            connpy_dot_proto_dot_connpy__pb2.BoolResponse.FromString,
+            connpy__pb2.BoolResponse.FromString,
             options,
             channel_credentials,
             insecure,

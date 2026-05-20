@@ -15,13 +15,22 @@ class AIHandler:
 
     def dispatch(self, args):
         if args.list_sessions:
-            sessions = self.app.services.ai.list_sessions()
+            limit = 20 if not getattr(args, "all", False) else None
+            sessions, total = self.app.services.ai.list_sessions(limit=limit)
             if not sessions:
                 printer.info("No saved AI sessions found.")
                 return
+            
             columns = ["ID", "Title", "Created At", "Model"]
             rows = [[s["id"], s["title"], s["created_at"], s["model"]] for s in sessions]
-            printer.table("AI Persisted Sessions", columns, rows)
+            
+            title = "AI Persisted Sessions"
+            if limit and total > limit:
+                title += f" (Showing last {limit} of {total})"
+                
+            printer.table(title, columns, rows)
+            if limit and total > limit:
+                printer.info(f"Use '--list --all' to see all {total} sessions.")
             return
             
         if args.delete_session:
@@ -102,7 +111,7 @@ class AIHandler:
                 if history:
                     mdprint(f"[debug]Analyzing {len(history)} previous messages...[/debug]\n")
             else:
-                printer.error(f"Could not load session {session_id}. Starting clean.")
+                printer.info(f"Session '{session_id}' not found. Starting clean.")
         
         if not history:
             mdprint(Rule(style="engineer"))
@@ -116,7 +125,7 @@ class AIHandler:
                 if user_query.lower() in ['exit', 'quit', 'bye', 'cancel']: break
                 
                 with console.status("[ai_status]Agent is thinking...") as status:
-                    result = self.app.myai.ask(user_query, chat_history=history, status=status, debug=args.debug, trust=args.trust, **self.ai_overrides)
+                    result = self.app.myai.ask(user_query, chat_history=history, status=status, debug=args.debug, trust=args.trust, session_id=session_id, **self.ai_overrides)
                 
                 new_history = result.get("chat_history")
                 if new_history is not None:
@@ -147,8 +156,7 @@ class AIHandler:
             action = mcp_args[0].lower()
             
             if action == "list":
-                settings = self.app.services.config_svc.get_settings()
-                mcp_servers = settings.get("ai", {}).get("mcp_servers", {})
+                mcp_servers = self.app.services.ai.list_mcp_servers()
                 if not mcp_servers:
                     printer.info("No MCP servers configured.")
                 else:
@@ -213,8 +221,7 @@ class AIHandler:
             from .forms import Forms
             self.app.cli_forms = Forms(self.app)
             
-        settings = self.app.services.config_svc.get_settings()
-        mcp_servers = settings.get("ai", {}).get("mcp_servers", {})
+        mcp_servers = self.app.services.ai.list_mcp_servers()
         
         result = self.app.cli_forms.mcp_wizard(mcp_servers)
         if not result:

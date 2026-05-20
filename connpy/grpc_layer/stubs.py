@@ -758,6 +758,7 @@ class AIStub:
         
         full_content = ""
         header_printed = False
+        current_responder = "engineer"
         final_result = {"response": "", "chat_history": []}
 
         # Background thread to pull responses from gRPC into a local queue
@@ -802,6 +803,10 @@ class AIStub:
                     break
 
                 if response.status_update:
+                    if response.status_update.startswith("__RESPONDER__:"):
+                        current_responder = response.status_update.split(":")[1].lower()
+                        continue
+                        
                     if response.requires_confirmation:
                         if status: status.stop()
                         
@@ -854,7 +859,9 @@ class AIStub:
                             stable_console = RichConsole(theme=connpy_theme, file=get_original_stdout())
                             
                             # Print header on first chunk
-                            stable_console.print(Rule("[bold engineer]Network Engineer[/bold engineer]", style="engineer"))
+                            alias = "architect" if current_responder == "architect" else "engineer"
+                            role_label = "Network Architect" if current_responder == "architect" else "Network Engineer"
+                            stable_console.print(Rule(f"[bold {alias}]{role_label}[/bold {alias}]", style=alias))
                             header_printed = True
                             
                             # Initialize parser
@@ -906,8 +913,13 @@ class AIStub:
         return self.stub.confirm(connpy_pb2.StringRequest(value=input_text)).value
 
     @handle_errors
-    def list_sessions(self):
-        return from_value(self.stub.list_sessions(Empty()).data)
+    def list_sessions(self, limit=None):
+        from .utils import from_value
+        res = self.stub.list_sessions(Empty())
+        sessions = from_value(res.data) or []
+        if limit and len(sessions) > limit:
+            return sessions[:limit], len(sessions)
+        return sessions, len(sessions)
 
     @handle_errors
     def delete_session(self, session_id):
@@ -928,6 +940,11 @@ class AIStub:
             remove=remove
         )
         self.stub.configure_mcp(req)
+
+    @handle_errors
+    def list_mcp_servers(self):
+        res = self.stub.list_mcp_servers(Empty())
+        return from_value(res.data) or {}
 
     @handle_errors
     def load_session_data(self, session_id):

@@ -70,6 +70,7 @@ service AIService {
     rpc delete_session (StringRequest) returns (google.protobuf.Empty) {}
     rpc configure_provider (ProviderRequest) returns (google.protobuf.Empty) {}
     rpc configure_mcp (MCPRequest) returns (google.protobuf.Empty) {}
+    rpc list_mcp_servers (google.protobuf.Empty) returns (ValueResponse) {}
     rpc load_session_data (StringRequest) returns (StructResponse) {}
 }
 

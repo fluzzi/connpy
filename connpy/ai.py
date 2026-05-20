@@ -1,4 +1,6 @@
 import os
+import secrets
+
 import sys
 import json
 import re
@@ -165,8 +167,8 @@ class ai:
         # Session Management
         self.sessions_dir = os.path.join(self.config.defaultdir, "ai_sessions")
         os.makedirs(self.sessions_dir, exist_ok=True)
-        self.session_id = None
-        self.session_path = None
+        self.session_id = getattr(self.config, "session_id", None)
+        self.session_path = os.path.join(self.sessions_dir, f"{self.session_id}.json") if self.session_id else None
 
         # Prompts base agnósticos
         architect_instructions = ""
@@ -877,16 +879,27 @@ class ai:
                     continue
         return sorted(sessions, key=lambda x: x["created_at"], reverse=True)
 
-    def list_sessions(self):
+    def list_sessions(self, limit=20):
         """Prints a list of sessions using printer.table."""
         sessions = self._get_sessions()
         if not sessions:
             printer.info("No saved AI sessions found.")
             return
         
+        total = len(sessions)
+        if limit and total > limit:
+            sessions = sessions[:limit]
+            
         columns = ["ID", "Title", "Created At", "Model"]
         rows = [[s["id"], s["title"], s["created_at"], s["model"]] for s in sessions]
-        printer.table("AI Persisted Sessions", columns, rows)
+        
+        title = "AI Persisted Sessions"
+        if limit and total > limit:
+            title += f" (Showing last {limit} of {total})"
+            
+        printer.table(title, columns, rows)
+        if limit and total > limit:
+            printer.info(f"Use '--list --all' (if supported) or check the sessions directory to see all {total} sessions.")
 
     def load_session_data(self, session_id):
         """Loads a session's raw data by ID."""
@@ -917,8 +930,10 @@ class ai:
         return sessions[0]["id"] if sessions else None
 
     def _generate_session_id(self, query):
-        """Generates a unique session ID based on timestamp."""
-        return datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        """Generates a unique session ID based on timestamp and a random suffix."""
+        ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        suffix = secrets.token_hex(2)
+        return f"{ts}-{suffix}"
 
     def save_session(self, history, title=None, model=None):
         """Saves current history to the session file."""
@@ -926,6 +941,8 @@ class ai:
             # Generate ID from first user query if available
             first_user_msg = next((m["content"] for m in history if m["role"] == "user"), "new-session")
             self.session_id = self._generate_session_id(first_user_msg)
+            self.session_path = os.path.join(self.sessions_dir, f"{self.session_id}.json")
+        elif not self.session_path:
             self.session_path = os.path.join(self.sessions_dir, f"{self.session_id}.json")
 
         # If it's a new file, we might want to set a better title
@@ -970,10 +987,15 @@ class ai:
         if chat_history is None: chat_history = []
         
         # Load session if provided and history is empty
-        if session_id and not chat_history:
-            session_data = self.load_session_data(session_id)
-            if session_data:
-                chat_history = session_data.get("history", [])
+        if session_id:
+            # Force the session_id even if it doesn't exist yet
+            self.session_id = session_id
+            self.session_path = os.path.join(self.sessions_dir, f"{session_id}.json")
+            
+            if not chat_history:
+                session_data = self.load_session_data(session_id)
+                if session_data:
+                    chat_history = session_data.get("history", [])
                 # If we loaded history, the caller might need it back
                 # But typically ask() is called in a loop with an external history object
 
@@ -1058,8 +1080,8 @@ class ai:
                 
                 label = "[architect][bold]Architect[/bold][/architect]" if current_brain == "architect" else "[engineer][bold]Engineer[/bold][/engineer]"
                 if status: 
-                    # Notify responder identity ONLY for web/remote clients (StatusBridge has is_web)
-                    if getattr(status, "is_web", False):
+                    # Notify responder identity for web/remote clients
+                    if getattr(status, "is_web", False) or getattr(status, "is_remote", False):
                         status.update(f"__RESPONDER__:{current_brain}")
                     status.update(f"{label} is thinking... (step {iteration})")
                 

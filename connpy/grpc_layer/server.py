@@ -483,6 +483,7 @@ class ProfileServicer(connpy_pb2_grpc.ProfileServiceServicer):
         self.service = ProfileService(config)
         self.node_service = NodeService(config)
 
+
     @handle_errors
     def list_profiles(self, request, context):
         f = request.filter_str if request.filter_str else None
@@ -731,6 +732,7 @@ class StatusBridge:
         self.on_interrupt = self._force_interrupt
         self.thread = None
         self.is_web = is_web
+        self.is_remote = True
 
     def _force_interrupt(self):
         """Forcefully raise KeyboardInterrupt in the target thread."""
@@ -862,9 +864,11 @@ class AIServicer(connpy_pb2_grpc.AIServiceServicer):
                 print(f"AI Task Error: {e}")
                 traceback.print_exc()
                 chunk_queue.put(("status", f"Error: {str(e)}"))
+                # Crucial: always send final_mark to avoid client deadlock
+                chunk_queue.put(("final_mark", {"response": f"Error: {str(e)}", "chat_history": history, "error": True}))
 
         def request_listener():
-            nonlocal bridge, is_web, ai_thread, agent_instance
+            nonlocal bridge, is_web, ai_thread, agent_instance, history
             try:
                 for req in request_iterator:
                     if req.interrupt:
@@ -878,6 +882,11 @@ class AIServicer(connpy_pb2_grpc.AIServiceServicer):
 
                     if req.input_text:
                         is_web = "web" in (req.session_id or "").lower() or (req.session_id or "").lower().startswith("ws-")
+                        
+                        # Hydrate history from client if it's the first interaction in this stream
+                        if not history and req.chat_history:
+                            from .utils import from_value
+                            history = from_value(req.chat_history) or []
                         if not bridge:
                             bridge = StatusBridge(chunk_queue, request_queue=request_queue, is_web=is_web)
 
@@ -948,7 +957,8 @@ class AIServicer(connpy_pb2_grpc.AIServiceServicer):
 
     @handle_errors
     def list_sessions(self, request, context):
-        return connpy_pb2.ValueResponse(data=to_value(self.service.list_sessions()))
+        sessions, total = self.service.list_sessions()
+        return connpy_pb2.ValueResponse(data=to_value(sessions))
 
     @handle_errors
     def delete_session(self, request, context):
@@ -970,6 +980,11 @@ class AIServicer(connpy_pb2_grpc.AIServiceServicer):
             remove=request.remove
         )
         return Empty()
+
+    @handle_errors
+    def list_mcp_servers(self, request, context):
+        mcp_servers = self.service.list_mcp_servers()
+        return connpy_pb2.ValueResponse(data=to_value(mcp_servers))
 
     @handle_errors
     def load_session_data(self, request, context):
