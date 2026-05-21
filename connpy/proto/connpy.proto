@@ -235,6 +235,8 @@ message AskRequest {
     bool trust = 10;
     string confirmation_answer = 11;
     bool interrupt = 12;
+    google.protobuf.Struct engineer_auth = 13;
+    google.protobuf.Struct architect_auth = 14;
 }
 
 message AIResponse {
@@ -255,6 +257,7 @@ message ProviderRequest {
     string provider = 1;
     string model = 2;
     string api_key = 3;
+    google.protobuf.Struct auth = 4;
 }
 
 message IntRequest {

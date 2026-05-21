@@ -47,7 +47,7 @@ class AIHandler:
         # Determinar session_id para retomar
         session_id = None
         if args.resume:
-            sessions = self.app.services.ai.list_sessions()
+            sessions, _ = self.app.services.ai.list_sessions()
             session_id = sessions[0]["id"] if sessions else None
             if not session_id:
                 printer.warning("No previous session found to resume.")
@@ -65,16 +65,23 @@ class AIHandler:
                 arguments[key] = cli_val[0]
             elif settings.get(key):
                 arguments[key] = settings.get(key)
+
+        for key in ["engineer_auth", "architect_auth"]:
+            cli_val = getattr(args, key, None)
+            if cli_val:
+                arguments[key] = self._parse_auth_value(cli_val[0])
+            elif settings.get(key):
+                arguments[key] = settings.get(key)
         
         # Check keys only if running in local mode (not remote)
         if getattr(self.app.services, "mode", "local") == "local":
-            if not arguments.get("engineer_api_key"):
-                printer.error("Engineer API key not configured. The chat cannot start.")
-                printer.info("Use 'connpy config --engineer-api-key <key>' to set it.")
+            if not arguments.get("engineer_api_key") and not arguments.get("engineer_auth"):
+                printer.error("Engineer API key/auth not configured. The chat cannot start.")
+                printer.info("Use 'connpy config --engineer-api-key <key>' or 'connpy config --engineer-auth <auth>' to set it.")
                 sys.exit(1)
-            if not arguments.get("architect_api_key"):
-                printer.warning("Architect API key not configured. Architect will be unavailable.")
-                printer.info("Use 'connpy config --architect-api-key <key>' to enable it.")
+            if not arguments.get("architect_api_key") and not arguments.get("architect_auth"):
+                printer.warning("Architect API key/auth not configured. Architect will be unavailable.")
+                printer.info("Use 'connpy config --architect-api-key <key>' or 'connpy config --architect-auth <auth>' to enable it.")
 
         # El resto de la interacción el CLI la maneja con el agente subyacente
         self.app.myai = self.app.services.ai
@@ -256,3 +263,33 @@ class AIHandler:
                 
         except Exception as e:
             printer.error(str(e))
+
+    def _parse_auth_value(self, value):
+        if not value or value.lower() in ["none", "clear"]:
+            return None
+        import os
+        import yaml
+        import json
+        if os.path.exists(value):
+            try:
+                with open(value, "r") as f:
+                    content = f.read()
+                try:
+                    return json.loads(content)
+                except ValueError:
+                    return yaml.safe_load(content)
+            except Exception as e:
+                printer.error(f"Failed to read/parse auth file '{value}': {e}")
+                sys.exit(1)
+        
+        try:
+            return json.loads(value)
+        except ValueError:
+            try:
+                parsed = yaml.safe_load(value)
+                if isinstance(parsed, dict):
+                    return parsed
+                raise ValueError()
+            except Exception:
+                printer.error("Auth parameter must be a valid JSON/YAML string, or a path to a JSON/YAML file.")
+                sys.exit(1)

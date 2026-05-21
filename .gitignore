@@ -146,6 +146,7 @@ package.json
 
 # Development docs
 connpy_roadmap.md
+testnew/
 testall/
 testremote/
 *.db
@@ -170,3 +171,6 @@ MULTI_USER_IMPLEMENTATION_STEPS.md
 #themes
 nord.yml
 theme.py
+
+#ai auth
+auth.json

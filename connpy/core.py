@@ -439,21 +439,16 @@ class node:
                     # Remove any stray \x00 bytes and forward normally
                     clean_data = data.replace(b'\x00', b'')
                     if clean_data:
-                        # Track command boundaries when user hits Enter
-                        if hasattr(self, 'mylog') and (b'\r' in clean_data or b'\n' in clean_data):
-                            # Introduce a tiny 20ms delay to allow late-arriving tab-completion bytes 
-                            # to be written to mylog before finalizing the boundary marker.
-                            async def delayed_marker():
-                                await asyncio.sleep(0.02)
-                                if hasattr(self, 'mylog'):
-                                    pos = self.mylog.tell()
-                                    self.cmd_byte_positions.append((pos, None))
-                                    if hasattr(self, 'current_local_stream') and self.current_local_stream is not None:
-                                        try:
-                                            await self.current_local_stream.write(f'\x1b]133;B;{pos}\x07'.encode())
-                                        except Exception:
-                                            pass
-                            asyncio.create_task(delayed_marker())
+                        # Track command boundaries when user hits Enter or presses Ctrl+C
+                        if hasattr(self, 'mylog') and (b'\r' in clean_data or b'\n' in clean_data or b'\x03' in clean_data):
+                            pos = self.mylog.tell()
+                            marker_cmd = "CANCELLED" if b'\x03' in clean_data else None
+                            self.cmd_byte_positions.append((pos, marker_cmd))
+                            if hasattr(self, 'current_local_stream') and self.current_local_stream is not None:
+                                try:
+                                    await self.current_local_stream.write(f'\x1b]133;B;{pos}\x07'.encode())
+                                except Exception:
+                                    pass
 
                         try:
                             os.write(child_fd, clean_data)

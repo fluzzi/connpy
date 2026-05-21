@@ -58,15 +58,18 @@ class AIService(BaseService):
                 prev_pos = cmd_byte_positions[i-1][0]
                 
                 if known_cmd:
-                    prev_chunk = raw_bytes[prev_pos:pos]
-                    prev_cleaned = self._clean_cisco_scrolling(prev_chunk.decode(errors='replace'))
-                    prev_lines = [l for l in prev_cleaned.split('\n') if l.strip()]
-                    prompt_text = prev_lines[-1].strip() if prev_lines else ""
-                    preview = f"{prompt_text}{known_cmd}" if prompt_text else known_cmd
-                    
-                    if len(preview) > 80:
-                        preview = preview[:77] + "..."
-                    parsed_positions.append({"pos": pos, "type": "VALID_CMD", "preview": preview})
+                    if known_cmd == "CANCELLED":
+                        parsed_positions.append({"pos": pos, "type": "CANCELLED", "preview": ""})
+                    else:
+                        prev_chunk = raw_bytes[prev_pos:pos]
+                        prev_cleaned = self._clean_cisco_scrolling(prev_chunk.decode(errors='replace'))
+                        prev_lines = [l for l in prev_cleaned.split('\n') if l.strip()]
+                        prompt_text = prev_lines[-1].strip() if prev_lines else ""
+                        preview = f"{prompt_text}{known_cmd}" if prompt_text else known_cmd
+                        
+                        if len(preview) > 80:
+                            preview = preview[:77] + "..."
+                        parsed_positions.append({"pos": pos, "type": "VALID_CMD", "preview": preview})
                 else:
                     chunk = raw_bytes[prev_pos:pos]
                     
@@ -129,11 +132,11 @@ class AIService(BaseService):
                 start_pos = item["pos"]
                 preview = item["preview"]
                 
-                # Find the end position: next VALID_CMD or EMPTY_PROMPT
+                # Find the end position: next VALID_CMD or EMPTY_PROMPT or CANCELLED
                 end_pos = current_prompt_pos
                 for j in range(i + 1, len(parsed_positions)):
                     next_item = parsed_positions[j]
-                    if next_item["type"] in ("VALID_CMD", "EMPTY_PROMPT"):
+                    if next_item["type"] in ("VALID_CMD", "EMPTY_PROMPT", "CANCELLED"):
                         end_pos = next_item["pos"]
                         break
                 
@@ -254,13 +257,15 @@ class AIService(BaseService):
         else:
             raise InvalidConfigurationError(f"Session '{session_id}' not found.")
 
-    def configure_provider(self, provider, model=None, api_key=None):
+    def configure_provider(self, provider, model=None, api_key=None, auth=None):
         """Update AI provider settings in the configuration."""
         settings = self.config.config.get("ai", {})
         if model:
             settings[f"{provider}_model"] = model
         if api_key:
             settings[f"{provider}_api_key"] = api_key
+        if auth is not None:
+            settings[f"{provider}_auth"] = auth
             
         self.config.config["ai"] = settings
         self.config._saveconfig(self.config.file)

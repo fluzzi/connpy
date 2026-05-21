@@ -745,6 +745,10 @@ class AIStub:
         )
         if chat_history is not None:
             initial_req.chat_history.CopyFrom(to_value(chat_history))
+        if "engineer_auth" in overrides and overrides["engineer_auth"]:
+            initial_req.engineer_auth.CopyFrom(to_struct(overrides["engineer_auth"]))
+        if "architect_auth" in overrides and overrides["architect_auth"]:
+            initial_req.architect_auth.CopyFrom(to_struct(overrides["architect_auth"]))
             
         req_queue.put(initial_req)
 
@@ -926,8 +930,10 @@ class AIStub:
         self.stub.delete_session(connpy_pb2.StringRequest(value=session_id))
 
     @handle_errors
-    def configure_provider(self, provider, model=None, api_key=None):
+    def configure_provider(self, provider, model=None, api_key=None, auth=None):
         req = connpy_pb2.ProviderRequest(provider=provider, model=model or "", api_key=api_key or "")
+        if auth:
+            req.auth.CopyFrom(to_struct(auth))
         self.stub.configure_provider(req)
 
     @handle_errors

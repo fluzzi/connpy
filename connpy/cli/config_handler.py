@@ -19,8 +19,10 @@ class ConfigHandler:
             "theme": self.set_theme,
             "engineer_model": self.set_ai_config,
             "engineer_api_key": self.set_ai_config,
+            "engineer_auth": self.set_ai_config,
             "architect_model": self.set_ai_config,
             "architect_api_key": self.set_ai_config,
+            "architect_auth": self.set_ai_config,
             "trusted_commands": self.set_ai_config,
             "service_mode": self.set_service_mode,
             "remote_host": self.set_remote_host,
@@ -127,9 +129,57 @@ class ConfigHandler:
         try:
             settings = self.app.services.config_svc.get_settings()
             aiconfig = settings.get("ai", {})
-            aiconfig[args.command] = args.data[0]
+            val = args.data[0]
+            
+            # Check for unset/clear request
+            if val.lower() in ["none", "clear", ""]:
+                if args.command in aiconfig:
+                    del aiconfig[args.command]
+            else:
+                # If configuring auth, parse as dictionary (JSON/YAML or file path)
+                if args.command in ["engineer_auth", "architect_auth"]:
+                    parsed_val = self._parse_auth_value(val)
+                    if parsed_val is not None:
+                        aiconfig[args.command] = parsed_val
+                    else:
+                        if args.command in aiconfig:
+                            del aiconfig[args.command]
+                else:
+                    aiconfig[args.command] = val
+            
             self.app.services.config_svc.update_setting("ai", aiconfig)
             printer.success("Config saved")
-        except ConnpyError as e:
+        except (ConnpyError, InvalidConfigurationError) as e:
             printer.error(str(e))
+
+    def _parse_auth_value(self, value):
+        if value.lower() in ["none", "clear", ""]:
+            return None
+        
+        # Check if it's a file path
+        import os
+        if os.path.exists(value):
+            try:
+                with open(value, "r") as f:
+                    content = f.read()
+                import json
+                try:
+                    return json.loads(content)
+                except ValueError:
+                    return yaml.safe_load(content)
+            except Exception as e:
+                raise InvalidConfigurationError(f"Failed to read/parse auth file '{value}': {e}")
+        
+        # Try parsing as inline JSON/YAML
+        try:
+            import json
+            return json.loads(value)
+        except ValueError:
+            try:
+                parsed = yaml.safe_load(value)
+                if isinstance(parsed, dict):
+                    return parsed
+                raise ValueError()
+            except Exception:
+                raise InvalidConfigurationError("Auth parameter must be a valid JSON/YAML string, or a path to a JSON/YAML file.")
 

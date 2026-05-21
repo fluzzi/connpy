@@ -246,7 +246,7 @@ def test_plugin_disable(mock_disable, app):
 
 @patch("connpy.services.ai_service.AIService.list_sessions")
 def test_ai_list(mock_list_sessions, app):
-    mock_list_sessions.return_value = [{"id": "1", "title": "t", "created_at": "now", "model": "m"}]
+    mock_list_sessions.return_value = ([{"id": "1", "title": "t", "created_at": "now", "model": "m"}], 1)
     app.start(["ai", "--list"])
     mock_list_sessions.assert_called_once()
 
@@ -262,3 +262,55 @@ def test_type_node_reserved_word(app):
         with pytest.raises(SystemExit) as exc:
             app._type_node("bulk")
         assert exc.value.code == 2
+
+@patch("connpy.services.config_service.ConfigService.update_setting")
+@patch("connpy.services.config_service.ConfigService.get_settings")
+def test_config_auth_inline_json(mock_get_settings, mock_update_setting, app):
+    mock_get_settings.return_value = {"ai": {}}
+    app.start(["config", "--engineer-auth", '{"vertex_project": "test-123"}'])
+    mock_update_setting.assert_called_once()
+    args, kwargs = mock_update_setting.call_args
+    assert args[0] == "ai"
+    assert args[1]["engineer_auth"] == {"vertex_project": "test-123"}
+
+@patch("connpy.services.config_service.ConfigService.update_setting")
+@patch("connpy.services.config_service.ConfigService.get_settings")
+def test_config_auth_inline_yaml(mock_get_settings, mock_update_setting, app):
+    mock_get_settings.return_value = {"ai": {}}
+    app.start(["config", "--architect-auth", 'project: test-yaml'])
+    mock_update_setting.assert_called_once()
+    args, kwargs = mock_update_setting.call_args
+    assert args[0] == "ai"
+    assert args[1]["architect_auth"] == {"project": "test-yaml"}
+
+@patch("connpy.services.config_service.ConfigService.update_setting")
+@patch("connpy.services.config_service.ConfigService.get_settings")
+def test_config_clear_auth(mock_get_settings, mock_update_setting, app):
+    mock_get_settings.return_value = {"ai": {"engineer_auth": {"project": "123"}, "engineer_api_key": "some-key"}}
+    
+    app.start(["config", "--engineer-auth", "clear"])
+    args, kwargs = mock_update_setting.call_args
+    assert "engineer_auth" not in args[1]
+    
+    app.start(["config", "--engineer-api-key", "none"])
+    args, kwargs = mock_update_setting.call_args
+    assert "engineer_api_key" not in args[1]
+
+@patch("os.path.exists")
+@patch("builtins.open")
+@patch("connpy.services.config_service.ConfigService.update_setting")
+@patch("connpy.services.config_service.ConfigService.get_settings")
+def test_config_auth_file_path(mock_get_settings, mock_update_setting, mock_open, mock_exists, app):
+    mock_get_settings.return_value = {"ai": {}}
+    mock_exists.side_effect = lambda p: True if p == "/path/to/creds.json" else False
+    mock_file = MagicMock()
+    mock_file.read.return_value = '{"vertex_project": "file-project"}'
+    mock_open.return_value.__enter__.return_value = mock_file
+    
+    app.start(["config", "--engineer-auth", "/path/to/creds.json"])
+    mock_update_setting.assert_called_once()
+    args, kwargs = mock_update_setting.call_args
+    assert args[0] == "ai"
+    assert args[1]["engineer_auth"] == {"vertex_project": "file-project"}
+
+

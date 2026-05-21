@@ -181,10 +181,27 @@ def _build_tree(nodes, folders, profiles, plugins, configdir):
     ai_dict = {"__exclude_used__": True, "--help": None, "-h": None}
     for opt in ["--engineer-model", "--engineer-api-key", "--architect-model", "--architect-api-key"]:
         ai_dict[opt] = {"*": ai_dict} # takes value, loops back
+    ai_dict["--engineer-auth"] = {"__extra__": lambda w: get_cwd(w, "--engineer-auth"), "*": ai_dict}
+    ai_dict["--architect-auth"] = {"__extra__": lambda w: get_cwd(w, "--architect-auth"), "*": ai_dict}
     for opt in ["--debug", "--trust", "--list", "--list-sessions", "--session", "--resume", "--delete", "--delete-session", "-y"]:
         ai_dict[opt] = ai_dict # takes no value, loops back
     ai_dict["--mcp"] = mcp_dict
     ai_dict["*"] = ai_dict
+
+    config_dict = {
+        "--allow-uppercase": ["true", "false"],
+        "--fzf": ["true", "false"],
+        "--completion": ["bash", "zsh"],
+        "--fzf-wrapper": ["bash", "zsh"],
+        "--service-mode": ["local", "remote"],
+        "--sync-remote": ["true", "false"],
+        "--help": None, "-h": None,
+    }
+    for opt in ["--keepalive", "--engineer-model", "--engineer-api-key", "--architect-model", "--architect-api-key", "--theme", "--remote", "--trusted-commands"]:
+        config_dict[opt] = {"*": config_dict}
+    config_dict["--configfolder"] = {"__extra__": lambda w: get_cwd(w, "--configfolder", True), "*": config_dict}
+    config_dict["--engineer-auth"] = {"__extra__": lambda w: get_cwd(w, "--engineer-auth"), "*": config_dict}
+    config_dict["--architect-auth"] = {"__extra__": lambda w: get_cwd(w, "--architect-auth"), "*": config_dict}
 
     mv_state = {"__extra__": _nodes, "--help": None, "-h": None}
     cp_state = {"__extra__": _nodes, "--help": None, "-h": None}
@@ -280,22 +297,7 @@ def _build_tree(nodes, folders, profiles, plugins, configdir):
             "--list": None, "--help": None,
             "-h": None,
         },
-        "config": {
-            "--allow-uppercase": ["true", "false"],
-            "--fzf": ["true", "false"],
-            "--keepalive": None,
-            "--completion": ["bash", "zsh"],
-            "--fzf-wrapper": ["bash", "zsh"],
-            "--configfolder": lambda w: get_cwd(w, "--configfolder", True),
-            "--engineer-model": None, "--engineer-api-key": None,
-            "--architect-model": None, "--architect-api-key": None,
-            "--theme": None,
-            "--service-mode": ["local", "remote"],
-            "--remote": None,
-            "--sync-remote": ["true", "false"],
-            "--trusted-commands": None,
-            "--help": None, "-h": None,
-        },
+        "config": config_dict,
         "sync": {
             "--login": None, "--logout": None,
             "--status": None, "--list": None,

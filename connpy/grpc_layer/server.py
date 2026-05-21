@@ -893,6 +893,10 @@ class AIServicer(connpy_pb2_grpc.AIServiceServicer):
                         overrides = {}
                         if req.engineer_model: overrides["engineer_model"] = req.engineer_model
                         if req.engineer_api_key: overrides["engineer_api_key"] = req.engineer_api_key
+                        if req.architect_model: overrides["architect_model"] = req.architect_model
+                        if req.architect_api_key: overrides["architect_api_key"] = req.architect_api_key
+                        if req.HasField("engineer_auth"): overrides["engineer_auth"] = from_struct(req.engineer_auth)
+                        if req.HasField("architect_auth"): overrides["architect_auth"] = from_struct(req.architect_auth)
                         
                         # Start AI in its own thread so we can keep listening for interrupts
                         ai_thread = threading.Thread(
@@ -967,7 +971,8 @@ class AIServicer(connpy_pb2_grpc.AIServiceServicer):
 
     @handle_errors
     def configure_provider(self, request, context):
-        self.service.configure_provider(request.provider, request.model, request.api_key)
+        auth_dict = from_struct(request.auth) if request.HasField("auth") else None
+        self.service.configure_provider(request.provider, request.model, request.api_key, auth=auth_dict)
         return Empty()
     
     @handle_errors

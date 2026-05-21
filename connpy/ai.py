@@ -108,7 +108,7 @@ class ai:
         r'^systemctl\s+status\s+', r'^journalctl\s+'
     ]
 
-    def __init__(self, config, org=None, api_key=None, engineer_model=None, architect_model=None, engineer_api_key=None, architect_api_key=None, console=None, confirm_handler=None, trust=False):
+    def __init__(self, config, org=None, api_key=None, engineer_model=None, architect_model=None, engineer_api_key=None, architect_api_key=None, console=None, confirm_handler=None, trust=False, engineer_auth=None, architect_auth=None, **kwargs):
         self.config = config
         self.console = console or printer.console
         self.confirm_handler = confirm_handler or self._local_confirm_handler
@@ -126,6 +126,29 @@ class ai:
         # API Keys (Prioridad: Argumento -> Config)
         self.engineer_key = engineer_api_key or aiconfig.get("engineer_api_key")
         self.architect_key = architect_api_key or aiconfig.get("architect_api_key")
+
+        # Auth configurations (Prioridad: Argumento -> Config)
+        self.engineer_auth = engineer_auth if engineer_auth is not None else aiconfig.get("engineer_auth")
+        if self.engineer_auth is None:
+            self.engineer_auth = {}
+        elif not isinstance(self.engineer_auth, dict):
+            self.engineer_auth = {}
+
+        self.architect_auth = architect_auth if architect_auth is not None else aiconfig.get("architect_auth")
+        if self.architect_auth is None:
+            self.architect_auth = {}
+        elif not isinstance(self.architect_auth, dict):
+            self.architect_auth = {}
+
+        # Backward compatibility fallbacks: only inject api_key if the auth dict is empty/not configured
+        if self.engineer_key and not self.engineer_auth:
+            self.engineer_auth["api_key"] = self.engineer_key
+        if self.architect_key and not self.architect_auth:
+            self.architect_auth["api_key"] = self.architect_key
+
+        # Strategic Reasoning Engine (Architect) availability
+        is_architect_keyless = "vertex" in self.architect_model.lower() or "ollama" in self.architect_model.lower() or "local" in self.architect_model.lower()
+        self.has_architect = bool(self.architect_key or self.architect_auth or is_architect_keyless)
 
         # Custom Trusted Commands Regexes
         custom_trusted = aiconfig.get("trusted_commands", [])
@@ -172,7 +195,7 @@ class ai:
 
         # Prompts base agnósticos
         architect_instructions = ""
-        if self.architect_key:
+        if self.has_architect:
             architect_instructions = """
             CRITICAL - CONSULT vs ESCALATE:
             - ALWAYS use 'consult_architect' for: Configuration planning, design decisions, complex troubleshooting.
@@ -188,7 +211,7 @@ class ai:
         else:
             architect_instructions = """
             CRITICAL - ARCHITECT UNAVAILABLE:
-            - The Strategic Reasoning Engine (Architect) is currently UNAVAILABLE because its API key is not configured.
+            - The Strategic Reasoning Engine (Architect) is currently UNAVAILABLE because its API key or authentication is not configured.
             - DO NOT attempt to consult or escalate to the architect.
             - If the user asks to consult the architect, inform them that the Architect is offline and offer to help them directly to the best of your abilities.
 """
@@ -294,15 +317,19 @@ class ai:
         if status_formatter:
             self.tool_status_formatters[name] = status_formatter
 
-    def _stream_completion(self, model, messages, tools, api_key, status=None, label="", debug=False, chunk_callback=None, **kwargs):
+    def _stream_completion(self, model, messages, tools, api_key=None, status=None, label="", debug=False, chunk_callback=None, auth=None, **kwargs):
         """Stream a completion call, rendering styled Markdown in real-time.
 
         Returns (response, streamed) where:
         - response: reconstructed ModelResponse (same as non-streaming)
         - streamed: True if text was rendered to console during streaming
         """
+        auth_dict = auth if auth is not None else {}
+        if api_key and "api_key" not in auth_dict:
+            auth_dict = auth_dict.copy()
+            auth_dict["api_key"] = api_key
 
-        stream_resp = completion(model=model, messages=messages, tools=tools, api_key=api_key, stream=True, **kwargs)
+        stream_resp = completion(model=model, messages=messages, tools=tools, stream=True, **auth_dict, **kwargs)
 
         chunks = []
         full_content = ""
@@ -745,7 +772,7 @@ class ai:
                 
                 try:
                     safe_messages = self._sanitize_messages(messages)
-                    response = completion(model=self.engineer_model, messages=safe_messages, tools=tools, api_key=self.engineer_key)
+                    response = completion(model=self.engineer_model, messages=safe_messages, tools=tools, **self.engineer_auth)
                 except Exception as e:
                     if status: status.stop()
                     raise ValueError(f"Engineer failed to connect: {str(e)}")
@@ -981,8 +1008,9 @@ class ai:
 
     @MethodHook
     def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=False, stream=True, session_id=None, chunk_callback=None):
-        if not self.engineer_key:
-            raise ValueError("Engineer API key not configured. Use 'connpy config --engineer-api-key <key>' to set it.")
+        is_engineer_keyless = "vertex" in self.engineer_model.lower() or "ollama" in self.engineer_model.lower() or "local" in self.engineer_model.lower()
+        if not self.engineer_key and not self.engineer_auth and not is_engineer_keyless:
+            raise ValueError("Engineer API key or authentication not configured. Use 'connpy config --engineer-auth <auth>' to set it.")
             
         if chat_history is None: chat_history = []
         
@@ -1031,6 +1059,7 @@ class ai:
         tools = self._get_architect_tools() if current_brain == "architect" else self._get_engineer_tools()
         model = self.architect_model if current_brain == "architect" else self.engineer_model
         key = self.architect_key if current_brain == "architect" else self.engineer_key
+        current_auth = self.architect_auth if current_brain == "architect" else self.engineer_auth
 
         # Estructura optimizada para Prompt Caching (Solo para Anthropic directo, Vertex tiene reglas distintas)
         if "claude" in model.lower() and "vertex" not in model.lower():
@@ -1090,12 +1119,12 @@ class ai:
                     safe_messages = self._sanitize_messages(messages)
                     if stream:
                         response, streamed_response = self._stream_completion(
-                            model=model, messages=safe_messages, tools=tools, api_key=key,
+                            model=model, messages=safe_messages, tools=tools, auth=current_auth,
                             status=status, label=label, debug=debug, num_retries=3,
                             chunk_callback=chunk_callback
                         )
                     else:
-                        response = completion(model=model, messages=safe_messages, tools=tools, api_key=key, num_retries=3)
+                        response = completion(model=model, messages=safe_messages, tools=tools, num_retries=3, **current_auth)
                 except Exception as e:
                     if current_brain == "architect":
                         if status: status.update("[unavailable]Architect unavailable! Falling back to Engineer...")
@@ -1104,6 +1133,7 @@ class ai:
                         model = self.engineer_model
                         tools = self._get_engineer_tools()
                         key = self.engineer_key
+                        current_auth = self.engineer_auth
                         # Rebuild messages with Engineer system prompt and original user request
                         messages = [{"role": "system", "content": self.engineer_system_prompt}]
                         # Add chat history if exists (excluding system prompt)
@@ -1196,6 +1226,7 @@ class ai:
                         model = self.architect_model
                         tools = self._get_architect_tools()
                         key = self.architect_key
+                        current_auth = self.architect_auth
                         messages[0] = {"role": "system", "content": self.architect_system_prompt}
                         # Prepare handover context to inject AFTER all tool responses
                         handover_msg = f"HANDOVER FROM EXECUTION ENGINE\n\nReason: {args['reason']}\n\nContext: {args['context']}\n\nYou are now in control of this conversation."
@@ -1217,6 +1248,7 @@ class ai:
                         model = self.engineer_model
                         tools = self._get_engineer_tools()
                         key = self.engineer_key
+                        current_auth = self.engineer_auth
                         messages[0] = {"role": "system", "content": self.engineer_system_prompt}
                         # Prepare handover context to inject AFTER all tool responses
                         handover_msg = f"HANDOVER FROM ARCHITECT\n\nSummary: {args['summary']}\n\nYou are now back in control. Continue handling the user's requests."
@@ -1258,7 +1290,7 @@ class ai:
                     messages.append({"role": "user", "content": "Hard iteration limit reached. Please provide a summary of your findings so far."})
                     try:
                         safe_messages = self._sanitize_messages(messages)
-                        response = completion(model=model, messages=safe_messages, tools=[], api_key=key)
+                        response = completion(model=model, messages=safe_messages, tools=[], **current_auth)
                         resp_msg = response.choices[0].message
                         messages.append(resp_msg.model_dump(exclude_none=True))
                     except Exception as e:
@@ -1278,7 +1310,7 @@ class ai:
             try:
                 safe_messages = self._sanitize_messages(summary_messages)
                 # Use tools=None to force a text summary during interruption
-                response = completion(model=model, messages=safe_messages, tools=None, api_key=key)
+                response = completion(model=model, messages=safe_messages, tools=None, **current_auth)
                 resp_msg = response.choices[0].message
                 messages.append(resp_msg.model_dump(exclude_none=True))
                 
@@ -1415,6 +1447,7 @@ Node: {node_name}"""
         # Use models based on persona
         current_model = self.architect_model if persona == "architect" else self.engineer_model
         current_key = self.architect_key if persona == "architect" else self.engineer_key
+        current_auth = self.architect_auth if persona == "architect" else self.engineer_auth
 
         try:
             while iteration < max_iterations:
@@ -1424,8 +1457,8 @@ Node: {node_name}"""
                     model=current_model,
                     messages=messages,
                     tools=mcp_tools if mcp_tools else None,
-                    api_key=current_key,
-                    stream=True
+                    stream=True,
+                    **current_auth
                 )
                 
                 full_content = ""
@@ -1498,8 +1531,8 @@ Node: {node_name}"""
                     model=self.engineer_model,
                     messages=messages,
                     tools=None,
-                    api_key=self.engineer_key,
-                    stream=True
+                    stream=True,
+                    **self.engineer_auth
                 )
                 
                 full_content = ""

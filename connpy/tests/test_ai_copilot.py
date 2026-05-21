@@ -193,3 +193,28 @@ def test_build_context_blocks_horizontal_scrolling_ansi():
     assert len(blocks) >= 1
     start, end, preview = blocks[0]
     assert "RP/0/RP0/CPU0:xrd# s show interfaces * | inc" in preview
+
+
+def test_build_context_blocks_cancelled_command():
+    from connpy.services.ai_service import AIService
+    svc = AIService(None)
+    
+    node_info = {"prompt": "router#"}
+    # Command 1: cancelled with Ctrl+C. Command 2: executed successfully.
+    raw_bytes = b"router# show plat\x03\r\nrouter# show ver\r\nrouter# "
+    
+    # 0: initial boundary
+    # 18: Ctrl+C pressed (ends Command 1, marked CANCELLED)
+    # 36: Enter pressed (ends Command 2)
+    cmd_byte_positions = [(0, None), (18, "CANCELLED"), (36, None)]
+    
+    blocks = svc.build_context_blocks(raw_bytes, cmd_byte_positions, node_info)
+    
+    # The cancelled command block (0 to 18) should NOT be registered as a VALID_CMD block.
+    # The block for "show ver" should be registered (starting at 36, ending at current_prompt_pos).
+    # Plus, the final block for "CURRENT CONTEXT".
+    valid_blocks = [b for b in blocks if "CURRENT CONTEXT" not in b[2]]
+    assert len(valid_blocks) == 1
+    assert "show ver" in valid_blocks[0][2]
+    assert "show plat" not in valid_blocks[0][2]
+

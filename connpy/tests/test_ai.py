@@ -23,7 +23,7 @@ class TestAIInit:
         myai = ai(config)
         with pytest.raises(ValueError) as exc:
             myai.ask("hello")
-        assert "Engineer API key not configured" in str(exc.value)
+        assert "Engineer API key or authentication not configured" in str(exc.value)
 
     def test_init_missing_architect_key_warns(self, ai_config, capsys, mock_litellm):
         """Warns if architect key is missing but doesn't crash."""
@@ -56,6 +56,77 @@ class TestAIInit:
                     myai = ai(ai_config)
                 except Exception:
                     pass  # May fail on other file opens, that's ok
+
+
+# =========================================================================
+# AI Auth Dict tests
+# =========================================================================
+
+class TestAIAuthDict:
+    def test_init_with_auth_dict(self, ai_config):
+        """Initializes correctly when auth dicts are configured."""
+        from connpy.ai import ai
+        ai_config.config["ai"]["engineer_api_key"] = None
+        ai_config.config["ai"]["architect_api_key"] = None
+        ai_config.config["ai"]["engineer_auth"] = {"my_key": "my_val"}
+        ai_config.config["ai"]["architect_auth"] = {"another_key": "another_val"}
+        myai = ai(ai_config)
+        assert myai.engineer_auth == {"my_key": "my_val"}
+        assert myai.architect_auth == {"another_key": "another_val"}
+
+    def test_compat_key_injection(self, ai_config):
+        """Injects API key into auth dict if auth is empty or doesn't have it."""
+        from connpy.ai import ai
+        ai_config.config["ai"]["engineer_api_key"] = "compat-eng-key"
+        ai_config.config["ai"]["architect_api_key"] = "compat-arch-key"
+        ai_config.config["ai"]["engineer_auth"] = {}
+        ai_config.config["ai"]["architect_auth"] = {}
+        myai = ai(ai_config)
+        assert myai.engineer_auth == {"api_key": "compat-eng-key"}
+        assert myai.architect_auth == {"api_key": "compat-arch-key"}
+
+    def test_has_architect_keyless(self, ai_config):
+        """Evaluates has_architect correctly for keyless models and auth configs."""
+        from connpy.ai import ai
+        # 1. Keyless model (Vertex)
+        ai_config.config["ai"]["architect_api_key"] = None
+        ai_config.config["ai"]["architect_auth"] = {}
+        ai_config.config["ai"]["architect_model"] = "vertex/gemini-pro"
+        myai = ai(ai_config)
+        assert myai.has_architect is True
+
+        # 2. Architect auth dict is set
+        ai_config.config["ai"]["architect_model"] = "custom-model"
+        ai_config.config["ai"]["architect_auth"] = {"vertex_project": "proj-1"}
+        myai = ai(ai_config)
+        assert myai.has_architect is True
+
+    def test_ask_unpacks_auth_dict(self, ai_config, mock_litellm):
+        """Verifies that ask unpacks engineer_auth when calling completion."""
+        from connpy.ai import ai
+        ai_config.config["ai"]["engineer_api_key"] = None
+        ai_config.config["ai"]["engineer_auth"] = {"vertex_project": "my-project", "vertex_location": "us-east1"}
+        myai = ai(ai_config)
+        myai.ask("test query", stream=False)
+        # Check mock_litellm completion call
+        mock_litellm["completion"].assert_called()
+        kwargs = mock_litellm["completion"].call_args.kwargs
+        assert kwargs.get("vertex_project") == "my-project"
+        assert kwargs.get("vertex_location") == "us-east1"
+        assert "api_key" not in kwargs
+
+    def test_auth_precedence_no_api_key_injection(self, ai_config):
+        """Verifies that api_key is not injected into the auth dict when auth is already set (non-empty)."""
+        from connpy.ai import ai
+        ai_config.config["ai"]["engineer_api_key"] = "legacy-eng-key"
+        ai_config.config["ai"]["architect_api_key"] = "legacy-arch-key"
+        ai_config.config["ai"]["engineer_auth"] = {"vertex_project": "proj-eng"}
+        ai_config.config["ai"]["architect_auth"] = {"vertex_project": "proj-arch"}
+        myai = ai(ai_config)
+        assert myai.engineer_auth == {"vertex_project": "proj-eng"}
+        assert "api_key" not in myai.engineer_auth
+        assert myai.architect_auth == {"vertex_project": "proj-arch"}
+        assert "api_key" not in myai.architect_auth
 
 
 # =========================================================================
@@ -427,12 +498,14 @@ class TestAISessions:
 
     def test_generate_session_id(self, myai):
         session_id = myai._generate_session_id("Any query")
-        # Format: YYYYMMDD-HHMMSS
-        assert len(session_id) == 15
+        # Format: YYYYMMDD-HHMMSS-suffix
+        assert len(session_id) == 20
         assert "-" in session_id
         parts = session_id.split("-")
+        assert len(parts) == 3
         assert len(parts[0]) == 8 # YYYYMMDD
         assert len(parts[1]) == 6 # HHMMSS
+        assert len(parts[2]) == 4 # suffix
 
     def test_save_and_load_session(self, myai):
         history = [
