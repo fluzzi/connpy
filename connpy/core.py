@@ -356,6 +356,7 @@ class node:
 
     async def _async_interact_loop(self, local_stream, resize_callback, copilot_handler=None):
         local_stream.setup(resize_callback=resize_callback)
+        self.current_local_stream = local_stream
         try:
             child_fd = self.child.child_fd
             
@@ -445,7 +446,13 @@ class node:
                             async def delayed_marker():
                                 await asyncio.sleep(0.02)
                                 if hasattr(self, 'mylog'):
-                                    self.cmd_byte_positions.append((self.mylog.tell(), None))
+                                    pos = self.mylog.tell()
+                                    self.cmd_byte_positions.append((pos, None))
+                                    if hasattr(self, 'current_local_stream') and self.current_local_stream is not None:
+                                        try:
+                                            await self.current_local_stream.write(f'\x1b]133;B;{pos}\x07'.encode())
+                                        except Exception:
+                                            pass
                             asyncio.create_task(delayed_marker())
 
                         try:
@@ -569,6 +576,7 @@ class node:
                 except Exception:
                     pass
         finally:
+            self.current_local_stream = None
             local_stream.teardown()
 
     @MethodHook
@@ -597,6 +605,11 @@ class node:
             if cmd != slc and hasattr(self, 'cmd_byte_positions') and self.cmd_byte_positions is not None:
                 log_pos = self.mylog.tell() if hasattr(self, 'mylog') else 0
                 self.cmd_byte_positions.append((log_pos, cmd))
+                if hasattr(self, 'current_local_stream') and self.current_local_stream is not None:
+                    try:
+                        await self.current_local_stream.write(f'\x1b]133;B;{log_pos}\x07'.encode())
+                    except Exception:
+                        pass
             
             # Write physically to PTY
             os.write(child_fd, (cmd + "\n").encode())
