@@ -100,7 +100,8 @@ class AIService(BaseService):
                         if not found_in_pass1:
                             # Fallback: The prompt might have been isolated in the previous chunk 
                             # due to asynchronous network delays splitting the output exactly at the newline.
-                            if prev_pos > 0:
+                            prev_was_valid_cmd = i >= 2 and parsed_positions[i-2]["type"] == "VALID_CMD"
+                            if prev_pos > 0 and not prev_was_valid_cmd:
                                 # Fetch the very last chunk that we just processed
                                 prev_prev_pos = cmd_byte_positions[i-2][0] if i >= 2 else 0
                                 prev_chunk_text = self._clean_cisco_scrolling(raw_bytes[prev_prev_pos:prev_pos].decode(errors='replace'))

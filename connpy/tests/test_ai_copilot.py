@@ -300,3 +300,103 @@ def test_copilot_range_mode_filtering():
     assert "show run" in captured_buffer
 
 
+def test_build_context_blocks_pager_scrolling_enter():
+    from connpy.services.ai_service import AIService
+    svc = AIService(None)
+    
+    node_info = {"prompt": "sixwind>"}
+    raw_bytes = (
+        b"sixwind> show configuration | less\r\n"
+        b"line 1 of output\nline 2 of output\n\r"
+        b"line 3 of output\nline 4 of output\n\r"
+        b"line 5 of output\n(END)\x1b[?1049l\x1b[?47l\r\nsixwind> \r\n"
+        b"sixwind> \r\n"
+        b"sixwind> \r\n"
+        b"sixwind> "
+    )
+    cmd_byte_positions = [
+        (0, None),
+        (36, None),
+        (70, None),
+        (105, None),
+        (153, None),
+        (164, None),
+        (175, None),
+        (186, None)
+    ]
+    
+    blocks = svc.build_context_blocks(raw_bytes, cmd_byte_positions, node_info)
+    
+    valid_blocks = [b for b in blocks if "CURRENT CONTEXT" not in b[2]]
+    assert len(valid_blocks) == 1
+    assert "show configuration" in valid_blocks[0][2]
+    assert valid_blocks[0][0] == 36
+    assert valid_blocks[0][1] == 153
+
+
+def test_build_context_blocks_pager_scrolling_space():
+    from connpy.services.ai_service import AIService
+    svc = AIService(None)
+    
+    node_info = {"prompt": "sixwind>"}
+    raw_bytes = (
+        b"sixwind> show configuration | less\r\n"
+        b"line 1 of output\nline 2 of output\n "
+        b"line 3 of output\nline 4 of output\n "
+        b"line 5 of output\n(END)\x1b[?1049l\x1b[?47l\r\n"
+        b"sixwind> \r\n"
+        b"sixwind> \r\n"
+        b"sixwind> \r\n"
+        b"sixwind> "
+    )
+    cmd_byte_positions = [
+        (0, None),
+        (36, None),
+        (144, None),
+        (155, None),
+        (166, None),
+        (177, None)
+    ]
+    
+    blocks = svc.build_context_blocks(raw_bytes, cmd_byte_positions, node_info)
+    
+    valid_blocks = [b for b in blocks if "CURRENT CONTEXT" not in b[2]]
+    assert len(valid_blocks) == 1
+    assert "show configuration" in valid_blocks[0][2]
+    assert valid_blocks[0][0] == 36
+    assert valid_blocks[0][1] == 155
+
+
+def test_build_context_blocks_pager_scrolling_6wind_escapes():
+    from connpy.services.ai_service import AIService
+    svc = AIService(None)
+    
+    node_info = {"prompt": "6WIND-PE1>", "os": "6wind"}
+    raw_bytes = (
+        b"6WIND-PE1> show config running fullpath nodefault\r\n"
+        b"line 1\r\n"
+        b"line 2\r\n"
+        b":\x1b[K\r\x1b[K/ vrf main interface gre gre2 mtu 8400\r\n"
+        b":\x1b[K\x07\r\x1b[K\x1b[?1l\x1b>6WIND-PE1> \r\n"
+        b"6WIND-PE1> \r\n"
+        b"6WIND-PE1> "
+    )
+    cmd_byte_positions = [
+        (0, None),
+        (52, None),
+        (136, None),
+        (177, None),
+        (177, None),
+        (190, None),
+        (203, None)
+    ]
+    
+    blocks = svc.build_context_blocks(raw_bytes, cmd_byte_positions, node_info)
+    
+    valid_blocks = [b for b in blocks if "CURRENT CONTEXT" not in b[2]]
+    assert len(valid_blocks) == 1
+    assert "show config running" in valid_blocks[0][2]
+
+
+
+

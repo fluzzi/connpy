@@ -11,7 +11,7 @@ def log_cleaner(data: str) -> str:
     cleaned_lines = []
     
     # Regex to capture: ANSI sequences, control characters (\r, \b, etc), and plain text chunks
-    token_re = re.compile(r'(\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/ ]*[@-~])|\r|\b|\x7f|[\x00-\x1F]|[^\x1B\r\b\x7f\x00-\x1F]+)')
+    token_re = re.compile(r'(\x1B(?:[\x30-\x5A\x5C-\x7E]|\[[0-?]*[ -/ ]*[@-~])|\r|\b|\x7f|[\x00-\x1F]|[^\x1B\r\b\x7f\x00-\x1F]+)')
     
     for line in lines:
         buffer = []
