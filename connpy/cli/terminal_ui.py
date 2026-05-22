@@ -134,7 +134,8 @@ class CopilotInterface:
                 if state['context_mode'] == self.mode_single:
                     active_raw = raw_bytes[start:end]
                 else:
-                    active_raw = raw_bytes[start:]
+                    # Concat only the bytes of valid blocks to skip intermediate empty/cancelled prompt noise
+                    active_raw = b"".join(raw_bytes[b[0]:b[1]] for b in blocks[idx:])
                 return preview + "\n" + log_cleaner(active_raw.decode(errors='replace'))
 
             def get_prompt_text():
@@ -335,6 +336,7 @@ class CopilotInterface:
                 persona_title = "Network Architect" if active_persona == "architect" else "Network Engineer"
                 
                 active_buffer = get_active_buffer()
+                
                 live_text = ""
                 first_chunk = True
                 

@@ -218,3 +218,85 @@ def test_build_context_blocks_cancelled_command():
     assert "show ver" in valid_blocks[0][2]
     assert "show plat" not in valid_blocks[0][2]
 
+
+def test_copilot_range_mode_filtering():
+    from connpy.cli.terminal_ui import CopilotInterface
+    
+    # We setup dummy raw_bytes with scrolling garbage in the middle:
+    # 0 to 10: "show ip" (VALID_CMD)
+    # 10 to 25: "some scrolling garbage we want to skip"
+    # 25 to 35: "show run" (VALID_CMD)
+    # 35 to 45: "current prompt" (final context block)
+    raw_bytes = b"show ip    garbage_to_skip_here   show run   router#"
+    
+    blocks = [
+        (0, 10, "router# show ip"),
+        (25, 35, "router# show run"),
+        (35, 45, "router#")
+    ]
+    
+    # Mock Config
+    class MockConfig:
+        def __init__(self):
+            self.config = {"ai": {}}
+            self.defaultdir = "/tmp"
+            
+    interface = CopilotInterface(MockConfig())
+    # Ensure default is RANGE mode
+    interface.mode_range = 0
+    interface.mode_single = 1
+    interface.mode_lines = 2
+    
+    captured_buffer = None
+    
+    async def mock_ai_call(active_buffer, question, on_chunk, node_info):
+        nonlocal captured_buffer
+        captured_buffer = active_buffer
+        return {"guide": "Ok", "commands": [], "risk_level": "low"}
+        
+    # Mock PromptSession.prompt_async to ask a question once then exit
+    prompt_calls = 0
+    async def mock_prompt_async(self, *args, **kwargs):
+        nonlocal prompt_calls
+        prompt_calls += 1
+        if prompt_calls == 1:
+            # Simulate pressing Ctrl+Up key twice to expand context range from 1 to 3 commands
+            kb = kwargs.get('key_bindings')
+            if kb:
+                class DummyApp:
+                    def invalidate(self): pass
+                class DummyEvent:
+                    app = DummyApp()
+                
+                # Find and invoke the 'c-up' handler twice
+                for b in kb.bindings:
+                    if any('up' in str(k).lower() for k in b.keys):
+                        b.handler(DummyEvent())
+                        b.handler(DummyEvent())
+            return "how are interfaces looking?"
+        else:
+            raise KeyboardInterrupt
+            
+    with patch('prompt_toolkit.PromptSession.prompt_async', mock_prompt_async):
+        async def run():
+            # Run session
+            return await interface.run_session(
+                raw_bytes=raw_bytes,
+                node_info={"name": "test"},
+                on_ai_call=mock_ai_call,
+                blocks=blocks
+            )
+            
+        asyncio.run(run())
+        
+    # In range mode: it should have concatenated the valid blocks
+    # block[0] is raw_bytes[0:10] => b"show ip    "
+    # block[1] is raw_bytes[25:35] => b"   show run"
+    # block[2] is raw_bytes[35:45] => b"   router#"
+    # Note: raw_bytes[10:25] (garbage) must be excluded!
+    assert captured_buffer is not None
+    assert "garbage_to_skip_here" not in captured_buffer
+    assert "show ip" in captured_buffer
+    assert "show run" in captured_buffer
+
+
