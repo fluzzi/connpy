@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.5">
+<meta name="generator" content="pdoc3 0.11.6">
 <title>connpy.grpc_layer.server API documentation</title>
 <meta name="description" content="">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
@@ -177,9 +177,11 @@ el.replaceWith(d);
                 print(f&#34;AI Task Error: {e}&#34;)
                 traceback.print_exc()
                 chunk_queue.put((&#34;status&#34;, f&#34;Error: {str(e)}&#34;))
+                # Crucial: always send final_mark to avoid client deadlock
+                chunk_queue.put((&#34;final_mark&#34;, {&#34;response&#34;: f&#34;Error: {str(e)}&#34;, &#34;chat_history&#34;: history, &#34;error&#34;: True}))
 
         def request_listener():
-            nonlocal bridge, is_web, ai_thread, agent_instance
+            nonlocal bridge, is_web, ai_thread, agent_instance, history
             try:
                 for req in request_iterator:
                     if req.interrupt:
@@ -193,12 +195,21 @@ el.replaceWith(d);
 
                     if req.input_text:
                         is_web = &#34;web&#34; in (req.session_id or &#34;&#34;).lower() or (req.session_id or &#34;&#34;).lower().startswith(&#34;ws-&#34;)
+                        
+                        # Hydrate history from client if it&#39;s the first interaction in this stream
+                        if not history and req.chat_history:
+                            from .utils import from_value
+                            history = from_value(req.chat_history) or []
                         if not bridge:
                             bridge = StatusBridge(chunk_queue, request_queue=request_queue, is_web=is_web)
 
                         overrides = {}
                         if req.engineer_model: overrides[&#34;engineer_model&#34;] = req.engineer_model
                         if req.engineer_api_key: overrides[&#34;engineer_api_key&#34;] = req.engineer_api_key
+                        if req.architect_model: overrides[&#34;architect_model&#34;] = req.architect_model
+                        if req.architect_api_key: overrides[&#34;architect_api_key&#34;] = req.architect_api_key
+                        if req.HasField(&#34;engineer_auth&#34;): overrides[&#34;engineer_auth&#34;] = from_struct(req.engineer_auth)
+                        if req.HasField(&#34;architect_auth&#34;): overrides[&#34;architect_auth&#34;] = from_struct(req.architect_auth)
                         
                         # Start AI in its own thread so we can keep listening for interrupts
                         ai_thread = threading.Thread(
@@ -263,7 +274,8 @@ el.replaceWith(d);
 
     @handle_errors
     def list_sessions(self, request, context):
-        return connpy_pb2.ValueResponse(data=to_value(self.service.list_sessions()))
+        sessions, total = self.service.list_sessions()
+        return connpy_pb2.ValueResponse(data=to_value(sessions))
 
     @handle_errors
     def delete_session(self, request, context):
@@ -272,7 +284,8 @@ el.replaceWith(d);
 
     @handle_errors
     def configure_provider(self, request, context):
-        self.service.configure_provider(request.provider, request.model, request.api_key)
+        auth_dict = from_struct(request.auth) if request.HasField(&#34;auth&#34;) else None
+        self.service.configure_provider(request.provider, request.model, request.api_key, auth=auth_dict)
         return Empty()
     
     @handle_errors
@@ -285,6 +298,11 @@ el.replaceWith(d);
             remove=request.remove
         )
         return Empty()
+
+    @handle_errors
+    def list_mcp_servers(self, request, context):
+        mcp_servers = self.service.list_mcp_servers()
+        return connpy_pb2.ValueResponse(data=to_value(mcp_servers))
 
     @handle_errors
     def load_session_data(self, request, context):
@@ -305,6 +323,7 @@ el.replaceWith(d);
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.configure_provider" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.configure_provider">configure_provider</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.confirm" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.confirm">confirm</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.delete_session" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.delete_session">delete_session</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.list_mcp_servers" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.list_mcp_servers">list_mcp_servers</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.list_sessions" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.list_sessions">list_sessions</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.load_session_data" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.load_session_data">load_session_data</a></code></li>
 </ul>
@@ -975,7 +994,9 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
 
                 asyncio.run(n._async_interact_loop(remote_stream, resize_callback, copilot_handler=remote_copilot_handler))
             except Exception as e:
-                pass
+                import traceback
+                print(f&#34;[ERROR in run_async_loop] {e}&#34;)
+                traceback.print_exc()
             finally:
                 n._teardown_interact_environment()
                 response_queue.put(None)  # Signal EOF
@@ -1195,6 +1216,7 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
         self.service = ProfileService(config)
         self.node_service = NodeService(config)
 
+
     @handle_errors
     def list_profiles(self, request, context):
         f = request.filter_str if request.filter_str else None
@@ -1261,6 +1283,7 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
         self.on_interrupt = self._force_interrupt
         self.thread = None
         self.is_web = is_web
+        self.is_remote = True
 
     def _force_interrupt(self):
         &#34;&#34;&#34;Forcefully raise KeyboardInterrupt in the target thread.&#34;&#34;&#34;
@@ -1560,7 +1583,7 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
 </footer>
 </body>
 </html>

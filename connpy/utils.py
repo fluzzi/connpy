@@ -7,6 +7,9 @@ def log_cleaner(data: str) -> str:
     if not data:
         return ""
             
+    # Remove OSC (Operating System Command) sequences (e.g., set window title \x1b]0;...\x07)
+    data = re.sub(r'\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)', '', data)
+
     lines = data.split('\n')
     cleaned_lines = []
     

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.5">
+<meta name="generator" content="pdoc3 0.11.6">
 <title>connpy.grpc_layer.stubs API documentation</title>
 <meta name="description" content="">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
@@ -122,6 +122,10 @@ el.replaceWith(d);
         )
         if chat_history is not None:
             initial_req.chat_history.CopyFrom(to_value(chat_history))
+        if &#34;engineer_auth&#34; in overrides and overrides[&#34;engineer_auth&#34;]:
+            initial_req.engineer_auth.CopyFrom(to_struct(overrides[&#34;engineer_auth&#34;]))
+        if &#34;architect_auth&#34; in overrides and overrides[&#34;architect_auth&#34;]:
+            initial_req.architect_auth.CopyFrom(to_struct(overrides[&#34;architect_auth&#34;]))
             
         req_queue.put(initial_req)
 
@@ -135,6 +139,7 @@ el.replaceWith(d);
         
         full_content = &#34;&#34;
         header_printed = False
+        current_responder = &#34;engineer&#34;
         final_result = {&#34;response&#34;: &#34;&#34;, &#34;chat_history&#34;: []}
 
         # Background thread to pull responses from gRPC into a local queue
@@ -179,6 +184,10 @@ el.replaceWith(d);
                     break
 
                 if response.status_update:
+                    if response.status_update.startswith(&#34;__RESPONDER__:&#34;):
+                        current_responder = response.status_update.split(&#34;:&#34;)[1].lower()
+                        continue
+                        
                     if response.requires_confirmation:
                         if status: status.stop()
                         
@@ -231,7 +240,9 @@ el.replaceWith(d);
                             stable_console = RichConsole(theme=connpy_theme, file=get_original_stdout())
                             
                             # Print header on first chunk
-                            stable_console.print(Rule(&#34;[bold engineer]Network Engineer[/bold engineer]&#34;, style=&#34;engineer&#34;))
+                            alias = &#34;architect&#34; if current_responder == &#34;architect&#34; else &#34;engineer&#34;
+                            role_label = &#34;Network Architect&#34; if current_responder == &#34;architect&#34; else &#34;Network Engineer&#34;
+                            stable_console.print(Rule(f&#34;[bold {alias}]{role_label}[/bold {alias}]&#34;, style=alias))
                             header_printed = True
                             
                             # Initialize parser
@@ -283,16 +294,23 @@ el.replaceWith(d);
         return self.stub.confirm(connpy_pb2.StringRequest(value=input_text)).value
 
     @handle_errors
-    def list_sessions(self):
-        return from_value(self.stub.list_sessions(Empty()).data)
+    def list_sessions(self, limit=None):
+        from .utils import from_value
+        res = self.stub.list_sessions(Empty())
+        sessions = from_value(res.data) or []
+        if limit and len(sessions) &gt; limit:
+            return sessions[:limit], len(sessions)
+        return sessions, len(sessions)
 
     @handle_errors
     def delete_session(self, session_id):
         self.stub.delete_session(connpy_pb2.StringRequest(value=session_id))
 
     @handle_errors
-    def configure_provider(self, provider, model=None, api_key=None):
+    def configure_provider(self, provider, model=None, api_key=None, auth=None):
         req = connpy_pb2.ProviderRequest(provider=provider, model=model or &#34;&#34;, api_key=api_key or &#34;&#34;)
+        if auth:
+            req.auth.CopyFrom(to_struct(auth))
         self.stub.configure_provider(req)
 
     @handle_errors
@@ -305,6 +323,11 @@ el.replaceWith(d);
             remove=remove
         )
         self.stub.configure_mcp(req)
+
+    @handle_errors
+    def list_mcp_servers(self):
+        res = self.stub.list_mcp_servers(Empty())
+        return from_value(res.data) or {}
 
     @handle_errors
     def load_session_data(self, session_id):
@@ -344,6 +367,10 @@ def ask(self, input_text, dryrun=False, chat_history=None, session_id=None, debu
     )
     if chat_history is not None:
         initial_req.chat_history.CopyFrom(to_value(chat_history))
+    if &#34;engineer_auth&#34; in overrides and overrides[&#34;engineer_auth&#34;]:
+        initial_req.engineer_auth.CopyFrom(to_struct(overrides[&#34;engineer_auth&#34;]))
+    if &#34;architect_auth&#34; in overrides and overrides[&#34;architect_auth&#34;]:
+        initial_req.architect_auth.CopyFrom(to_struct(overrides[&#34;architect_auth&#34;]))
         
     req_queue.put(initial_req)
 
@@ -357,6 +384,7 @@ def ask(self, input_text, dryrun=False, chat_history=None, session_id=None, debu
     
     full_content = &#34;&#34;
     header_printed = False
+    current_responder = &#34;engineer&#34;
     final_result = {&#34;response&#34;: &#34;&#34;, &#34;chat_history&#34;: []}
 
     # Background thread to pull responses from gRPC into a local queue
@@ -401,6 +429,10 @@ def ask(self, input_text, dryrun=False, chat_history=None, session_id=None, debu
                 break
 
             if response.status_update:
+                if response.status_update.startswith(&#34;__RESPONDER__:&#34;):
+                    current_responder = response.status_update.split(&#34;:&#34;)[1].lower()
+                    continue
+                    
                 if response.requires_confirmation:
                     if status: status.stop()
                     
@@ -453,7 +485,9 @@ def ask(self, input_text, dryrun=False, chat_history=None, session_id=None, debu
                         stable_console = RichConsole(theme=connpy_theme, file=get_original_stdout())
                         
                         # Print header on first chunk
-                        stable_console.print(Rule(&#34;[bold engineer]Network Engineer[/bold engineer]&#34;, style=&#34;engineer&#34;))
+                        alias = &#34;architect&#34; if current_responder == &#34;architect&#34; else &#34;engineer&#34;
+                        role_label = &#34;Network Architect&#34; if current_responder == &#34;architect&#34; else &#34;Network Engineer&#34;
+                        stable_console.print(Rule(f&#34;[bold {alias}]{role_label}[/bold {alias}]&#34;, style=alias))
                         header_printed = True
                         
                         # Initialize parser
@@ -524,7 +558,7 @@ def configure_mcp(self, name, url=None, enabled=True, auto_load_on_os=None, remo
 <div class="desc"></div>
 </dd>
 <dt id="connpy.grpc_layer.stubs.AIStub.configure_provider"><code class="name flex">
-<span>def <span class="ident">configure_provider</span></span>(<span>self, provider, model=None, api_key=None)</span>
+<span>def <span class="ident">configure_provider</span></span>(<span>self, provider, model=None, api_key=None, auth=None)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -532,8 +566,10 @@ def configure_mcp(self, name, url=None, enabled=True, auto_load_on_os=None, remo
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@handle_errors
-def configure_provider(self, provider, model=None, api_key=None):
+def configure_provider(self, provider, model=None, api_key=None, auth=None):
     req = connpy_pb2.ProviderRequest(provider=provider, model=model or &#34;&#34;, api_key=api_key or &#34;&#34;)
+    if auth:
+        req.auth.CopyFrom(to_struct(auth))
     self.stub.configure_provider(req)</code></pre>
 </details>
 <div class="desc"></div>
@@ -566,8 +602,8 @@ def delete_session(self, session_id):
 </details>
 <div class="desc"></div>
 </dd>
-<dt id="connpy.grpc_layer.stubs.AIStub.list_sessions"><code class="name flex">
-<span>def <span class="ident">list_sessions</span></span>(<span>self)</span>
+<dt id="connpy.grpc_layer.stubs.AIStub.list_mcp_servers"><code class="name flex">
+<span>def <span class="ident">list_mcp_servers</span></span>(<span>self)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -575,8 +611,28 @@ def delete_session(self, session_id):
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@handle_errors
-def list_sessions(self):
-    return from_value(self.stub.list_sessions(Empty()).data)</code></pre>
+def list_mcp_servers(self):
+    res = self.stub.list_mcp_servers(Empty())
+    return from_value(res.data) or {}</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.AIStub.list_sessions"><code class="name flex">
+<span>def <span class="ident">list_sessions</span></span>(<span>self, limit=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def list_sessions(self, limit=None):
+    from .utils import from_value
+    res = self.stub.list_sessions(Empty())
+    sessions = from_value(res.data) or []
+    if limit and len(sessions) &gt; limit:
+        return sessions[:limit], len(sessions)
+    return sessions, len(sessions)</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -2470,6 +2526,7 @@ def stop_api(self):
 <li><code><a title="connpy.grpc_layer.stubs.AIStub.configure_provider" href="#connpy.grpc_layer.stubs.AIStub.configure_provider">configure_provider</a></code></li>
 <li><code><a title="connpy.grpc_layer.stubs.AIStub.confirm" href="#connpy.grpc_layer.stubs.AIStub.confirm">confirm</a></code></li>
 <li><code><a title="connpy.grpc_layer.stubs.AIStub.delete_session" href="#connpy.grpc_layer.stubs.AIStub.delete_session">delete_session</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.AIStub.list_mcp_servers" href="#connpy.grpc_layer.stubs.AIStub.list_mcp_servers">list_mcp_servers</a></code></li>
 <li><code><a title="connpy.grpc_layer.stubs.AIStub.list_sessions" href="#connpy.grpc_layer.stubs.AIStub.list_sessions">list_sessions</a></code></li>
 <li><code><a title="connpy.grpc_layer.stubs.AIStub.load_session_data" href="#connpy.grpc_layer.stubs.AIStub.load_session_data">load_session_data</a></code></li>
 </ul>
@@ -2561,7 +2618,7 @@ def stop_api(self):
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
 </footer>
 </body>
 </html>

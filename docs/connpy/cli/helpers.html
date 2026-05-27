@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.5">
+<meta name="generator" content="pdoc3 0.11.6">
 <title>connpy.cli.helpers API documentation</title>
 <meta name="description" content="">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
@@ -69,7 +69,7 @@ el.replaceWith(d);
             return answer[0]
     else:
         questions = [inquirer.List(name, message=&#34;Pick {} to {}:&#34;.format(name,action), choices=list_, carousel=True)]
-        answer = inquirer.prompt(questions)
+        answer = inquirer.prompt(questions, theme=theme)
         if answer == None:
             return None
         else:
@@ -114,6 +114,65 @@ el.replaceWith(d);
         return defaultdir</code></pre>
 </details>
 <div class="desc"></div>
+</dd>
+<dt id="connpy.cli.helpers.get_theme"><code class="name flex">
+<span>def <span class="ident">get_theme</span></span>(<span>)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_theme():
+    &#34;&#34;&#34;Returns a fresh instance of the theme with current colors.&#34;&#34;&#34;
+    return ConnpyTheme()</code></pre>
+</details>
+<div class="desc"><p>Returns a fresh instance of the theme with current colors.</p></div>
+</dd>
+<dt id="connpy.cli.helpers.hex_to_blessed"><code class="name flex">
+<span>def <span class="ident">hex_to_blessed</span></span>(<span>hex_str)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def hex_to_blessed(hex_str):
+    &#34;&#34;&#34;Convert hex color string to blessed/ansi format.&#34;&#34;&#34;
+    if not hex_str or not isinstance(hex_str, str):
+        return term.normal
+    
+    # Check for bold prefix
+    prefix = &#34;&#34;
+    if hex_str.startswith(&#39;bold &#39;):
+        prefix = term.bold
+        hex_str = hex_str.replace(&#39;bold &#39;, &#39;&#39;).strip()
+    
+    # If it&#39;s a standard color name
+    if not hex_str.startswith(&#39;#&#39;):
+        return prefix + getattr(term, hex_str, term.normal)
+    
+    # Parse hex
+    try:
+        h = hex_str.lstrip(&#39;#&#39;)
+        if len(h) == 3:
+            h = &#39;&#39;.join([c*2 for c in h])
+        r = int(h[0:2], 16)
+        g = int(h[2:4], 16)
+        b = int(h[4:6], 16)
+        
+        # Try RGB, fallback to standard cyan if it fails or returns empty
+        try:
+            c = term.color_rgb(r, g, b)
+            if not c: # Some terms return empty for RGB
+                return prefix + term.cyan
+            return prefix + c
+        except:
+            return prefix + term.cyan
+    except:
+        return prefix + term.normal</code></pre>
+</details>
+<div class="desc"><p>Convert hex color string to blessed/ansi format.</p></div>
 </dd>
 <dt id="connpy.cli.helpers.nodes_completer"><code class="name flex">
 <span>def <span class="ident">nodes_completer</span></span>(<span>prefix, parsed_args, **kwargs)</span>
@@ -181,6 +240,61 @@ el.replaceWith(d);
 </dl>
 </section>
 <section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="connpy.cli.helpers.ConnpyTheme"><code class="flex name class">
+<span>class <span class="ident">ConnpyTheme</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class ConnpyTheme(Default):
+    def __init__(self):
+        super().__init__()
+        try:
+            from ..printer import _global_active_styles
+            # Use user_prompt as primary accent, fallback to info/cyan
+            accent = _global_active_styles.get(&#34;user_prompt&#34;, _global_active_styles.get(&#34;info&#34;, &#34;cyan&#34;))
+            accent_color = hex_to_blessed(accent)
+            
+            self.Question.mark_color = accent_color
+            self.List.selection_color = accent_color
+            self.List.selection_cursor = &#34;&gt;&#34;
+        except:
+            # Absolute fallback to standard cyan
+            self.Question.mark_color = term.cyan
+            self.List.selection_color = term.bold_cyan
+            self.List.selection_cursor = &#34;&gt;&#34;</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>inquirer.themes.Default</li>
+<li>inquirer.themes.Theme</li>
+</ul>
+</dd>
+<dt id="connpy.cli.helpers.ThemeProxy"><code class="flex name class">
+<span>class <span class="ident">ThemeProxy</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class ThemeProxy:
+    &#34;&#34;&#34;Proxy to ensure theme colors are resolved at runtime.&#34;&#34;&#34;
+    def __getattr__(self, name):
+        return getattr(get_theme(), name)
+    def __iter__(self):
+        return iter(get_theme())
+    def __getitem__(self, item):
+        return get_theme()[item]</code></pre>
+</details>
+<div class="desc"><p>Proxy to ensure theme colors are resolved at runtime.</p></div>
+</dd>
+</dl>
 </section>
 </article>
 <nav id="sidebar">
@@ -198,16 +312,28 @@ el.replaceWith(d);
 <li><code><a title="connpy.cli.helpers.choose" href="#connpy.cli.helpers.choose">choose</a></code></li>
 <li><code><a title="connpy.cli.helpers.folders_completer" href="#connpy.cli.helpers.folders_completer">folders_completer</a></code></li>
 <li><code><a title="connpy.cli.helpers.get_config_dir" href="#connpy.cli.helpers.get_config_dir">get_config_dir</a></code></li>
+<li><code><a title="connpy.cli.helpers.get_theme" href="#connpy.cli.helpers.get_theme">get_theme</a></code></li>
+<li><code><a title="connpy.cli.helpers.hex_to_blessed" href="#connpy.cli.helpers.hex_to_blessed">hex_to_blessed</a></code></li>
 <li><code><a title="connpy.cli.helpers.nodes_completer" href="#connpy.cli.helpers.nodes_completer">nodes_completer</a></code></li>
 <li><code><a title="connpy.cli.helpers.profiles_completer" href="#connpy.cli.helpers.profiles_completer">profiles_completer</a></code></li>
 <li><code><a title="connpy.cli.helpers.toplevel_completer" href="#connpy.cli.helpers.toplevel_completer">toplevel_completer</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="connpy.cli.helpers.ConnpyTheme" href="#connpy.cli.helpers.ConnpyTheme">ConnpyTheme</a></code></h4>
+</li>
+<li>
+<h4><code><a title="connpy.cli.helpers.ThemeProxy" href="#connpy.cli.helpers.ThemeProxy">ThemeProxy</a></code></h4>
+</li>
 </ul>
 </li>
 </ul>
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
 </footer>
 </body>
 </html>

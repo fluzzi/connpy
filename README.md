@@ -17,8 +17,12 @@ The v6 release introduces the **AI Copilot**, an interactive terminal assistant 
 ## 🤖 AI Copilot (New in v6)
 The AI Copilot is deeply integrated into your terminal workflow:
 - **Terminal Context Awareness**: The Copilot can "see" your screen output, helping you diagnose errors or analyze command results in real-time.
+- **Dynamic Context Selection**: Flexibly select single, range, or line-based terminal blocks to feed the Copilot, filtering out interactive scrolling garbage automatically (e.g., Cisco IOS/XR scrolling, paginators).
 - **Hybrid Multi-Agent System**: Automatically escalates complex tasks between the **Network Engineer** (execution) and the **Network Architect** (strategy).
 - **MCP Integration**: Dynamically load tools from external providers (6WIND, AWS, etc.) via the Model Context Protocol.
+- **Flexible Auth & Keyless AI**: Support for advanced LiteLLM credentials (`--engineer-auth` / `--architect-auth`) allowing keyless local models (Ollama), cloud engines (Vertex AI), or custom endpoints.
+- **Enhanced Session Management**: Uniquely generated sessions, robust pagination, and interactive styling translating prompt themes directly to terminal escapes.
+- **Semantic Prompt Integration**: Emit standard OSC prompt sequences (`\x1b]133;B`) for real-time remote/web front-end command tracking.
 - **Interactive Chat**: Launch with `conn ai` for a collaborative troubleshooting session.
 
 

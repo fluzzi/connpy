@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.5">
+<meta name="generator" content="pdoc3 0.11.6">
 <title>connpy.services API documentation</title>
 <meta name="description" content="">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
@@ -113,6 +113,37 @@ el.replaceWith(d);
 <pre><code class="python">class AIService(BaseService):
     &#34;&#34;&#34;Business logic for interacting with AI agents and LLM configurations.&#34;&#34;&#34;
 
+    def _clean_cisco_scrolling(self, text: str) -&gt; str:
+        &#34;&#34;&#34;Resolves horizontal scrolling artifacts (backspaces, \r, ANSI) by merging overlapping segments.&#34;&#34;&#34;
+        def merge_overlapping(s1, s2):
+            s2_clean = s2.lstrip(&#39; $&#39;)
+            max_overlap = min(len(s1), len(s2_clean))
+            for i in range(max_overlap, 0, -1):
+                if s1[-i:] == s2_clean[:i]:
+                    return s1 + s2_clean[i:]
+            return s1 + s2_clean
+
+        scroll_re = re.compile(r&#39;(\x08{5,}\s*\$?|\$\r|\x1b\[\d+[GD]\s*\$?)&#39;)
+        parts = scroll_re.split(text)
+        merged = &#34;&#34;
+        
+        for part in parts:
+            if scroll_re.match(part):
+                continue
+                
+            cleaned = log_cleaner(part)
+            if not merged:
+                merged = cleaned
+            else:
+                merged_lines = merged.split(&#39;\n&#39;)
+                cleaned_lines = cleaned.split(&#39;\n&#39;)
+                
+                merged_lines[-1] = merge_overlapping(merged_lines[-1], cleaned_lines[0])
+                merged_lines.extend(cleaned_lines[1:])
+                merged = &#34;\n&#34;.join(merged_lines)
+                
+        return merged
+
     def build_context_blocks(self, raw_bytes: bytes, cmd_byte_positions: list, node_info: dict, last_line: str = &#34;&#34;) -&gt; list:
         &#34;&#34;&#34;Identifies command blocks in the terminal history.&#34;&#34;&#34;
         blocks = []
@@ -134,28 +165,69 @@ el.replaceWith(d);
                 prev_pos = cmd_byte_positions[i-1][0]
                 
                 if known_cmd:
-                    prev_chunk = raw_bytes[prev_pos:pos]
-                    prev_cleaned = log_cleaner(prev_chunk.decode(errors=&#39;replace&#39;))
-                    prev_lines = [l for l in prev_cleaned.split(&#39;\n&#39;) if l.strip()]
-                    prompt_text = prev_lines[-1].strip() if prev_lines else &#34;&#34;
-                    preview = f&#34;{prompt_text}{known_cmd}&#34; if prompt_text else known_cmd
-                    parsed_positions.append({&#34;pos&#34;: pos, &#34;type&#34;: &#34;VALID_CMD&#34;, &#34;preview&#34;: preview[:80]})
+                    if known_cmd == &#34;CANCELLED&#34;:
+                        parsed_positions.append({&#34;pos&#34;: pos, &#34;type&#34;: &#34;CANCELLED&#34;, &#34;preview&#34;: &#34;&#34;})
+                    else:
+                        prev_chunk = raw_bytes[prev_pos:pos]
+                        prev_cleaned = self._clean_cisco_scrolling(prev_chunk.decode(errors=&#39;replace&#39;))
+                        prev_lines = [l for l in prev_cleaned.split(&#39;\n&#39;) if l.strip()]
+                        prompt_text = prev_lines[-1].strip() if prev_lines else &#34;&#34;
+                        preview = f&#34;{prompt_text}{known_cmd}&#34; if prompt_text else known_cmd
+                        
+                        if len(preview) &gt; 80:
+                            preview = preview[:77] + &#34;...&#34;
+                        parsed_positions.append({&#34;pos&#34;: pos, &#34;type&#34;: &#34;VALID_CMD&#34;, &#34;preview&#34;: preview})
                 else:
                     chunk = raw_bytes[prev_pos:pos]
-                    cleaned = log_cleaner(chunk.decode(errors=&#39;replace&#39;))
-                    lines = [l for l in cleaned.split(&#39;\n&#39;) if l.strip()]
-                    preview = lines[-1].strip() if lines else &#34;&#34;
                     
-                    if preview:
-                        match = prompt_re.search(preview)
-                        if match:
-                            cmd_text = preview[match.end():].strip()
-                            if cmd_text:
-                                parsed_positions.append({&#34;pos&#34;: pos, &#34;type&#34;: &#34;VALID_CMD&#34;, &#34;preview&#34;: preview[:80]})
-                            else:
-                                parsed_positions.append({&#34;pos&#34;: pos, &#34;type&#34;: &#34;EMPTY_PROMPT&#34;, &#34;preview&#34;: &#34;&#34;})
-                        else:
-                            parsed_positions.append({&#34;pos&#34;: pos, &#34;type&#34;: &#34;SCROLLING&#34;, &#34;preview&#34;: &#34;&#34;})
+                    cleaned = self._clean_cisco_scrolling(chunk.decode(errors=&#39;replace&#39;))
+                    lines = [l for l in cleaned.split(&#39;\n&#39;) if l.strip()]
+                    
+                    found_in_pass1 = False
+                    if lines:
+                        # Search backwards through the last few lines for the prompt
+                        for idx in range(len(lines) - 1, max(-1, len(lines) - 10), -1):
+                            match = prompt_re.search(lines[idx])
+                            if match:
+                                ptxt = match.group(0).strip()
+                                cmd_first_line = lines[idx][match.end():].strip()
+                                cmd_rest = [l.strip() for l in lines[idx+1:]]
+                                cmd_text = &#34; &#34;.join([cmd_first_line] + cmd_rest).strip()
+                                
+                                if cmd_text:
+                                    pv = f&#34;{ptxt} {cmd_text}&#34;.strip()
+                                    if len(pv) &gt; 80:
+                                        pv = pv[:77] + &#34;...&#34;
+                                    parsed_positions.append({&#34;pos&#34;: pos, &#34;type&#34;: &#34;VALID_CMD&#34;, &#34;preview&#34;: pv})
+                                else:
+                                    parsed_positions.append({&#34;pos&#34;: pos, &#34;type&#34;: &#34;EMPTY_PROMPT&#34;, &#34;preview&#34;: &#34;&#34;})
+                                found_in_pass1 = True
+                                break
+                        
+                        if not found_in_pass1:
+                            # Fallback: The prompt might have been isolated in the previous chunk 
+                            # due to asynchronous network delays splitting the output exactly at the newline.
+                            prev_was_valid_cmd = i &gt;= 2 and parsed_positions[i-2][&#34;type&#34;] == &#34;VALID_CMD&#34;
+                            if prev_pos &gt; 0 and not prev_was_valid_cmd:
+                                # Fetch the very last chunk that we just processed
+                                prev_prev_pos = cmd_byte_positions[i-2][0] if i &gt;= 2 else 0
+                                prev_chunk_text = self._clean_cisco_scrolling(raw_bytes[prev_prev_pos:prev_pos].decode(errors=&#39;replace&#39;))
+                                prev_lines_text = [l for l in prev_chunk_text.split(&#39;\n&#39;) if l.strip()]
+                                
+                                if prev_lines_text:
+                                    prev_match = prompt_re.search(prev_lines_text[-1])
+                                    if prev_match:
+                                        ptxt = prev_match.group(0).strip()
+                                        cmd_text = &#34; &#34;.join([l.strip() for l in lines]).strip()
+                                        if cmd_text:
+                                            pv = f&#34;{ptxt} {cmd_text}&#34;.strip()
+                                            if len(pv) &gt; 80:
+                                                pv = pv[:77] + &#34;...&#34;
+                                            parsed_positions.append({&#34;pos&#34;: pos, &#34;type&#34;: &#34;VALID_CMD&#34;, &#34;preview&#34;: pv})
+                                            found_in_pass1 = True
+                            
+                            if not found_in_pass1:
+                                parsed_positions.append({&#34;pos&#34;: pos, &#34;type&#34;: &#34;SCROLLING&#34;, &#34;preview&#34;: &#34;&#34;})
                     else:
                         parsed_positions.append({&#34;pos&#34;: pos, &#34;type&#34;: &#34;SCROLLING&#34;, &#34;preview&#34;: &#34;&#34;})
 
@@ -168,11 +240,11 @@ el.replaceWith(d);
                 start_pos = item[&#34;pos&#34;]
                 preview = item[&#34;preview&#34;]
                 
-                # Find the end position: next VALID_CMD or EMPTY_PROMPT
+                # Find the end position: next VALID_CMD or EMPTY_PROMPT or CANCELLED
                 end_pos = current_prompt_pos
                 for j in range(i + 1, len(parsed_positions)):
                     next_item = parsed_positions[j]
-                    if next_item[&#34;type&#34;] in (&#34;VALID_CMD&#34;, &#34;EMPTY_PROMPT&#34;):
+                    if next_item[&#34;type&#34;] in (&#34;VALID_CMD&#34;, &#34;EMPTY_PROMPT&#34;, &#34;CANCELLED&#34;):
                         end_pos = next_item[&#34;pos&#34;]
                         break
                 
@@ -274,11 +346,14 @@ el.replaceWith(d);
         return await asyncio.wrap_future(future)
 
 
-    def list_sessions(self):
-        &#34;&#34;&#34;Return a list of all saved AI sessions.&#34;&#34;&#34;
+    def list_sessions(self, limit=None):
+        &#34;&#34;&#34;Return a list of saved AI sessions, optionally limited.&#34;&#34;&#34;
         from connpy.ai import ai
         agent = ai(self.config)
-        return agent._get_sessions()
+        sessions = agent._get_sessions()
+        if limit and len(sessions) &gt; limit:
+            return sessions[:limit], len(sessions)
+        return sessions, len(sessions)
 
     def delete_session(self, session_id):
         &#34;&#34;&#34;Delete an AI session by ID.&#34;&#34;&#34;
@@ -290,13 +365,15 @@ el.replaceWith(d);
         else:
             raise InvalidConfigurationError(f&#34;Session &#39;{session_id}&#39; not found.&#34;)
 
-    def configure_provider(self, provider, model=None, api_key=None):
+    def configure_provider(self, provider, model=None, api_key=None, auth=None):
         &#34;&#34;&#34;Update AI provider settings in the configuration.&#34;&#34;&#34;
         settings = self.config.config.get(&#34;ai&#34;, {})
         if model:
             settings[f&#34;{provider}_model&#34;] = model
         if api_key:
             settings[f&#34;{provider}_api_key&#34;] = api_key
+        if auth is not None:
+            settings[f&#34;{provider}_auth&#34;] = auth
             
         self.config.config[&#34;ai&#34;] = settings
         self.config._saveconfig(self.config.file)
@@ -334,6 +411,11 @@ el.replaceWith(d);
         ai_settings[&#34;mcp_servers&#34;] = mcp_servers
         self.config.config[&#34;ai&#34;] = ai_settings
         self.config._saveconfig(self.config.file)
+
+    def list_mcp_servers(self) -&gt; dict:
+        &#34;&#34;&#34;Get the configured MCP servers.&#34;&#34;&#34;
+        ai_settings = self.config.config.get(&#34;ai&#34;, {})
+        return ai_settings.get(&#34;mcp_servers&#34;, {})
 
     def load_session_data(self, session_id):
         &#34;&#34;&#34;Load a session&#39;s raw data by ID.&#34;&#34;&#34;
@@ -434,28 +516,69 @@ el.replaceWith(d);
             prev_pos = cmd_byte_positions[i-1][0]
             
             if known_cmd:
-                prev_chunk = raw_bytes[prev_pos:pos]
-                prev_cleaned = log_cleaner(prev_chunk.decode(errors=&#39;replace&#39;))
-                prev_lines = [l for l in prev_cleaned.split(&#39;\n&#39;) if l.strip()]
-                prompt_text = prev_lines[-1].strip() if prev_lines else &#34;&#34;
-                preview = f&#34;{prompt_text}{known_cmd}&#34; if prompt_text else known_cmd
-                parsed_positions.append({&#34;pos&#34;: pos, &#34;type&#34;: &#34;VALID_CMD&#34;, &#34;preview&#34;: preview[:80]})
+                if known_cmd == &#34;CANCELLED&#34;:
+                    parsed_positions.append({&#34;pos&#34;: pos, &#34;type&#34;: &#34;CANCELLED&#34;, &#34;preview&#34;: &#34;&#34;})
+                else:
+                    prev_chunk = raw_bytes[prev_pos:pos]
+                    prev_cleaned = self._clean_cisco_scrolling(prev_chunk.decode(errors=&#39;replace&#39;))
+                    prev_lines = [l for l in prev_cleaned.split(&#39;\n&#39;) if l.strip()]
+                    prompt_text = prev_lines[-1].strip() if prev_lines else &#34;&#34;
+                    preview = f&#34;{prompt_text}{known_cmd}&#34; if prompt_text else known_cmd
+                    
+                    if len(preview) &gt; 80:
+                        preview = preview[:77] + &#34;...&#34;
+                    parsed_positions.append({&#34;pos&#34;: pos, &#34;type&#34;: &#34;VALID_CMD&#34;, &#34;preview&#34;: preview})
             else:
                 chunk = raw_bytes[prev_pos:pos]
-                cleaned = log_cleaner(chunk.decode(errors=&#39;replace&#39;))
-                lines = [l for l in cleaned.split(&#39;\n&#39;) if l.strip()]
-                preview = lines[-1].strip() if lines else &#34;&#34;
                 
-                if preview:
-                    match = prompt_re.search(preview)
-                    if match:
-                        cmd_text = preview[match.end():].strip()
-                        if cmd_text:
-                            parsed_positions.append({&#34;pos&#34;: pos, &#34;type&#34;: &#34;VALID_CMD&#34;, &#34;preview&#34;: preview[:80]})
-                        else:
-                            parsed_positions.append({&#34;pos&#34;: pos, &#34;type&#34;: &#34;EMPTY_PROMPT&#34;, &#34;preview&#34;: &#34;&#34;})
-                    else:
-                        parsed_positions.append({&#34;pos&#34;: pos, &#34;type&#34;: &#34;SCROLLING&#34;, &#34;preview&#34;: &#34;&#34;})
+                cleaned = self._clean_cisco_scrolling(chunk.decode(errors=&#39;replace&#39;))
+                lines = [l for l in cleaned.split(&#39;\n&#39;) if l.strip()]
+                
+                found_in_pass1 = False
+                if lines:
+                    # Search backwards through the last few lines for the prompt
+                    for idx in range(len(lines) - 1, max(-1, len(lines) - 10), -1):
+                        match = prompt_re.search(lines[idx])
+                        if match:
+                            ptxt = match.group(0).strip()
+                            cmd_first_line = lines[idx][match.end():].strip()
+                            cmd_rest = [l.strip() for l in lines[idx+1:]]
+                            cmd_text = &#34; &#34;.join([cmd_first_line] + cmd_rest).strip()
+                            
+                            if cmd_text:
+                                pv = f&#34;{ptxt} {cmd_text}&#34;.strip()
+                                if len(pv) &gt; 80:
+                                    pv = pv[:77] + &#34;...&#34;
+                                parsed_positions.append({&#34;pos&#34;: pos, &#34;type&#34;: &#34;VALID_CMD&#34;, &#34;preview&#34;: pv})
+                            else:
+                                parsed_positions.append({&#34;pos&#34;: pos, &#34;type&#34;: &#34;EMPTY_PROMPT&#34;, &#34;preview&#34;: &#34;&#34;})
+                            found_in_pass1 = True
+                            break
+                    
+                    if not found_in_pass1:
+                        # Fallback: The prompt might have been isolated in the previous chunk 
+                        # due to asynchronous network delays splitting the output exactly at the newline.
+                        prev_was_valid_cmd = i &gt;= 2 and parsed_positions[i-2][&#34;type&#34;] == &#34;VALID_CMD&#34;
+                        if prev_pos &gt; 0 and not prev_was_valid_cmd:
+                            # Fetch the very last chunk that we just processed
+                            prev_prev_pos = cmd_byte_positions[i-2][0] if i &gt;= 2 else 0
+                            prev_chunk_text = self._clean_cisco_scrolling(raw_bytes[prev_prev_pos:prev_pos].decode(errors=&#39;replace&#39;))
+                            prev_lines_text = [l for l in prev_chunk_text.split(&#39;\n&#39;) if l.strip()]
+                            
+                            if prev_lines_text:
+                                prev_match = prompt_re.search(prev_lines_text[-1])
+                                if prev_match:
+                                    ptxt = prev_match.group(0).strip()
+                                    cmd_text = &#34; &#34;.join([l.strip() for l in lines]).strip()
+                                    if cmd_text:
+                                        pv = f&#34;{ptxt} {cmd_text}&#34;.strip()
+                                        if len(pv) &gt; 80:
+                                            pv = pv[:77] + &#34;...&#34;
+                                        parsed_positions.append({&#34;pos&#34;: pos, &#34;type&#34;: &#34;VALID_CMD&#34;, &#34;preview&#34;: pv})
+                                        found_in_pass1 = True
+                        
+                        if not found_in_pass1:
+                            parsed_positions.append({&#34;pos&#34;: pos, &#34;type&#34;: &#34;SCROLLING&#34;, &#34;preview&#34;: &#34;&#34;})
                 else:
                     parsed_positions.append({&#34;pos&#34;: pos, &#34;type&#34;: &#34;SCROLLING&#34;, &#34;preview&#34;: &#34;&#34;})
 
@@ -468,11 +591,11 @@ el.replaceWith(d);
             start_pos = item[&#34;pos&#34;]
             preview = item[&#34;preview&#34;]
             
-            # Find the end position: next VALID_CMD or EMPTY_PROMPT
+            # Find the end position: next VALID_CMD or EMPTY_PROMPT or CANCELLED
             end_pos = current_prompt_pos
             for j in range(i + 1, len(parsed_positions)):
                 next_item = parsed_positions[j]
-                if next_item[&#34;type&#34;] in (&#34;VALID_CMD&#34;, &#34;EMPTY_PROMPT&#34;):
+                if next_item[&#34;type&#34;] in (&#34;VALID_CMD&#34;, &#34;EMPTY_PROMPT&#34;, &#34;CANCELLED&#34;):
                     end_pos = next_item[&#34;pos&#34;]
                     break
             
@@ -533,20 +656,22 @@ el.replaceWith(d);
 <div class="desc"><p>Update MCP server settings in the configuration with smart merging.</p></div>
 </dd>
 <dt id="connpy.services.AIService.configure_provider"><code class="name flex">
-<span>def <span class="ident">configure_provider</span></span>(<span>self, provider, model=None, api_key=None)</span>
+<span>def <span class="ident">configure_provider</span></span>(<span>self, provider, model=None, api_key=None, auth=None)</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def configure_provider(self, provider, model=None, api_key=None):
+<pre><code class="python">def configure_provider(self, provider, model=None, api_key=None, auth=None):
     &#34;&#34;&#34;Update AI provider settings in the configuration.&#34;&#34;&#34;
     settings = self.config.config.get(&#34;ai&#34;, {})
     if model:
         settings[f&#34;{provider}_model&#34;] = model
     if api_key:
         settings[f&#34;{provider}_api_key&#34;] = api_key
+    if auth is not None:
+        settings[f&#34;{provider}_auth&#34;] = auth
         
     self.config.config[&#34;ai&#34;] = settings
     self.config._saveconfig(self.config.file)</code></pre>
@@ -589,21 +714,39 @@ el.replaceWith(d);
 </details>
 <div class="desc"><p>Delete an AI session by ID.</p></div>
 </dd>
-<dt id="connpy.services.AIService.list_sessions"><code class="name flex">
-<span>def <span class="ident">list_sessions</span></span>(<span>self)</span>
+<dt id="connpy.services.AIService.list_mcp_servers"><code class="name flex">
+<span>def <span class="ident">list_mcp_servers</span></span>(<span>self) ‑> dict</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def list_sessions(self):
-    &#34;&#34;&#34;Return a list of all saved AI sessions.&#34;&#34;&#34;
+<pre><code class="python">def list_mcp_servers(self) -&gt; dict:
+    &#34;&#34;&#34;Get the configured MCP servers.&#34;&#34;&#34;
+    ai_settings = self.config.config.get(&#34;ai&#34;, {})
+    return ai_settings.get(&#34;mcp_servers&#34;, {})</code></pre>
+</details>
+<div class="desc"><p>Get the configured MCP servers.</p></div>
+</dd>
+<dt id="connpy.services.AIService.list_sessions"><code class="name flex">
+<span>def <span class="ident">list_sessions</span></span>(<span>self, limit=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def list_sessions(self, limit=None):
+    &#34;&#34;&#34;Return a list of saved AI sessions, optionally limited.&#34;&#34;&#34;
     from connpy.ai import ai
     agent = ai(self.config)
-    return agent._get_sessions()</code></pre>
+    sessions = agent._get_sessions()
+    if limit and len(sessions) &gt; limit:
+        return sessions[:limit], len(sessions)
+    return sessions, len(sessions)</code></pre>
 </details>
-<div class="desc"><p>Return a list of all saved AI sessions.</p></div>
+<div class="desc"><p>Return a list of saved AI sessions, optionally limited.</p></div>
 </dd>
 <dt id="connpy.services.AIService.load_session_data"><code class="name flex">
 <span>def <span class="ident">load_session_data</span></span>(<span>self, session_id)</span>
@@ -3726,6 +3869,7 @@ el.replaceWith(d);
 <li><code><a title="connpy.services.AIService.configure_provider" href="#connpy.services.AIService.configure_provider">configure_provider</a></code></li>
 <li><code><a title="connpy.services.AIService.confirm" href="#connpy.services.AIService.confirm">confirm</a></code></li>
 <li><code><a title="connpy.services.AIService.delete_session" href="#connpy.services.AIService.delete_session">delete_session</a></code></li>
+<li><code><a title="connpy.services.AIService.list_mcp_servers" href="#connpy.services.AIService.list_mcp_servers">list_mcp_servers</a></code></li>
 <li><code><a title="connpy.services.AIService.list_sessions" href="#connpy.services.AIService.list_sessions">list_sessions</a></code></li>
 <li><code><a title="connpy.services.AIService.load_session_data" href="#connpy.services.AIService.load_session_data">load_session_data</a></code></li>
 <li><code><a title="connpy.services.AIService.process_copilot_input" href="#connpy.services.AIService.process_copilot_input">process_copilot_input</a></code></li>
@@ -3840,7 +3984,7 @@ el.replaceWith(d);
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
 </footer>
 </body>
 </html>

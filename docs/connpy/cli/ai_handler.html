@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.5">
+<meta name="generator" content="pdoc3 0.11.6">
 <title>connpy.cli.ai_handler API documentation</title>
 <meta name="description" content="">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
@@ -61,13 +61,22 @@ el.replaceWith(d);
 
     def dispatch(self, args):
         if args.list_sessions:
-            sessions = self.app.services.ai.list_sessions()
+            limit = 20 if not getattr(args, &#34;all&#34;, False) else None
+            sessions, total = self.app.services.ai.list_sessions(limit=limit)
             if not sessions:
                 printer.info(&#34;No saved AI sessions found.&#34;)
                 return
+            
             columns = [&#34;ID&#34;, &#34;Title&#34;, &#34;Created At&#34;, &#34;Model&#34;]
             rows = [[s[&#34;id&#34;], s[&#34;title&#34;], s[&#34;created_at&#34;], s[&#34;model&#34;]] for s in sessions]
-            printer.table(&#34;AI Persisted Sessions&#34;, columns, rows)
+            
+            title = &#34;AI Persisted Sessions&#34;
+            if limit and total &gt; limit:
+                title += f&#34; (Showing last {limit} of {total})&#34;
+                
+            printer.table(title, columns, rows)
+            if limit and total &gt; limit:
+                printer.info(f&#34;Use &#39;--list --all&#39; to see all {total} sessions.&#34;)
             return
             
         if args.delete_session:
@@ -84,7 +93,7 @@ el.replaceWith(d);
         # Determinar session_id para retomar
         session_id = None
         if args.resume:
-            sessions = self.app.services.ai.list_sessions()
+            sessions, _ = self.app.services.ai.list_sessions()
             session_id = sessions[0][&#34;id&#34;] if sessions else None
             if not session_id:
                 printer.warning(&#34;No previous session found to resume.&#34;)
@@ -102,16 +111,23 @@ el.replaceWith(d);
                 arguments[key] = cli_val[0]
             elif settings.get(key):
                 arguments[key] = settings.get(key)
+
+        for key in [&#34;engineer_auth&#34;, &#34;architect_auth&#34;]:
+            cli_val = getattr(args, key, None)
+            if cli_val:
+                arguments[key] = self._parse_auth_value(cli_val[0])
+            elif settings.get(key):
+                arguments[key] = settings.get(key)
         
         # Check keys only if running in local mode (not remote)
         if getattr(self.app.services, &#34;mode&#34;, &#34;local&#34;) == &#34;local&#34;:
-            if not arguments.get(&#34;engineer_api_key&#34;):
-                printer.error(&#34;Engineer API key not configured. The chat cannot start.&#34;)
-                printer.info(&#34;Use &#39;connpy config --engineer-api-key &lt;key&gt;&#39; to set it.&#34;)
+            if not arguments.get(&#34;engineer_api_key&#34;) and not arguments.get(&#34;engineer_auth&#34;):
+                printer.error(&#34;Engineer API key/auth not configured. The chat cannot start.&#34;)
+                printer.info(&#34;Use &#39;connpy config --engineer-api-key &lt;key&gt;&#39; or &#39;connpy config --engineer-auth &lt;auth&gt;&#39; to set it.&#34;)
                 sys.exit(1)
-            if not arguments.get(&#34;architect_api_key&#34;):
-                printer.warning(&#34;Architect API key not configured. Architect will be unavailable.&#34;)
-                printer.info(&#34;Use &#39;connpy config --architect-api-key &lt;key&gt;&#39; to enable it.&#34;)
+            if not arguments.get(&#34;architect_api_key&#34;) and not arguments.get(&#34;architect_auth&#34;):
+                printer.warning(&#34;Architect API key/auth not configured. Architect will be unavailable.&#34;)
+                printer.info(&#34;Use &#39;connpy config --architect-api-key &lt;key&gt;&#39; or &#39;connpy config --architect-auth &lt;auth&gt;&#39; to enable it.&#34;)
 
         # El resto de la interacción el CLI la maneja con el agente subyacente
         self.app.myai = self.app.services.ai
@@ -148,7 +164,7 @@ el.replaceWith(d);
                 if history:
                     mdprint(f&#34;[debug]Analyzing {len(history)} previous messages...[/debug]\n&#34;)
             else:
-                printer.error(f&#34;Could not load session {session_id}. Starting clean.&#34;)
+                printer.info(f&#34;Session &#39;{session_id}&#39; not found. Starting clean.&#34;)
         
         if not history:
             mdprint(Rule(style=&#34;engineer&#34;))
@@ -162,7 +178,7 @@ el.replaceWith(d);
                 if user_query.lower() in [&#39;exit&#39;, &#39;quit&#39;, &#39;bye&#39;, &#39;cancel&#39;]: break
                 
                 with console.status(&#34;[ai_status]Agent is thinking...&#34;) as status:
-                    result = self.app.myai.ask(user_query, chat_history=history, status=status, debug=args.debug, trust=args.trust, **self.ai_overrides)
+                    result = self.app.myai.ask(user_query, chat_history=history, status=status, debug=args.debug, trust=args.trust, session_id=session_id, **self.ai_overrides)
                 
                 new_history = result.get(&#34;chat_history&#34;)
                 if new_history is not None:
@@ -193,8 +209,7 @@ el.replaceWith(d);
             action = mcp_args[0].lower()
             
             if action == &#34;list&#34;:
-                settings = self.app.services.config_svc.get_settings()
-                mcp_servers = settings.get(&#34;ai&#34;, {}).get(&#34;mcp_servers&#34;, {})
+                mcp_servers = self.app.services.ai.list_mcp_servers()
                 if not mcp_servers:
                     printer.info(&#34;No MCP servers configured.&#34;)
                 else:
@@ -259,8 +274,7 @@ el.replaceWith(d);
             from .forms import Forms
             self.app.cli_forms = Forms(self.app)
             
-        settings = self.app.services.config_svc.get_settings()
-        mcp_servers = settings.get(&#34;ai&#34;, {}).get(&#34;mcp_servers&#34;, {})
+        mcp_servers = self.app.services.ai.list_mcp_servers()
         
         result = self.app.cli_forms.mcp_wizard(mcp_servers)
         if not result:
@@ -294,7 +308,37 @@ el.replaceWith(d);
                 printer.success(f&#34;MCP server &#39;{result[&#39;name&#39;]}&#39; removed.&#34;)
                 
         except Exception as e:
-            printer.error(str(e))</code></pre>
+            printer.error(str(e))
+
+    def _parse_auth_value(self, value):
+        if not value or value.lower() in [&#34;none&#34;, &#34;clear&#34;]:
+            return None
+        import os
+        import yaml
+        import json
+        if os.path.exists(value):
+            try:
+                with open(value, &#34;r&#34;) as f:
+                    content = f.read()
+                try:
+                    return json.loads(content)
+                except ValueError:
+                    return yaml.safe_load(content)
+            except Exception as e:
+                printer.error(f&#34;Failed to read/parse auth file &#39;{value}&#39;: {e}&#34;)
+                sys.exit(1)
+        
+        try:
+            return json.loads(value)
+        except ValueError:
+            try:
+                parsed = yaml.safe_load(value)
+                if isinstance(parsed, dict):
+                    return parsed
+                raise ValueError()
+            except Exception:
+                printer.error(&#34;Auth parameter must be a valid JSON/YAML string, or a path to a JSON/YAML file.&#34;)
+                sys.exit(1)</code></pre>
 </details>
 <div class="desc"></div>
 <h3>Methods</h3>
@@ -316,8 +360,7 @@ el.replaceWith(d);
         action = mcp_args[0].lower()
         
         if action == &#34;list&#34;:
-            settings = self.app.services.config_svc.get_settings()
-            mcp_servers = settings.get(&#34;ai&#34;, {}).get(&#34;mcp_servers&#34;, {})
+            mcp_servers = self.app.services.ai.list_mcp_servers()
             if not mcp_servers:
                 printer.info(&#34;No MCP servers configured.&#34;)
             else:
@@ -382,8 +425,7 @@ el.replaceWith(d);
         from .forms import Forms
         self.app.cli_forms = Forms(self.app)
         
-    settings = self.app.services.config_svc.get_settings()
-    mcp_servers = settings.get(&#34;ai&#34;, {}).get(&#34;mcp_servers&#34;, {})
+    mcp_servers = self.app.services.ai.list_mcp_servers()
     
     result = self.app.cli_forms.mcp_wizard(mcp_servers)
     if not result:
@@ -431,13 +473,22 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def dispatch(self, args):
     if args.list_sessions:
-        sessions = self.app.services.ai.list_sessions()
+        limit = 20 if not getattr(args, &#34;all&#34;, False) else None
+        sessions, total = self.app.services.ai.list_sessions(limit=limit)
         if not sessions:
             printer.info(&#34;No saved AI sessions found.&#34;)
             return
+        
         columns = [&#34;ID&#34;, &#34;Title&#34;, &#34;Created At&#34;, &#34;Model&#34;]
         rows = [[s[&#34;id&#34;], s[&#34;title&#34;], s[&#34;created_at&#34;], s[&#34;model&#34;]] for s in sessions]
-        printer.table(&#34;AI Persisted Sessions&#34;, columns, rows)
+        
+        title = &#34;AI Persisted Sessions&#34;
+        if limit and total &gt; limit:
+            title += f&#34; (Showing last {limit} of {total})&#34;
+            
+        printer.table(title, columns, rows)
+        if limit and total &gt; limit:
+            printer.info(f&#34;Use &#39;--list --all&#39; to see all {total} sessions.&#34;)
         return
         
     if args.delete_session:
@@ -454,7 +505,7 @@ el.replaceWith(d);
     # Determinar session_id para retomar
     session_id = None
     if args.resume:
-        sessions = self.app.services.ai.list_sessions()
+        sessions, _ = self.app.services.ai.list_sessions()
         session_id = sessions[0][&#34;id&#34;] if sessions else None
         if not session_id:
             printer.warning(&#34;No previous session found to resume.&#34;)
@@ -472,16 +523,23 @@ el.replaceWith(d);
             arguments[key] = cli_val[0]
         elif settings.get(key):
             arguments[key] = settings.get(key)
+
+    for key in [&#34;engineer_auth&#34;, &#34;architect_auth&#34;]:
+        cli_val = getattr(args, key, None)
+        if cli_val:
+            arguments[key] = self._parse_auth_value(cli_val[0])
+        elif settings.get(key):
+            arguments[key] = settings.get(key)
     
     # Check keys only if running in local mode (not remote)
     if getattr(self.app.services, &#34;mode&#34;, &#34;local&#34;) == &#34;local&#34;:
-        if not arguments.get(&#34;engineer_api_key&#34;):
-            printer.error(&#34;Engineer API key not configured. The chat cannot start.&#34;)
-            printer.info(&#34;Use &#39;connpy config --engineer-api-key &lt;key&gt;&#39; to set it.&#34;)
+        if not arguments.get(&#34;engineer_api_key&#34;) and not arguments.get(&#34;engineer_auth&#34;):
+            printer.error(&#34;Engineer API key/auth not configured. The chat cannot start.&#34;)
+            printer.info(&#34;Use &#39;connpy config --engineer-api-key &lt;key&gt;&#39; or &#39;connpy config --engineer-auth &lt;auth&gt;&#39; to set it.&#34;)
             sys.exit(1)
-        if not arguments.get(&#34;architect_api_key&#34;):
-            printer.warning(&#34;Architect API key not configured. Architect will be unavailable.&#34;)
-            printer.info(&#34;Use &#39;connpy config --architect-api-key &lt;key&gt;&#39; to enable it.&#34;)
+        if not arguments.get(&#34;architect_api_key&#34;) and not arguments.get(&#34;architect_auth&#34;):
+            printer.warning(&#34;Architect API key/auth not configured. Architect will be unavailable.&#34;)
+            printer.info(&#34;Use &#39;connpy config --architect-api-key &lt;key&gt;&#39; or &#39;connpy config --architect-auth &lt;auth&gt;&#39; to enable it.&#34;)
 
     # El resto de la interacción el CLI la maneja con el agente subyacente
     self.app.myai = self.app.services.ai
@@ -512,7 +570,7 @@ el.replaceWith(d);
             if history:
                 mdprint(f&#34;[debug]Analyzing {len(history)} previous messages...[/debug]\n&#34;)
         else:
-            printer.error(f&#34;Could not load session {session_id}. Starting clean.&#34;)
+            printer.info(f&#34;Session &#39;{session_id}&#39; not found. Starting clean.&#34;)
     
     if not history:
         mdprint(Rule(style=&#34;engineer&#34;))
@@ -526,7 +584,7 @@ el.replaceWith(d);
             if user_query.lower() in [&#39;exit&#39;, &#39;quit&#39;, &#39;bye&#39;, &#39;cancel&#39;]: break
             
             with console.status(&#34;[ai_status]Agent is thinking...&#34;) as status:
-                result = self.app.myai.ask(user_query, chat_history=history, status=status, debug=args.debug, trust=args.trust, **self.ai_overrides)
+                result = self.app.myai.ask(user_query, chat_history=history, status=status, debug=args.debug, trust=args.trust, session_id=session_id, **self.ai_overrides)
             
             new_history = result.get(&#34;chat_history&#34;)
             if new_history is not None:
@@ -608,7 +666,7 @@ el.replaceWith(d);
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
 </footer>
 </body>
 </html>

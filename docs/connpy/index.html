@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.5">
+<meta name="generator" content="pdoc3 0.11.6">
 <title>connpy API documentation</title>
 <meta name="description" content="&lt;p align=&#34;center&#34;&gt;
 &lt;img src=&#34;https://nginx.gederico.dynu.net/images/CONNPY-resized.png&#34; alt=&#34;App Logo&#34;&gt;
@@ -202,10 +202,6 @@ response = myai.ask(&quot;What is the status of the BGP neighbors in the office?
 <div class="desc"></div>
 </dd>
 <dt><code class="name"><a title="connpy.services" href="services/index.html">connpy.services</a></code></dt>
-<dd>
-<div class="desc"></div>
-</dd>
-<dt><code class="name"><a title="connpy.tests" href="tests/index.html">connpy.tests</a></code></dt>
 <dd>
 <div class="desc"></div>
 </dd>
@@ -620,7 +616,7 @@ indicating successful verification.</p>
 </dd>
 <dt id="connpy.ai"><code class="flex name class">
 <span>class <span class="ident">ai</span></span>
-<span>(</span><span>config,<br>org=None,<br>api_key=None,<br>engineer_model=None,<br>architect_model=None,<br>engineer_api_key=None,<br>architect_api_key=None,<br>console=None,<br>confirm_handler=None,<br>trust=False)</span>
+<span>(</span><span>config,<br>org=None,<br>api_key=None,<br>engineer_model=None,<br>architect_model=None,<br>engineer_api_key=None,<br>architect_api_key=None,<br>console=None,<br>confirm_handler=None,<br>trust=False,<br>engineer_auth=None,<br>architect_auth=None,<br>**kwargs)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -638,7 +634,7 @@ class ai:
         r&#39;^systemctl\s+status\s+&#39;, r&#39;^journalctl\s+&#39;
     ]
 
-    def __init__(self, config, org=None, api_key=None, engineer_model=None, architect_model=None, engineer_api_key=None, architect_api_key=None, console=None, confirm_handler=None, trust=False):
+    def __init__(self, config, org=None, api_key=None, engineer_model=None, architect_model=None, engineer_api_key=None, architect_api_key=None, console=None, confirm_handler=None, trust=False, engineer_auth=None, architect_auth=None, **kwargs):
         self.config = config
         self.console = console or printer.console
         self.confirm_handler = confirm_handler or self._local_confirm_handler
@@ -656,6 +652,29 @@ class ai:
         # API Keys (Prioridad: Argumento -&gt; Config)
         self.engineer_key = engineer_api_key or aiconfig.get(&#34;engineer_api_key&#34;)
         self.architect_key = architect_api_key or aiconfig.get(&#34;architect_api_key&#34;)
+
+        # Auth configurations (Prioridad: Argumento -&gt; Config)
+        self.engineer_auth = engineer_auth if engineer_auth is not None else aiconfig.get(&#34;engineer_auth&#34;)
+        if self.engineer_auth is None:
+            self.engineer_auth = {}
+        elif not isinstance(self.engineer_auth, dict):
+            self.engineer_auth = {}
+
+        self.architect_auth = architect_auth if architect_auth is not None else aiconfig.get(&#34;architect_auth&#34;)
+        if self.architect_auth is None:
+            self.architect_auth = {}
+        elif not isinstance(self.architect_auth, dict):
+            self.architect_auth = {}
+
+        # Backward compatibility fallbacks: only inject api_key if the auth dict is empty/not configured
+        if self.engineer_key and not self.engineer_auth:
+            self.engineer_auth[&#34;api_key&#34;] = self.engineer_key
+        if self.architect_key and not self.architect_auth:
+            self.architect_auth[&#34;api_key&#34;] = self.architect_key
+
+        # Strategic Reasoning Engine (Architect) availability
+        is_architect_keyless = &#34;vertex&#34; in self.architect_model.lower() or &#34;ollama&#34; in self.architect_model.lower() or &#34;local&#34; in self.architect_model.lower()
+        self.has_architect = bool(self.architect_key or self.architect_auth or is_architect_keyless)
 
         # Custom Trusted Commands Regexes
         custom_trusted = aiconfig.get(&#34;trusted_commands&#34;, [])
@@ -697,12 +716,12 @@ class ai:
         # Session Management
         self.sessions_dir = os.path.join(self.config.defaultdir, &#34;ai_sessions&#34;)
         os.makedirs(self.sessions_dir, exist_ok=True)
-        self.session_id = None
-        self.session_path = None
+        self.session_id = getattr(self.config, &#34;session_id&#34;, None)
+        self.session_path = os.path.join(self.sessions_dir, f&#34;{self.session_id}.json&#34;) if self.session_id else None
 
         # Prompts base agnósticos
         architect_instructions = &#34;&#34;
-        if self.architect_key:
+        if self.has_architect:
             architect_instructions = &#34;&#34;&#34;
             CRITICAL - CONSULT vs ESCALATE:
             - ALWAYS use &#39;consult_architect&#39; for: Configuration planning, design decisions, complex troubleshooting.
@@ -718,7 +737,7 @@ class ai:
         else:
             architect_instructions = &#34;&#34;&#34;
             CRITICAL - ARCHITECT UNAVAILABLE:
-            - The Strategic Reasoning Engine (Architect) is currently UNAVAILABLE because its API key is not configured.
+            - The Strategic Reasoning Engine (Architect) is currently UNAVAILABLE because its API key or authentication is not configured.
             - DO NOT attempt to consult or escalate to the architect.
             - If the user asks to consult the architect, inform them that the Architect is offline and offer to help them directly to the best of your abilities.
 &#34;&#34;&#34;
@@ -824,15 +843,19 @@ class ai:
         if status_formatter:
             self.tool_status_formatters[name] = status_formatter
 
-    def _stream_completion(self, model, messages, tools, api_key, status=None, label=&#34;&#34;, debug=False, chunk_callback=None, **kwargs):
+    def _stream_completion(self, model, messages, tools, api_key=None, status=None, label=&#34;&#34;, debug=False, chunk_callback=None, auth=None, **kwargs):
         &#34;&#34;&#34;Stream a completion call, rendering styled Markdown in real-time.
 
         Returns (response, streamed) where:
         - response: reconstructed ModelResponse (same as non-streaming)
         - streamed: True if text was rendered to console during streaming
         &#34;&#34;&#34;
+        auth_dict = auth if auth is not None else {}
+        if api_key and &#34;api_key&#34; not in auth_dict:
+            auth_dict = auth_dict.copy()
+            auth_dict[&#34;api_key&#34;] = api_key
 
-        stream_resp = completion(model=model, messages=messages, tools=tools, api_key=api_key, stream=True, **kwargs)
+        stream_resp = completion(model=model, messages=messages, tools=tools, stream=True, **auth_dict, **kwargs)
 
         chunks = []
         full_content = &#34;&#34;
@@ -1275,7 +1298,7 @@ class ai:
                 
                 try:
                     safe_messages = self._sanitize_messages(messages)
-                    response = completion(model=self.engineer_model, messages=safe_messages, tools=tools, api_key=self.engineer_key)
+                    response = completion(model=self.engineer_model, messages=safe_messages, tools=tools, **self.engineer_auth)
                 except Exception as e:
                     if status: status.stop()
                     raise ValueError(f&#34;Engineer failed to connect: {str(e)}&#34;)
@@ -1409,16 +1432,27 @@ class ai:
                     continue
         return sorted(sessions, key=lambda x: x[&#34;created_at&#34;], reverse=True)
 
-    def list_sessions(self):
+    def list_sessions(self, limit=20):
         &#34;&#34;&#34;Prints a list of sessions using printer.table.&#34;&#34;&#34;
         sessions = self._get_sessions()
         if not sessions:
             printer.info(&#34;No saved AI sessions found.&#34;)
             return
         
+        total = len(sessions)
+        if limit and total &gt; limit:
+            sessions = sessions[:limit]
+            
         columns = [&#34;ID&#34;, &#34;Title&#34;, &#34;Created At&#34;, &#34;Model&#34;]
         rows = [[s[&#34;id&#34;], s[&#34;title&#34;], s[&#34;created_at&#34;], s[&#34;model&#34;]] for s in sessions]
-        printer.table(&#34;AI Persisted Sessions&#34;, columns, rows)
+        
+        title = &#34;AI Persisted Sessions&#34;
+        if limit and total &gt; limit:
+            title += f&#34; (Showing last {limit} of {total})&#34;
+            
+        printer.table(title, columns, rows)
+        if limit and total &gt; limit:
+            printer.info(f&#34;Use &#39;--list --all&#39; (if supported) or check the sessions directory to see all {total} sessions.&#34;)
 
     def load_session_data(self, session_id):
         &#34;&#34;&#34;Loads a session&#39;s raw data by ID.&#34;&#34;&#34;
@@ -1449,8 +1483,10 @@ class ai:
         return sessions[0][&#34;id&#34;] if sessions else None
 
     def _generate_session_id(self, query):
-        &#34;&#34;&#34;Generates a unique session ID based on timestamp.&#34;&#34;&#34;
-        return datetime.datetime.now().strftime(&#34;%Y%m%d-%H%M%S&#34;)
+        &#34;&#34;&#34;Generates a unique session ID based on timestamp and a random suffix.&#34;&#34;&#34;
+        ts = datetime.datetime.now().strftime(&#34;%Y%m%d-%H%M%S&#34;)
+        suffix = secrets.token_hex(2)
+        return f&#34;{ts}-{suffix}&#34;
 
     def save_session(self, history, title=None, model=None):
         &#34;&#34;&#34;Saves current history to the session file.&#34;&#34;&#34;
@@ -1458,6 +1494,8 @@ class ai:
             # Generate ID from first user query if available
             first_user_msg = next((m[&#34;content&#34;] for m in history if m[&#34;role&#34;] == &#34;user&#34;), &#34;new-session&#34;)
             self.session_id = self._generate_session_id(first_user_msg)
+            self.session_path = os.path.join(self.sessions_dir, f&#34;{self.session_id}.json&#34;)
+        elif not self.session_path:
             self.session_path = os.path.join(self.sessions_dir, f&#34;{self.session_id}.json&#34;)
 
         # If it&#39;s a new file, we might want to set a better title
@@ -1496,16 +1534,22 @@ class ai:
 
     @MethodHook
     def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=False, stream=True, session_id=None, chunk_callback=None):
-        if not self.engineer_key:
-            raise ValueError(&#34;Engineer API key not configured. Use &#39;connpy config --engineer-api-key &lt;key&gt;&#39; to set it.&#34;)
+        is_engineer_keyless = &#34;vertex&#34; in self.engineer_model.lower() or &#34;ollama&#34; in self.engineer_model.lower() or &#34;local&#34; in self.engineer_model.lower()
+        if not self.engineer_key and not self.engineer_auth and not is_engineer_keyless:
+            raise ValueError(&#34;Engineer API key or authentication not configured. Use &#39;connpy config --engineer-auth &lt;auth&gt;&#39; to set it.&#34;)
             
         if chat_history is None: chat_history = []
         
         # Load session if provided and history is empty
-        if session_id and not chat_history:
-            session_data = self.load_session_data(session_id)
-            if session_data:
-                chat_history = session_data.get(&#34;history&#34;, [])
+        if session_id:
+            # Force the session_id even if it doesn&#39;t exist yet
+            self.session_id = session_id
+            self.session_path = os.path.join(self.sessions_dir, f&#34;{session_id}.json&#34;)
+            
+            if not chat_history:
+                session_data = self.load_session_data(session_id)
+                if session_data:
+                    chat_history = session_data.get(&#34;history&#34;, [])
                 # If we loaded history, the caller might need it back
                 # But typically ask() is called in a loop with an external history object
 
@@ -1541,6 +1585,7 @@ class ai:
         tools = self._get_architect_tools() if current_brain == &#34;architect&#34; else self._get_engineer_tools()
         model = self.architect_model if current_brain == &#34;architect&#34; else self.engineer_model
         key = self.architect_key if current_brain == &#34;architect&#34; else self.engineer_key
+        current_auth = self.architect_auth if current_brain == &#34;architect&#34; else self.engineer_auth
 
         # Estructura optimizada para Prompt Caching (Solo para Anthropic directo, Vertex tiene reglas distintas)
         if &#34;claude&#34; in model.lower() and &#34;vertex&#34; not in model.lower():
@@ -1590,8 +1635,8 @@ class ai:
                 
                 label = &#34;[architect][bold]Architect[/bold][/architect]&#34; if current_brain == &#34;architect&#34; else &#34;[engineer][bold]Engineer[/bold][/engineer]&#34;
                 if status: 
-                    # Notify responder identity ONLY for web/remote clients (StatusBridge has is_web)
-                    if getattr(status, &#34;is_web&#34;, False):
+                    # Notify responder identity for web/remote clients
+                    if getattr(status, &#34;is_web&#34;, False) or getattr(status, &#34;is_remote&#34;, False):
                         status.update(f&#34;__RESPONDER__:{current_brain}&#34;)
                     status.update(f&#34;{label} is thinking... (step {iteration})&#34;)
                 
@@ -1600,12 +1645,12 @@ class ai:
                     safe_messages = self._sanitize_messages(messages)
                     if stream:
                         response, streamed_response = self._stream_completion(
-                            model=model, messages=safe_messages, tools=tools, api_key=key,
+                            model=model, messages=safe_messages, tools=tools, auth=current_auth,
                             status=status, label=label, debug=debug, num_retries=3,
                             chunk_callback=chunk_callback
                         )
                     else:
-                        response = completion(model=model, messages=safe_messages, tools=tools, api_key=key, num_retries=3)
+                        response = completion(model=model, messages=safe_messages, tools=tools, num_retries=3, **current_auth)
                 except Exception as e:
                     if current_brain == &#34;architect&#34;:
                         if status: status.update(&#34;[unavailable]Architect unavailable! Falling back to Engineer...&#34;)
@@ -1614,6 +1659,7 @@ class ai:
                         model = self.engineer_model
                         tools = self._get_engineer_tools()
                         key = self.engineer_key
+                        current_auth = self.engineer_auth
                         # Rebuild messages with Engineer system prompt and original user request
                         messages = [{&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: self.engineer_system_prompt}]
                         # Add chat history if exists (excluding system prompt)
@@ -1706,6 +1752,7 @@ class ai:
                         model = self.architect_model
                         tools = self._get_architect_tools()
                         key = self.architect_key
+                        current_auth = self.architect_auth
                         messages[0] = {&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: self.architect_system_prompt}
                         # Prepare handover context to inject AFTER all tool responses
                         handover_msg = f&#34;HANDOVER FROM EXECUTION ENGINE\n\nReason: {args[&#39;reason&#39;]}\n\nContext: {args[&#39;context&#39;]}\n\nYou are now in control of this conversation.&#34;
@@ -1727,6 +1774,7 @@ class ai:
                         model = self.engineer_model
                         tools = self._get_engineer_tools()
                         key = self.engineer_key
+                        current_auth = self.engineer_auth
                         messages[0] = {&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: self.engineer_system_prompt}
                         # Prepare handover context to inject AFTER all tool responses
                         handover_msg = f&#34;HANDOVER FROM ARCHITECT\n\nSummary: {args[&#39;summary&#39;]}\n\nYou are now back in control. Continue handling the user&#39;s requests.&#34;
@@ -1768,7 +1816,7 @@ class ai:
                     messages.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;Hard iteration limit reached. Please provide a summary of your findings so far.&#34;})
                     try:
                         safe_messages = self._sanitize_messages(messages)
-                        response = completion(model=model, messages=safe_messages, tools=[], api_key=key)
+                        response = completion(model=model, messages=safe_messages, tools=[], **current_auth)
                         resp_msg = response.choices[0].message
                         messages.append(resp_msg.model_dump(exclude_none=True))
                     except Exception as e:
@@ -1788,7 +1836,7 @@ class ai:
             try:
                 safe_messages = self._sanitize_messages(summary_messages)
                 # Use tools=None to force a text summary during interruption
-                response = completion(model=model, messages=safe_messages, tools=None, api_key=key)
+                response = completion(model=model, messages=safe_messages, tools=None, **current_auth)
                 resp_msg = response.choices[0].message
                 messages.append(resp_msg.model_dump(exclude_none=True))
                 
@@ -1925,6 +1973,7 @@ Node: {node_name}&#34;&#34;&#34;
         # Use models based on persona
         current_model = self.architect_model if persona == &#34;architect&#34; else self.engineer_model
         current_key = self.architect_key if persona == &#34;architect&#34; else self.engineer_key
+        current_auth = self.architect_auth if persona == &#34;architect&#34; else self.engineer_auth
 
         try:
             while iteration &lt; max_iterations:
@@ -1934,8 +1983,8 @@ Node: {node_name}&#34;&#34;&#34;
                     model=current_model,
                     messages=messages,
                     tools=mcp_tools if mcp_tools else None,
-                    api_key=current_key,
-                    stream=True
+                    stream=True,
+                    **current_auth
                 )
                 
                 full_content = &#34;&#34;
@@ -2008,8 +2057,8 @@ Node: {node_name}&#34;&#34;&#34;
                     model=self.engineer_model,
                     messages=messages,
                     tools=None,
-                    api_key=self.engineer_key,
-                    stream=True
+                    stream=True,
+                    **self.engineer_auth
                 )
                 
                 full_content = &#34;&#34;
@@ -2095,7 +2144,7 @@ Node: {node_name}&#34;&#34;&#34;
 <dl>
 <dt id="connpy.ai.SAFE_COMMANDS"><code class="name">var <span class="ident">SAFE_COMMANDS</span></code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>The type of the None singleton.</p></div>
 </dd>
 </dl>
 <h3>Instance variables</h3>
@@ -2255,6 +2304,7 @@ Node: {node_name}&#34;&#34;&#34;
         # Use models based on persona
         current_model = self.architect_model if persona == &#34;architect&#34; else self.engineer_model
         current_key = self.architect_key if persona == &#34;architect&#34; else self.engineer_key
+        current_auth = self.architect_auth if persona == &#34;architect&#34; else self.engineer_auth
 
         try:
             while iteration &lt; max_iterations:
@@ -2264,8 +2314,8 @@ Node: {node_name}&#34;&#34;&#34;
                     model=current_model,
                     messages=messages,
                     tools=mcp_tools if mcp_tools else None,
-                    api_key=current_key,
-                    stream=True
+                    stream=True,
+                    **current_auth
                 )
                 
                 full_content = &#34;&#34;
@@ -2338,8 +2388,8 @@ Node: {node_name}&#34;&#34;&#34;
                     model=self.engineer_model,
                     messages=messages,
                     tools=None,
-                    api_key=self.engineer_key,
-                    stream=True
+                    stream=True,
+                    **self.engineer_auth
                 )
                 
                 full_content = &#34;&#34;
@@ -2429,16 +2479,22 @@ Node: {node_name}&#34;&#34;&#34;
 </summary>
 <pre><code class="python">@MethodHook
 def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=False, stream=True, session_id=None, chunk_callback=None):
-    if not self.engineer_key:
-        raise ValueError(&#34;Engineer API key not configured. Use &#39;connpy config --engineer-api-key &lt;key&gt;&#39; to set it.&#34;)
+    is_engineer_keyless = &#34;vertex&#34; in self.engineer_model.lower() or &#34;ollama&#34; in self.engineer_model.lower() or &#34;local&#34; in self.engineer_model.lower()
+    if not self.engineer_key and not self.engineer_auth and not is_engineer_keyless:
+        raise ValueError(&#34;Engineer API key or authentication not configured. Use &#39;connpy config --engineer-auth &lt;auth&gt;&#39; to set it.&#34;)
         
     if chat_history is None: chat_history = []
     
     # Load session if provided and history is empty
-    if session_id and not chat_history:
-        session_data = self.load_session_data(session_id)
-        if session_data:
-            chat_history = session_data.get(&#34;history&#34;, [])
+    if session_id:
+        # Force the session_id even if it doesn&#39;t exist yet
+        self.session_id = session_id
+        self.session_path = os.path.join(self.sessions_dir, f&#34;{session_id}.json&#34;)
+        
+        if not chat_history:
+            session_data = self.load_session_data(session_id)
+            if session_data:
+                chat_history = session_data.get(&#34;history&#34;, [])
             # If we loaded history, the caller might need it back
             # But typically ask() is called in a loop with an external history object
 
@@ -2474,6 +2530,7 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
     tools = self._get_architect_tools() if current_brain == &#34;architect&#34; else self._get_engineer_tools()
     model = self.architect_model if current_brain == &#34;architect&#34; else self.engineer_model
     key = self.architect_key if current_brain == &#34;architect&#34; else self.engineer_key
+    current_auth = self.architect_auth if current_brain == &#34;architect&#34; else self.engineer_auth
 
     # Estructura optimizada para Prompt Caching (Solo para Anthropic directo, Vertex tiene reglas distintas)
     if &#34;claude&#34; in model.lower() and &#34;vertex&#34; not in model.lower():
@@ -2523,8 +2580,8 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
             
             label = &#34;[architect][bold]Architect[/bold][/architect]&#34; if current_brain == &#34;architect&#34; else &#34;[engineer][bold]Engineer[/bold][/engineer]&#34;
             if status: 
-                # Notify responder identity ONLY for web/remote clients (StatusBridge has is_web)
-                if getattr(status, &#34;is_web&#34;, False):
+                # Notify responder identity for web/remote clients
+                if getattr(status, &#34;is_web&#34;, False) or getattr(status, &#34;is_remote&#34;, False):
                     status.update(f&#34;__RESPONDER__:{current_brain}&#34;)
                 status.update(f&#34;{label} is thinking... (step {iteration})&#34;)
             
@@ -2533,12 +2590,12 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
                 safe_messages = self._sanitize_messages(messages)
                 if stream:
                     response, streamed_response = self._stream_completion(
-                        model=model, messages=safe_messages, tools=tools, api_key=key,
+                        model=model, messages=safe_messages, tools=tools, auth=current_auth,
                         status=status, label=label, debug=debug, num_retries=3,
                         chunk_callback=chunk_callback
                     )
                 else:
-                    response = completion(model=model, messages=safe_messages, tools=tools, api_key=key, num_retries=3)
+                    response = completion(model=model, messages=safe_messages, tools=tools, num_retries=3, **current_auth)
             except Exception as e:
                 if current_brain == &#34;architect&#34;:
                     if status: status.update(&#34;[unavailable]Architect unavailable! Falling back to Engineer...&#34;)
@@ -2547,6 +2604,7 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
                     model = self.engineer_model
                     tools = self._get_engineer_tools()
                     key = self.engineer_key
+                    current_auth = self.engineer_auth
                     # Rebuild messages with Engineer system prompt and original user request
                     messages = [{&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: self.engineer_system_prompt}]
                     # Add chat history if exists (excluding system prompt)
@@ -2639,6 +2697,7 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
                     model = self.architect_model
                     tools = self._get_architect_tools()
                     key = self.architect_key
+                    current_auth = self.architect_auth
                     messages[0] = {&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: self.architect_system_prompt}
                     # Prepare handover context to inject AFTER all tool responses
                     handover_msg = f&#34;HANDOVER FROM EXECUTION ENGINE\n\nReason: {args[&#39;reason&#39;]}\n\nContext: {args[&#39;context&#39;]}\n\nYou are now in control of this conversation.&#34;
@@ -2660,6 +2719,7 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
                     model = self.engineer_model
                     tools = self._get_engineer_tools()
                     key = self.engineer_key
+                    current_auth = self.engineer_auth
                     messages[0] = {&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: self.engineer_system_prompt}
                     # Prepare handover context to inject AFTER all tool responses
                     handover_msg = f&#34;HANDOVER FROM ARCHITECT\n\nSummary: {args[&#39;summary&#39;]}\n\nYou are now back in control. Continue handling the user&#39;s requests.&#34;
@@ -2701,7 +2761,7 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
                 messages.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;Hard iteration limit reached. Please provide a summary of your findings so far.&#34;})
                 try:
                     safe_messages = self._sanitize_messages(messages)
-                    response = completion(model=model, messages=safe_messages, tools=[], api_key=key)
+                    response = completion(model=model, messages=safe_messages, tools=[], **current_auth)
                     resp_msg = response.choices[0].message
                     messages.append(resp_msg.model_dump(exclude_none=True))
                 except Exception as e:
@@ -2721,7 +2781,7 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
         try:
             safe_messages = self._sanitize_messages(summary_messages)
             # Use tools=None to force a text summary during interruption
-            response = completion(model=model, messages=safe_messages, tools=None, api_key=key)
+            response = completion(model=model, messages=safe_messages, tools=None, **current_auth)
             resp_msg = response.choices[0].message
             messages.append(resp_msg.model_dump(exclude_none=True))
             
@@ -2844,23 +2904,34 @@ def confirm(self, user_input): return True</code></pre>
 <div class="desc"><p>List nodes matching the filter pattern. Returns metadata for &lt;=5 nodes, names only for more.</p></div>
 </dd>
 <dt id="connpy.ai.list_sessions"><code class="name flex">
-<span>def <span class="ident">list_sessions</span></span>(<span>self)</span>
+<span>def <span class="ident">list_sessions</span></span>(<span>self, limit=20)</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def list_sessions(self):
+<pre><code class="python">def list_sessions(self, limit=20):
     &#34;&#34;&#34;Prints a list of sessions using printer.table.&#34;&#34;&#34;
     sessions = self._get_sessions()
     if not sessions:
         printer.info(&#34;No saved AI sessions found.&#34;)
         return
     
+    total = len(sessions)
+    if limit and total &gt; limit:
+        sessions = sessions[:limit]
+        
     columns = [&#34;ID&#34;, &#34;Title&#34;, &#34;Created At&#34;, &#34;Model&#34;]
     rows = [[s[&#34;id&#34;], s[&#34;title&#34;], s[&#34;created_at&#34;], s[&#34;model&#34;]] for s in sessions]
-    printer.table(&#34;AI Persisted Sessions&#34;, columns, rows)</code></pre>
+    
+    title = &#34;AI Persisted Sessions&#34;
+    if limit and total &gt; limit:
+        title += f&#34; (Showing last {limit} of {total})&#34;
+        
+    printer.table(title, columns, rows)
+    if limit and total &gt; limit:
+        printer.info(f&#34;Use &#39;--list --all&#39; (if supported) or check the sessions directory to see all {total} sessions.&#34;)</code></pre>
 </details>
 <div class="desc"><p>Prints a list of sessions using printer.table.</p></div>
 </dd>
@@ -3069,6 +3140,8 @@ def confirm(self, user_input): return True</code></pre>
         # Generate ID from first user query if available
         first_user_msg = next((m[&#34;content&#34;] for m in history if m[&#34;role&#34;] == &#34;user&#34;), &#34;new-session&#34;)
         self.session_id = self._generate_session_id(first_user_msg)
+        self.session_path = os.path.join(self.sessions_dir, f&#34;{self.session_id}.json&#34;)
+    elif not self.session_path:
         self.session_path = os.path.join(self.sessions_dir, f&#34;{self.session_id}.json&#34;)
 
     # If it&#39;s a new file, we might want to set a better title
@@ -4226,8 +4299,11 @@ class node:
 
 
     def _setup_interact_environment(self, debug=False, logger=None, async_mode=False):
-        size = re.search(&#39;columns=([0-9]+).*lines=([0-9]+)&#39;,str(os.get_terminal_size()))
-        self.child.setwinsize(int(size.group(2)),int(size.group(1)))
+        try:
+            size = re.search(&#39;columns=([0-9]+).*lines=([0-9]+)&#39;,str(os.get_terminal_size()))
+            self.child.setwinsize(int(size.group(2)),int(size.group(1)))
+        except OSError:
+            pass
         if logger:
             port_str = f&#34;:{self.port}&#34; if self.port and self.protocol not in [&#34;ssm&#34;, &#34;kubectl&#34;, &#34;docker&#34;] else &#34;&#34;
             logger(&#34;success&#34;, f&#34;Connected to {self.unique} at {self.host}{port_str} via: {self.protocol}&#34;)
@@ -4264,6 +4340,7 @@ class node:
 
     async def _async_interact_loop(self, local_stream, resize_callback, copilot_handler=None):
         local_stream.setup(resize_callback=resize_callback)
+        self.current_local_stream = local_stream
         try:
             child_fd = self.child.child_fd
             
@@ -4346,11 +4423,19 @@ class node:
                     # Remove any stray \x00 bytes and forward normally
                     clean_data = data.replace(b&#39;\x00&#39;, b&#39;&#39;)
                     if clean_data:
-                        # Track command boundaries when user hits Enter
-                        if hasattr(self, &#39;mylog&#39;) and (b&#39;\r&#39; in clean_data or b&#39;\n&#39; in clean_data):
-                            self.cmd_byte_positions.append((self.mylog.tell(), None))
+                        # Track command boundaries when user hits Enter or presses Ctrl+C
+                        if hasattr(self, &#39;mylog&#39;) and (b&#39;\r&#39; in clean_data or b&#39;\n&#39; in clean_data or b&#39;\x03&#39; in clean_data):
+                            pos = self.mylog.tell()
+                            marker_cmd = &#34;CANCELLED&#34; if b&#39;\x03&#39; in clean_data else None
+                            self.cmd_byte_positions.append((pos, marker_cmd))
+                            if hasattr(self, &#39;current_local_stream&#39;) and self.current_local_stream is not None:
+                                try:
+                                    await self.current_local_stream.write(f&#39;\x1b]133;B;{pos}\x07&#39;.encode())
+                                except Exception:
+                                    pass
 
-                        try:                            os.write(child_fd, clean_data)
+                        try:
+                            os.write(child_fd, clean_data)
                         except OSError:
                             break
                         self.lastinput = time()
@@ -4470,6 +4555,7 @@ class node:
                 except Exception:
                     pass
         finally:
+            self.current_local_stream = None
             local_stream.teardown()
 
     @MethodHook
@@ -4498,6 +4584,11 @@ class node:
             if cmd != slc and hasattr(self, &#39;cmd_byte_positions&#39;) and self.cmd_byte_positions is not None:
                 log_pos = self.mylog.tell() if hasattr(self, &#39;mylog&#39;) else 0
                 self.cmd_byte_positions.append((log_pos, cmd))
+                if hasattr(self, &#39;current_local_stream&#39;) and self.current_local_stream is not None:
+                    try:
+                        await self.current_local_stream.write(f&#39;\x1b]133;B;{log_pos}\x07&#39;.encode())
+                    except Exception:
+                        pass
             
             # Write physically to PTY
             os.write(child_fd, (cmd + &#34;\n&#34;).encode())
@@ -5137,6 +5228,11 @@ async def inject_commands(self, commands, child_fd, on_inject=None):
         if cmd != slc and hasattr(self, &#39;cmd_byte_positions&#39;) and self.cmd_byte_positions is not None:
             log_pos = self.mylog.tell() if hasattr(self, &#39;mylog&#39;) else 0
             self.cmd_byte_positions.append((log_pos, cmd))
+            if hasattr(self, &#39;current_local_stream&#39;) and self.current_local_stream is not None:
+                try:
+                    await self.current_local_stream.write(f&#39;\x1b]133;B;{log_pos}\x07&#39;.encode())
+                except Exception:
+                    pass
         
         # Write physically to PTY
         os.write(child_fd, (cmd + &#34;\n&#34;).encode())
@@ -6225,7 +6321,6 @@ def test(self, commands, expected, vars = None,*, folder = None, prompt = None, 
 <li><code><a title="connpy.mcp_client" href="mcp_client.html">connpy.mcp_client</a></code></li>
 <li><code><a title="connpy.proto" href="proto/index.html">connpy.proto</a></code></li>
 <li><code><a title="connpy.services" href="services/index.html">connpy.services</a></code></li>
-<li><code><a title="connpy.tests" href="tests/index.html">connpy.tests</a></code></li>
 <li><code><a title="connpy.tunnels" href="tunnels.html">connpy.tunnels</a></code></li>
 <li><code><a title="connpy.utils" href="utils.html">connpy.utils</a></code></li>
 </ul>
@@ -6289,7 +6384,7 @@ def test(self, commands, expected, vars = None,*, folder = None, prompt = None, 
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
 </footer>
 </body>
 </html>

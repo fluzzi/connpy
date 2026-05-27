@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.5">
+<meta name="generator" content="pdoc3 0.11.6">
 <title>connpy.cli.config_handler API documentation</title>
 <meta name="description" content="">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
@@ -70,8 +70,10 @@ el.replaceWith(d);
             &#34;theme&#34;: self.set_theme,
             &#34;engineer_model&#34;: self.set_ai_config,
             &#34;engineer_api_key&#34;: self.set_ai_config,
+            &#34;engineer_auth&#34;: self.set_ai_config,
             &#34;architect_model&#34;: self.set_ai_config,
             &#34;architect_api_key&#34;: self.set_ai_config,
+            &#34;architect_auth&#34;: self.set_ai_config,
             &#34;trusted_commands&#34;: self.set_ai_config,
             &#34;service_mode&#34;: self.set_service_mode,
             &#34;remote_host&#34;: self.set_remote_host,
@@ -178,11 +180,59 @@ el.replaceWith(d);
         try:
             settings = self.app.services.config_svc.get_settings()
             aiconfig = settings.get(&#34;ai&#34;, {})
-            aiconfig[args.command] = args.data[0]
+            val = args.data[0]
+            
+            # Check for unset/clear request
+            if val.lower() in [&#34;none&#34;, &#34;clear&#34;, &#34;&#34;]:
+                if args.command in aiconfig:
+                    del aiconfig[args.command]
+            else:
+                # If configuring auth, parse as dictionary (JSON/YAML or file path)
+                if args.command in [&#34;engineer_auth&#34;, &#34;architect_auth&#34;]:
+                    parsed_val = self._parse_auth_value(val)
+                    if parsed_val is not None:
+                        aiconfig[args.command] = parsed_val
+                    else:
+                        if args.command in aiconfig:
+                            del aiconfig[args.command]
+                else:
+                    aiconfig[args.command] = val
+            
             self.app.services.config_svc.update_setting(&#34;ai&#34;, aiconfig)
             printer.success(&#34;Config saved&#34;)
-        except ConnpyError as e:
-            printer.error(str(e))</code></pre>
+        except (ConnpyError, InvalidConfigurationError) as e:
+            printer.error(str(e))
+
+    def _parse_auth_value(self, value):
+        if value.lower() in [&#34;none&#34;, &#34;clear&#34;, &#34;&#34;]:
+            return None
+        
+        # Check if it&#39;s a file path
+        import os
+        if os.path.exists(value):
+            try:
+                with open(value, &#34;r&#34;) as f:
+                    content = f.read()
+                import json
+                try:
+                    return json.loads(content)
+                except ValueError:
+                    return yaml.safe_load(content)
+            except Exception as e:
+                raise InvalidConfigurationError(f&#34;Failed to read/parse auth file &#39;{value}&#39;: {e}&#34;)
+        
+        # Try parsing as inline JSON/YAML
+        try:
+            import json
+            return json.loads(value)
+        except ValueError:
+            try:
+                parsed = yaml.safe_load(value)
+                if isinstance(parsed, dict):
+                    return parsed
+                raise ValueError()
+            except Exception:
+                raise InvalidConfigurationError(&#34;Auth parameter must be a valid JSON/YAML string, or a path to a JSON/YAML file.&#34;)</code></pre>
 </details>
 <div class="desc"></div>
 <h3>Methods</h3>
@@ -206,8 +256,10 @@ el.replaceWith(d);
         &#34;theme&#34;: self.set_theme,
         &#34;engineer_model&#34;: self.set_ai_config,
         &#34;engineer_api_key&#34;: self.set_ai_config,
+        &#34;engineer_auth&#34;: self.set_ai_config,
         &#34;architect_model&#34;: self.set_ai_config,
         &#34;architect_api_key&#34;: self.set_ai_config,
+        &#34;architect_auth&#34;: self.set_ai_config,
         &#34;trusted_commands&#34;: self.set_ai_config,
         &#34;service_mode&#34;: self.set_service_mode,
         &#34;remote_host&#34;: self.set_remote_host,
@@ -234,10 +286,27 @@ el.replaceWith(d);
     try:
         settings = self.app.services.config_svc.get_settings()
         aiconfig = settings.get(&#34;ai&#34;, {})
-        aiconfig[args.command] = args.data[0]
+        val = args.data[0]
+        
+        # Check for unset/clear request
+        if val.lower() in [&#34;none&#34;, &#34;clear&#34;, &#34;&#34;]:
+            if args.command in aiconfig:
+                del aiconfig[args.command]
+        else:
+            # If configuring auth, parse as dictionary (JSON/YAML or file path)
+            if args.command in [&#34;engineer_auth&#34;, &#34;architect_auth&#34;]:
+                parsed_val = self._parse_auth_value(val)
+                if parsed_val is not None:
+                    aiconfig[args.command] = parsed_val
+                else:
+                    if args.command in aiconfig:
+                        del aiconfig[args.command]
+            else:
+                aiconfig[args.command] = val
+        
         self.app.services.config_svc.update_setting(&#34;ai&#34;, aiconfig)
         printer.success(&#34;Config saved&#34;)
-    except ConnpyError as e:
+    except (ConnpyError, InvalidConfigurationError) as e:
         printer.error(str(e))</code></pre>
 </details>
 <div class="desc"></div>
@@ -482,7 +551,7 @@ el.replaceWith(d);
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
 </footer>
 </body>
 </html>

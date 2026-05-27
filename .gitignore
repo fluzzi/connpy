@@ -152,6 +152,7 @@ testremote/
 *.db
 *.patch
 scratch.py
+connpy.code-workspace
 
 # Internal planning and implementation docs
 PLAN_CAPA_SERVICIOS.md
