@@ -1016,18 +1016,6 @@ class node:
             cmd += f" {self.options}"
         return cmd
 
-    @MethodHook
-    def _generate_ssm_cmd(self):
-        region = self.tags.get("region", "") if isinstance(self.tags, dict) else ""
-        profile = self.tags.get("profile", "") if isinstance(self.tags, dict) else ""
-        cmd = f"aws ssm start-session --target {self.host}"
-        if region:
-            cmd += f" --region {region}"
-        if profile:
-            cmd += f" --profile {profile}"
-        if self.options:
-            cmd += f" {self.options}"
-        return cmd
 
     @MethodHook
     def _get_cmd(self):

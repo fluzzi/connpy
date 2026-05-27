@@ -1008,9 +1008,11 @@ class ai:
 
     @MethodHook
     def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=False, stream=True, session_id=None, chunk_callback=None):
+        soft_limit_warned = False
         is_engineer_keyless = "vertex" in self.engineer_model.lower() or "ollama" in self.engineer_model.lower() or "local" in self.engineer_model.lower()
         if not self.engineer_key and not self.engineer_auth and not is_engineer_keyless:
             raise ValueError("Engineer API key or authentication not configured. Use 'connpy config --engineer-auth <auth>' to set it.")
+
             
         if chat_history is None: chat_history = []
         

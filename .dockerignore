@@ -20,3 +20,10 @@ scratch
 testall
 testremote
 automation-template.yaml
+
+# Sensitive local files and credentials
+auth.json
+key.db
+config.db
+*.db
+testnew/
