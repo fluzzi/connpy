@@ -19,6 +19,9 @@ class LoginHandler:
             sys.exit(1)
 
     def login(self, args):
+        if getattr(args, "status", False):
+            return self.show_status()
+
         if self.app.services.mode != "remote":
             printer.warning("Note: Your current configuration is set to local mode. Logging in will save credentials, but they will only apply when service-mode is set to 'remote'.")
 
@@ -90,3 +93,51 @@ class LoginHandler:
                 sys.exit(1)
         else:
             printer.info("No active session found (already logged out).")
+
+    def show_status(self):
+        import base64
+        import json
+        import datetime
+        
+        token_path = os.path.join(self.app.config.defaultdir, ".token")
+        if not os.path.exists(token_path):
+            printer.warning("No active session found. You can log in using 'connpy login'.")
+            return
+            
+        try:
+            with open(token_path, "r") as f:
+                token = f.read().strip()
+                
+            parts = token.split(".")
+            if len(parts) != 3:
+                printer.error("Invalid local session token format.")
+                return
+                
+            payload_b64 = parts[1]
+            payload_b64 += "=" * ((4 - len(payload_b64) % 4) % 4)
+            payload_bytes = base64.urlsafe_b64decode(payload_b64)
+            payload = json.loads(payload_bytes.decode("utf-8"))
+            
+            username = payload.get("sub")
+            exp = payload.get("exp")
+            
+            if not exp:
+                printer.success(f"Active session as '{username}' (Indefinite expiration).")
+                return
+                
+            now = datetime.datetime.now(datetime.timezone.utc).timestamp()
+            if now > exp:
+                printer.error("Session has expired. Please log in again using 'connpy login'.")
+                return
+                
+            remaining = exp - now
+            hours = int(remaining // 3600)
+            minutes = int((remaining % 3600) // 60)
+            
+            printer.success(f"Logged in as '{username}'")
+            printer.info(f"Time remaining: {hours}h {minutes}m")
+            
+            exp_dt = datetime.datetime.fromtimestamp(exp, datetime.timezone.utc)
+            printer.info(f"Expires at: {exp_dt.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+        except Exception as e:
+            printer.error(f"Failed to check local session status: {e}")

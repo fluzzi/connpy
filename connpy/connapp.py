@@ -379,6 +379,7 @@ class connapp:
         loginparser = subparsers.add_parser("login", help="Login to remote connpy server", description="Login to remote connpy server", formatter_class=RichHelpFormatter)
         loginparser.error = self._custom_error
         loginparser.add_argument("username", nargs='?', default=None, help="Username to authenticate")
+        loginparser.add_argument("-s", "--status", action="store_true", help="Check current login status")
         loginparser.set_defaults(func=self._login.dispatch, action="login")
 
         #LOGOUTPARSER

@@ -86,7 +86,14 @@ class TestCLIMultiUserParsing:
         
         args = parser.parse_args(["login", "someuser"])
         assert args.username == "someuser"
+        assert args.status is False
         assert args.func == app_instance._login.dispatch
+        
+        args = parser.parse_args(["login", "--status"])
+        assert args.status is True
+        
+        args = parser.parse_args(["login", "-s"])
+        assert args.status is True
         
         args = parser.parse_args(["logout"])
         assert args.func == app_instance._login.dispatch
@@ -184,3 +191,49 @@ class TestAuthClientInterceptor:
         
         # Verify metadata remains empty
         assert len(intercepted_details.metadata) == 0
+
+
+class TestLoginHandlerStatus:
+    def test_status_no_token(self, app_instance):
+        handler = LoginHandler(app_instance)
+        
+        with patch("os.path.exists", return_value=False):
+            with patch("connpy.printer.warning") as mock_warning:
+                handler.show_status()
+                mock_warning.assert_called_once_with("No active session found. You can log in using 'connpy login'.")
+
+    def test_status_invalid_token(self, app_instance):
+        handler = LoginHandler(app_instance)
+        
+        with patch("os.path.exists", return_value=True):
+            with patch("builtins.open", mock_open(read_data="invalid-token")):
+                with patch("connpy.printer.error") as mock_error:
+                    handler.show_status()
+                    mock_error.assert_called_once_with("Invalid local session token format.")
+
+    def test_status_valid_token(self, app_instance):
+        handler = LoginHandler(app_instance)
+        
+        # Mock token payload: {"sub": "testuser", "exp": 1780007003}
+        # Part 1 (header): eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        # Part 2 (payload): eyJzdWIiOiJ0ZXN0dXNlciIsImV4cCI6MTc4MDAwNzAwM30
+        # Part 3 (sig): signature
+        token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0dXNlciIsImV4cCI6MTc4MDAwNzAwM30.signature"
+        
+        with patch("os.path.exists", return_value=True):
+            with patch("builtins.open", mock_open(read_data=token)):
+                with patch("connpy.printer.success") as mock_success:
+                    with patch("connpy.printer.info") as mock_info:
+                        # Patch time so exp is in the future
+                        with patch("datetime.datetime") as mock_dt:
+                            mock_dt.now.return_value.timestamp.return_value = 1780000000
+                            # Mock fromtimestamp for expiration display
+                            mock_dt.fromtimestamp.return_value.strftime.return_value = "2026-05-28 19:23:23 UTC"
+                            
+                            handler.show_status()
+                            mock_success.assert_called_once_with("Logged in as 'testuser'")
+
+
+def mock_open(*args, **kwargs):
+    from unittest.mock import mock_open as unittest_mock_open
+    return unittest_mock_open(*args, **kwargs)
