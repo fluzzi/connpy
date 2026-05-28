@@ -148,7 +148,7 @@ class NodeService(BaseService):
             self.config._connections_add(**data)
             self.config._saveconfig(self.config.file)
 
-    def update_node(self, unique_id, data):
+    def update_node(self, unique_id, data, save=True):
         """Explicitly update an existing node."""
         all_nodes = self.config._getallnodes()
         if unique_id not in all_nodes:
@@ -162,9 +162,10 @@ class NodeService(BaseService):
             
         # config._connections_add actually handles updates if ID exists correctly
         self.config._connections_add(**data)
-        self.config._saveconfig(self.config.file)
+        if save:
+            self.config._saveconfig(self.config.file)
 
-    def delete_node(self, unique_id, is_folder=False):
+    def delete_node(self, unique_id, is_folder=False, save=True):
         """Logic for deleting a node or folder."""
         if is_folder:
             uniques = self.config._explode_unique(unique_id)
@@ -177,7 +178,8 @@ class NodeService(BaseService):
                 raise NodeNotFoundError(f"Node '{unique_id}' not found or invalid.")
             self.config._connections_del(**uniques)
             
-        self.config._saveconfig(self.config.file)
+        if save:
+            self.config._saveconfig(self.config.file)
 
     def connect_node(self, unique_id, sftp=False, debug=False, logger=None):
         """Interact with a node directly."""

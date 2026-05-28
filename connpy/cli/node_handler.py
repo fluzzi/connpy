@@ -14,6 +14,23 @@ class NodeHandler:
         self.app = app
         self.forms = Forms(app)
 
+    def _filter_exact_match(self, matches, query):
+        if not query or len(matches) <= 1:
+            return matches
+        
+        exact_matches = []
+        for m in matches:
+            if self.app.case:
+                if m == query:
+                    exact_matches.append(m)
+            else:
+                if m.lower() == query.lower():
+                    exact_matches.append(m)
+                    
+        if len(exact_matches) == 1:
+            return exact_matches
+        return matches
+
     def dispatch(self, args):
         if not self.app.case and args.data != None:
             args.data = args.data.lower()
@@ -39,6 +56,7 @@ class NodeHandler:
         else:
             try:
                 matches = self.app.services.nodes.list_nodes(args.data)
+                matches = self._filter_exact_match(matches, args.data)
             except Exception:
                 matches = []
 
@@ -73,6 +91,7 @@ class NodeHandler:
                 matches = self.app.services.nodes.list_folders(args.data)
             else:
                 matches = self.app.services.nodes.list_nodes(args.data)
+                matches = self._filter_exact_match(matches, args.data)
         except Exception:
             matches = []
 
@@ -87,8 +106,9 @@ class NodeHandler:
             sys.exit(7)
 
         try:
-            for item in matches:
-                self.app.services.nodes.delete_node(item, is_folder=is_folder)
+            for i, item in enumerate(matches):
+                save_on_last = (i == len(matches) - 1)
+                self.app.services.nodes.delete_node(item, is_folder=is_folder, save=save_on_last)
             
             if len(matches) == 1:
                 printer.success(f"{matches[0]} deleted successfully")
@@ -144,6 +164,7 @@ class NodeHandler:
             
         try:
             matches = self.app.services.nodes.list_nodes(args.data)
+            matches = self._filter_exact_match(matches, args.data)
         except Exception:
             matches = []
 
@@ -171,6 +192,7 @@ class NodeHandler:
             
         try:
             matches = self.app.services.nodes.list_nodes(args.data)
+            matches = self._filter_exact_match(matches, args.data)
         except Exception:
             matches = []
             
@@ -209,7 +231,7 @@ class NodeHandler:
                 self.app.services.nodes.update_node(matches[0], updatenode)
                 printer.success(f"{args.data} edited successfully")
             else:
-                editcount = 0
+                changed_items = []
                 for k in matches:
                     updated_item = self.app.services.nodes.explode_unique(k)
                     updated_item["type"] = "connection"
@@ -222,8 +244,12 @@ class NodeHandler:
                             updated_item[key] = updatenode[key]
                     
                     if this_item_changed:
-                        editcount += 1
-                        self.app.services.nodes.update_node(k, updated_item)
+                        changed_items.append((k, updated_item))
+                
+                editcount = len(changed_items)
+                for i, (k, updated_item) in enumerate(changed_items):
+                    save_on_last = (i == editcount - 1)
+                    self.app.services.nodes.update_node(k, updated_item, save=save_on_last)
                 
                 if editcount == 0:
                     printer.info("Nothing to do here")

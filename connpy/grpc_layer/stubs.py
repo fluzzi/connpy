@@ -462,16 +462,18 @@ class NodeStub:
         self._trigger_local_cache_sync()
 
     @handle_errors
-    def update_node(self, unique_id, data):
+    def update_node(self, unique_id, data, save=True):
         req = connpy_pb2.NodeRequest(id=unique_id, data=to_struct(data), is_folder=False)
         self.stub.update_node(req)
-        self._trigger_local_cache_sync()
+        if save:
+            self._trigger_local_cache_sync()
 
     @handle_errors
-    def delete_node(self, unique_id, is_folder=False):
+    def delete_node(self, unique_id, is_folder=False, save=True):
         req = connpy_pb2.DeleteRequest(id=unique_id, is_folder=is_folder)
         self.stub.delete_node(req)
-        self._trigger_local_cache_sync()
+        if save:
+            self._trigger_local_cache_sync()
 
     @handle_errors
     def move_node(self, src_id, dst_id, copy=False):
@@ -895,9 +897,6 @@ class AIStub:
                         from ..printer import connpy_theme, get_original_stdout
                         stable_console = RichConsole(theme=connpy_theme, file=get_original_stdout())
                         stable_console.print(Rule(style=alias))
-                    elif not full_content and final_result.get("response"):
-                        # If nothing streamed but we have response (e.g. error or direct guide)
-                        printer.console.print(Panel(Markdown(final_result["response"]), title=title, border_style=alias, expand=False))
                     break
         except Exception as e:
             # Check if it was a gRPC error that we should let handle_errors catch

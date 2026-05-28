@@ -815,8 +815,13 @@ class StatusBridge:
         return default
 
 class AIServicer(connpy_pb2_grpc.AIServiceServicer):
-    def __init__(self, config):
+    def __init__(self, config, debug=False):
         self.service = AIService(config)
+        self.server_debug = debug
+        if debug:
+            from rich.console import Console
+            from ..printer import connpy_theme, get_original_stdout
+            self.server_console = Console(theme=connpy_theme, file=get_original_stdout())
 
     @handle_errors
     def ask(self, request_iterator, context):
@@ -859,6 +864,16 @@ class AIServicer(connpy_pb2_grpc.AIServiceServicer):
 
                 # Send final chunk marker
                 chunk_queue.put(("final_mark", res))
+            except ValueError as e:
+                # Configuration or LLM provider connection errors are expected, only print in debug mode
+                if debug or getattr(self, "server_debug", False):
+                    from rich.console import Console
+                    from ..printer import connpy_theme, get_original_stdout
+                    c = getattr(self, "server_console", None) or Console(theme=connpy_theme, file=get_original_stdout())
+                    c.print(f"[debug][DEBUG][/debug] AI Task Error: {e}")
+                chunk_queue.put(("status", f"Error: {str(e)}"))
+                # Crucial: always send final_mark to avoid client deadlock
+                chunk_queue.put(("final_mark", {"response": f"Error: {str(e)}", "chat_history": history, "error": True}))
             except Exception as e:
                 import traceback
                 print(f"AI Task Error: {e}")
@@ -1058,7 +1073,7 @@ def serve(config, port=8048, debug=False):
     remote_plugin_pb2_grpc.add_RemotePluginServiceServicer_to_server(plugin_servicer, server)
     connpy_pb2_grpc.add_ExecutionServiceServicer_to_server(ExecutionServicer(config), server)
     connpy_pb2_grpc.add_ImportExportServiceServicer_to_server(ImportExportServicer(config), server)
-    connpy_pb2_grpc.add_AIServiceServicer_to_server(AIServicer(config), server)
+    connpy_pb2_grpc.add_AIServiceServicer_to_server(AIServicer(config, debug=debug), server)
     connpy_pb2_grpc.add_SystemServiceServicer_to_server(SystemServicer(config), server)
     
     server.add_insecure_port(f'[::]:{port}')
