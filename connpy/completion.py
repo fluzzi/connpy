@@ -105,6 +105,21 @@ def _get_plugins(which, defaultdir):
         return final_all_plugins
 
 
+def _get_users(configdir):
+    import yaml
+    registry_file = os.path.join(configdir, "users", "registry.yaml")
+    if not os.path.exists(registry_file):
+        return []
+    try:
+        with open(registry_file, "r") as f:
+            data = yaml.safe_load(f) or {}
+            if isinstance(data, dict) and "users" in data:
+                return list(data["users"].keys())
+    except Exception:
+        pass
+    return []
+
+
 def _build_tree(nodes, folders, profiles, plugins, configdir):
     """Build the declarative CLI navigation tree.
 
@@ -203,6 +218,19 @@ def _build_tree(nodes, folders, profiles, plugins, configdir):
     config_dict["--engineer-auth"] = {"__extra__": lambda w: get_cwd(w, "--engineer-auth"), "*": config_dict}
     config_dict["--architect-auth"] = {"__extra__": lambda w: get_cwd(w, "--architect-auth"), "*": config_dict}
 
+    _users = lambda w=None: _get_users(configdir)
+
+    user_dict = {
+        "--add": {"*": {"--path": {"__extra__": lambda w: get_cwd(w, "--path", True), "*": None}}},
+        "--del": {"__extra__": _users},
+        "--rm": {"__extra__": _users},
+        "--show": {"__extra__": _users},
+        "--regen-password": {"__extra__": _users},
+        "--list": None,
+        "--ls": None,
+        "--help": None, "-h": None
+    }
+
     mv_state = {"__extra__": _nodes, "--help": None, "-h": None}
     cp_state = {"__extra__": _nodes, "--help": None, "-h": None}
     ls_state = {
@@ -297,6 +325,9 @@ def _build_tree(nodes, folders, profiles, plugins, configdir):
             "--list": None, "--help": None,
             "-h": None,
         },
+        "user": user_dict,
+        "login": {"--help": None, "-h": None, "*": None},
+        "logout": {"--help": None, "-h": None},
         "config": config_dict,
         "sync": {
             "--login": None, "--logout": None,

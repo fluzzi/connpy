@@ -2535,3 +2535,118 @@ class SystemService(object):
             timeout,
             metadata,
             _registered_method=True)
+
+
+class AuthServiceStub(object):
+    """Missing associated documentation comment in .proto file."""
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.login = channel.unary_unary(
+                '/connpy.AuthService/login',
+                request_serializer=connpy__pb2.LoginRequest.SerializeToString,
+                response_deserializer=connpy__pb2.LoginResponse.FromString,
+                _registered_method=True)
+        self.change_password = channel.unary_unary(
+                '/connpy.AuthService/change_password',
+                request_serializer=connpy__pb2.ChangePasswordRequest.SerializeToString,
+                response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                _registered_method=True)
+
+
+class AuthServiceServicer(object):
+    """Missing associated documentation comment in .proto file."""
+
+    def login(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def change_password(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+
+def add_AuthServiceServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'login': grpc.unary_unary_rpc_method_handler(
+                    servicer.login,
+                    request_deserializer=connpy__pb2.LoginRequest.FromString,
+                    response_serializer=connpy__pb2.LoginResponse.SerializeToString,
+            ),
+            'change_password': grpc.unary_unary_rpc_method_handler(
+                    servicer.change_password,
+                    request_deserializer=connpy__pb2.ChangePasswordRequest.FromString,
+                    response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'connpy.AuthService', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers('connpy.AuthService', rpc_method_handlers)
+
+
+ # This class is part of an EXPERIMENTAL API.
+class AuthService(object):
+    """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def login(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/connpy.AuthService/login',
+            connpy__pb2.LoginRequest.SerializeToString,
+            connpy__pb2.LoginResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def change_password(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/connpy.AuthService/change_password',
+            connpy__pb2.ChangePasswordRequest.SerializeToString,
+            google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)

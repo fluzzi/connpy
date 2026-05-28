@@ -43,7 +43,8 @@ class configfile:
                               passwords.
         '''
 
-    def __init__(self, conf = None, key = None):
+    def __init__(self, conf = None, key = None, shared_config = None):
+        self._shared_config = shared_config
         ''' 
             
         ### Optional Parameters:  
@@ -147,6 +148,32 @@ class configfile:
         # Self-heal text caches if they are missing
         if not os.path.exists(self.fzf_cachefile) or not os.path.exists(self.folders_cachefile) or not os.path.exists(self.profiles_cachefile):
             self._generate_nodes_cache()
+
+
+    def get_effective_setting(self, key, default=None):
+        """Get config setting with shared fallback for inheritable keys."""
+        val = self.config.get(key)
+        if key == "ai":
+            if val is not None:
+                if self._shared_config:
+                    import copy
+                    # Deep merge: shared as base, user overrides
+                    base = copy.deepcopy(self._shared_config.config.get(key, {}))
+                    if isinstance(base, dict) and isinstance(val, dict):
+                        # Recursive update for inner dictionaries (like mcp_servers or model details)
+                        def deep_merge(d1, d2):
+                            for k, v in d2.items():
+                                if isinstance(v, dict) and k in d1 and isinstance(d1[k], dict):
+                                    deep_merge(d1[k], v)
+                                else:
+                                    d1[k] = copy.deepcopy(v)
+                        deep_merge(base, val)
+                        return base
+                return val
+            elif self._shared_config:
+                return self._shared_config.config.get(key, default)
+        
+        return val if val is not None else default
 
 
     def _validate_config(self, data):
@@ -489,7 +516,8 @@ class configfile:
             else:
                 printer.error("Filter must be a string or a list of strings")
                 sys.exit(1)
-            nodes = [item for item in nodes if any(re.search(pattern, item) for pattern in flat_filter)]
+            flags = re.IGNORECASE if not self.config.get("case", False) else 0
+            nodes = [item for item in nodes if any(re.search(pattern, item, flags) for pattern in flat_filter)]
         return nodes
 
     @MethodHook

@@ -141,4 +141,62 @@ class TestTreeCompletions:
         assert "stop" in loop_back_comp
 
 
+class TestUserCompletions:
+    def test_user_command_options(self):
+        from connpy.completion import _build_tree, resolve_completion
+        tree = _build_tree([], [], [], {}, "/tmp")
+        
+        # Test options at the "user" level
+        user_completions = resolve_completion(["user", ""], tree)
+        assert "--add" in user_completions
+        assert "--del" in user_completions
+        assert "--rm" in user_completions
+        assert "--show" in user_completions
+        assert "--regen-password" in user_completions
+        assert "--list" in user_completions
+        assert "--ls" in user_completions
+
+    def test_user_action_completed_users(self, tmp_path):
+        from connpy.completion import _build_tree, resolve_completion
+        import yaml
+        
+        # Create users directory and mock registry
+        users_dir = tmp_path / "users"
+        users_dir.mkdir()
+        registry_file = users_dir / "registry.yaml"
+        
+        registry_data = {
+            "users": {
+                "fluzzi": {"password_hash": "hash1"},
+                "john": {"password_hash": "hash2"}
+            }
+        }
+        with open(registry_file, "w") as f:
+            yaml.dump(registry_data, f)
+            
+        tree = _build_tree([], [], [], {}, str(tmp_path))
+        
+        # Resolve after --del, --rm, --show, --regen-password
+        for action in ["--del", "--rm", "--show", "--regen-password"]:
+            completions = resolve_completion(["user", action, ""], tree)
+            assert "fluzzi" in completions
+            assert "john" in completions
+            
+        # --add username completed options
+        add_completions = resolve_completion(["user", "--add", "newguy", ""], tree)
+        assert "--path" in add_completions
+
+    def test_login_logout_completions(self):
+        from connpy.completion import _build_tree, resolve_completion
+        tree = _build_tree([], [], [], {}, "/tmp")
+        
+        # Test login option resolution
+        login_completions = resolve_completion(["login", ""], tree)
+        assert "--help" in login_completions
+        
+        # Test logout option resolution
+        logout_completions = resolve_completion(["logout", ""], tree)
+        assert "--help" in logout_completions
+
+
 

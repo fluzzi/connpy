@@ -79,15 +79,16 @@ class connapp:
         self.debug_api = debug_api
         self.ai = ai
         
-        # Register context filtering hooks
-        self.services.context.config._getallnodes.register_post_hook(self.services.context.filter_node_list)
-        self.services.context.config._getallfolders.register_post_hook(self.services.context.filter_node_list)
-        self.services.context.config._getallnodesfull.register_post_hook(self.services.context.filter_node_dict)
-
-        if hasattr(self.services.nodes, "list_nodes") and hasattr(self.services.nodes.list_nodes, "register_post_hook"):
-            self.services.nodes.list_nodes.register_post_hook(self.services.context.filter_node_list)
-        if hasattr(self.services.nodes, "list_folders") and hasattr(self.services.nodes.list_folders, "register_post_hook"):
-            self.services.nodes.list_folders.register_post_hook(self.services.context.filter_node_list)
+        # Register context filtering hooks (only on Client CLI, bypass on gRPC Server)
+        is_api_server = len(sys.argv) > 1 and sys.argv[1] == "api"
+        if not is_api_server:
+            self.services.context.config._getallnodes.register_post_hook(self.services.context.filter_node_list)
+            self.services.context.config._getallfolders.register_post_hook(self.services.context.filter_node_list)
+            self.services.context.config._getallnodesfull.register_post_hook(self.services.context.filter_node_dict)
+            if hasattr(self.services.nodes, "list_nodes") and hasattr(self.services.nodes.list_nodes, "register_post_hook"):
+                self.services.nodes.list_nodes.register_post_hook(self.services.context.filter_node_list)
+            if hasattr(self.services.nodes, "list_folders") and hasattr(self.services.nodes.list_folders, "register_post_hook"):
+                self.services.nodes.list_folders.register_post_hook(self.services.context.filter_node_list)
 
         # Apply theme from config if exists before remote connection attempts
         user_theme = self.config.config.get("theme", {})
@@ -109,7 +110,10 @@ class connapp:
         except ConnpyError as e:
             # If in remote mode, connectivity issues should be reported
             if mode == "remote":
-                printer.warning(f"Failed to fetch data from remote server: {e}")
+                is_auth_cmd = len(sys.argv) > 1 and sys.argv[1] in ["login", "logout", "user"]
+                is_unauth = "unauthenticated" in str(e).lower() or "token" in str(e).lower()
+                if not (is_auth_cmd and is_unauth):
+                    printer.warning(f"Failed to fetch data from remote server: {e}")
             self.nodes_list = []
             self.folders = []
             self.profiles = []
@@ -135,6 +139,8 @@ class connapp:
         from .cli.context_handler import ContextHandler
         from .cli.import_export_handler import ImportExportHandler
         from .cli.sync_handler import SyncHandler
+        from .cli.user_handler import UserHandler
+        from .cli.login_handler import LoginHandler
         
         # Instantiate Handlers
         self._node = NodeHandler(self)
@@ -147,6 +153,8 @@ class connapp:
         self._context = ContextHandler(self)
         self._import_export = ImportExportHandler(self)
         self._sync = SyncHandler(self)
+        self._user = UserHandler(self)
+        self._login = LoginHandler(self)
 
         # Register auto-sync hook to trigger after config saves
         from .configfile import configfile
@@ -353,6 +361,30 @@ class connapp:
         configcrud.add_argument("--sync-remote", dest="sync_remote", nargs=1, action=self._store_type, help="Sync remote nodes to Google Drive", choices=["true","false"])
         configparser.add_argument("--trusted-commands", dest="trusted_commands", nargs=1, action=self._store_type, help="Set custom trusted commands regexes (comma separated)", metavar="REGEX,REGEX")
         configparser.set_defaults(func=self._config.dispatch)
+ 
+        #USERPARSER
+        userparser = subparsers.add_parser("user", help="Manage server users", description="Manage server users", formatter_class=RichHelpFormatter)
+        userparser.error = self._custom_error
+        usercrud = userparser.add_mutually_exclusive_group(required=True)
+        usercrud.add_argument("--add", nargs=1, dest="add", help="Add new user", metavar="USERNAME")
+        usercrud.add_argument("--del", "--rm", nargs=1, dest="delete", help="Delete user", metavar="USERNAME")
+        usercrud.add_argument("--list", "--ls", dest="list", action="store_true", help="List all users")
+        usercrud.add_argument("--show", nargs=1, dest="show", help="Show user details", metavar="USERNAME")
+        usercrud.add_argument("--regen-password", nargs=1, dest="regen_password", help="Regenerate user password", metavar="USERNAME")
+        
+        userparser.add_argument("--path", dest="path", nargs=1, help="Custom configuration path for user configuration (in Mode B)")
+        userparser.set_defaults(func=self._user.dispatch)
+
+        #LOGINPARSER
+        loginparser = subparsers.add_parser("login", help="Login to remote connpy server", description="Login to remote connpy server", formatter_class=RichHelpFormatter)
+        loginparser.error = self._custom_error
+        loginparser.add_argument("username", nargs='?', default=None, help="Username to authenticate")
+        loginparser.set_defaults(func=self._login.dispatch, action="login")
+
+        #LOGOUTPARSER
+        logoutparser = subparsers.add_parser("logout", help="Logout from remote connpy server", description="Logout from remote connpy server", formatter_class=RichHelpFormatter)
+        logoutparser.error = self._custom_error
+        logoutparser.set_defaults(func=self._login.dispatch, action="logout")
 
         #SYNCPARSER
         syncparser = subparsers.add_parser("sync", help="Sync config with Google Drive", description="Sync config with Google Drive", formatter_class=RichHelpFormatter)

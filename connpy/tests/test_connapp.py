@@ -165,9 +165,9 @@ def test_ai(mock_status, mock_ask, app):
 
 @patch("connpy.services.execution_service.ExecutionService.run_commands")
 def test_run(mock_run_commands, app):
-    app.start(["run", "node1", "command1", "command2"])
+    app.start(["run", "router1", "command1", "command2"])
     mock_run_commands.assert_called_once()
-    assert mock_run_commands.call_args[1]["nodes_filter"] == "node1"
+    assert mock_run_commands.call_args[1]["nodes_filter"] == ["router1"]
     assert mock_run_commands.call_args[1]["commands"] == ["command1 command2"]
 
 @patch("os.path.exists")

@@ -307,7 +307,10 @@ class AIService(BaseService):
 
     def list_mcp_servers(self) -> dict:
         """Get the configured MCP servers."""
-        ai_settings = self.config.config.get("ai", {})
+        if hasattr(self.config, "get_effective_setting"):
+            ai_settings = self.config.get_effective_setting("ai", {})
+        else:
+            ai_settings = self.config.config.get("ai", {}) if hasattr(self.config, "config") else {}
         return ai_settings.get("mcp_servers", {})
 
     def load_session_data(self, session_id):

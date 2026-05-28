@@ -48,7 +48,10 @@ class MCPClientManager:
 
         all_llm_tools = []
         try:
-            mcp_config = self.config.config.get("ai", {}).get("mcp_servers", {})
+            if hasattr(self.config, "get_effective_setting"):
+                mcp_config = self.config.get_effective_setting("ai", {}).get("mcp_servers", {})
+            else:
+                mcp_config = self.config.config.get("ai", {}).get("mcp_servers", {}) if hasattr(self.config, "config") else {}
         except Exception:
             return []
         

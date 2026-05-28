@@ -116,8 +116,11 @@ class ai:
         self.interrupted = False
 
         
-        # 1. Cargar configuración genérica
-        aiconfig = self.config.config.get("ai", {})
+        # 1. Cargar configuración genérica con herencia/merge global
+        if hasattr(self.config, "get_effective_setting"):
+            aiconfig = self.config.get_effective_setting("ai", {})
+        else:
+            aiconfig = self.config.config.get("ai", {}) if hasattr(self.config, "config") else {}
         
         # Modelos (Prioridad: Argumento -> Config -> Default)
         self.engineer_model = engineer_model or aiconfig.get("engineer_model") or "gemini/gemini-3.1-flash-lite"

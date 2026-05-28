@@ -4,6 +4,8 @@ from google.protobuf.empty_pb2 import Empty
 import os
 import ctypes
 import threading
+import contextvars
+import datetime
 
 # Suppress harmless but noisy gRPC fork() warnings from pexpect child processes
 os.environ["GRPC_VERBOSITY"] = "NONE"
@@ -14,15 +16,7 @@ from .utils import to_value, from_value, to_struct, from_struct
 from ..services.exceptions import ConnpyError
 from .. import printer
 
-# Import local services
-from ..services.node_service import NodeService
-from ..services.profile_service import ProfileService
-from ..services.config_service import ConfigService
-from ..services.plugin_service import PluginService
-from ..services.ai_service import AIService
-from ..services.system_service import SystemService
-from ..services.execution_service import ExecutionService
-from ..services.import_export_service import ImportExportService
+_current_user = contextvars.ContextVar("current_user", default=None)
 
 def handle_errors(func):
     import inspect
@@ -31,10 +25,16 @@ def handle_errors(func):
             try:
                 for item in func(*args, **kwargs):
                     yield item
+            except grpc.RpcError:
+                raise
             except ConnpyError as e:
                 context = kwargs.get("context") or args[-1]
                 context.abort(grpc.StatusCode.INTERNAL, str(e))
             except Exception as e:
+                if type(e) is Exception and not e.args:
+                    raise e
+                if e.__class__.__name__ in ("_AbortError", "RpcError"):
+                    raise e
                 context = kwargs.get("context") or args[-1]
                 context.abort(grpc.StatusCode.UNKNOWN, str(e))
             finally:
@@ -44,10 +44,16 @@ def handle_errors(func):
         def wrapper(*args, **kwargs):
             try:
                 return func(*args, **kwargs)
+            except grpc.RpcError:
+                raise
             except ConnpyError as e:
                 context = kwargs.get("context") or args[-1]
                 context.abort(grpc.StatusCode.INTERNAL, str(e))
             except Exception as e:
+                if type(e) is Exception and not e.args:
+                    raise e
+                if e.__class__.__name__ in ("_AbortError", "RpcError"):
+                    raise e
                 context = kwargs.get("context") or args[-1]
                 context.abort(grpc.StatusCode.UNKNOWN, str(e))
             finally:
@@ -55,13 +61,28 @@ def handle_errors(func):
         return wrapper
 
 class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
-    def __init__(self, config, debug=False):
-        self.service = NodeService(config)
+    def __init__(self, provider, registry=None, debug=False):
+        if not hasattr(provider, "mode"):
+            from connpy.services.provider import ServiceProvider
+            provider = ServiceProvider(provider, mode="local")
+        self._fallback_provider = provider
+        self._registry = registry
         self.server_debug = debug
         if debug:
             from rich.console import Console
             from ..printer import connpy_theme, get_original_stdout
             self.server_console = Console(theme=connpy_theme, file=get_original_stdout())
+
+    def _get_provider(self):
+        if self._registry:
+            username = _current_user.get()
+            if username:
+                return self._registry.get_provider(username)
+        return self._fallback_provider
+
+    @property
+    def service(self):
+        return self._get_provider().nodes
 
     @handle_errors
     def interact_node(self, request_iterator, context):
@@ -69,10 +90,16 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
         import os
         import asyncio
         from connpy.core import node
-        from ..services.profile_service import ProfileService
         from connpy.tunnels import RemoteStream
         import queue
         import threading
+
+        # Resolve provider once at the start of the RPC stream
+        provider = self._get_provider()
+        nodes_service = provider.nodes
+        profile_service = provider.profiles
+        ai_service = provider.ai
+        user_config = provider.config
 
         # Fetch first setup packet
         try:
@@ -100,9 +127,9 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
 
             if base_node_id:
                 # Look up the base node in config and use its full data
-                nodes = self.service.config._getallnodes(base_node_id)
+                nodes = user_config._getallnodes(base_node_id)
                 if nodes:
-                    device = self.service.config.getitem(nodes[0])
+                    device = user_config.getitem(nodes[0])
                     # Override device properties with any passed in params
                     for attr in valid_attrs:
                         if attr in params:
@@ -116,11 +143,11 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
                         device["tags"] = device_tags
 
                     node_name = params.get("name", base_node_id)
-                    n = node(node_name, **device, config=self.service.config)
+                    n = node(node_name, **device, config=user_config)
                 else:
                     # base_node not found, fall back to dynamic
                     node_name = params.get("name", fallback_id)
-                    n = node(node_name, host=params.get("host", ""), config=self.service.config)
+                    n = node(node_name, host=params.get("host", ""), config=user_config)
                     for attr in valid_attrs:
                         if attr in params:
                             setattr(n, attr, params[attr])
@@ -128,19 +155,18 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
                         n.tags = params["tags"]
             else:
                 node_name = params.get("name", fallback_id)
-                n = node(node_name, host=params.get("host", ""), config=self.service.config)
+                n = node(node_name, host=params.get("host", ""), config=user_config)
                 for attr in valid_attrs:
                     if attr in params:
                         setattr(n, attr, params[attr])
                 if "tags" in params:
                     n.tags = params["tags"]
         else:
-            node_data = self.service.config.getitem(unique_id, extract=False)
+            node_data = user_config.getitem(unique_id, extract=False)
             if not node_data:
                 context.abort(grpc.StatusCode.NOT_FOUND, f"Node {unique_id} not found")
-            profile_service = ProfileService(self.service.config)
             resolved_data = profile_service.resolve_node_data(node_data)
-            n = node(unique_id, **resolved_data, config=self.service.config)
+            n = node(unique_id, **resolved_data, config=user_config)
             if sftp:
                 n.protocol = "sftp"
 
@@ -207,9 +233,8 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
                     import json
                     import asyncio
                     import os
-                    from ..services.ai_service import AIService
                     
-                    service = AIService(self.service.config)
+                    service = ai_service
 
                     if node_info is None:
                         node_info = {}
@@ -479,10 +504,27 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
         )
 
 class ProfileServicer(connpy_pb2_grpc.ProfileServiceServicer):
-    def __init__(self, config):
-        self.service = ProfileService(config)
-        self.node_service = NodeService(config)
+    def __init__(self, provider, registry=None):
+        if not hasattr(provider, "mode"):
+            from connpy.services.provider import ServiceProvider
+            provider = ServiceProvider(provider, mode="local")
+        self._fallback_provider = provider
+        self._registry = registry
 
+    def _get_provider(self):
+        if self._registry:
+            username = _current_user.get()
+            if username:
+                return self._registry.get_provider(username)
+        return self._fallback_provider
+
+    @property
+    def service(self):
+        return self._get_provider().profiles
+
+    @property
+    def node_service(self):
+        return self._get_provider().nodes
 
     @handle_errors
     def list_profiles(self, request, context):
@@ -516,8 +558,23 @@ class ProfileServicer(connpy_pb2_grpc.ProfileServiceServicer):
         return Empty()
 
 class ConfigServicer(connpy_pb2_grpc.ConfigServiceServicer):
-    def __init__(self, config):
-        self.service = ConfigService(config)
+    def __init__(self, provider, registry=None):
+        if not hasattr(provider, "mode"):
+            from connpy.services.provider import ServiceProvider
+            provider = ServiceProvider(provider, mode="local")
+        self._fallback_provider = provider
+        self._registry = registry
+
+    def _get_provider(self):
+        if self._registry:
+            username = _current_user.get()
+            if username:
+                return self._registry.get_provider(username)
+        return self._fallback_provider
+
+    @property
+    def service(self):
+        return self._get_provider().config_svc
 
     @handle_errors
     def get_settings(self, request, context):
@@ -546,8 +603,23 @@ class ConfigServicer(connpy_pb2_grpc.ConfigServiceServicer):
         return connpy_pb2.StructResponse(data=to_struct(self.service.apply_theme_from_file(request.value)))
 
 class PluginServicer(connpy_pb2_grpc.PluginServiceServicer, remote_plugin_pb2_grpc.RemotePluginServiceServicer):
-    def __init__(self, config):
-        self.service = PluginService(config)
+    def __init__(self, provider, registry=None):
+        if not hasattr(provider, "mode"):
+            from connpy.services.provider import ServiceProvider
+            provider = ServiceProvider(provider, mode="local")
+        self._fallback_provider = provider
+        self._registry = registry
+
+    def _get_provider(self):
+        if self._registry:
+            username = _current_user.get()
+            if username:
+                return self._registry.get_provider(username)
+        return self._fallback_provider
+
+    @property
+    def service(self):
+        return self._get_provider().plugins
 
     @handle_errors
     def list_plugins(self, request, context):
@@ -589,8 +661,23 @@ class PluginServicer(connpy_pb2_grpc.PluginServiceServicer, remote_plugin_pb2_gr
             yield remote_plugin_pb2.OutputChunk(text=chunk)
 
 class ExecutionServicer(connpy_pb2_grpc.ExecutionServiceServicer):
-    def __init__(self, config):
-        self.service = ExecutionService(config)
+    def __init__(self, provider, registry=None):
+        if not hasattr(provider, "mode"):
+            from connpy.services.provider import ServiceProvider
+            provider = ServiceProvider(provider, mode="local")
+        self._fallback_provider = provider
+        self._registry = registry
+
+    def _get_provider(self):
+        if self._registry:
+            username = _current_user.get()
+            if username:
+                return self._registry.get_provider(username)
+        return self._fallback_provider
+
+    @property
+    def service(self):
+        return self._get_provider().execution
 
     @handle_errors
     def run_commands(self, request, context):
@@ -599,6 +686,11 @@ class ExecutionServicer(connpy_pb2_grpc.ExecutionServiceServicer):
         
         nodes_filter = request.nodes[0] if len(request.nodes) == 1 else list(request.nodes)
         
+        # Resolve provider in the main gRPC thread where _current_user ContextVar is set.
+        # threading.Thread does NOT inherit ContextVars, so self.service inside
+        # _worker() would fall back to the admin provider.
+        execution_service = self.service
+        
         q = queue.Queue()
         
         def _on_complete(unique, output, status):
@@ -606,7 +698,7 @@ class ExecutionServicer(connpy_pb2_grpc.ExecutionServiceServicer):
             
         def _worker():
             try:
-                self.service.run_commands(                    nodes_filter=nodes_filter,
+                execution_service.run_commands(                    nodes_filter=nodes_filter,
                     commands=list(request.commands),
                     folder=request.folder if request.folder else None,
                     prompt=request.prompt if request.prompt else None,
@@ -645,6 +737,9 @@ class ExecutionServicer(connpy_pb2_grpc.ExecutionServiceServicer):
         
         nodes_filter = request.nodes[0] if len(request.nodes) == 1 else list(request.nodes)
 
+        # Resolve provider in the main gRPC thread where _current_user ContextVar is set.
+        execution_service = self.service
+        
         q = queue.Queue()
         
         def _on_complete(unique, node_output, node_status, node_result):
@@ -652,7 +747,7 @@ class ExecutionServicer(connpy_pb2_grpc.ExecutionServiceServicer):
             
         def _worker():
             try:
-                self.service.test_commands(
+                execution_service.test_commands(
                     nodes_filter=nodes_filter,
                     commands=list(request.commands),
                     expected=list(request.expected),
@@ -698,9 +793,27 @@ class ExecutionServicer(connpy_pb2_grpc.ExecutionServiceServicer):
         return connpy_pb2.StructResponse(data=to_struct(res))
 
 class ImportExportServicer(connpy_pb2_grpc.ImportExportServiceServicer):
-    def __init__(self, config):
-        self.service = ImportExportService(config)
-        self.node_service = NodeService(config)
+    def __init__(self, provider, registry=None):
+        if not hasattr(provider, "mode"):
+            from connpy.services.provider import ServiceProvider
+            provider = ServiceProvider(provider, mode="local")
+        self._fallback_provider = provider
+        self._registry = registry
+
+    def _get_provider(self):
+        if self._registry:
+            username = _current_user.get()
+            if username:
+                return self._registry.get_provider(username)
+        return self._fallback_provider
+
+    @property
+    def service(self):
+        return self._get_provider().import_export
+
+    @property
+    def node_service(self):
+        return self._get_provider().nodes
 
     @handle_errors
     def export_to_file(self, request, context):
@@ -815,14 +928,30 @@ class StatusBridge:
         return default
 
 class AIServicer(connpy_pb2_grpc.AIServiceServicer):
-    def __init__(self, config):
-        self.service = AIService(config)
+    def __init__(self, provider, registry=None):
+        if not hasattr(provider, "mode"):
+            from connpy.services.provider import ServiceProvider
+            provider = ServiceProvider(provider, mode="local")
+        self._fallback_provider = provider
+        self._registry = registry
+
+    def _get_provider(self):
+        if self._registry:
+            username = _current_user.get()
+            if username:
+                return self._registry.get_provider(username)
+        return self._fallback_provider
+
+    @property
+    def service(self):
+        return self._get_provider().ai
 
     @handle_errors
     def ask(self, request_iterator, context):
         import queue
         import threading
 
+        ai_service = self.service
         chunk_queue = queue.Queue()
         request_queue = queue.Queue()
         bridge = None
@@ -840,7 +969,7 @@ class AIServicer(connpy_pb2_grpc.AIServiceServicer):
             nonlocal history, bridge, agent_instance
             try:
                 # Run the AI interaction (this blocks this specific thread)
-                res = self.service.ask(
+                res = ai_service.ask(
                     input_text,
                     chat_history=history if history else None,
                     session_id=session_id,
@@ -996,8 +1125,23 @@ class AIServicer(connpy_pb2_grpc.AIServiceServicer):
         return connpy_pb2.StructResponse(data=to_struct(self.service.load_session_data(request.value)))
 
 class SystemServicer(connpy_pb2_grpc.SystemServiceServicer):
-    def __init__(self, config):
-        self.service = SystemService(config)
+    def __init__(self, provider, registry=None):
+        if not hasattr(provider, "mode"):
+            from connpy.services.provider import ServiceProvider
+            provider = ServiceProvider(provider, mode="local")
+        self._fallback_provider = provider
+        self._registry = registry
+
+    def _get_provider(self):
+        if self._registry:
+            username = _current_user.get()
+            if username:
+                return self._registry.get_provider(username)
+        return self._fallback_provider
+
+    @property
+    def service(self):
+        return self._get_provider().system
 
     @handle_errors
     def start_api(self, request, context):
@@ -1023,6 +1167,138 @@ class SystemServicer(connpy_pb2_grpc.SystemServiceServicer):
     def get_api_status(self, request, context):
         return connpy_pb2.BoolResponse(value=self.service.get_api_status())
 
+class AuthServicer(connpy_pb2_grpc.AuthServiceServicer):
+    def __init__(self, registry):
+        self.registry = registry
+
+    @handle_errors
+    def login(self, request, context):
+        username = request.username
+        password = request.password
+        
+        if not self.registry.user_service.authenticate(username, password):
+            context.abort(grpc.StatusCode.UNAUTHENTICATED, "Invalid username or password")
+            
+        token = self.registry.user_service.generate_jwt(username)
+        expires_at = int((datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=8)).timestamp())
+        
+        return connpy_pb2.LoginResponse(
+            token=token,
+            username=username,
+            expires_at=expires_at
+        )
+
+    @handle_errors
+    def change_password(self, request, context):
+        username = _current_user.get()
+        if not username:
+            context.abort(grpc.StatusCode.UNAUTHENTICATED, "Authentication required")
+            
+        try:
+            self.registry.user_service.change_password(username, request.old_password, request.new_password)
+            self.registry.evict(username)
+        except ValueError as e:
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(e))
+            
+        return Empty()
+
+class AuthInterceptor(grpc.ServerInterceptor):
+    OPEN_METHODS = ["/connpy.AuthService/login"]
+
+    def __init__(self, registry):
+        self.registry = registry
+
+    def intercept_service(self, continuation, handler_call_details):
+        method = handler_call_details.method
+        if method in self.OPEN_METHODS:
+            return continuation(handler_call_details)
+
+        if not self.registry.has_users():
+            return continuation(handler_call_details)
+
+        token = self._extract_token(handler_call_details.invocation_metadata)
+        if not token:
+            return self._unauthenticated_handler(handler_call_details, "Authorization token is missing")
+
+        username = self.registry.user_service.verify_jwt(token)
+        if not username:
+            return self._unauthenticated_handler(handler_call_details, "Invalid or expired token")
+
+        handler = continuation(handler_call_details)
+        if handler is None:
+            return None
+
+        return self._wrap_handler(handler, username)
+
+    def _wrap_handler(self, handler, username):
+        if handler.unary_unary:
+            original_behavior = handler.unary_unary
+            def wrapper(request, context):
+                token = _current_user.set(username)
+                try:
+                    return original_behavior(request, context)
+                finally:
+                    _current_user.reset(token)
+            return grpc.unary_unary_rpc_method_handler(
+                wrapper,
+                request_deserializer=handler.request_deserializer,
+                response_serializer=handler.response_serializer,
+            )
+        elif handler.unary_stream:
+            original_behavior = handler.unary_stream
+            def wrapper(request, context):
+                token = _current_user.set(username)
+                try:
+                    for response in original_behavior(request, context):
+                        yield response
+                finally:
+                    _current_user.reset(token)
+            return grpc.unary_stream_rpc_method_handler(
+                wrapper,
+                request_deserializer=handler.request_deserializer,
+                response_serializer=handler.response_serializer,
+            )
+        elif handler.stream_unary:
+            original_behavior = handler.stream_unary
+            def wrapper(request_iterator, context):
+                token = _current_user.set(username)
+                try:
+                    return original_behavior(request_iterator, context)
+                finally:
+                    _current_user.reset(token)
+            return grpc.stream_unary_rpc_method_handler(
+                wrapper,
+                request_deserializer=handler.request_deserializer,
+                response_serializer=handler.response_serializer,
+            )
+        elif handler.stream_stream:
+            original_behavior = handler.stream_stream
+            def wrapper(request_iterator, context):
+                token = _current_user.set(username)
+                try:
+                    for response in original_behavior(request_iterator, context):
+                        yield response
+                finally:
+                    _current_user.reset(token)
+            return grpc.stream_stream_rpc_method_handler(
+                wrapper,
+                request_deserializer=handler.request_deserializer,
+                response_serializer=handler.response_serializer,
+            )
+        return handler
+
+    def _extract_token(self, metadata):
+        for key, value in metadata:
+            if key.lower() == "authorization":
+                if value.startswith("Bearer "):
+                    return value[7:]
+        return None
+
+    def _unauthenticated_handler(self, handler_call_details, message):
+        def abort_call(request_or_iterator, context):
+            context.abort(grpc.StatusCode.UNAUTHENTICATED, message)
+        return grpc.unary_unary_rpc_method_handler(abort_call)
+
 class LoggingInterceptor(grpc.ServerInterceptor):
     def __init__(self):
         from rich.console import Console
@@ -1047,19 +1323,30 @@ class LoggingInterceptor(grpc.ServerInterceptor):
         return result
 
 def serve(config, port=8048, debug=False):
-    interceptors = [LoggingInterceptor()] if debug else []
+    from connpy.grpc_layer.user_registry import UserRegistry
+    from connpy.services.provider import ServiceProvider
+
+    fallback_provider = ServiceProvider(config, mode="local")
+    registry = UserRegistry(config.defaultdir)
+
+    interceptors = []
+    if debug:
+        interceptors.append(LoggingInterceptor())
+    interceptors.append(AuthInterceptor(registry))
+    
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10), interceptors=interceptors)
     
-    connpy_pb2_grpc.add_NodeServiceServicer_to_server(NodeServicer(config, debug=debug), server)
-    connpy_pb2_grpc.add_ProfileServiceServicer_to_server(ProfileServicer(config), server)
-    connpy_pb2_grpc.add_ConfigServiceServicer_to_server(ConfigServicer(config), server)
-    plugin_servicer = PluginServicer(config)
+    connpy_pb2_grpc.add_NodeServiceServicer_to_server(NodeServicer(fallback_provider, registry=registry, debug=debug), server)
+    connpy_pb2_grpc.add_ProfileServiceServicer_to_server(ProfileServicer(fallback_provider, registry=registry), server)
+    connpy_pb2_grpc.add_ConfigServiceServicer_to_server(ConfigServicer(fallback_provider, registry=registry), server)
+    plugin_servicer = PluginServicer(fallback_provider, registry=registry)
     connpy_pb2_grpc.add_PluginServiceServicer_to_server(plugin_servicer, server)
     remote_plugin_pb2_grpc.add_RemotePluginServiceServicer_to_server(plugin_servicer, server)
-    connpy_pb2_grpc.add_ExecutionServiceServicer_to_server(ExecutionServicer(config), server)
-    connpy_pb2_grpc.add_ImportExportServiceServicer_to_server(ImportExportServicer(config), server)
-    connpy_pb2_grpc.add_AIServiceServicer_to_server(AIServicer(config), server)
-    connpy_pb2_grpc.add_SystemServiceServicer_to_server(SystemServicer(config), server)
+    connpy_pb2_grpc.add_ExecutionServiceServicer_to_server(ExecutionServicer(fallback_provider, registry=registry), server)
+    connpy_pb2_grpc.add_ImportExportServiceServicer_to_server(ImportExportServicer(fallback_provider, registry=registry), server)
+    connpy_pb2_grpc.add_AIServiceServicer_to_server(AIServicer(fallback_provider, registry=registry), server)
+    connpy_pb2_grpc.add_SystemServiceServicer_to_server(SystemServicer(fallback_provider, registry=registry), server)
+    connpy_pb2_grpc.add_AuthServiceServicer_to_server(AuthServicer(registry), server)
     
     server.add_insecure_port(f'[::]:{port}')
     server.start()

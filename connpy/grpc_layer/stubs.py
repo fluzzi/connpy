@@ -980,3 +980,78 @@ class SystemStub:
     @handle_errors
     def get_api_status(self):
         return self.stub.get_api_status(Empty()).value
+
+class _ClientCallDetails(object):
+    def __init__(self, method, timeout, metadata, credentials, wait_for_ready, compression=None):
+        self.method = method
+        self.timeout = timeout
+        self.metadata = metadata
+        self.credentials = credentials
+        self.wait_for_ready = wait_for_ready
+        self.compression = compression
+
+class AuthClientInterceptor(grpc.UnaryUnaryClientInterceptor,
+                            grpc.UnaryStreamClientInterceptor,
+                            grpc.StreamUnaryClientInterceptor,
+                            grpc.StreamStreamClientInterceptor):
+    def __init__(self, token_provider):
+        self.token_provider = token_provider
+
+    def _add_metadata(self, client_call_details):
+        token = self.token_provider()
+        if not token:
+            return client_call_details
+        
+        metadata = []
+        if client_call_details.metadata:
+            metadata = list(client_call_details.metadata)
+            
+        # Check if already present to avoid duplicates
+        if not any(k.lower() == "authorization" for k, v in metadata):
+            metadata.append(("authorization", f"Bearer {token}"))
+            
+        return _ClientCallDetails(
+            method=client_call_details.method,
+            timeout=client_call_details.timeout,
+            metadata=metadata,
+            credentials=client_call_details.credentials,
+            wait_for_ready=client_call_details.wait_for_ready,
+            compression=client_call_details.compression,
+        )
+
+    def intercept_unary_unary(self, continuation, client_call_details, request):
+        new_details = self._add_metadata(client_call_details)
+        return continuation(new_details, request)
+
+    def intercept_unary_stream(self, continuation, client_call_details, request):
+        new_details = self._add_metadata(client_call_details)
+        return continuation(new_details, request)
+
+    def intercept_stream_unary(self, continuation, client_call_details, request_iterator):
+        new_details = self._add_metadata(client_call_details)
+        return continuation(new_details, request_iterator)
+
+    def intercept_stream_stream(self, continuation, client_call_details, request_iterator):
+        new_details = self._add_metadata(client_call_details)
+        return continuation(new_details, request_iterator)
+
+
+class AuthStub:
+    def __init__(self, channel, remote_host):
+        self.stub = connpy_pb2_grpc.AuthServiceStub(channel)
+        self.remote_host = remote_host
+
+    @handle_errors
+    def login(self, username, password):
+        req = connpy_pb2.LoginRequest(username=username, password=password)
+        resp = self.stub.login(req)
+        return {
+            "token": resp.token,
+            "username": resp.username,
+            "expires_at": resp.expires_at
+        }
+
+    @handle_errors
+    def change_password(self, old_password, new_password):
+        req = connpy_pb2.ChangePasswordRequest(old_password=old_password, new_password=new_password)
+        self.stub.change_password(req)

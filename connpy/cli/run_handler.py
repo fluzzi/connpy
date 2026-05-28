@@ -20,6 +20,17 @@ class RunHandler:
 
     def node_run(self, args):
         nodes_filter = args.data[0]
+        
+        # Resolve and filter nodes through context-aware list_nodes
+        try:
+            matched_nodes = self.app.services.nodes.list_nodes(nodes_filter)
+        except Exception:
+            matched_nodes = []
+            
+        if not matched_nodes:
+            printer.error(f"No nodes found matching filter: {nodes_filter}")
+            sys.exit(2)
+            
         commands = [" ".join(args.data[1:])]
 
         try:
@@ -36,7 +47,7 @@ class RunHandler:
                     printer.test_panel(unique, node_output, node_status, node_result)
 
                 results = self.app.services.execution.test_commands(
-                    nodes_filter=nodes_filter,
+                    nodes_filter=matched_nodes,
                     commands=commands,
                     expected=args.test_expected,
                     on_node_complete=_on_node_complete
@@ -53,7 +64,7 @@ class RunHandler:
                     printer.node_panel(unique, node_output, node_status)
 
                 results = self.app.services.execution.run_commands(
-                    nodes_filter=nodes_filter,
+                    nodes_filter=matched_nodes,
                     commands=commands,
                     on_node_complete=_on_node_complete
                 )
@@ -102,6 +113,28 @@ class RunHandler:
         stdout = (output_cfg == "stdout")
         folder = output_cfg if output_cfg not in [None, "stdout"] else None
         prompt = options.get("prompt")
+
+        # Resolve and filter nodes through context-aware list_nodes
+        try:
+            if isinstance(nodelist, str):
+                resolved_nodes = self.app.services.nodes.list_nodes(nodelist)
+            elif isinstance(nodelist, list):
+                resolved_nodes = []
+                for item in nodelist:
+                    matches = self.app.services.nodes.list_nodes(item)
+                    for m in matches:
+                        if m not in resolved_nodes:
+                            resolved_nodes.append(m)
+            else:
+                resolved_nodes = []
+        except Exception:
+            resolved_nodes = []
+
+        if not resolved_nodes:
+            printer.error(f"[{name}] No nodes found matching filter: {nodelist}")
+            sys.exit(11)
+
+        nodelist = resolved_nodes
 
         try:
             header_printed = False
