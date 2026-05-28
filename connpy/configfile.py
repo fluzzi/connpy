@@ -160,6 +160,16 @@ class configfile:
                     # Deep merge: shared as base, user overrides
                     base = copy.deepcopy(self._shared_config.config.get(key, {}))
                     if isinstance(base, dict) and isinstance(val, dict):
+                        # Credential isolation:
+                        # If user defines engineer credentials, discard shared ones
+                        if "engineer_api_key" in val or "engineer_auth" in val:
+                            base.pop("engineer_api_key", None)
+                            base.pop("engineer_auth", None)
+                        # If user defines architect credentials, discard shared ones
+                        if "architect_api_key" in val or "architect_auth" in val:
+                            base.pop("architect_api_key", None)
+                            base.pop("architect_auth", None)
+                            
                         # Recursive update for inner dictionaries (like mcp_servers or model details)
                         def deep_merge(d1, d2):
                             for k, v in d2.items():

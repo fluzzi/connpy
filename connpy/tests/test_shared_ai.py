@@ -160,3 +160,58 @@ def test_registry_injection_and_hot_reload(temp_config_dir):
     ai_settings_updated = provider2.config.get_effective_setting("ai")
     assert ai_settings_updated.get("engineer_api_key") == "global-updated-key"
     assert ai_settings_updated.get("engineer_model") == "global-model"
+
+
+def test_shared_ai_credential_isolation(temp_config_dir):
+    """Test that setting user engineer/architect credentials discards corresponding shared credentials."""
+    shared_dir = os.path.join(temp_config_dir, "shared_isolation")
+    user_dir = os.path.join(temp_config_dir, "user_isolation")
+    os.makedirs(shared_dir, exist_ok=True)
+    os.makedirs(user_dir, exist_ok=True)
+    
+    shared_path = os.path.join(shared_dir, "config.yaml")
+    user_path = os.path.join(user_dir, "config.yaml")
+    
+    # Shared has both api_key and auth
+    shared_data = {
+        "config": {
+            "ai": {
+                "engineer_api_key": "global-initial-key",
+                "engineer_auth": {"vertex_project": "shared-project", "api_key": "shared-auth-key"},
+                "architect_api_key": "global-arch-key",
+                "architect_auth": {"project": "arch-project"}
+            }
+        },
+        "connections": {},
+        "profiles": {}
+    }
+    with open(shared_path, "w") as f:
+        yaml.safe_dump(shared_data, f)
+        
+    # User configures ONLY engineer_api_key (expects engineer_auth to be discarded)
+    # and ONLY architect_auth (expects architect_api_key to be discarded)
+    user_data = {
+        "config": {
+            "ai": {
+                "engineer_api_key": "user-custom-key",
+                "architect_auth": {"project": "user-project", "api_key": "user-auth-key"}
+            }
+        },
+        "connections": {},
+        "profiles": {}
+    }
+    with open(user_path, "w") as f:
+        yaml.safe_dump(user_data, f)
+
+    shared_config = configfile(conf=shared_path)
+    user_config = configfile(conf=user_path, shared_config=shared_config)
+    
+    effective_ai = user_config.get_effective_setting("ai")
+    
+    # 1. Engineer: local api_key is present, so shared engineer_auth must be completely discarded
+    assert effective_ai.get("engineer_api_key") == "user-custom-key"
+    assert "engineer_auth" not in effective_ai
+    
+    # 2. Architect: local auth is present, so shared architect_api_key must be completely discarded
+    assert effective_ai.get("architect_auth") == {"project": "user-project", "api_key": "user-auth-key"}
+    assert "architect_api_key" not in effective_ai
