@@ -7,15 +7,46 @@ from .exceptions import InvalidConfigurationError, NodeNotFoundError
 class PluginService(BaseService):
     """Business logic for enabling, disabling, and listing plugins."""
 
+    def _get_plugin_path(self, name, include_disabled=True):
+        """Resolves the physical path of a plugin by name. Priority: user, shared/global, core."""
+        import os
+        
+        # 1. User directory
+        user_dir = os.path.join(self.config.defaultdir, "plugins")
+        if os.path.exists(user_dir):
+            p_file = os.path.join(user_dir, f"{name}.py")
+            if os.path.exists(p_file):
+                return p_file, "user", True
+            if include_disabled:
+                bkp_file = os.path.join(user_dir, f"{name}.py.bkp")
+                if os.path.exists(bkp_file):
+                    return bkp_file, "user", False
+                    
+        # 2. Shared/Global directory
+        if hasattr(self.config, "_shared_config") and self.config._shared_config:
+            shared_dir = os.path.join(self.config._shared_config.defaultdir, "plugins")
+            if os.path.exists(shared_dir):
+                p_file = os.path.join(shared_dir, f"{name}.py")
+                if os.path.exists(p_file):
+                    return p_file, "shared", True
+                if include_disabled:
+                    bkp_file = os.path.join(shared_dir, f"{name}.py.bkp")
+                    if os.path.exists(bkp_file):
+                        return bkp_file, "shared", False
+                        
+        # 3. Core plugins
+        core_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "core_plugins")
+        p_file = os.path.join(core_dir, f"{name}.py")
+        if os.path.exists(p_file):
+            return p_file, "core", True
+            
+        return None, None, False
+
+
     def list_plugins(self):
         """List all core and user-defined plugins with their status and hash."""
         import os
         import hashlib
-        
-        # Check for user plugins directory
-        plugin_dir = os.path.join(self.config.defaultdir, "plugins")
-        # Check for core plugins directory
-        core_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "core_plugins")
         
         all_plugin_info = {}
 
@@ -26,18 +57,42 @@ class PluginService(BaseService):
             except Exception:
                 return ""
 
-        # User plugins
-        if os.path.exists(plugin_dir):
-            for f in os.listdir(plugin_dir):
+        # 1. Scan core plugins (lowest priority)
+        core_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "core_plugins")
+        if os.path.exists(core_dir):
+            for f in os.listdir(core_dir):
                 if f.endswith(".py"):
                     name = f[:-3]
-                    path = os.path.join(plugin_dir, f)
+                    path = os.path.join(core_dir, f)
+                    all_plugin_info[name] = {"enabled": True, "hash": get_hash(path)}
+
+        # 2. Scan shared plugins (medium priority)
+        if hasattr(self.config, "_shared_config") and self.config._shared_config:
+            shared_dir = os.path.join(self.config._shared_config.defaultdir, "plugins")
+            if os.path.exists(shared_dir):
+                for f in os.listdir(shared_dir):
+                    if f.endswith(".py"):
+                        name = f[:-3]
+                        path = os.path.join(shared_dir, f)
+                        all_plugin_info[name] = {"enabled": True, "hash": get_hash(path)}
+                    elif f.endswith(".py.bkp"):
+                        name = f[:-7]
+                        all_plugin_info[name] = {"enabled": False}
+
+        # 3. Scan user plugins (highest priority)
+        user_dir = os.path.join(self.config.defaultdir, "plugins")
+        if os.path.exists(user_dir):
+            for f in os.listdir(user_dir):
+                if f.endswith(".py"):
+                    name = f[:-3]
+                    path = os.path.join(user_dir, f)
                     all_plugin_info[name] = {"enabled": True, "hash": get_hash(path)}
                 elif f.endswith(".py.bkp"):
                     name = f[:-7]
                     all_plugin_info[name] = {"enabled": False}
 
         return all_plugin_info
+
 
     def add_plugin(self, name, source_file, update=False):
         """Add or update a plugin from a local file."""
@@ -119,6 +174,10 @@ class PluginService(BaseService):
                     raise InvalidConfigurationError(f"Failed to delete plugin file '{f}': {e}")
         
         if not deleted:
+            # If not deleted from user directory, check if it's in shared or core
+            path, origin, enabled = self._get_plugin_path(name, include_disabled=True)
+            if origin in ["shared", "core"]:
+                raise InvalidConfigurationError("Global and core plugins are read-only and cannot be deleted by users.")
             raise InvalidConfigurationError(f"Plugin '{name}' not found.")
 
     def enable_plugin(self, name):
@@ -127,17 +186,38 @@ class PluginService(BaseService):
         plugin_file = os.path.join(self.config.defaultdir, "plugins", f"{name}.py")
         disabled_file = f"{plugin_file}.bkp"
         
+        if os.path.exists(disabled_file):
+            # Check if it is a shadow bkp file (0 bytes shadowing shared/core)
+            is_shadow = False
+            if os.path.getsize(disabled_file) == 0:
+                # Resolve without the local bkp file to verify if shared/core has it
+                path, origin, enabled = self._get_plugin_path(name, include_disabled=False)
+                if origin in ["shared", "core"]:
+                    is_shadow = True
+            
+            if is_shadow:
+                # Remove shadow file to restore inheritance
+                try:
+                    os.remove(disabled_file)
+                    return True
+                except OSError as e:
+                    raise InvalidConfigurationError(f"Failed to remove shadow file '{disabled_file}': {e}")
+            else:
+                try:
+                    os.rename(disabled_file, plugin_file)
+                    return True
+                except OSError as e:
+                    raise InvalidConfigurationError(f"Failed to enable plugin '{name}': {e}")
+        
         if os.path.exists(plugin_file):
             return False # Already enabled
             
-        if not os.path.exists(disabled_file):
-            raise InvalidConfigurationError(f"Plugin '{name}' not found.")
+        # If it doesn't exist locally, check if it's already an active shared/core plugin
+        path, origin, enabled = self._get_plugin_path(name, include_disabled=False)
+        if origin in ["shared", "core"]:
+            return False # Already active/enabled through inheritance
             
-        try:
-            os.rename(disabled_file, plugin_file)
-            return True
-        except OSError as e:
-            raise InvalidConfigurationError(f"Failed to enable plugin '{name}': {e}")
+        raise InvalidConfigurationError(f"Plugin '{name}' not found.")
 
     def disable_plugin(self, name):
         """Deactivate a plugin by renaming it to a backup file."""
@@ -145,33 +225,41 @@ class PluginService(BaseService):
         plugin_file = os.path.join(self.config.defaultdir, "plugins", f"{name}.py")
         disabled_file = f"{plugin_file}.bkp"
         
+        if os.path.exists(plugin_file):
+            # Regular user-level plugin exists. Rename to bkp
+            try:
+                os.rename(plugin_file, disabled_file)
+                return True
+            except OSError as e:
+                raise InvalidConfigurationError(f"Failed to disable plugin '{name}': {e}")
+                
         if os.path.exists(disabled_file):
             return False # Already disabled
             
-        if not os.path.exists(plugin_file):
-            raise InvalidConfigurationError(f"Plugin '{name}' not found or is a core plugin.")
-            
-        try:
-            os.rename(plugin_file, disabled_file)
-            return True
-        except OSError as e:
-            raise InvalidConfigurationError(f"Failed to disable plugin '{name}': {e}")
+        # Check if it exists in shared or core
+        path, origin, enabled = self._get_plugin_path(name, include_disabled=False)
+        if origin in ["shared", "core"]:
+            # Shadow disable it by creating an empty .py.bkp in user plugins dir
+            plugin_dir = os.path.dirname(plugin_file)
+            os.makedirs(plugin_dir, exist_ok=True)
+            try:
+                with open(disabled_file, "w") as f:
+                    f.write("")
+                return True
+            except OSError as e:
+                raise InvalidConfigurationError(f"Failed to create shadow disable file: {e}")
+                
+        raise InvalidConfigurationError(f"Plugin '{name}' not found or is already disabled.")
 
     def get_plugin_source(self, name):
         import os
         from ..services.exceptions import InvalidConfigurationError
         
-        plugin_file = os.path.join(self.config.defaultdir, "plugins", f"{name}.py")
-        core_path = os.path.dirname(os.path.realpath(__file__)) + f"/../core_plugins/{name}.py"
-        
-        if os.path.exists(plugin_file):
-            target = plugin_file
-        elif os.path.exists(core_path):
-            target = core_path
-        else:
+        path, origin, enabled = self._get_plugin_path(name, include_disabled=False)
+        if not path:
             raise InvalidConfigurationError(f"Plugin '{name}' not found")
         
-        with open(target, "r") as f:
+        with open(path, "r") as f:
             return f.read()
 
     def invoke_plugin(self, name, args_dict):
@@ -211,17 +299,12 @@ class PluginService(BaseService):
         
         p_manager = Plugins()
         import os
-        plugin_file = os.path.join(self.config.defaultdir, "plugins", f"{name}.py")
-        core_path = os.path.dirname(os.path.realpath(__file__)) + f"/../core_plugins/{name}.py"
         
-        if os.path.exists(plugin_file):
-            target = plugin_file
-        elif os.path.exists(core_path):
-            target = core_path
-        else:
+        path, origin, enabled = self._get_plugin_path(name, include_disabled=False)
+        if not path:
             raise InvalidConfigurationError(f"Plugin '{name}' not found")
             
-        module = p_manager._import_from_path(target)
+        module = p_manager._import_from_path(path)
         parser = module.Parser().parser if hasattr(module, "Parser") else None
         
         if "__func_name__" in args_dict and hasattr(module, args_dict["__func_name__"]):

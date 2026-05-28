@@ -162,7 +162,11 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
                 if "tags" in params:
                     n.tags = params["tags"]
         else:
-            node_data = user_config.getitem(unique_id, extract=False)
+            try:
+                node_data = user_config.getitem(unique_id, extract=False)
+            except (KeyError, TypeError):
+                node_data = None
+                
             if not node_data:
                 context.abort(grpc.StatusCode.NOT_FOUND, f"Node {unique_id} not found")
             resolved_data = profile_service.resolve_node_data(node_data)
