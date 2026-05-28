@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.6">
+<meta name="generator" content="pdoc3 0.11.5">
 <title>connpy.services API documentation</title>
 <meta name="description" content="">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
@@ -89,6 +89,10 @@ el.replaceWith(d);
 <div class="desc"></div>
 </dd>
 <dt><code class="name"><a title="connpy.services.system_service" href="system_service.html">connpy.services.system_service</a></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt><code class="name"><a title="connpy.services.user_service" href="user_service.html">connpy.services.user_service</a></code></dt>
 <dd>
 <div class="desc"></div>
 </dd>
@@ -414,7 +418,10 @@ el.replaceWith(d);
 
     def list_mcp_servers(self) -&gt; dict:
         &#34;&#34;&#34;Get the configured MCP servers.&#34;&#34;&#34;
-        ai_settings = self.config.config.get(&#34;ai&#34;, {})
+        if hasattr(self.config, &#34;get_effective_setting&#34;):
+            ai_settings = self.config.get_effective_setting(&#34;ai&#34;, {})
+        else:
+            ai_settings = self.config.config.get(&#34;ai&#34;, {}) if hasattr(self.config, &#34;config&#34;) else {}
         return ai_settings.get(&#34;mcp_servers&#34;, {})
 
     def load_session_data(self, session_id):
@@ -724,7 +731,10 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def list_mcp_servers(self) -&gt; dict:
     &#34;&#34;&#34;Get the configured MCP servers.&#34;&#34;&#34;
-    ai_settings = self.config.config.get(&#34;ai&#34;, {})
+    if hasattr(self.config, &#34;get_effective_setting&#34;):
+        ai_settings = self.config.get_effective_setting(&#34;ai&#34;, {})
+    else:
+        ai_settings = self.config.config.get(&#34;ai&#34;, {}) if hasattr(self.config, &#34;config&#34;) else {}
     return ai_settings.get(&#34;mcp_servers&#34;, {})</code></pre>
 </details>
 <div class="desc"><p>Get the configured MCP servers.</p></div>
@@ -2008,7 +2018,7 @@ el.replaceWith(d);
             self.config._connections_add(**data)
             self.config._saveconfig(self.config.file)
 
-    def update_node(self, unique_id, data):
+    def update_node(self, unique_id, data, save=True):
         &#34;&#34;&#34;Explicitly update an existing node.&#34;&#34;&#34;
         all_nodes = self.config._getallnodes()
         if unique_id not in all_nodes:
@@ -2022,9 +2032,10 @@ el.replaceWith(d);
             
         # config._connections_add actually handles updates if ID exists correctly
         self.config._connections_add(**data)
-        self.config._saveconfig(self.config.file)
+        if save:
+            self.config._saveconfig(self.config.file)
 
-    def delete_node(self, unique_id, is_folder=False):
+    def delete_node(self, unique_id, is_folder=False, save=True):
         &#34;&#34;&#34;Logic for deleting a node or folder.&#34;&#34;&#34;
         if is_folder:
             uniques = self.config._explode_unique(unique_id)
@@ -2037,7 +2048,8 @@ el.replaceWith(d);
                 raise NodeNotFoundError(f&#34;Node &#39;{unique_id}&#39; not found or invalid.&#34;)
             self.config._connections_del(**uniques)
             
-        self.config._saveconfig(self.config.file)
+        if save:
+            self.config._saveconfig(self.config.file)
 
     def connect_node(self, unique_id, sftp=False, debug=False, logger=None):
         &#34;&#34;&#34;Interact with a node directly.&#34;&#34;&#34;
@@ -2267,14 +2279,14 @@ el.replaceWith(d);
 <div class="desc"><p>Interact with a node directly.</p></div>
 </dd>
 <dt id="connpy.services.NodeService.delete_node"><code class="name flex">
-<span>def <span class="ident">delete_node</span></span>(<span>self, unique_id, is_folder=False)</span>
+<span>def <span class="ident">delete_node</span></span>(<span>self, unique_id, is_folder=False, save=True)</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def delete_node(self, unique_id, is_folder=False):
+<pre><code class="python">def delete_node(self, unique_id, is_folder=False, save=True):
     &#34;&#34;&#34;Logic for deleting a node or folder.&#34;&#34;&#34;
     if is_folder:
         uniques = self.config._explode_unique(unique_id)
@@ -2287,7 +2299,8 @@ el.replaceWith(d);
             raise NodeNotFoundError(f&#34;Node &#39;{unique_id}&#39; not found or invalid.&#34;)
         self.config._connections_del(**uniques)
         
-    self.config._saveconfig(self.config.file)</code></pre>
+    if save:
+        self.config._saveconfig(self.config.file)</code></pre>
 </details>
 <div class="desc"><p>Logic for deleting a node or folder.</p></div>
 </dd>
@@ -2496,14 +2509,14 @@ el.replaceWith(d);
 <div class="desc"><p>Move or copy a node.</p></div>
 </dd>
 <dt id="connpy.services.NodeService.update_node"><code class="name flex">
-<span>def <span class="ident">update_node</span></span>(<span>self, unique_id, data)</span>
+<span>def <span class="ident">update_node</span></span>(<span>self, unique_id, data, save=True)</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def update_node(self, unique_id, data):
+<pre><code class="python">def update_node(self, unique_id, data, save=True):
     &#34;&#34;&#34;Explicitly update an existing node.&#34;&#34;&#34;
     all_nodes = self.config._getallnodes()
     if unique_id not in all_nodes:
@@ -2517,7 +2530,8 @@ el.replaceWith(d);
         
     # config._connections_add actually handles updates if ID exists correctly
     self.config._connections_add(**data)
-    self.config._saveconfig(self.config.file)</code></pre>
+    if save:
+        self.config._saveconfig(self.config.file)</code></pre>
 </details>
 <div class="desc"><p>Explicitly update an existing node.</p></div>
 </dd>
@@ -2568,15 +2582,46 @@ el.replaceWith(d);
 <pre><code class="python">class PluginService(BaseService):
     &#34;&#34;&#34;Business logic for enabling, disabling, and listing plugins.&#34;&#34;&#34;
 
+    def _get_plugin_path(self, name, include_disabled=True):
+        &#34;&#34;&#34;Resolves the physical path of a plugin by name. Priority: user, shared/global, core.&#34;&#34;&#34;
+        import os
+        
+        # 1. User directory
+        user_dir = os.path.join(self.config.defaultdir, &#34;plugins&#34;)
+        if os.path.exists(user_dir):
+            p_file = os.path.join(user_dir, f&#34;{name}.py&#34;)
+            if os.path.exists(p_file):
+                return p_file, &#34;user&#34;, True
+            if include_disabled:
+                bkp_file = os.path.join(user_dir, f&#34;{name}.py.bkp&#34;)
+                if os.path.exists(bkp_file):
+                    return bkp_file, &#34;user&#34;, False
+                    
+        # 2. Shared/Global directory
+        if hasattr(self.config, &#34;_shared_config&#34;) and self.config._shared_config:
+            shared_dir = os.path.join(self.config._shared_config.defaultdir, &#34;plugins&#34;)
+            if os.path.exists(shared_dir):
+                p_file = os.path.join(shared_dir, f&#34;{name}.py&#34;)
+                if os.path.exists(p_file):
+                    return p_file, &#34;shared&#34;, True
+                if include_disabled:
+                    bkp_file = os.path.join(shared_dir, f&#34;{name}.py.bkp&#34;)
+                    if os.path.exists(bkp_file):
+                        return bkp_file, &#34;shared&#34;, False
+                        
+        # 3. Core plugins
+        core_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), &#34;..&#34;, &#34;core_plugins&#34;)
+        p_file = os.path.join(core_dir, f&#34;{name}.py&#34;)
+        if os.path.exists(p_file):
+            return p_file, &#34;core&#34;, True
+            
+        return None, None, False
+
+
     def list_plugins(self):
         &#34;&#34;&#34;List all core and user-defined plugins with their status and hash.&#34;&#34;&#34;
         import os
         import hashlib
-        
-        # Check for user plugins directory
-        plugin_dir = os.path.join(self.config.defaultdir, &#34;plugins&#34;)
-        # Check for core plugins directory
-        core_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), &#34;..&#34;, &#34;core_plugins&#34;)
         
         all_plugin_info = {}
 
@@ -2587,18 +2632,42 @@ el.replaceWith(d);
             except Exception:
                 return &#34;&#34;
 
-        # User plugins
-        if os.path.exists(plugin_dir):
-            for f in os.listdir(plugin_dir):
+        # 1. Scan core plugins (lowest priority)
+        core_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), &#34;..&#34;, &#34;core_plugins&#34;)
+        if os.path.exists(core_dir):
+            for f in os.listdir(core_dir):
                 if f.endswith(&#34;.py&#34;):
                     name = f[:-3]
-                    path = os.path.join(plugin_dir, f)
+                    path = os.path.join(core_dir, f)
+                    all_plugin_info[name] = {&#34;enabled&#34;: True, &#34;hash&#34;: get_hash(path)}
+
+        # 2. Scan shared plugins (medium priority)
+        if hasattr(self.config, &#34;_shared_config&#34;) and self.config._shared_config:
+            shared_dir = os.path.join(self.config._shared_config.defaultdir, &#34;plugins&#34;)
+            if os.path.exists(shared_dir):
+                for f in os.listdir(shared_dir):
+                    if f.endswith(&#34;.py&#34;):
+                        name = f[:-3]
+                        path = os.path.join(shared_dir, f)
+                        all_plugin_info[name] = {&#34;enabled&#34;: True, &#34;hash&#34;: get_hash(path)}
+                    elif f.endswith(&#34;.py.bkp&#34;):
+                        name = f[:-7]
+                        all_plugin_info[name] = {&#34;enabled&#34;: False}
+
+        # 3. Scan user plugins (highest priority)
+        user_dir = os.path.join(self.config.defaultdir, &#34;plugins&#34;)
+        if os.path.exists(user_dir):
+            for f in os.listdir(user_dir):
+                if f.endswith(&#34;.py&#34;):
+                    name = f[:-3]
+                    path = os.path.join(user_dir, f)
                     all_plugin_info[name] = {&#34;enabled&#34;: True, &#34;hash&#34;: get_hash(path)}
                 elif f.endswith(&#34;.py.bkp&#34;):
                     name = f[:-7]
                     all_plugin_info[name] = {&#34;enabled&#34;: False}
 
         return all_plugin_info
+
 
     def add_plugin(self, name, source_file, update=False):
         &#34;&#34;&#34;Add or update a plugin from a local file.&#34;&#34;&#34;
@@ -2680,6 +2749,10 @@ el.replaceWith(d);
                     raise InvalidConfigurationError(f&#34;Failed to delete plugin file &#39;{f}&#39;: {e}&#34;)
         
         if not deleted:
+            # If not deleted from user directory, check if it&#39;s in shared or core
+            path, origin, enabled = self._get_plugin_path(name, include_disabled=True)
+            if origin in [&#34;shared&#34;, &#34;core&#34;]:
+                raise InvalidConfigurationError(&#34;Global and core plugins are read-only and cannot be deleted by users.&#34;)
             raise InvalidConfigurationError(f&#34;Plugin &#39;{name}&#39; not found.&#34;)
 
     def enable_plugin(self, name):
@@ -2688,17 +2761,38 @@ el.replaceWith(d);
         plugin_file = os.path.join(self.config.defaultdir, &#34;plugins&#34;, f&#34;{name}.py&#34;)
         disabled_file = f&#34;{plugin_file}.bkp&#34;
         
+        if os.path.exists(disabled_file):
+            # Check if it is a shadow bkp file (0 bytes shadowing shared/core)
+            is_shadow = False
+            if os.path.getsize(disabled_file) == 0:
+                # Resolve without the local bkp file to verify if shared/core has it
+                path, origin, enabled = self._get_plugin_path(name, include_disabled=False)
+                if origin in [&#34;shared&#34;, &#34;core&#34;]:
+                    is_shadow = True
+            
+            if is_shadow:
+                # Remove shadow file to restore inheritance
+                try:
+                    os.remove(disabled_file)
+                    return True
+                except OSError as e:
+                    raise InvalidConfigurationError(f&#34;Failed to remove shadow file &#39;{disabled_file}&#39;: {e}&#34;)
+            else:
+                try:
+                    os.rename(disabled_file, plugin_file)
+                    return True
+                except OSError as e:
+                    raise InvalidConfigurationError(f&#34;Failed to enable plugin &#39;{name}&#39;: {e}&#34;)
+        
         if os.path.exists(plugin_file):
             return False # Already enabled
             
-        if not os.path.exists(disabled_file):
-            raise InvalidConfigurationError(f&#34;Plugin &#39;{name}&#39; not found.&#34;)
+        # If it doesn&#39;t exist locally, check if it&#39;s already an active shared/core plugin
+        path, origin, enabled = self._get_plugin_path(name, include_disabled=False)
+        if origin in [&#34;shared&#34;, &#34;core&#34;]:
+            return False # Already active/enabled through inheritance
             
-        try:
-            os.rename(disabled_file, plugin_file)
-            return True
-        except OSError as e:
-            raise InvalidConfigurationError(f&#34;Failed to enable plugin &#39;{name}&#39;: {e}&#34;)
+        raise InvalidConfigurationError(f&#34;Plugin &#39;{name}&#39; not found.&#34;)
 
     def disable_plugin(self, name):
         &#34;&#34;&#34;Deactivate a plugin by renaming it to a backup file.&#34;&#34;&#34;
@@ -2706,33 +2800,41 @@ el.replaceWith(d);
         plugin_file = os.path.join(self.config.defaultdir, &#34;plugins&#34;, f&#34;{name}.py&#34;)
         disabled_file = f&#34;{plugin_file}.bkp&#34;
         
+        if os.path.exists(plugin_file):
+            # Regular user-level plugin exists. Rename to bkp
+            try:
+                os.rename(plugin_file, disabled_file)
+                return True
+            except OSError as e:
+                raise InvalidConfigurationError(f&#34;Failed to disable plugin &#39;{name}&#39;: {e}&#34;)
+                
         if os.path.exists(disabled_file):
             return False # Already disabled
             
-        if not os.path.exists(plugin_file):
-            raise InvalidConfigurationError(f&#34;Plugin &#39;{name}&#39; not found or is a core plugin.&#34;)
-            
-        try:
-            os.rename(plugin_file, disabled_file)
-            return True
-        except OSError as e:
-            raise InvalidConfigurationError(f&#34;Failed to disable plugin &#39;{name}&#39;: {e}&#34;)
+        # Check if it exists in shared or core
+        path, origin, enabled = self._get_plugin_path(name, include_disabled=False)
+        if origin in [&#34;shared&#34;, &#34;core&#34;]:
+            # Shadow disable it by creating an empty .py.bkp in user plugins dir
+            plugin_dir = os.path.dirname(plugin_file)
+            os.makedirs(plugin_dir, exist_ok=True)
+            try:
+                with open(disabled_file, &#34;w&#34;) as f:
+                    f.write(&#34;&#34;)
+                return True
+            except OSError as e:
+                raise InvalidConfigurationError(f&#34;Failed to create shadow disable file: {e}&#34;)
+                
+        raise InvalidConfigurationError(f&#34;Plugin &#39;{name}&#39; not found or is already disabled.&#34;)
 
     def get_plugin_source(self, name):
         import os
         from ..services.exceptions import InvalidConfigurationError
         
-        plugin_file = os.path.join(self.config.defaultdir, &#34;plugins&#34;, f&#34;{name}.py&#34;)
-        core_path = os.path.dirname(os.path.realpath(__file__)) + f&#34;/../core_plugins/{name}.py&#34;
-        
-        if os.path.exists(plugin_file):
-            target = plugin_file
-        elif os.path.exists(core_path):
-            target = core_path
-        else:
+        path, origin, enabled = self._get_plugin_path(name, include_disabled=False)
+        if not path:
             raise InvalidConfigurationError(f&#34;Plugin &#39;{name}&#39; not found&#34;)
         
-        with open(target, &#34;r&#34;) as f:
+        with open(path, &#34;r&#34;) as f:
             return f.read()
 
     def invoke_plugin(self, name, args_dict):
@@ -2772,17 +2874,12 @@ el.replaceWith(d);
         
         p_manager = Plugins()
         import os
-        plugin_file = os.path.join(self.config.defaultdir, &#34;plugins&#34;, f&#34;{name}.py&#34;)
-        core_path = os.path.dirname(os.path.realpath(__file__)) + f&#34;/../core_plugins/{name}.py&#34;
         
-        if os.path.exists(plugin_file):
-            target = plugin_file
-        elif os.path.exists(core_path):
-            target = core_path
-        else:
+        path, origin, enabled = self._get_plugin_path(name, include_disabled=False)
+        if not path:
             raise InvalidConfigurationError(f&#34;Plugin &#39;{name}&#39; not found&#34;)
             
-        module = p_manager._import_from_path(target)
+        module = p_manager._import_from_path(path)
         parser = module.Parser().parser if hasattr(module, &#34;Parser&#34;) else None
         
         if &#34;__func_name__&#34; in args_dict and hasattr(module, args_dict[&#34;__func_name__&#34;]):
@@ -2935,6 +3032,10 @@ el.replaceWith(d);
                 raise InvalidConfigurationError(f&#34;Failed to delete plugin file &#39;{f}&#39;: {e}&#34;)
     
     if not deleted:
+        # If not deleted from user directory, check if it&#39;s in shared or core
+        path, origin, enabled = self._get_plugin_path(name, include_disabled=True)
+        if origin in [&#34;shared&#34;, &#34;core&#34;]:
+            raise InvalidConfigurationError(&#34;Global and core plugins are read-only and cannot be deleted by users.&#34;)
         raise InvalidConfigurationError(f&#34;Plugin &#39;{name}&#39; not found.&#34;)</code></pre>
 </details>
 <div class="desc"><p>Remove a plugin file permanently.</p></div>
@@ -2953,17 +3054,31 @@ el.replaceWith(d);
     plugin_file = os.path.join(self.config.defaultdir, &#34;plugins&#34;, f&#34;{name}.py&#34;)
     disabled_file = f&#34;{plugin_file}.bkp&#34;
     
+    if os.path.exists(plugin_file):
+        # Regular user-level plugin exists. Rename to bkp
+        try:
+            os.rename(plugin_file, disabled_file)
+            return True
+        except OSError as e:
+            raise InvalidConfigurationError(f&#34;Failed to disable plugin &#39;{name}&#39;: {e}&#34;)
+            
     if os.path.exists(disabled_file):
         return False # Already disabled
         
-    if not os.path.exists(plugin_file):
-        raise InvalidConfigurationError(f&#34;Plugin &#39;{name}&#39; not found or is a core plugin.&#34;)
-        
-    try:
-        os.rename(plugin_file, disabled_file)
-        return True
-    except OSError as e:
-        raise InvalidConfigurationError(f&#34;Failed to disable plugin &#39;{name}&#39;: {e}&#34;)</code></pre>
+    # Check if it exists in shared or core
+    path, origin, enabled = self._get_plugin_path(name, include_disabled=False)
+    if origin in [&#34;shared&#34;, &#34;core&#34;]:
+        # Shadow disable it by creating an empty .py.bkp in user plugins dir
+        plugin_dir = os.path.dirname(plugin_file)
+        os.makedirs(plugin_dir, exist_ok=True)
+        try:
+            with open(disabled_file, &#34;w&#34;) as f:
+                f.write(&#34;&#34;)
+            return True
+        except OSError as e:
+            raise InvalidConfigurationError(f&#34;Failed to create shadow disable file: {e}&#34;)
+            
+    raise InvalidConfigurationError(f&#34;Plugin &#39;{name}&#39; not found or is already disabled.&#34;)</code></pre>
 </details>
 <div class="desc"><p>Deactivate a plugin by renaming it to a backup file.</p></div>
 </dd>
@@ -2981,17 +3096,38 @@ el.replaceWith(d);
     plugin_file = os.path.join(self.config.defaultdir, &#34;plugins&#34;, f&#34;{name}.py&#34;)
     disabled_file = f&#34;{plugin_file}.bkp&#34;
     
+    if os.path.exists(disabled_file):
+        # Check if it is a shadow bkp file (0 bytes shadowing shared/core)
+        is_shadow = False
+        if os.path.getsize(disabled_file) == 0:
+            # Resolve without the local bkp file to verify if shared/core has it
+            path, origin, enabled = self._get_plugin_path(name, include_disabled=False)
+            if origin in [&#34;shared&#34;, &#34;core&#34;]:
+                is_shadow = True
+        
+        if is_shadow:
+            # Remove shadow file to restore inheritance
+            try:
+                os.remove(disabled_file)
+                return True
+            except OSError as e:
+                raise InvalidConfigurationError(f&#34;Failed to remove shadow file &#39;{disabled_file}&#39;: {e}&#34;)
+        else:
+            try:
+                os.rename(disabled_file, plugin_file)
+                return True
+            except OSError as e:
+                raise InvalidConfigurationError(f&#34;Failed to enable plugin &#39;{name}&#39;: {e}&#34;)
+    
     if os.path.exists(plugin_file):
         return False # Already enabled
         
-    if not os.path.exists(disabled_file):
-        raise InvalidConfigurationError(f&#34;Plugin &#39;{name}&#39; not found.&#34;)
+    # If it doesn&#39;t exist locally, check if it&#39;s already an active shared/core plugin
+    path, origin, enabled = self._get_plugin_path(name, include_disabled=False)
+    if origin in [&#34;shared&#34;, &#34;core&#34;]:
+        return False # Already active/enabled through inheritance
         
-    try:
-        os.rename(disabled_file, plugin_file)
-        return True
-    except OSError as e:
-        raise InvalidConfigurationError(f&#34;Failed to enable plugin &#39;{name}&#39;: {e}&#34;)</code></pre>
+    raise InvalidConfigurationError(f&#34;Plugin &#39;{name}&#39; not found.&#34;)</code></pre>
 </details>
 <div class="desc"><p>Activate a plugin by renaming its backup file.</p></div>
 </dd>
@@ -3007,17 +3143,11 @@ el.replaceWith(d);
     import os
     from ..services.exceptions import InvalidConfigurationError
     
-    plugin_file = os.path.join(self.config.defaultdir, &#34;plugins&#34;, f&#34;{name}.py&#34;)
-    core_path = os.path.dirname(os.path.realpath(__file__)) + f&#34;/../core_plugins/{name}.py&#34;
-    
-    if os.path.exists(plugin_file):
-        target = plugin_file
-    elif os.path.exists(core_path):
-        target = core_path
-    else:
+    path, origin, enabled = self._get_plugin_path(name, include_disabled=False)
+    if not path:
         raise InvalidConfigurationError(f&#34;Plugin &#39;{name}&#39; not found&#34;)
     
-    with open(target, &#34;r&#34;) as f:
+    with open(path, &#34;r&#34;) as f:
         return f.read()</code></pre>
 </details>
 <div class="desc"></div>
@@ -3067,17 +3197,12 @@ el.replaceWith(d);
     
     p_manager = Plugins()
     import os
-    plugin_file = os.path.join(self.config.defaultdir, &#34;plugins&#34;, f&#34;{name}.py&#34;)
-    core_path = os.path.dirname(os.path.realpath(__file__)) + f&#34;/../core_plugins/{name}.py&#34;
     
-    if os.path.exists(plugin_file):
-        target = plugin_file
-    elif os.path.exists(core_path):
-        target = core_path
-    else:
+    path, origin, enabled = self._get_plugin_path(name, include_disabled=False)
+    if not path:
         raise InvalidConfigurationError(f&#34;Plugin &#39;{name}&#39; not found&#34;)
         
-    module = p_manager._import_from_path(target)
+    module = p_manager._import_from_path(path)
     parser = module.Parser().parser if hasattr(module, &#34;Parser&#34;) else None
     
     if &#34;__func_name__&#34; in args_dict and hasattr(module, args_dict[&#34;__func_name__&#34;]):
@@ -3146,11 +3271,6 @@ el.replaceWith(d);
     import os
     import hashlib
     
-    # Check for user plugins directory
-    plugin_dir = os.path.join(self.config.defaultdir, &#34;plugins&#34;)
-    # Check for core plugins directory
-    core_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), &#34;..&#34;, &#34;core_plugins&#34;)
-    
     all_plugin_info = {}
 
     def get_hash(path):
@@ -3160,12 +3280,35 @@ el.replaceWith(d);
         except Exception:
             return &#34;&#34;
 
-    # User plugins
-    if os.path.exists(plugin_dir):
-        for f in os.listdir(plugin_dir):
+    # 1. Scan core plugins (lowest priority)
+    core_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), &#34;..&#34;, &#34;core_plugins&#34;)
+    if os.path.exists(core_dir):
+        for f in os.listdir(core_dir):
             if f.endswith(&#34;.py&#34;):
                 name = f[:-3]
-                path = os.path.join(plugin_dir, f)
+                path = os.path.join(core_dir, f)
+                all_plugin_info[name] = {&#34;enabled&#34;: True, &#34;hash&#34;: get_hash(path)}
+
+    # 2. Scan shared plugins (medium priority)
+    if hasattr(self.config, &#34;_shared_config&#34;) and self.config._shared_config:
+        shared_dir = os.path.join(self.config._shared_config.defaultdir, &#34;plugins&#34;)
+        if os.path.exists(shared_dir):
+            for f in os.listdir(shared_dir):
+                if f.endswith(&#34;.py&#34;):
+                    name = f[:-3]
+                    path = os.path.join(shared_dir, f)
+                    all_plugin_info[name] = {&#34;enabled&#34;: True, &#34;hash&#34;: get_hash(path)}
+                elif f.endswith(&#34;.py.bkp&#34;):
+                    name = f[:-7]
+                    all_plugin_info[name] = {&#34;enabled&#34;: False}
+
+    # 3. Scan user plugins (highest priority)
+    user_dir = os.path.join(self.config.defaultdir, &#34;plugins&#34;)
+    if os.path.exists(user_dir):
+        for f in os.listdir(user_dir):
+            if f.endswith(&#34;.py&#34;):
+                name = f[:-3]
+                path = os.path.join(user_dir, f)
                 all_plugin_info[name] = {&#34;enabled&#34;: True, &#34;hash&#34;: get_hash(path)}
             elif f.endswith(&#34;.py.bkp&#34;):
                 name = f[:-7]
@@ -3854,6 +3997,7 @@ el.replaceWith(d);
 <li><code><a title="connpy.services.provider" href="provider.html">connpy.services.provider</a></code></li>
 <li><code><a title="connpy.services.sync_service" href="sync_service.html">connpy.services.sync_service</a></code></li>
 <li><code><a title="connpy.services.system_service" href="system_service.html">connpy.services.system_service</a></code></li>
+<li><code><a title="connpy.services.user_service" href="user_service.html">connpy.services.user_service</a></code></li>
 </ul>
 </li>
 <li><h3><a href="#header-classes">Classes</a></h3>
@@ -3984,7 +4128,7 @@ el.replaceWith(d);
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
 </footer>
 </body>
 </html>

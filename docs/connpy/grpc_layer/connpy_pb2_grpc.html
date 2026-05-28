@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.6">
+<meta name="generator" content="pdoc3 0.11.5">
 <title>connpy.grpc_layer.connpy_pb2_grpc API documentation</title>
 <meta name="description" content="Client and server classes corresponding to protobuf-defined services.">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
@@ -105,6 +105,34 @@ el.replaceWith(d);
             &#39;connpy.AIService&#39;, rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
     server.add_registered_method_handlers(&#39;connpy.AIService&#39;, rpc_method_handlers)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.connpy_pb2_grpc.add_AuthServiceServicer_to_server"><code class="name flex">
+<span>def <span class="ident">add_AuthServiceServicer_to_server</span></span>(<span>servicer, server)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def add_AuthServiceServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            &#39;login&#39;: grpc.unary_unary_rpc_method_handler(
+                    servicer.login,
+                    request_deserializer=connpy__pb2.LoginRequest.FromString,
+                    response_serializer=connpy__pb2.LoginResponse.SerializeToString,
+            ),
+            &#39;change_password&#39;: grpc.unary_unary_rpc_method_handler(
+                    servicer.change_password,
+                    request_deserializer=connpy__pb2.ChangePasswordRequest.FromString,
+                    response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            &#39;connpy.AuthService&#39;, rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers(&#39;connpy.AuthService&#39;, rpc_method_handlers)</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -1331,6 +1359,251 @@ def load_session_data(request,
                 &#39;/connpy.AIService/load_session_data&#39;,
                 request_serializer=connpy__pb2.StringRequest.SerializeToString,
                 response_deserializer=connpy__pb2.StructResponse.FromString,
+                _registered_method=True)</code></pre>
+</details>
+<div class="desc"><p>Missing associated documentation comment in .proto file.</p>
+<p>Constructor.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>channel</code></strong></dt>
+<dd>A grpc.Channel.</dd>
+</dl></div>
+</dd>
+<dt id="connpy.grpc_layer.connpy_pb2_grpc.AuthService"><code class="flex name class">
+<span>class <span class="ident">AuthService</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class AuthService(object):
+    &#34;&#34;&#34;Missing associated documentation comment in .proto file.&#34;&#34;&#34;
+
+    @staticmethod
+    def login(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            &#39;/connpy.AuthService/login&#39;,
+            connpy__pb2.LoginRequest.SerializeToString,
+            connpy__pb2.LoginResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def change_password(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            &#39;/connpy.AuthService/change_password&#39;,
+            connpy__pb2.ChangePasswordRequest.SerializeToString,
+            google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)</code></pre>
+</details>
+<div class="desc"><p>Missing associated documentation comment in .proto file.</p></div>
+<h3>Static methods</h3>
+<dl>
+<dt id="connpy.grpc_layer.connpy_pb2_grpc.AuthService.change_password"><code class="name flex">
+<span>def <span class="ident">change_password</span></span>(<span>request,<br>target,<br>options=(),<br>channel_credentials=None,<br>call_credentials=None,<br>insecure=False,<br>compression=None,<br>wait_for_ready=None,<br>timeout=None,<br>metadata=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@staticmethod
+def change_password(request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None):
+    return grpc.experimental.unary_unary(
+        request,
+        target,
+        &#39;/connpy.AuthService/change_password&#39;,
+        connpy__pb2.ChangePasswordRequest.SerializeToString,
+        google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+        options,
+        channel_credentials,
+        insecure,
+        call_credentials,
+        compression,
+        wait_for_ready,
+        timeout,
+        metadata,
+        _registered_method=True)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.connpy_pb2_grpc.AuthService.login"><code class="name flex">
+<span>def <span class="ident">login</span></span>(<span>request,<br>target,<br>options=(),<br>channel_credentials=None,<br>call_credentials=None,<br>insecure=False,<br>compression=None,<br>wait_for_ready=None,<br>timeout=None,<br>metadata=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@staticmethod
+def login(request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None):
+    return grpc.experimental.unary_unary(
+        request,
+        target,
+        &#39;/connpy.AuthService/login&#39;,
+        connpy__pb2.LoginRequest.SerializeToString,
+        connpy__pb2.LoginResponse.FromString,
+        options,
+        channel_credentials,
+        insecure,
+        call_credentials,
+        compression,
+        wait_for_ready,
+        timeout,
+        metadata,
+        _registered_method=True)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer"><code class="flex name class">
+<span>class <span class="ident">AuthServiceServicer</span></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class AuthServiceServicer(object):
+    &#34;&#34;&#34;Missing associated documentation comment in .proto file.&#34;&#34;&#34;
+
+    def login(self, request, context):
+        &#34;&#34;&#34;Missing associated documentation comment in .proto file.&#34;&#34;&#34;
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details(&#39;Method not implemented!&#39;)
+        raise NotImplementedError(&#39;Method not implemented!&#39;)
+
+    def change_password(self, request, context):
+        &#34;&#34;&#34;Missing associated documentation comment in .proto file.&#34;&#34;&#34;
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details(&#39;Method not implemented!&#39;)
+        raise NotImplementedError(&#39;Method not implemented!&#39;)</code></pre>
+</details>
+<div class="desc"><p>Missing associated documentation comment in .proto file.</p></div>
+<h3>Subclasses</h3>
+<ul class="hlist">
+<li><a title="connpy.grpc_layer.server.AuthServicer" href="server.html#connpy.grpc_layer.server.AuthServicer">AuthServicer</a></li>
+</ul>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.change_password"><code class="name flex">
+<span>def <span class="ident">change_password</span></span>(<span>self, request, context)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def change_password(self, request, context):
+    &#34;&#34;&#34;Missing associated documentation comment in .proto file.&#34;&#34;&#34;
+    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+    context.set_details(&#39;Method not implemented!&#39;)
+    raise NotImplementedError(&#39;Method not implemented!&#39;)</code></pre>
+</details>
+<div class="desc"><p>Missing associated documentation comment in .proto file.</p></div>
+</dd>
+<dt id="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.login"><code class="name flex">
+<span>def <span class="ident">login</span></span>(<span>self, request, context)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def login(self, request, context):
+    &#34;&#34;&#34;Missing associated documentation comment in .proto file.&#34;&#34;&#34;
+    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+    context.set_details(&#39;Method not implemented!&#39;)
+    raise NotImplementedError(&#39;Method not implemented!&#39;)</code></pre>
+</details>
+<div class="desc"><p>Missing associated documentation comment in .proto file.</p></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceStub"><code class="flex name class">
+<span>class <span class="ident">AuthServiceStub</span></span>
+<span>(</span><span>channel)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class AuthServiceStub(object):
+    &#34;&#34;&#34;Missing associated documentation comment in .proto file.&#34;&#34;&#34;
+
+    def __init__(self, channel):
+        &#34;&#34;&#34;Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        &#34;&#34;&#34;
+        self.login = channel.unary_unary(
+                &#39;/connpy.AuthService/login&#39;,
+                request_serializer=connpy__pb2.LoginRequest.SerializeToString,
+                response_deserializer=connpy__pb2.LoginResponse.FromString,
+                _registered_method=True)
+        self.change_password = channel.unary_unary(
+                &#39;/connpy.AuthService/change_password&#39;,
+                request_serializer=connpy__pb2.ChangePasswordRequest.SerializeToString,
+                response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)</code></pre>
 </details>
 <div class="desc"><p>Missing associated documentation comment in .proto file.</p>
@@ -5802,6 +6075,7 @@ def stop_api(request,
 <li><h3><a href="#header-functions">Functions</a></h3>
 <ul class="">
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.add_AIServiceServicer_to_server" href="#connpy.grpc_layer.connpy_pb2_grpc.add_AIServiceServicer_to_server">add_AIServiceServicer_to_server</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.add_AuthServiceServicer_to_server" href="#connpy.grpc_layer.connpy_pb2_grpc.add_AuthServiceServicer_to_server">add_AuthServiceServicer_to_server</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.add_ConfigServiceServicer_to_server" href="#connpy.grpc_layer.connpy_pb2_grpc.add_ConfigServiceServicer_to_server">add_ConfigServiceServicer_to_server</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.add_ExecutionServiceServicer_to_server" href="#connpy.grpc_layer.connpy_pb2_grpc.add_ExecutionServiceServicer_to_server">add_ExecutionServiceServicer_to_server</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.add_ImportExportServiceServicer_to_server" href="#connpy.grpc_layer.connpy_pb2_grpc.add_ImportExportServiceServicer_to_server">add_ImportExportServiceServicer_to_server</a></code></li>
@@ -5843,6 +6117,23 @@ def stop_api(request,
 </li>
 <li>
 <h4><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceStub" href="#connpy.grpc_layer.connpy_pb2_grpc.AIServiceStub">AIServiceStub</a></code></h4>
+</li>
+<li>
+<h4><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthService" href="#connpy.grpc_layer.connpy_pb2_grpc.AuthService">AuthService</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthService.change_password" href="#connpy.grpc_layer.connpy_pb2_grpc.AuthService.change_password">change_password</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthService.login" href="#connpy.grpc_layer.connpy_pb2_grpc.AuthService.login">login</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer" href="#connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer">AuthServiceServicer</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.change_password" href="#connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.change_password">change_password</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.login" href="#connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.login">login</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceStub" href="#connpy.grpc_layer.connpy_pb2_grpc.AuthServiceStub">AuthServiceStub</a></code></h4>
 </li>
 <li>
 <h4><code><a title="connpy.grpc_layer.connpy_pb2_grpc.ConfigService" href="#connpy.grpc_layer.connpy_pb2_grpc.ConfigService">ConfigService</a></code></h4>
@@ -6029,7 +6320,7 @@ def stop_api(request,
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
 </footer>
 </body>
 </html>

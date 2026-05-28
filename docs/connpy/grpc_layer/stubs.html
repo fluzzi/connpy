@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.6">
+<meta name="generator" content="pdoc3 0.11.5">
 <title>connpy.grpc_layer.stubs API documentation</title>
 <meta name="description" content="">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
@@ -272,9 +272,6 @@ el.replaceWith(d);
                         from ..printer import connpy_theme, get_original_stdout
                         stable_console = RichConsole(theme=connpy_theme, file=get_original_stdout())
                         stable_console.print(Rule(style=alias))
-                    elif not full_content and final_result.get(&#34;response&#34;):
-                        # If nothing streamed but we have response (e.g. error or direct guide)
-                        printer.console.print(Panel(Markdown(final_result[&#34;response&#34;]), title=title, border_style=alias, expand=False))
                     break
         except Exception as e:
             # Check if it was a gRPC error that we should let handle_errors catch
@@ -517,9 +514,6 @@ def ask(self, input_text, dryrun=False, chat_history=None, session_id=None, debu
                     from ..printer import connpy_theme, get_original_stdout
                     stable_console = RichConsole(theme=connpy_theme, file=get_original_stdout())
                     stable_console.print(Rule(style=alias))
-                elif not full_content and final_result.get(&#34;response&#34;):
-                    # If nothing streamed but we have response (e.g. error or direct guide)
-                    printer.console.print(Panel(Markdown(final_result[&#34;response&#34;]), title=title, border_style=alias, expand=False))
                 break
     except Exception as e:
         # Check if it was a gRPC error that we should let handle_errors catch
@@ -647,6 +641,303 @@ def list_sessions(self, limit=None):
 <pre><code class="python">@handle_errors
 def load_session_data(self, session_id):
     return from_struct(self.stub.load_session_data(connpy_pb2.StringRequest(value=session_id)).data)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.grpc_layer.stubs.AuthClientInterceptor"><code class="flex name class">
+<span>class <span class="ident">AuthClientInterceptor</span></span>
+<span>(</span><span>token_provider)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class AuthClientInterceptor(grpc.UnaryUnaryClientInterceptor,
+                            grpc.UnaryStreamClientInterceptor,
+                            grpc.StreamUnaryClientInterceptor,
+                            grpc.StreamStreamClientInterceptor):
+    def __init__(self, token_provider):
+        self.token_provider = token_provider
+
+    def _add_metadata(self, client_call_details):
+        token = self.token_provider()
+        if not token:
+            return client_call_details
+        
+        metadata = []
+        if client_call_details.metadata:
+            metadata = list(client_call_details.metadata)
+            
+        # Check if already present to avoid duplicates
+        if not any(k.lower() == &#34;authorization&#34; for k, v in metadata):
+            metadata.append((&#34;authorization&#34;, f&#34;Bearer {token}&#34;))
+            
+        return _ClientCallDetails(
+            method=client_call_details.method,
+            timeout=client_call_details.timeout,
+            metadata=metadata,
+            credentials=client_call_details.credentials,
+            wait_for_ready=client_call_details.wait_for_ready,
+            compression=client_call_details.compression,
+        )
+
+    def intercept_unary_unary(self, continuation, client_call_details, request):
+        new_details = self._add_metadata(client_call_details)
+        return continuation(new_details, request)
+
+    def intercept_unary_stream(self, continuation, client_call_details, request):
+        new_details = self._add_metadata(client_call_details)
+        return continuation(new_details, request)
+
+    def intercept_stream_unary(self, continuation, client_call_details, request_iterator):
+        new_details = self._add_metadata(client_call_details)
+        return continuation(new_details, request_iterator)
+
+    def intercept_stream_stream(self, continuation, client_call_details, request_iterator):
+        new_details = self._add_metadata(client_call_details)
+        return continuation(new_details, request_iterator)</code></pre>
+</details>
+<div class="desc"><p>Affords intercepting unary-unary invocations.</p></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>grpc.UnaryUnaryClientInterceptor</li>
+<li>grpc.UnaryStreamClientInterceptor</li>
+<li>grpc.StreamUnaryClientInterceptor</li>
+<li>grpc.StreamStreamClientInterceptor</li>
+<li>abc.ABC</li>
+</ul>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.grpc_layer.stubs.AuthClientInterceptor.intercept_stream_stream"><code class="name flex">
+<span>def <span class="ident">intercept_stream_stream</span></span>(<span>self, continuation, client_call_details, request_iterator)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def intercept_stream_stream(self, continuation, client_call_details, request_iterator):
+    new_details = self._add_metadata(client_call_details)
+    return continuation(new_details, request_iterator)</code></pre>
+</details>
+<div class="desc"><p>Intercepts a stream-stream invocation.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>continuation</code></strong></dt>
+<dd>A function that proceeds with the invocation by
+executing the next interceptor in chain or invoking the
+actual RPC on the underlying Channel. It is the interceptor's
+responsibility to call it if it decides to move the RPC forward.
+The interceptor can use
+<code>response_iterator = continuation(client_call_details, request_iterator)</code>
+to continue with the RPC. <code>continuation</code> returns an object that is
+both a Call for the RPC and an iterator for response values.
+Drawing response values from the returned Call-iterator may
+raise RpcError indicating termination of the RPC with non-OK
+status.</dd>
+<dt><strong><code>client_call_details</code></strong></dt>
+<dd>A ClientCallDetails object describing the
+outgoing RPC.</dd>
+<dt><strong><code>request_iterator</code></strong></dt>
+<dd>An iterator that yields request values for the RPC.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>An object that is both a Call for the RPC and an iterator of
+response values. Drawing response values from the returned
+Call-iterator may raise RpcError indicating termination of
+the RPC with non-OK status. This object <em>should</em> also fulfill the
+Future interface, though it may not.</p></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.AuthClientInterceptor.intercept_stream_unary"><code class="name flex">
+<span>def <span class="ident">intercept_stream_unary</span></span>(<span>self, continuation, client_call_details, request_iterator)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def intercept_stream_unary(self, continuation, client_call_details, request_iterator):
+    new_details = self._add_metadata(client_call_details)
+    return continuation(new_details, request_iterator)</code></pre>
+</details>
+<div class="desc"><p>Intercepts a stream-unary invocation asynchronously.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>continuation</code></strong></dt>
+<dd>A function that proceeds with the invocation by
+executing the next interceptor in chain or invoking the
+actual RPC on the underlying Channel. It is the interceptor's
+responsibility to call it if it decides to move the RPC forward.
+The interceptor can use
+<code>response_future = continuation(client_call_details, request_iterator)</code>
+to continue with the RPC. <code>continuation</code> returns an object that is
+both a Call for the RPC and a Future. In the event of RPC completion,
+the return Call-Future's result value will be the response message
+of the RPC. Should the event terminate with non-OK status, the
+returned Call-Future's exception value will be an RpcError.</dd>
+<dt><strong><code>client_call_details</code></strong></dt>
+<dd>A ClientCallDetails object describing the
+outgoing RPC.</dd>
+<dt><strong><code>request_iterator</code></strong></dt>
+<dd>An iterator that yields request values for the RPC.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>An object that is both a Call for the RPC and a Future.
+In the event of RPC completion, the return Call-Future's
+result value will be the response message of the RPC.
+Should the event terminate with non-OK status, the returned
+Call-Future's exception value will be an RpcError.</p></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.AuthClientInterceptor.intercept_unary_stream"><code class="name flex">
+<span>def <span class="ident">intercept_unary_stream</span></span>(<span>self, continuation, client_call_details, request)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def intercept_unary_stream(self, continuation, client_call_details, request):
+    new_details = self._add_metadata(client_call_details)
+    return continuation(new_details, request)</code></pre>
+</details>
+<div class="desc"><p>Intercepts a unary-stream invocation.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>continuation</code></strong></dt>
+<dd>A function that proceeds with the invocation by
+executing the next interceptor in chain or invoking the
+actual RPC on the underlying Channel. It is the interceptor's
+responsibility to call it if it decides to move the RPC forward.
+The interceptor can use
+<code>response_iterator = continuation(client_call_details, request)</code>
+to continue with the RPC. <code>continuation</code> returns an object that is
+both a Call for the RPC and an iterator for response values.
+Drawing response values from the returned Call-iterator may
+raise RpcError indicating termination of the RPC with non-OK
+status.</dd>
+<dt><strong><code>client_call_details</code></strong></dt>
+<dd>A ClientCallDetails object describing the
+outgoing RPC.</dd>
+<dt><strong><code>request</code></strong></dt>
+<dd>The request value for the RPC.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>An object that is both a Call for the RPC and an iterator of
+response values. Drawing response values from the returned
+Call-iterator may raise RpcError indicating termination of
+the RPC with non-OK status. This object <em>should</em> also fulfill the
+Future interface, though it may not.</p></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.AuthClientInterceptor.intercept_unary_unary"><code class="name flex">
+<span>def <span class="ident">intercept_unary_unary</span></span>(<span>self, continuation, client_call_details, request)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def intercept_unary_unary(self, continuation, client_call_details, request):
+    new_details = self._add_metadata(client_call_details)
+    return continuation(new_details, request)</code></pre>
+</details>
+<div class="desc"><p>Intercepts a unary-unary invocation asynchronously.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>continuation</code></strong></dt>
+<dd>A function that proceeds with the invocation by
+executing the next interceptor in chain or invoking the
+actual RPC on the underlying Channel. It is the interceptor's
+responsibility to call it if it decides to move the RPC forward.
+The interceptor can use
+<code>response_future = continuation(client_call_details, request)</code>
+to continue with the RPC. <code>continuation</code> returns an object that is
+both a Call for the RPC and a Future. In the event of RPC
+completion, the return Call-Future's result value will be
+the response message of the RPC. Should the event terminate
+with non-OK status, the returned Call-Future's exception value
+will be an RpcError.</dd>
+<dt><strong><code>client_call_details</code></strong></dt>
+<dd>A ClientCallDetails object describing the
+outgoing RPC.</dd>
+<dt><strong><code>request</code></strong></dt>
+<dd>The request value for the RPC.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>An object that is both a Call for the RPC and a Future.
+In the event of RPC completion, the return Call-Future's
+result value will be the response message of the RPC.
+Should the event terminate with non-OK status, the returned
+Call-Future's exception value will be an RpcError.</p></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.grpc_layer.stubs.AuthStub"><code class="flex name class">
+<span>class <span class="ident">AuthStub</span></span>
+<span>(</span><span>channel, remote_host)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class AuthStub:
+    def __init__(self, channel, remote_host):
+        self.stub = connpy_pb2_grpc.AuthServiceStub(channel)
+        self.remote_host = remote_host
+
+    @handle_errors
+    def login(self, username, password):
+        req = connpy_pb2.LoginRequest(username=username, password=password)
+        resp = self.stub.login(req)
+        return {
+            &#34;token&#34;: resp.token,
+            &#34;username&#34;: resp.username,
+            &#34;expires_at&#34;: resp.expires_at
+        }
+
+    @handle_errors
+    def change_password(self, old_password, new_password):
+        req = connpy_pb2.ChangePasswordRequest(old_password=old_password, new_password=new_password)
+        self.stub.change_password(req)</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.grpc_layer.stubs.AuthStub.change_password"><code class="name flex">
+<span>def <span class="ident">change_password</span></span>(<span>self, old_password, new_password)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def change_password(self, old_password, new_password):
+    req = connpy_pb2.ChangePasswordRequest(old_password=old_password, new_password=new_password)
+    self.stub.change_password(req)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.AuthStub.login"><code class="name flex">
+<span>def <span class="ident">login</span></span>(<span>self, username, password)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def login(self, username, password):
+    req = connpy_pb2.LoginRequest(username=username, password=password)
+    resp = self.stub.login(req)
+    return {
+        &#34;token&#34;: resp.token,
+        &#34;username&#34;: resp.username,
+        &#34;expires_at&#34;: resp.expires_at
+    }</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -1467,16 +1758,18 @@ def set_reserved_names(self, names):
         self._trigger_local_cache_sync()
 
     @handle_errors
-    def update_node(self, unique_id, data):
+    def update_node(self, unique_id, data, save=True):
         req = connpy_pb2.NodeRequest(id=unique_id, data=to_struct(data), is_folder=False)
         self.stub.update_node(req)
-        self._trigger_local_cache_sync()
+        if save:
+            self._trigger_local_cache_sync()
 
     @handle_errors
-    def delete_node(self, unique_id, is_folder=False):
+    def delete_node(self, unique_id, is_folder=False, save=True):
         req = connpy_pb2.DeleteRequest(id=unique_id, is_folder=is_folder)
         self.stub.delete_node(req)
-        self._trigger_local_cache_sync()
+        if save:
+            self._trigger_local_cache_sync()
 
     @handle_errors
     def move_node(self, src_id, dst_id, copy=False):
@@ -1857,7 +2150,7 @@ def connect_node(self, unique_id, sftp=False, debug=False, logger=None):
 <div class="desc"></div>
 </dd>
 <dt id="connpy.grpc_layer.stubs.NodeStub.delete_node"><code class="name flex">
-<span>def <span class="ident">delete_node</span></span>(<span>self, unique_id, is_folder=False)</span>
+<span>def <span class="ident">delete_node</span></span>(<span>self, unique_id, is_folder=False, save=True)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -1865,10 +2158,11 @@ def connect_node(self, unique_id, sftp=False, debug=False, logger=None):
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@handle_errors
-def delete_node(self, unique_id, is_folder=False):
+def delete_node(self, unique_id, is_folder=False, save=True):
     req = connpy_pb2.DeleteRequest(id=unique_id, is_folder=is_folder)
     self.stub.delete_node(req)
-    self._trigger_local_cache_sync()</code></pre>
+    if save:
+        self._trigger_local_cache_sync()</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -2028,7 +2322,7 @@ def set_reserved_names(self, names):
 <div class="desc"></div>
 </dd>
 <dt id="connpy.grpc_layer.stubs.NodeStub.update_node"><code class="name flex">
-<span>def <span class="ident">update_node</span></span>(<span>self, unique_id, data)</span>
+<span>def <span class="ident">update_node</span></span>(<span>self, unique_id, data, save=True)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -2036,10 +2330,11 @@ def set_reserved_names(self, names):
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@handle_errors
-def update_node(self, unique_id, data):
+def update_node(self, unique_id, data, save=True):
     req = connpy_pb2.NodeRequest(id=unique_id, data=to_struct(data), is_folder=False)
     self.stub.update_node(req)
-    self._trigger_local_cache_sync()</code></pre>
+    if save:
+        self._trigger_local_cache_sync()</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -2532,6 +2827,22 @@ def stop_api(self):
 </ul>
 </li>
 <li>
+<h4><code><a title="connpy.grpc_layer.stubs.AuthClientInterceptor" href="#connpy.grpc_layer.stubs.AuthClientInterceptor">AuthClientInterceptor</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.grpc_layer.stubs.AuthClientInterceptor.intercept_stream_stream" href="#connpy.grpc_layer.stubs.AuthClientInterceptor.intercept_stream_stream">intercept_stream_stream</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.AuthClientInterceptor.intercept_stream_unary" href="#connpy.grpc_layer.stubs.AuthClientInterceptor.intercept_stream_unary">intercept_stream_unary</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.AuthClientInterceptor.intercept_unary_stream" href="#connpy.grpc_layer.stubs.AuthClientInterceptor.intercept_unary_stream">intercept_unary_stream</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.AuthClientInterceptor.intercept_unary_unary" href="#connpy.grpc_layer.stubs.AuthClientInterceptor.intercept_unary_unary">intercept_unary_unary</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.grpc_layer.stubs.AuthStub" href="#connpy.grpc_layer.stubs.AuthStub">AuthStub</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.grpc_layer.stubs.AuthStub.change_password" href="#connpy.grpc_layer.stubs.AuthStub.change_password">change_password</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.AuthStub.login" href="#connpy.grpc_layer.stubs.AuthStub.login">login</a></code></li>
+</ul>
+</li>
+<li>
 <h4><code><a title="connpy.grpc_layer.stubs.ConfigStub" href="#connpy.grpc_layer.stubs.ConfigStub">ConfigStub</a></code></h4>
 <ul class="">
 <li><code><a title="connpy.grpc_layer.stubs.ConfigStub.encrypt_password" href="#connpy.grpc_layer.stubs.ConfigStub.encrypt_password">encrypt_password</a></code></li>
@@ -2618,7 +2929,7 @@ def stop_api(self):
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
 </footer>
 </body>
 </html>

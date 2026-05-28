@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.6">
+<meta name="generator" content="pdoc3 0.11.5">
 <title>connpy API documentation</title>
 <meta name="description" content="&lt;p align=&#34;center&#34;&gt;
 &lt;img src=&#34;https://nginx.gederico.dynu.net/images/CONNPY-resized.png&#34; alt=&#34;App Logo&#34;&gt;
@@ -51,8 +51,12 @@ el.replaceWith(d);
 <h2 id="ai-copilot-new-in-v6">🤖 AI Copilot (New in v6)</h2>
 <p>The AI Copilot is deeply integrated into your terminal workflow:
 - <strong>Terminal Context Awareness</strong>: The Copilot can "see" your screen output, helping you diagnose errors or analyze command results in real-time.
+- <strong>Dynamic Context Selection</strong>: Flexibly select single, range, or line-based terminal blocks to feed the Copilot, filtering out interactive scrolling garbage automatically (e.g., Cisco IOS/XR scrolling, paginators).
 - <strong>Hybrid Multi-Agent System</strong>: Automatically escalates complex tasks between the <strong>Network Engineer</strong> (execution) and the <strong>Network Architect</strong> (strategy).
 - <strong>MCP Integration</strong>: Dynamically load tools from external providers (6WIND, AWS, etc.) via the Model Context Protocol.
+- <strong>Flexible Auth &amp; Keyless AI</strong>: Support for advanced LiteLLM credentials (<code>--engineer-auth</code> / <code>--architect-auth</code>) allowing keyless local models (Ollama), cloud engines (Vertex AI), or custom endpoints.
+- <strong>Enhanced Session Management</strong>: Uniquely generated sessions, robust pagination, and interactive styling translating prompt themes directly to terminal escapes.
+- <strong>Semantic Prompt Integration</strong>: Emit standard OSC prompt sequences (<code>]133;B</code>) for real-time remote/web front-end command tracking.
 - <strong>Interactive Chat</strong>: Launch with <code>conn <a title="connpy.ai" href="#connpy.ai">ai</a></code> for a collaborative troubleshooting session.</p>
 <h2 id="core-features">Core Features</h2>
 <ul>
@@ -642,8 +646,11 @@ class ai:
         self.interrupted = False
 
         
-        # 1. Cargar configuración genérica
-        aiconfig = self.config.config.get(&#34;ai&#34;, {})
+        # 1. Cargar configuración genérica con herencia/merge global
+        if hasattr(self.config, &#34;get_effective_setting&#34;):
+            aiconfig = self.config.get_effective_setting(&#34;ai&#34;, {})
+        else:
+            aiconfig = self.config.config.get(&#34;ai&#34;, {}) if hasattr(self.config, &#34;config&#34;) else {}
         
         # Modelos (Prioridad: Argumento -&gt; Config -&gt; Default)
         self.engineer_model = engineer_model or aiconfig.get(&#34;engineer_model&#34;) or &#34;gemini/gemini-3.1-flash-lite&#34;
@@ -1534,9 +1541,11 @@ class ai:
 
     @MethodHook
     def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=False, stream=True, session_id=None, chunk_callback=None):
+        soft_limit_warned = False
         is_engineer_keyless = &#34;vertex&#34; in self.engineer_model.lower() or &#34;ollama&#34; in self.engineer_model.lower() or &#34;local&#34; in self.engineer_model.lower()
         if not self.engineer_key and not self.engineer_auth and not is_engineer_keyless:
             raise ValueError(&#34;Engineer API key or authentication not configured. Use &#39;connpy config --engineer-auth &lt;auth&gt;&#39; to set it.&#34;)
+
             
         if chat_history is None: chat_history = []
         
@@ -2144,7 +2153,7 @@ Node: {node_name}&#34;&#34;&#34;
 <dl>
 <dt id="connpy.ai.SAFE_COMMANDS"><code class="name">var <span class="ident">SAFE_COMMANDS</span></code></dt>
 <dd>
-<div class="desc"><p>The type of the None singleton.</p></div>
+<div class="desc"></div>
 </dd>
 </dl>
 <h3>Instance variables</h3>
@@ -2479,9 +2488,11 @@ Node: {node_name}&#34;&#34;&#34;
 </summary>
 <pre><code class="python">@MethodHook
 def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=False, stream=True, session_id=None, chunk_callback=None):
+    soft_limit_warned = False
     is_engineer_keyless = &#34;vertex&#34; in self.engineer_model.lower() or &#34;ollama&#34; in self.engineer_model.lower() or &#34;local&#34; in self.engineer_model.lower()
     if not self.engineer_key and not self.engineer_auth and not is_engineer_keyless:
         raise ValueError(&#34;Engineer API key or authentication not configured. Use &#39;connpy config --engineer-auth &lt;auth&gt;&#39; to set it.&#34;)
+
         
     if chat_history is None: chat_history = []
     
@@ -3184,7 +3195,7 @@ def confirm(self, user_input): return True</code></pre>
 </dd>
 <dt id="connpy.configfile"><code class="flex name class">
 <span>class <span class="ident">configfile</span></span>
-<span>(</span><span>conf=None, key=None)</span>
+<span>(</span><span>conf=None, key=None, shared_config=None)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -3217,7 +3228,8 @@ class configfile:
                               passwords.
         &#39;&#39;&#39;
 
-    def __init__(self, conf = None, key = None):
+    def __init__(self, conf = None, key = None, shared_config = None):
+        self._shared_config = shared_config
         &#39;&#39;&#39; 
             
         ### Optional Parameters:  
@@ -3321,6 +3333,42 @@ class configfile:
         # Self-heal text caches if they are missing
         if not os.path.exists(self.fzf_cachefile) or not os.path.exists(self.folders_cachefile) or not os.path.exists(self.profiles_cachefile):
             self._generate_nodes_cache()
+
+
+    def get_effective_setting(self, key, default=None):
+        &#34;&#34;&#34;Get config setting with shared fallback for inheritable keys.&#34;&#34;&#34;
+        val = self.config.get(key)
+        if key == &#34;ai&#34;:
+            if val is not None:
+                if self._shared_config:
+                    import copy
+                    # Deep merge: shared as base, user overrides
+                    base = copy.deepcopy(self._shared_config.config.get(key, {}))
+                    if isinstance(base, dict) and isinstance(val, dict):
+                        # Credential isolation:
+                        # If user defines engineer credentials, discard shared ones
+                        if &#34;engineer_api_key&#34; in val or &#34;engineer_auth&#34; in val:
+                            base.pop(&#34;engineer_api_key&#34;, None)
+                            base.pop(&#34;engineer_auth&#34;, None)
+                        # If user defines architect credentials, discard shared ones
+                        if &#34;architect_api_key&#34; in val or &#34;architect_auth&#34; in val:
+                            base.pop(&#34;architect_api_key&#34;, None)
+                            base.pop(&#34;architect_auth&#34;, None)
+                            
+                        # Recursive update for inner dictionaries (like mcp_servers or model details)
+                        def deep_merge(d1, d2):
+                            for k, v in d2.items():
+                                if isinstance(v, dict) and k in d1 and isinstance(d1[k], dict):
+                                    deep_merge(d1[k], v)
+                                else:
+                                    d1[k] = copy.deepcopy(v)
+                        deep_merge(base, val)
+                        return base
+                return val
+            elif self._shared_config:
+                return self._shared_config.config.get(key, default)
+        
+        return val if val is not None else default
 
 
     def _validate_config(self, data):
@@ -3663,7 +3711,8 @@ class configfile:
             else:
                 printer.error(&#34;Filter must be a string or a list of strings&#34;)
                 sys.exit(1)
-            nodes = [item for item in nodes if any(re.search(pattern, item) for pattern in flat_filter)]
+            flags = re.IGNORECASE if not self.config.get(&#34;case&#34;, False) else 0
+            nodes = [item for item in nodes if any(re.search(pattern, item, flags) for pattern in flat_filter)]
         return nodes
 
     @MethodHook
@@ -3786,13 +3835,6 @@ class configfile:
 
 - publickey    (obj): Object containing the public key to decrypt 
                       passwords.
-</code></pre>
-<h3 id="optional-parameters">Optional Parameters:</h3>
-<pre><code>- conf (str): Path/file to config file. If left empty default
-              path is ~/.config/conn/config.yaml
-
-- key  (str): Path/file to RSA key file. If left empty default
-              path is ~/.config/conn/.osk
 </code></pre></div>
 <h3>Methods</h3>
 <dl>
@@ -3843,6 +3885,51 @@ def encrypt(self, password, keyfile=None):
 <h3 id="returns">Returns:</h3>
 <pre><code>str: Encrypted password.
 </code></pre></div>
+</dd>
+<dt id="connpy.configfile.get_effective_setting"><code class="name flex">
+<span>def <span class="ident">get_effective_setting</span></span>(<span>self, key, default=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_effective_setting(self, key, default=None):
+    &#34;&#34;&#34;Get config setting with shared fallback for inheritable keys.&#34;&#34;&#34;
+    val = self.config.get(key)
+    if key == &#34;ai&#34;:
+        if val is not None:
+            if self._shared_config:
+                import copy
+                # Deep merge: shared as base, user overrides
+                base = copy.deepcopy(self._shared_config.config.get(key, {}))
+                if isinstance(base, dict) and isinstance(val, dict):
+                    # Credential isolation:
+                    # If user defines engineer credentials, discard shared ones
+                    if &#34;engineer_api_key&#34; in val or &#34;engineer_auth&#34; in val:
+                        base.pop(&#34;engineer_api_key&#34;, None)
+                        base.pop(&#34;engineer_auth&#34;, None)
+                    # If user defines architect credentials, discard shared ones
+                    if &#34;architect_api_key&#34; in val or &#34;architect_auth&#34; in val:
+                        base.pop(&#34;architect_api_key&#34;, None)
+                        base.pop(&#34;architect_auth&#34;, None)
+                        
+                    # Recursive update for inner dictionaries (like mcp_servers or model details)
+                    def deep_merge(d1, d2):
+                        for k, v in d2.items():
+                            if isinstance(v, dict) and k in d1 and isinstance(d1[k], dict):
+                                deep_merge(d1[k], v)
+                            else:
+                                d1[k] = copy.deepcopy(v)
+                    deep_merge(base, val)
+                    return base
+            return val
+        elif self._shared_config:
+            return self._shared_config.config.get(key, default)
+    
+    return val if val is not None else default</code></pre>
+</details>
+<div class="desc"><p>Get config setting with shared fallback for inheritable keys.</p></div>
 </dd>
 <dt id="connpy.configfile.getitem"><code class="name flex">
 <span>def <span class="ident">getitem</span></span>(<span>self, unique, keys=None, extract=False)</span>
@@ -5000,18 +5087,6 @@ class node:
             cmd += f&#34; {self.options}&#34;
         return cmd
 
-    @MethodHook
-    def _generate_ssm_cmd(self):
-        region = self.tags.get(&#34;region&#34;, &#34;&#34;) if isinstance(self.tags, dict) else &#34;&#34;
-        profile = self.tags.get(&#34;profile&#34;, &#34;&#34;) if isinstance(self.tags, dict) else &#34;&#34;
-        cmd = f&#34;aws ssm start-session --target {self.host}&#34;
-        if region:
-            cmd += f&#34; --region {region}&#34;
-        if profile:
-            cmd += f&#34; --profile {profile}&#34;
-        if self.options:
-            cmd += f&#34; {self.options}&#34;
-        return cmd
 
     @MethodHook
     def _get_cmd(self):
@@ -6358,6 +6433,7 @@ def test(self, commands, expected, vars = None,*, folder = None, prompt = None, 
 <h4><code><a title="connpy.configfile" href="#connpy.configfile">configfile</a></code></h4>
 <ul class="">
 <li><code><a title="connpy.configfile.encrypt" href="#connpy.configfile.encrypt">encrypt</a></code></li>
+<li><code><a title="connpy.configfile.get_effective_setting" href="#connpy.configfile.get_effective_setting">get_effective_setting</a></code></li>
 <li><code><a title="connpy.configfile.getitem" href="#connpy.configfile.getitem">getitem</a></code></li>
 <li><code><a title="connpy.configfile.getitems" href="#connpy.configfile.getitems">getitems</a></code></li>
 </ul>
@@ -6384,7 +6460,7 @@ def test(self, commands, expected, vars = None,*, folder = None, prompt = None, 
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
 </footer>
 </body>
 </html>

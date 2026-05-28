@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.6">
+<meta name="generator" content="pdoc3 0.11.5">
 <title>connpy.grpc_layer.server API documentation</title>
 <meta name="description" content="">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
@@ -59,10 +59,16 @@ el.replaceWith(d);
             try:
                 for item in func(*args, **kwargs):
                     yield item
+            except grpc.RpcError:
+                raise
             except ConnpyError as e:
                 context = kwargs.get(&#34;context&#34;) or args[-1]
                 context.abort(grpc.StatusCode.INTERNAL, str(e))
             except Exception as e:
+                if type(e) is Exception and not e.args:
+                    raise e
+                if e.__class__.__name__ in (&#34;_AbortError&#34;, &#34;RpcError&#34;):
+                    raise e
                 context = kwargs.get(&#34;context&#34;) or args[-1]
                 context.abort(grpc.StatusCode.UNKNOWN, str(e))
             finally:
@@ -72,10 +78,16 @@ el.replaceWith(d);
         def wrapper(*args, **kwargs):
             try:
                 return func(*args, **kwargs)
+            except grpc.RpcError:
+                raise
             except ConnpyError as e:
                 context = kwargs.get(&#34;context&#34;) or args[-1]
                 context.abort(grpc.StatusCode.INTERNAL, str(e))
             except Exception as e:
+                if type(e) is Exception and not e.args:
+                    raise e
+                if e.__class__.__name__ in (&#34;_AbortError&#34;, &#34;RpcError&#34;):
+                    raise e
                 context = kwargs.get(&#34;context&#34;) or args[-1]
                 context.abort(grpc.StatusCode.UNKNOWN, str(e))
             finally:
@@ -93,19 +105,30 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def serve(config, port=8048, debug=False):
-    interceptors = [LoggingInterceptor()] if debug else []
+    from connpy.grpc_layer.user_registry import UserRegistry
+    from connpy.services.provider import ServiceProvider
+
+    fallback_provider = ServiceProvider(config, mode=&#34;local&#34;)
+    registry = UserRegistry(config.defaultdir)
+
+    interceptors = []
+    if debug:
+        interceptors.append(LoggingInterceptor())
+    interceptors.append(AuthInterceptor(registry))
+    
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10), interceptors=interceptors)
     
-    connpy_pb2_grpc.add_NodeServiceServicer_to_server(NodeServicer(config, debug=debug), server)
-    connpy_pb2_grpc.add_ProfileServiceServicer_to_server(ProfileServicer(config), server)
-    connpy_pb2_grpc.add_ConfigServiceServicer_to_server(ConfigServicer(config), server)
-    plugin_servicer = PluginServicer(config)
+    connpy_pb2_grpc.add_NodeServiceServicer_to_server(NodeServicer(fallback_provider, registry=registry, debug=debug), server)
+    connpy_pb2_grpc.add_ProfileServiceServicer_to_server(ProfileServicer(fallback_provider, registry=registry), server)
+    connpy_pb2_grpc.add_ConfigServiceServicer_to_server(ConfigServicer(fallback_provider, registry=registry), server)
+    plugin_servicer = PluginServicer(fallback_provider, registry=registry)
     connpy_pb2_grpc.add_PluginServiceServicer_to_server(plugin_servicer, server)
     remote_plugin_pb2_grpc.add_RemotePluginServiceServicer_to_server(plugin_servicer, server)
-    connpy_pb2_grpc.add_ExecutionServiceServicer_to_server(ExecutionServicer(config), server)
-    connpy_pb2_grpc.add_ImportExportServiceServicer_to_server(ImportExportServicer(config), server)
-    connpy_pb2_grpc.add_AIServiceServicer_to_server(AIServicer(config), server)
-    connpy_pb2_grpc.add_SystemServiceServicer_to_server(SystemServicer(config), server)
+    connpy_pb2_grpc.add_ExecutionServiceServicer_to_server(ExecutionServicer(fallback_provider, registry=registry), server)
+    connpy_pb2_grpc.add_ImportExportServiceServicer_to_server(ImportExportServicer(fallback_provider, registry=registry), server)
+    connpy_pb2_grpc.add_AIServiceServicer_to_server(AIServicer(fallback_provider, registry=registry, debug=debug), server)
+    connpy_pb2_grpc.add_SystemServiceServicer_to_server(SystemServicer(fallback_provider, registry=registry), server)
+    connpy_pb2_grpc.add_AuthServiceServicer_to_server(AuthServicer(registry), server)
     
     server.add_insecure_port(f&#39;[::]:{port}&#39;)
     server.start()
@@ -120,7 +143,7 @@ el.replaceWith(d);
 <dl>
 <dt id="connpy.grpc_layer.server.AIServicer"><code class="flex name class">
 <span>class <span class="ident">AIServicer</span></span>
-<span>(</span><span>config)</span>
+<span>(</span><span>provider, registry=None, debug=False)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -128,14 +151,35 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class AIServicer(connpy_pb2_grpc.AIServiceServicer):
-    def __init__(self, config):
-        self.service = AIService(config)
+    def __init__(self, provider, registry=None, debug=False):
+        if not hasattr(provider, &#34;mode&#34;):
+            from connpy.services.provider import ServiceProvider
+            provider = ServiceProvider(provider, mode=&#34;local&#34;)
+        self._fallback_provider = provider
+        self._registry = registry
+        self.server_debug = debug
+        if debug:
+            from rich.console import Console
+            from ..printer import connpy_theme, get_original_stdout
+            self.server_console = Console(theme=connpy_theme, file=get_original_stdout())
+
+    def _get_provider(self):
+        if self._registry:
+            username = _current_user.get()
+            if username:
+                return self._registry.get_provider(username)
+        return self._fallback_provider
+
+    @property
+    def service(self):
+        return self._get_provider().ai
 
     @handle_errors
     def ask(self, request_iterator, context):
         import queue
         import threading
 
+        ai_service = self.service
         chunk_queue = queue.Queue()
         request_queue = queue.Queue()
         bridge = None
@@ -153,7 +197,7 @@ el.replaceWith(d);
             nonlocal history, bridge, agent_instance
             try:
                 # Run the AI interaction (this blocks this specific thread)
-                res = self.service.ask(
+                res = ai_service.ask(
                     input_text,
                     chat_history=history if history else None,
                     session_id=session_id,
@@ -172,6 +216,16 @@ el.replaceWith(d);
 
                 # Send final chunk marker
                 chunk_queue.put((&#34;final_mark&#34;, res))
+            except ValueError as e:
+                # Configuration or LLM provider connection errors are expected, only print in debug mode
+                if debug or getattr(self, &#34;server_debug&#34;, False):
+                    from rich.console import Console
+                    from ..printer import connpy_theme, get_original_stdout
+                    c = getattr(self, &#34;server_console&#34;, None) or Console(theme=connpy_theme, file=get_original_stdout())
+                    c.print(f&#34;[debug][DEBUG][/debug] AI Task Error: {e}&#34;)
+                chunk_queue.put((&#34;status&#34;, f&#34;Error: {str(e)}&#34;))
+                # Crucial: always send final_mark to avoid client deadlock
+                chunk_queue.put((&#34;final_mark&#34;, {&#34;response&#34;: f&#34;Error: {str(e)}&#34;, &#34;chat_history&#34;: history, &#34;error&#34;: True}))
             except Exception as e:
                 import traceback
                 print(f&#34;AI Task Error: {e}&#34;)
@@ -313,6 +367,21 @@ el.replaceWith(d);
 <ul class="hlist">
 <li><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer">AIServiceServicer</a></li>
 </ul>
+<h3>Instance variables</h3>
+<dl>
+<dt id="connpy.grpc_layer.server.AIServicer.service"><code class="name">prop <span class="ident">service</span></code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def service(self):
+    return self._get_provider().ai</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
 <h3>Inherited members</h3>
 <ul class="hlist">
 <li><code><b><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer">AIServiceServicer</a></b></code>:
@@ -330,9 +399,243 @@ el.replaceWith(d);
 </li>
 </ul>
 </dd>
+<dt id="connpy.grpc_layer.server.AuthInterceptor"><code class="flex name class">
+<span>class <span class="ident">AuthInterceptor</span></span>
+<span>(</span><span>registry)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class AuthInterceptor(grpc.ServerInterceptor):
+    OPEN_METHODS = [&#34;/connpy.AuthService/login&#34;]
+
+    def __init__(self, registry):
+        self.registry = registry
+
+    def intercept_service(self, continuation, handler_call_details):
+        method = handler_call_details.method
+        if method in self.OPEN_METHODS:
+            return continuation(handler_call_details)
+
+        if not self.registry.has_users():
+            return continuation(handler_call_details)
+
+        token = self._extract_token(handler_call_details.invocation_metadata)
+        if not token:
+            return self._unauthenticated_handler(handler_call_details, &#34;Authorization token is missing&#34;)
+
+        username = self.registry.user_service.verify_jwt(token)
+        if not username:
+            return self._unauthenticated_handler(handler_call_details, &#34;Invalid or expired token&#34;)
+
+        handler = continuation(handler_call_details)
+        if handler is None:
+            return None
+
+        return self._wrap_handler(handler, username)
+
+    def _wrap_handler(self, handler, username):
+        if handler.unary_unary:
+            original_behavior = handler.unary_unary
+            def wrapper(request, context):
+                token = _current_user.set(username)
+                try:
+                    return original_behavior(request, context)
+                finally:
+                    _current_user.reset(token)
+            return grpc.unary_unary_rpc_method_handler(
+                wrapper,
+                request_deserializer=handler.request_deserializer,
+                response_serializer=handler.response_serializer,
+            )
+        elif handler.unary_stream:
+            original_behavior = handler.unary_stream
+            def wrapper(request, context):
+                token = _current_user.set(username)
+                try:
+                    for response in original_behavior(request, context):
+                        yield response
+                finally:
+                    _current_user.reset(token)
+            return grpc.unary_stream_rpc_method_handler(
+                wrapper,
+                request_deserializer=handler.request_deserializer,
+                response_serializer=handler.response_serializer,
+            )
+        elif handler.stream_unary:
+            original_behavior = handler.stream_unary
+            def wrapper(request_iterator, context):
+                token = _current_user.set(username)
+                try:
+                    return original_behavior(request_iterator, context)
+                finally:
+                    _current_user.reset(token)
+            return grpc.stream_unary_rpc_method_handler(
+                wrapper,
+                request_deserializer=handler.request_deserializer,
+                response_serializer=handler.response_serializer,
+            )
+        elif handler.stream_stream:
+            original_behavior = handler.stream_stream
+            def wrapper(request_iterator, context):
+                token = _current_user.set(username)
+                try:
+                    for response in original_behavior(request_iterator, context):
+                        yield response
+                finally:
+                    _current_user.reset(token)
+            return grpc.stream_stream_rpc_method_handler(
+                wrapper,
+                request_deserializer=handler.request_deserializer,
+                response_serializer=handler.response_serializer,
+            )
+        return handler
+
+    def _extract_token(self, metadata):
+        for key, value in metadata:
+            if key.lower() == &#34;authorization&#34;:
+                if value.startswith(&#34;Bearer &#34;):
+                    return value[7:]
+        return None
+
+    def _unauthenticated_handler(self, handler_call_details, message):
+        def abort_call(request_or_iterator, context):
+            context.abort(grpc.StatusCode.UNAUTHENTICATED, message)
+        return grpc.unary_unary_rpc_method_handler(abort_call)</code></pre>
+</details>
+<div class="desc"><p>Affords intercepting incoming RPCs on the service-side.</p></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>grpc.ServerInterceptor</li>
+<li>abc.ABC</li>
+</ul>
+<h3>Class variables</h3>
+<dl>
+<dt id="connpy.grpc_layer.server.AuthInterceptor.OPEN_METHODS"><code class="name">var <span class="ident">OPEN_METHODS</span></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+</dl>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.grpc_layer.server.AuthInterceptor.intercept_service"><code class="name flex">
+<span>def <span class="ident">intercept_service</span></span>(<span>self, continuation, handler_call_details)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def intercept_service(self, continuation, handler_call_details):
+    method = handler_call_details.method
+    if method in self.OPEN_METHODS:
+        return continuation(handler_call_details)
+
+    if not self.registry.has_users():
+        return continuation(handler_call_details)
+
+    token = self._extract_token(handler_call_details.invocation_metadata)
+    if not token:
+        return self._unauthenticated_handler(handler_call_details, &#34;Authorization token is missing&#34;)
+
+    username = self.registry.user_service.verify_jwt(token)
+    if not username:
+        return self._unauthenticated_handler(handler_call_details, &#34;Invalid or expired token&#34;)
+
+    handler = continuation(handler_call_details)
+    if handler is None:
+        return None
+
+    return self._wrap_handler(handler, username)</code></pre>
+</details>
+<div class="desc"><p>Intercepts incoming RPCs before handing them over to a handler.</p>
+<p>State can be passed from an interceptor to downstream interceptors
+via contextvars. The first interceptor is called from an empty
+contextvars.Context, and the same Context is used for downstream
+interceptors and for the final handler call. Note that there are no
+guarantees that interceptors and handlers will be called from the
+same thread.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>continuation</code></strong></dt>
+<dd>A function that takes a HandlerCallDetails and
+proceeds to invoke the next interceptor in the chain, if any,
+or the RPC handler lookup logic, with the call details passed
+as an argument, and returns an RpcMethodHandler instance if
+the RPC is considered serviced, or None otherwise.</dd>
+<dt><strong><code>handler_call_details</code></strong></dt>
+<dd>A HandlerCallDetails describing the RPC.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>An RpcMethodHandler with which the RPC may be serviced if the
+interceptor chooses to service this RPC, or None otherwise.</p></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.grpc_layer.server.AuthServicer"><code class="flex name class">
+<span>class <span class="ident">AuthServicer</span></span>
+<span>(</span><span>registry)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class AuthServicer(connpy_pb2_grpc.AuthServiceServicer):
+    def __init__(self, registry):
+        self.registry = registry
+
+    @handle_errors
+    def login(self, request, context):
+        username = request.username
+        password = request.password
+        
+        if not self.registry.user_service.authenticate(username, password):
+            context.abort(grpc.StatusCode.UNAUTHENTICATED, &#34;Invalid username or password&#34;)
+            
+        token = self.registry.user_service.generate_jwt(username)
+        expires_at = int((datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=8)).timestamp())
+        
+        return connpy_pb2.LoginResponse(
+            token=token,
+            username=username,
+            expires_at=expires_at
+        )
+
+    @handle_errors
+    def change_password(self, request, context):
+        username = _current_user.get()
+        if not username:
+            context.abort(grpc.StatusCode.UNAUTHENTICATED, &#34;Authentication required&#34;)
+            
+        try:
+            self.registry.user_service.change_password(username, request.old_password, request.new_password)
+            self.registry.evict(username)
+        except ValueError as e:
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(e))
+            
+        return Empty()</code></pre>
+</details>
+<div class="desc"><p>Missing associated documentation comment in .proto file.</p></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer">AuthServiceServicer</a></li>
+</ul>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer">AuthServiceServicer</a></b></code>:
+<ul class="hlist">
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.change_password" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.change_password">change_password</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.login" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.login">login</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
 <dt id="connpy.grpc_layer.server.ConfigServicer"><code class="flex name class">
 <span>class <span class="ident">ConfigServicer</span></span>
-<span>(</span><span>config)</span>
+<span>(</span><span>provider, registry=None)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -340,8 +643,23 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class ConfigServicer(connpy_pb2_grpc.ConfigServiceServicer):
-    def __init__(self, config):
-        self.service = ConfigService(config)
+    def __init__(self, provider, registry=None):
+        if not hasattr(provider, &#34;mode&#34;):
+            from connpy.services.provider import ServiceProvider
+            provider = ServiceProvider(provider, mode=&#34;local&#34;)
+        self._fallback_provider = provider
+        self._registry = registry
+
+    def _get_provider(self):
+        if self._registry:
+            username = _current_user.get()
+            if username:
+                return self._registry.get_provider(username)
+        return self._fallback_provider
+
+    @property
+    def service(self):
+        return self._get_provider().config_svc
 
     @handle_errors
     def get_settings(self, request, context):
@@ -374,6 +692,21 @@ el.replaceWith(d);
 <ul class="hlist">
 <li><a title="connpy.grpc_layer.connpy_pb2_grpc.ConfigServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ConfigServiceServicer">ConfigServiceServicer</a></li>
 </ul>
+<h3>Instance variables</h3>
+<dl>
+<dt id="connpy.grpc_layer.server.ConfigServicer.service"><code class="name">prop <span class="ident">service</span></code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def service(self):
+    return self._get_provider().config_svc</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
 <h3>Inherited members</h3>
 <ul class="hlist">
 <li><code><b><a title="connpy.grpc_layer.connpy_pb2_grpc.ConfigServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ConfigServiceServicer">ConfigServiceServicer</a></b></code>:
@@ -390,7 +723,7 @@ el.replaceWith(d);
 </dd>
 <dt id="connpy.grpc_layer.server.ExecutionServicer"><code class="flex name class">
 <span>class <span class="ident">ExecutionServicer</span></span>
-<span>(</span><span>config)</span>
+<span>(</span><span>provider, registry=None)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -398,8 +731,23 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class ExecutionServicer(connpy_pb2_grpc.ExecutionServiceServicer):
-    def __init__(self, config):
-        self.service = ExecutionService(config)
+    def __init__(self, provider, registry=None):
+        if not hasattr(provider, &#34;mode&#34;):
+            from connpy.services.provider import ServiceProvider
+            provider = ServiceProvider(provider, mode=&#34;local&#34;)
+        self._fallback_provider = provider
+        self._registry = registry
+
+    def _get_provider(self):
+        if self._registry:
+            username = _current_user.get()
+            if username:
+                return self._registry.get_provider(username)
+        return self._fallback_provider
+
+    @property
+    def service(self):
+        return self._get_provider().execution
 
     @handle_errors
     def run_commands(self, request, context):
@@ -408,6 +756,11 @@ el.replaceWith(d);
         
         nodes_filter = request.nodes[0] if len(request.nodes) == 1 else list(request.nodes)
         
+        # Resolve provider in the main gRPC thread where _current_user ContextVar is set.
+        # threading.Thread does NOT inherit ContextVars, so self.service inside
+        # _worker() would fall back to the admin provider.
+        execution_service = self.service
+        
         q = queue.Queue()
         
         def _on_complete(unique, output, status):
@@ -415,7 +768,7 @@ el.replaceWith(d);
             
         def _worker():
             try:
-                self.service.run_commands(                    nodes_filter=nodes_filter,
+                execution_service.run_commands(                    nodes_filter=nodes_filter,
                     commands=list(request.commands),
                     folder=request.folder if request.folder else None,
                     prompt=request.prompt if request.prompt else None,
@@ -454,6 +807,9 @@ el.replaceWith(d);
         
         nodes_filter = request.nodes[0] if len(request.nodes) == 1 else list(request.nodes)
 
+        # Resolve provider in the main gRPC thread where _current_user ContextVar is set.
+        execution_service = self.service
+        
         q = queue.Queue()
         
         def _on_complete(unique, node_output, node_status, node_result):
@@ -461,7 +817,7 @@ el.replaceWith(d);
             
         def _worker():
             try:
-                self.service.test_commands(
+                execution_service.test_commands(
                     nodes_filter=nodes_filter,
                     commands=list(request.commands),
                     expected=list(request.expected),
@@ -511,6 +867,21 @@ el.replaceWith(d);
 <ul class="hlist">
 <li><a title="connpy.grpc_layer.connpy_pb2_grpc.ExecutionServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ExecutionServiceServicer">ExecutionServiceServicer</a></li>
 </ul>
+<h3>Instance variables</h3>
+<dl>
+<dt id="connpy.grpc_layer.server.ExecutionServicer.service"><code class="name">prop <span class="ident">service</span></code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def service(self):
+    return self._get_provider().execution</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
 <h3>Inherited members</h3>
 <ul class="hlist">
 <li><code><b><a title="connpy.grpc_layer.connpy_pb2_grpc.ExecutionServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ExecutionServiceServicer">ExecutionServiceServicer</a></b></code>:
@@ -525,7 +896,7 @@ el.replaceWith(d);
 </dd>
 <dt id="connpy.grpc_layer.server.ImportExportServicer"><code class="flex name class">
 <span>class <span class="ident">ImportExportServicer</span></span>
-<span>(</span><span>config)</span>
+<span>(</span><span>provider, registry=None)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -533,9 +904,27 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class ImportExportServicer(connpy_pb2_grpc.ImportExportServiceServicer):
-    def __init__(self, config):
-        self.service = ImportExportService(config)
-        self.node_service = NodeService(config)
+    def __init__(self, provider, registry=None):
+        if not hasattr(provider, &#34;mode&#34;):
+            from connpy.services.provider import ServiceProvider
+            provider = ServiceProvider(provider, mode=&#34;local&#34;)
+        self._fallback_provider = provider
+        self._registry = registry
+
+    def _get_provider(self):
+        if self._registry:
+            username = _current_user.get()
+            if username:
+                return self._registry.get_provider(username)
+        return self._fallback_provider
+
+    @property
+    def service(self):
+        return self._get_provider().import_export
+
+    @property
+    def node_service(self):
+        return self._get_provider().nodes
 
     @handle_errors
     def export_to_file(self, request, context):
@@ -565,6 +954,33 @@ el.replaceWith(d);
 <ul class="hlist">
 <li><a title="connpy.grpc_layer.connpy_pb2_grpc.ImportExportServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ImportExportServiceServicer">ImportExportServiceServicer</a></li>
 </ul>
+<h3>Instance variables</h3>
+<dl>
+<dt id="connpy.grpc_layer.server.ImportExportServicer.node_service"><code class="name">prop <span class="ident">node_service</span></code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def node_service(self):
+    return self._get_provider().nodes</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.server.ImportExportServicer.service"><code class="name">prop <span class="ident">service</span></code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def service(self):
+    return self._get_provider().import_export</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
 <h3>Inherited members</h3>
 <ul class="hlist">
 <li><code><b><a title="connpy.grpc_layer.connpy_pb2_grpc.ImportExportServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ImportExportServiceServicer">ImportExportServiceServicer</a></b></code>:
@@ -666,7 +1082,7 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
 </dd>
 <dt id="connpy.grpc_layer.server.NodeServicer"><code class="flex name class">
 <span>class <span class="ident">NodeServicer</span></span>
-<span>(</span><span>config, debug=False)</span>
+<span>(</span><span>provider, registry=None, debug=False)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -674,13 +1090,28 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
-    def __init__(self, config, debug=False):
-        self.service = NodeService(config)
+    def __init__(self, provider, registry=None, debug=False):
+        if not hasattr(provider, &#34;mode&#34;):
+            from connpy.services.provider import ServiceProvider
+            provider = ServiceProvider(provider, mode=&#34;local&#34;)
+        self._fallback_provider = provider
+        self._registry = registry
         self.server_debug = debug
         if debug:
             from rich.console import Console
             from ..printer import connpy_theme, get_original_stdout
             self.server_console = Console(theme=connpy_theme, file=get_original_stdout())
+
+    def _get_provider(self):
+        if self._registry:
+            username = _current_user.get()
+            if username:
+                return self._registry.get_provider(username)
+        return self._fallback_provider
+
+    @property
+    def service(self):
+        return self._get_provider().nodes
 
     @handle_errors
     def interact_node(self, request_iterator, context):
@@ -688,10 +1119,16 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
         import os
         import asyncio
         from connpy.core import node
-        from ..services.profile_service import ProfileService
         from connpy.tunnels import RemoteStream
         import queue
         import threading
+
+        # Resolve provider once at the start of the RPC stream
+        provider = self._get_provider()
+        nodes_service = provider.nodes
+        profile_service = provider.profiles
+        ai_service = provider.ai
+        user_config = provider.config
 
         # Fetch first setup packet
         try:
@@ -719,9 +1156,9 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
 
             if base_node_id:
                 # Look up the base node in config and use its full data
-                nodes = self.service.config._getallnodes(base_node_id)
+                nodes = user_config._getallnodes(base_node_id)
                 if nodes:
-                    device = self.service.config.getitem(nodes[0])
+                    device = user_config.getitem(nodes[0])
                     # Override device properties with any passed in params
                     for attr in valid_attrs:
                         if attr in params:
@@ -735,11 +1172,11 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
                         device[&#34;tags&#34;] = device_tags
 
                     node_name = params.get(&#34;name&#34;, base_node_id)
-                    n = node(node_name, **device, config=self.service.config)
+                    n = node(node_name, **device, config=user_config)
                 else:
                     # base_node not found, fall back to dynamic
                     node_name = params.get(&#34;name&#34;, fallback_id)
-                    n = node(node_name, host=params.get(&#34;host&#34;, &#34;&#34;), config=self.service.config)
+                    n = node(node_name, host=params.get(&#34;host&#34;, &#34;&#34;), config=user_config)
                     for attr in valid_attrs:
                         if attr in params:
                             setattr(n, attr, params[attr])
@@ -747,19 +1184,22 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
                         n.tags = params[&#34;tags&#34;]
             else:
                 node_name = params.get(&#34;name&#34;, fallback_id)
-                n = node(node_name, host=params.get(&#34;host&#34;, &#34;&#34;), config=self.service.config)
+                n = node(node_name, host=params.get(&#34;host&#34;, &#34;&#34;), config=user_config)
                 for attr in valid_attrs:
                     if attr in params:
                         setattr(n, attr, params[attr])
                 if &#34;tags&#34; in params:
                     n.tags = params[&#34;tags&#34;]
         else:
-            node_data = self.service.config.getitem(unique_id, extract=False)
+            try:
+                node_data = user_config.getitem(unique_id, extract=False)
+            except (KeyError, TypeError):
+                node_data = None
+                
             if not node_data:
                 context.abort(grpc.StatusCode.NOT_FOUND, f&#34;Node {unique_id} not found&#34;)
-            profile_service = ProfileService(self.service.config)
             resolved_data = profile_service.resolve_node_data(node_data)
-            n = node(unique_id, **resolved_data, config=self.service.config)
+            n = node(unique_id, **resolved_data, config=user_config)
             if sftp:
                 n.protocol = &#34;sftp&#34;
 
@@ -826,9 +1266,8 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
                     import json
                     import asyncio
                     import os
-                    from ..services.ai_service import AIService
                     
-                    service = AIService(self.service.config)
+                    service = ai_service
 
                     if node_info is None:
                         node_info = {}
@@ -1102,6 +1541,21 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
 <ul class="hlist">
 <li><a title="connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer">NodeServiceServicer</a></li>
 </ul>
+<h3>Instance variables</h3>
+<dl>
+<dt id="connpy.grpc_layer.server.NodeServicer.service"><code class="name">prop <span class="ident">service</span></code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def service(self):
+    return self._get_provider().nodes</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
 <h3>Inherited members</h3>
 <ul class="hlist">
 <li><code><b><a title="connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.NodeServiceServicer">NodeServiceServicer</a></b></code>:
@@ -1127,7 +1581,7 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
 </dd>
 <dt id="connpy.grpc_layer.server.PluginServicer"><code class="flex name class">
 <span>class <span class="ident">PluginServicer</span></span>
-<span>(</span><span>config)</span>
+<span>(</span><span>provider, registry=None)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -1135,8 +1589,23 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class PluginServicer(connpy_pb2_grpc.PluginServiceServicer, remote_plugin_pb2_grpc.RemotePluginServiceServicer):
-    def __init__(self, config):
-        self.service = PluginService(config)
+    def __init__(self, provider, registry=None):
+        if not hasattr(provider, &#34;mode&#34;):
+            from connpy.services.provider import ServiceProvider
+            provider = ServiceProvider(provider, mode=&#34;local&#34;)
+        self._fallback_provider = provider
+        self._registry = registry
+
+    def _get_provider(self):
+        if self._registry:
+            username = _current_user.get()
+            if username:
+                return self._registry.get_provider(username)
+        return self._fallback_provider
+
+    @property
+    def service(self):
+        return self._get_provider().plugins
 
     @handle_errors
     def list_plugins(self, request, context):
@@ -1183,6 +1652,21 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
 <li><a title="connpy.grpc_layer.connpy_pb2_grpc.PluginServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.PluginServiceServicer">PluginServiceServicer</a></li>
 <li><a title="connpy.grpc_layer.remote_plugin_pb2_grpc.RemotePluginServiceServicer" href="remote_plugin_pb2_grpc.html#connpy.grpc_layer.remote_plugin_pb2_grpc.RemotePluginServiceServicer">RemotePluginServiceServicer</a></li>
 </ul>
+<h3>Instance variables</h3>
+<dl>
+<dt id="connpy.grpc_layer.server.PluginServicer.service"><code class="name">prop <span class="ident">service</span></code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def service(self):
+    return self._get_provider().plugins</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
 <h3>Inherited members</h3>
 <ul class="hlist">
 <li><code><b><a title="connpy.grpc_layer.connpy_pb2_grpc.PluginServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.PluginServiceServicer">PluginServiceServicer</a></b></code>:
@@ -1204,7 +1688,7 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
 </dd>
 <dt id="connpy.grpc_layer.server.ProfileServicer"><code class="flex name class">
 <span>class <span class="ident">ProfileServicer</span></span>
-<span>(</span><span>config)</span>
+<span>(</span><span>provider, registry=None)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -1212,10 +1696,27 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class ProfileServicer(connpy_pb2_grpc.ProfileServiceServicer):
-    def __init__(self, config):
-        self.service = ProfileService(config)
-        self.node_service = NodeService(config)
+    def __init__(self, provider, registry=None):
+        if not hasattr(provider, &#34;mode&#34;):
+            from connpy.services.provider import ServiceProvider
+            provider = ServiceProvider(provider, mode=&#34;local&#34;)
+        self._fallback_provider = provider
+        self._registry = registry
 
+    def _get_provider(self):
+        if self._registry:
+            username = _current_user.get()
+            if username:
+                return self._registry.get_provider(username)
+        return self._fallback_provider
+
+    @property
+    def service(self):
+        return self._get_provider().profiles
+
+    @property
+    def node_service(self):
+        return self._get_provider().nodes
 
     @handle_errors
     def list_profiles(self, request, context):
@@ -1253,6 +1754,33 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
 <ul class="hlist">
 <li><a title="connpy.grpc_layer.connpy_pb2_grpc.ProfileServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ProfileServiceServicer">ProfileServiceServicer</a></li>
 </ul>
+<h3>Instance variables</h3>
+<dl>
+<dt id="connpy.grpc_layer.server.ProfileServicer.node_service"><code class="name">prop <span class="ident">node_service</span></code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def node_service(self):
+    return self._get_provider().nodes</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.server.ProfileServicer.service"><code class="name">prop <span class="ident">service</span></code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def service(self):
+    return self._get_provider().profiles</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
 <h3>Inherited members</h3>
 <ul class="hlist">
 <li><code><b><a title="connpy.grpc_layer.connpy_pb2_grpc.ProfileServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ProfileServiceServicer">ProfileServiceServicer</a></b></code>:
@@ -1463,7 +1991,7 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
 </dd>
 <dt id="connpy.grpc_layer.server.SystemServicer"><code class="flex name class">
 <span>class <span class="ident">SystemServicer</span></span>
-<span>(</span><span>config)</span>
+<span>(</span><span>provider, registry=None)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -1471,8 +1999,23 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class SystemServicer(connpy_pb2_grpc.SystemServiceServicer):
-    def __init__(self, config):
-        self.service = SystemService(config)
+    def __init__(self, provider, registry=None):
+        if not hasattr(provider, &#34;mode&#34;):
+            from connpy.services.provider import ServiceProvider
+            provider = ServiceProvider(provider, mode=&#34;local&#34;)
+        self._fallback_provider = provider
+        self._registry = registry
+
+    def _get_provider(self):
+        if self._registry:
+            username = _current_user.get()
+            if username:
+                return self._registry.get_provider(username)
+        return self._fallback_provider
+
+    @property
+    def service(self):
+        return self._get_provider().system
 
     @handle_errors
     def start_api(self, request, context):
@@ -1503,6 +2046,21 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
 <ul class="hlist">
 <li><a title="connpy.grpc_layer.connpy_pb2_grpc.SystemServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.SystemServiceServicer">SystemServiceServicer</a></li>
 </ul>
+<h3>Instance variables</h3>
+<dl>
+<dt id="connpy.grpc_layer.server.SystemServicer.service"><code class="name">prop <span class="ident">service</span></code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def service(self):
+    return self._get_provider().system</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
 <h3>Inherited members</h3>
 <ul class="hlist">
 <li><code><b><a title="connpy.grpc_layer.connpy_pb2_grpc.SystemServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.SystemServiceServicer">SystemServiceServicer</a></b></code>:
@@ -1539,15 +2097,38 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
 <ul>
 <li>
 <h4><code><a title="connpy.grpc_layer.server.AIServicer" href="#connpy.grpc_layer.server.AIServicer">AIServicer</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.grpc_layer.server.AIServicer.service" href="#connpy.grpc_layer.server.AIServicer.service">service</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.grpc_layer.server.AuthInterceptor" href="#connpy.grpc_layer.server.AuthInterceptor">AuthInterceptor</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.grpc_layer.server.AuthInterceptor.OPEN_METHODS" href="#connpy.grpc_layer.server.AuthInterceptor.OPEN_METHODS">OPEN_METHODS</a></code></li>
+<li><code><a title="connpy.grpc_layer.server.AuthInterceptor.intercept_service" href="#connpy.grpc_layer.server.AuthInterceptor.intercept_service">intercept_service</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.grpc_layer.server.AuthServicer" href="#connpy.grpc_layer.server.AuthServicer">AuthServicer</a></code></h4>
 </li>
 <li>
 <h4><code><a title="connpy.grpc_layer.server.ConfigServicer" href="#connpy.grpc_layer.server.ConfigServicer">ConfigServicer</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.grpc_layer.server.ConfigServicer.service" href="#connpy.grpc_layer.server.ConfigServicer.service">service</a></code></li>
+</ul>
 </li>
 <li>
 <h4><code><a title="connpy.grpc_layer.server.ExecutionServicer" href="#connpy.grpc_layer.server.ExecutionServicer">ExecutionServicer</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.grpc_layer.server.ExecutionServicer.service" href="#connpy.grpc_layer.server.ExecutionServicer.service">service</a></code></li>
+</ul>
 </li>
 <li>
 <h4><code><a title="connpy.grpc_layer.server.ImportExportServicer" href="#connpy.grpc_layer.server.ImportExportServicer">ImportExportServicer</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.grpc_layer.server.ImportExportServicer.node_service" href="#connpy.grpc_layer.server.ImportExportServicer.node_service">node_service</a></code></li>
+<li><code><a title="connpy.grpc_layer.server.ImportExportServicer.service" href="#connpy.grpc_layer.server.ImportExportServicer.service">service</a></code></li>
+</ul>
 </li>
 <li>
 <h4><code><a title="connpy.grpc_layer.server.LoggingInterceptor" href="#connpy.grpc_layer.server.LoggingInterceptor">LoggingInterceptor</a></code></h4>
@@ -1557,12 +2138,22 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
 </li>
 <li>
 <h4><code><a title="connpy.grpc_layer.server.NodeServicer" href="#connpy.grpc_layer.server.NodeServicer">NodeServicer</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.grpc_layer.server.NodeServicer.service" href="#connpy.grpc_layer.server.NodeServicer.service">service</a></code></li>
+</ul>
 </li>
 <li>
 <h4><code><a title="connpy.grpc_layer.server.PluginServicer" href="#connpy.grpc_layer.server.PluginServicer">PluginServicer</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.grpc_layer.server.PluginServicer.service" href="#connpy.grpc_layer.server.PluginServicer.service">service</a></code></li>
+</ul>
 </li>
 <li>
 <h4><code><a title="connpy.grpc_layer.server.ProfileServicer" href="#connpy.grpc_layer.server.ProfileServicer">ProfileServicer</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.grpc_layer.server.ProfileServicer.node_service" href="#connpy.grpc_layer.server.ProfileServicer.node_service">node_service</a></code></li>
+<li><code><a title="connpy.grpc_layer.server.ProfileServicer.service" href="#connpy.grpc_layer.server.ProfileServicer.service">service</a></code></li>
+</ul>
 </li>
 <li>
 <h4><code><a title="connpy.grpc_layer.server.StatusBridge" href="#connpy.grpc_layer.server.StatusBridge">StatusBridge</a></code></h4>
@@ -1576,6 +2167,9 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
 </li>
 <li>
 <h4><code><a title="connpy.grpc_layer.server.SystemServicer" href="#connpy.grpc_layer.server.SystemServicer">SystemServicer</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.grpc_layer.server.SystemServicer.service" href="#connpy.grpc_layer.server.SystemServicer.service">service</a></code></li>
+</ul>
 </li>
 </ul>
 </li>
@@ -1583,7 +2177,7 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
 </footer>
 </body>
 </html>

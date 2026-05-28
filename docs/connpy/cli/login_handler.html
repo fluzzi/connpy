@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<meta name="generator" content="pdoc3 0.11.5">
+<title>connpy.cli.login_handler API documentation</title>
+<meta name="description" content="">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:1.5em;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:2em 0 .50em 0}h3{font-size:1.4em;margin:1.6em 0 .7em 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .2s ease-in-out}a:visited{color:#503}a:hover{color:#b62}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900;font-weight:bold}pre code{font-size:.8em;line-height:1.4em;padding:1em;display:block}code{background:#f3f3f3;font-family:"DejaVu Sans Mono",monospace;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source > summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible;min-width:max-content}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em 1em;margin:1em 0}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul ul{padding-left:1em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha512-D9gUyxqja7hBtkWpPWGt9wfbfaMGVt9gnyCvYa+jojwwPHLCzUm5i8rpk7vD7wNee9bA35eYIjobYPaQuKS1MQ==" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => {
+hljs.configure({languages: ['bash', 'css', 'diff', 'graphql', 'ini', 'javascript', 'json', 'plaintext', 'python', 'python-repl', 'rust', 'shell', 'sql', 'typescript', 'xml', 'yaml']});
+hljs.highlightAll();
+/* Collapse source docstrings */
+setTimeout(() => {
+[...document.querySelectorAll('.hljs.language-python > .hljs-string')]
+.filter(el => el.innerHTML.length > 200 && ['"""', "'''"].includes(el.innerHTML.substring(0, 3)))
+.forEach(el => {
+let d = document.createElement('details');
+d.classList.add('hljs-string');
+d.innerHTML = '<summary>"""</summary>' + el.innerHTML.substring(3);
+el.replaceWith(d);
+});
+}, 100);
+})</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>connpy.cli.login_handler</code></h1>
+</header>
+<section id="section-intro">
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="connpy.cli.login_handler.LoginHandler"><code class="flex name class">
+<span>class <span class="ident">LoginHandler</span></span>
+<span>(</span><span>app)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class LoginHandler:
+    def __init__(self, app):
+        self.app = app
+
+    def dispatch(self, args):
+        action = getattr(args, &#34;action&#34;, None)
+        if action == &#34;login&#34;:
+            return self.login(args)
+        elif action == &#34;logout&#34;:
+            return self.logout(args)
+        else:
+            printer.error(f&#34;Unknown action: {action}&#34;)
+            sys.exit(1)
+
+    def login(self, args):
+        if getattr(args, &#34;status&#34;, False):
+            return self.show_status()
+
+        if self.app.services.mode != &#34;remote&#34;:
+            printer.warning(&#34;Note: Your current configuration is set to local mode. Logging in will save credentials, but they will only apply when service-mode is set to &#39;remote&#39;.&#34;)
+
+        username = getattr(args, &#34;username&#34;, None)
+        if not username:
+            try:
+                username = input(&#34;Username: &#34;).strip()
+                if not username:
+                    printer.error(&#34;Username cannot be empty.&#34;)
+                    sys.exit(1)
+            except (KeyboardInterrupt, EOFError):
+                printer.warning(&#34;\nOperation cancelled.&#34;)
+                sys.exit(130)
+
+        try:
+            password = getpass.getpass(&#34;Password: &#34;)
+            if not password:
+                printer.error(&#34;Password cannot be empty.&#34;)
+                sys.exit(1)
+        except (KeyboardInterrupt, EOFError):
+            printer.warning(&#34;\nOperation cancelled.&#34;)
+            sys.exit(130)
+
+        # Make the gRPC login call via self.app.services.auth stub
+        # We need to make sure auth is initialized in remote mode.
+        # If we are in local mode, self.app.services.auth is not initialized on ServiceProvider.
+        # Let&#39;s instantiate it dynamically if it&#39;s not present.
+        auth_service = getattr(self.app.services, &#34;auth&#34;, None)
+        if not auth_service:
+            import grpc
+            from ..grpc_layer.stubs import AuthStub
+            remote_host = self.app.services.remote_host or self.app.config.config.get(&#34;remote_host&#34;)
+            if not remote_host:
+                printer.error(&#34;Remote host is not configured. Run &#39;connpy config --remote HOST:PORT&#39; first.&#34;)
+                sys.exit(1)
+            try:
+                channel = grpc.insecure_channel(remote_host)
+                auth_service = AuthStub(channel, remote_host=remote_host)
+            except Exception as e:
+                printer.error(f&#34;Failed to connect to remote server for login: {e}&#34;)
+                sys.exit(1)
+
+        try:
+            res = auth_service.login(username, password)
+            token = res[&#34;token&#34;]
+            
+            # Save token to ~/.config/conn/.token
+            token_path = os.path.join(self.app.config.defaultdir, &#34;.token&#34;)
+            with open(token_path, &#34;w&#34;) as f:
+                f.write(token)
+            os.chmod(token_path, 0o600)
+            
+            printer.success(f&#34;Logged in successfully as &#39;{username}&#39;. Session expires in 8 hours.&#34;)
+        except ConnpyError as e:
+            printer.error(f&#34;Login failed: {e}&#34;)
+            sys.exit(1)
+        except Exception as e:
+            printer.error(f&#34;Login failed with unexpected error: {e}&#34;)
+            sys.exit(1)
+
+    def logout(self, args):
+        token_path = os.path.join(self.app.config.defaultdir, &#34;.token&#34;)
+        if os.path.exists(token_path):
+            try:
+                os.remove(token_path)
+                printer.success(&#34;Logged out successfully. Local session cleared.&#34;)
+            except Exception as e:
+                printer.error(f&#34;Failed to clear session: {e}&#34;)
+                sys.exit(1)
+        else:
+            printer.info(&#34;No active session found (already logged out).&#34;)
+
+    def show_status(self):
+        import base64
+        import json
+        import datetime
+        
+        token_path = os.path.join(self.app.config.defaultdir, &#34;.token&#34;)
+        if not os.path.exists(token_path):
+            printer.warning(&#34;No active session found. You can log in using &#39;connpy login&#39;.&#34;)
+            return
+            
+        try:
+            with open(token_path, &#34;r&#34;) as f:
+                token = f.read().strip()
+                
+            parts = token.split(&#34;.&#34;)
+            if len(parts) != 3:
+                printer.error(&#34;Invalid local session token format.&#34;)
+                return
+                
+            payload_b64 = parts[1]
+            payload_b64 += &#34;=&#34; * ((4 - len(payload_b64) % 4) % 4)
+            payload_bytes = base64.urlsafe_b64decode(payload_b64)
+            payload = json.loads(payload_bytes.decode(&#34;utf-8&#34;))
+            
+            username = payload.get(&#34;sub&#34;)
+            exp = payload.get(&#34;exp&#34;)
+            
+            if not exp:
+                printer.success(f&#34;Active session as &#39;{username}&#39; (Indefinite expiration).&#34;)
+                return
+                
+            now = datetime.datetime.now(datetime.timezone.utc).timestamp()
+            if now &gt; exp:
+                printer.error(&#34;Session has expired. Please log in again using &#39;connpy login&#39;.&#34;)
+                return
+                
+            remaining = exp - now
+            hours = int(remaining // 3600)
+            minutes = int((remaining % 3600) // 60)
+            
+            printer.success(f&#34;Logged in as &#39;{username}&#39;&#34;)
+            printer.info(f&#34;Time remaining: {hours}h {minutes}m&#34;)
+            
+            exp_dt = datetime.datetime.fromtimestamp(exp, datetime.timezone.utc)
+            printer.info(f&#34;Expires at: {exp_dt.strftime(&#39;%Y-%m-%d %H:%M:%S UTC&#39;)}&#34;)
+        except Exception as e:
+            printer.error(f&#34;Failed to check local session status: {e}&#34;)</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.cli.login_handler.LoginHandler.dispatch"><code class="name flex">
+<span>def <span class="ident">dispatch</span></span>(<span>self, args)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def dispatch(self, args):
+    action = getattr(args, &#34;action&#34;, None)
+    if action == &#34;login&#34;:
+        return self.login(args)
+    elif action == &#34;logout&#34;:
+        return self.logout(args)
+    else:
+        printer.error(f&#34;Unknown action: {action}&#34;)
+        sys.exit(1)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.cli.login_handler.LoginHandler.login"><code class="name flex">
+<span>def <span class="ident">login</span></span>(<span>self, args)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def login(self, args):
+    if getattr(args, &#34;status&#34;, False):
+        return self.show_status()
+
+    if self.app.services.mode != &#34;remote&#34;:
+        printer.warning(&#34;Note: Your current configuration is set to local mode. Logging in will save credentials, but they will only apply when service-mode is set to &#39;remote&#39;.&#34;)
+
+    username = getattr(args, &#34;username&#34;, None)
+    if not username:
+        try:
+            username = input(&#34;Username: &#34;).strip()
+            if not username:
+                printer.error(&#34;Username cannot be empty.&#34;)
+                sys.exit(1)
+        except (KeyboardInterrupt, EOFError):
+            printer.warning(&#34;\nOperation cancelled.&#34;)
+            sys.exit(130)
+
+    try:
+        password = getpass.getpass(&#34;Password: &#34;)
+        if not password:
+            printer.error(&#34;Password cannot be empty.&#34;)
+            sys.exit(1)
+    except (KeyboardInterrupt, EOFError):
+        printer.warning(&#34;\nOperation cancelled.&#34;)
+        sys.exit(130)
+
+    # Make the gRPC login call via self.app.services.auth stub
+    # We need to make sure auth is initialized in remote mode.
+    # If we are in local mode, self.app.services.auth is not initialized on ServiceProvider.
+    # Let&#39;s instantiate it dynamically if it&#39;s not present.
+    auth_service = getattr(self.app.services, &#34;auth&#34;, None)
+    if not auth_service:
+        import grpc
+        from ..grpc_layer.stubs import AuthStub
+        remote_host = self.app.services.remote_host or self.app.config.config.get(&#34;remote_host&#34;)
+        if not remote_host:
+            printer.error(&#34;Remote host is not configured. Run &#39;connpy config --remote HOST:PORT&#39; first.&#34;)
+            sys.exit(1)
+        try:
+            channel = grpc.insecure_channel(remote_host)
+            auth_service = AuthStub(channel, remote_host=remote_host)
+        except Exception as e:
+            printer.error(f&#34;Failed to connect to remote server for login: {e}&#34;)
+            sys.exit(1)
+
+    try:
+        res = auth_service.login(username, password)
+        token = res[&#34;token&#34;]
+        
+        # Save token to ~/.config/conn/.token
+        token_path = os.path.join(self.app.config.defaultdir, &#34;.token&#34;)
+        with open(token_path, &#34;w&#34;) as f:
+            f.write(token)
+        os.chmod(token_path, 0o600)
+        
+        printer.success(f&#34;Logged in successfully as &#39;{username}&#39;. Session expires in 8 hours.&#34;)
+    except ConnpyError as e:
+        printer.error(f&#34;Login failed: {e}&#34;)
+        sys.exit(1)
+    except Exception as e:
+        printer.error(f&#34;Login failed with unexpected error: {e}&#34;)
+        sys.exit(1)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.cli.login_handler.LoginHandler.logout"><code class="name flex">
+<span>def <span class="ident">logout</span></span>(<span>self, args)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def logout(self, args):
+    token_path = os.path.join(self.app.config.defaultdir, &#34;.token&#34;)
+    if os.path.exists(token_path):
+        try:
+            os.remove(token_path)
+            printer.success(&#34;Logged out successfully. Local session cleared.&#34;)
+        except Exception as e:
+            printer.error(f&#34;Failed to clear session: {e}&#34;)
+            sys.exit(1)
+    else:
+        printer.info(&#34;No active session found (already logged out).&#34;)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.cli.login_handler.LoginHandler.show_status"><code class="name flex">
+<span>def <span class="ident">show_status</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def show_status(self):
+    import base64
+    import json
+    import datetime
+    
+    token_path = os.path.join(self.app.config.defaultdir, &#34;.token&#34;)
+    if not os.path.exists(token_path):
+        printer.warning(&#34;No active session found. You can log in using &#39;connpy login&#39;.&#34;)
+        return
+        
+    try:
+        with open(token_path, &#34;r&#34;) as f:
+            token = f.read().strip()
+            
+        parts = token.split(&#34;.&#34;)
+        if len(parts) != 3:
+            printer.error(&#34;Invalid local session token format.&#34;)
+            return
+            
+        payload_b64 = parts[1]
+        payload_b64 += &#34;=&#34; * ((4 - len(payload_b64) % 4) % 4)
+        payload_bytes = base64.urlsafe_b64decode(payload_b64)
+        payload = json.loads(payload_bytes.decode(&#34;utf-8&#34;))
+        
+        username = payload.get(&#34;sub&#34;)
+        exp = payload.get(&#34;exp&#34;)
+        
+        if not exp:
+            printer.success(f&#34;Active session as &#39;{username}&#39; (Indefinite expiration).&#34;)
+            return
+            
+        now = datetime.datetime.now(datetime.timezone.utc).timestamp()
+        if now &gt; exp:
+            printer.error(&#34;Session has expired. Please log in again using &#39;connpy login&#39;.&#34;)
+            return
+            
+        remaining = exp - now
+        hours = int(remaining // 3600)
+        minutes = int((remaining % 3600) // 60)
+        
+        printer.success(f&#34;Logged in as &#39;{username}&#39;&#34;)
+        printer.info(f&#34;Time remaining: {hours}h {minutes}m&#34;)
+        
+        exp_dt = datetime.datetime.fromtimestamp(exp, datetime.timezone.utc)
+        printer.info(f&#34;Expires at: {exp_dt.strftime(&#39;%Y-%m-%d %H:%M:%S UTC&#39;)}&#34;)
+    except Exception as e:
+        printer.error(f&#34;Failed to check local session status: {e}&#34;)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="connpy.cli" href="index.html">connpy.cli</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="connpy.cli.login_handler.LoginHandler" href="#connpy.cli.login_handler.LoginHandler">LoginHandler</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.cli.login_handler.LoginHandler.dispatch" href="#connpy.cli.login_handler.LoginHandler.dispatch">dispatch</a></code></li>
+<li><code><a title="connpy.cli.login_handler.LoginHandler.login" href="#connpy.cli.login_handler.LoginHandler.login">login</a></code></li>
+<li><code><a title="connpy.cli.login_handler.LoginHandler.logout" href="#connpy.cli.login_handler.LoginHandler.logout">logout</a></code></li>
+<li><code><a title="connpy.cli.login_handler.LoginHandler.show_status" href="#connpy.cli.login_handler.LoginHandler.show_status">show_status</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
+</footer>
+</body>
+</html>

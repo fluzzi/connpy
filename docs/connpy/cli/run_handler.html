@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.6">
+<meta name="generator" content="pdoc3 0.11.5">
 <title>connpy.cli.run_handler API documentation</title>
 <meta name="description" content="">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
@@ -68,6 +68,17 @@ el.replaceWith(d);
 
     def node_run(self, args):
         nodes_filter = args.data[0]
+        
+        # Resolve and filter nodes through context-aware list_nodes
+        try:
+            matched_nodes = self.app.services.nodes.list_nodes(nodes_filter)
+        except Exception:
+            matched_nodes = []
+            
+        if not matched_nodes:
+            printer.error(f&#34;No nodes found matching filter: {nodes_filter}&#34;)
+            sys.exit(2)
+            
         commands = [&#34; &#34;.join(args.data[1:])]
 
         try:
@@ -84,7 +95,7 @@ el.replaceWith(d);
                     printer.test_panel(unique, node_output, node_status, node_result)
 
                 results = self.app.services.execution.test_commands(
-                    nodes_filter=nodes_filter,
+                    nodes_filter=matched_nodes,
                     commands=commands,
                     expected=args.test_expected,
                     on_node_complete=_on_node_complete
@@ -101,7 +112,7 @@ el.replaceWith(d);
                     printer.node_panel(unique, node_output, node_status)
 
                 results = self.app.services.execution.run_commands(
-                    nodes_filter=nodes_filter,
+                    nodes_filter=matched_nodes,
                     commands=commands,
                     on_node_complete=_on_node_complete
                 )
@@ -150,6 +161,28 @@ el.replaceWith(d);
         stdout = (output_cfg == &#34;stdout&#34;)
         folder = output_cfg if output_cfg not in [None, &#34;stdout&#34;] else None
         prompt = options.get(&#34;prompt&#34;)
+
+        # Resolve and filter nodes through context-aware list_nodes
+        try:
+            if isinstance(nodelist, str):
+                resolved_nodes = self.app.services.nodes.list_nodes(nodelist)
+            elif isinstance(nodelist, list):
+                resolved_nodes = []
+                for item in nodelist:
+                    matches = self.app.services.nodes.list_nodes(item)
+                    for m in matches:
+                        if m not in resolved_nodes:
+                            resolved_nodes.append(m)
+            else:
+                resolved_nodes = []
+        except Exception:
+            resolved_nodes = []
+
+        if not resolved_nodes:
+            printer.error(f&#34;[{name}] No nodes found matching filter: {nodelist}&#34;)
+            sys.exit(11)
+
+        nodelist = resolved_nodes
 
         try:
             header_printed = False
@@ -242,6 +275,28 @@ el.replaceWith(d);
     folder = output_cfg if output_cfg not in [None, &#34;stdout&#34;] else None
     prompt = options.get(&#34;prompt&#34;)
 
+    # Resolve and filter nodes through context-aware list_nodes
+    try:
+        if isinstance(nodelist, str):
+            resolved_nodes = self.app.services.nodes.list_nodes(nodelist)
+        elif isinstance(nodelist, list):
+            resolved_nodes = []
+            for item in nodelist:
+                matches = self.app.services.nodes.list_nodes(item)
+                for m in matches:
+                    if m not in resolved_nodes:
+                        resolved_nodes.append(m)
+        else:
+            resolved_nodes = []
+    except Exception:
+        resolved_nodes = []
+
+    if not resolved_nodes:
+        printer.error(f&#34;[{name}] No nodes found matching filter: {nodelist}&#34;)
+        sys.exit(11)
+
+    nodelist = resolved_nodes
+
     try:
         header_printed = False
         if action == &#34;run&#34;:
@@ -333,6 +388,17 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def node_run(self, args):
     nodes_filter = args.data[0]
+    
+    # Resolve and filter nodes through context-aware list_nodes
+    try:
+        matched_nodes = self.app.services.nodes.list_nodes(nodes_filter)
+    except Exception:
+        matched_nodes = []
+        
+    if not matched_nodes:
+        printer.error(f&#34;No nodes found matching filter: {nodes_filter}&#34;)
+        sys.exit(2)
+        
     commands = [&#34; &#34;.join(args.data[1:])]
 
     try:
@@ -349,7 +415,7 @@ el.replaceWith(d);
                 printer.test_panel(unique, node_output, node_status, node_result)
 
             results = self.app.services.execution.test_commands(
-                nodes_filter=nodes_filter,
+                nodes_filter=matched_nodes,
                 commands=commands,
                 expected=args.test_expected,
                 on_node_complete=_on_node_complete
@@ -366,7 +432,7 @@ el.replaceWith(d);
                 printer.node_panel(unique, node_output, node_status)
 
             results = self.app.services.execution.run_commands(
-                nodes_filter=nodes_filter,
+                nodes_filter=matched_nodes,
                 commands=commands,
                 on_node_complete=_on_node_complete
             )
@@ -454,7 +520,7 @@ el.replaceWith(d);
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
 </footer>
 </body>
 </html>
