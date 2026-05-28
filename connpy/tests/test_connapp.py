@@ -40,7 +40,7 @@ def test_node_del(mock_prompt, mock_delete_node, mock_list_nodes, app):
     mock_list_nodes.return_value = ["router1"]
     mock_prompt.return_value = {"delete": True}
     app.start(["node", "-r", "router1"])
-    mock_delete_node.assert_called_once_with("router1", is_folder=False)
+    mock_delete_node.assert_called_once_with("router1", is_folder=False, save=True)
 
 @patch("connpy.services.node_service.NodeService.list_nodes")
 @patch("connpy.services.node_service.NodeService.get_node_details")
@@ -312,5 +312,15 @@ def test_config_auth_file_path(mock_get_settings, mock_update_setting, mock_open
     args, kwargs = mock_update_setting.call_args
     assert args[0] == "ai"
     assert args[1]["engineer_auth"] == {"vertex_project": "file-project"}
+
+
+@patch("connpy.services.node_service.NodeService.list_nodes")
+@patch("connpy.services.node_service.NodeService.connect_node")
+def test_node_connect_exact_match_priority(mock_connect_node, mock_list_nodes, app):
+    """Test that exact matches are prioritized over partial/regex matches when connecting."""
+    mock_list_nodes.return_value = ["pe1@ctx", "qro1pe1@ctx"]
+    app.start(["node", "pe1@ctx"])
+    mock_connect_node.assert_called_once_with("pe1@ctx", sftp=False, debug=False, logger=app._service_logger)
+
 
 
