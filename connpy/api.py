@@ -48,14 +48,50 @@ def stop_api():
     return port
 
 def debug_api(port=8048, config=None):
-    from .grpc_layer.server import serve
-    conf = config or configfile()
-    server = serve(conf, port=port, debug=True)
-    printer.info(f"gRPC Server running in debug mode on port {port}...")
-    _wait_for_termination()
-    server.stop(0)
-    from .ai import cleanup
-    cleanup()
+    # Check if already running via PID file verification
+    for pid_file in [PID_FILE1, PID_FILE2]:
+        if os.path.exists(pid_file):
+            try:
+                with open(pid_file, "r") as f:
+                    pid = int(f.readline().strip())
+                os.kill(pid, 0)
+                # If we get here, process exists
+                printer.info(f"API is already running (PID {pid})")
+                return
+            except (ValueError, OSError, ProcessLookupError):
+                # Stale PID file, ignore here
+                pass
+
+    # Create PID file for the debug process
+    written_pid_file = None
+    my_pid = os.getpid()
+    try:
+        with open(PID_FILE1, "w") as f:
+            f.write(str(my_pid) + "\n" + str(port))
+        written_pid_file = PID_FILE1
+    except OSError:
+        try:
+            with open(PID_FILE2, "w") as f:
+                f.write(str(my_pid) + "\n" + str(port))
+            written_pid_file = PID_FILE2
+        except OSError:
+            pass
+
+    try:
+        from .grpc_layer.server import serve
+        conf = config or configfile()
+        server = serve(conf, port=port, debug=True)
+        printer.info(f"gRPC Server running in debug mode on port {port}...")
+        _wait_for_termination()
+        server.stop(0)
+        from .ai import cleanup
+        cleanup()
+    finally:
+        if written_pid_file and os.path.exists(written_pid_file):
+            try:
+                os.remove(written_pid_file)
+            except OSError:
+                pass
 
 def start_server(port=8048, config=None):
     try:
