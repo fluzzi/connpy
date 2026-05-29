@@ -215,7 +215,7 @@ class UserService:
         if username not in registry["users"]:
             raise ValueError(f"User '{username}' not found")
             
-        expiration = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=8)
+        expiration = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=12)
         payload = {
             "sub": username,
             "exp": expiration

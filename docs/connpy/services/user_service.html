@@ -261,7 +261,7 @@ el.replaceWith(d);
         if username not in registry[&#34;users&#34;]:
             raise ValueError(f&#34;User &#39;{username}&#39; not found&#34;)
             
-        expiration = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=8)
+        expiration = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=12)
         payload = {
             &#34;sub&#34;: username,
             &#34;exp&#34;: expiration
@@ -473,7 +473,7 @@ Mode B: config_path set -&gt; Reuses existing directory after validating its str
     if username not in registry[&#34;users&#34;]:
         raise ValueError(f&#34;User &#39;{username}&#39; not found&#34;)
         
-    expiration = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=8)
+    expiration = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=12)
     payload = {
         &#34;sub&#34;: username,
         &#34;exp&#34;: expiration

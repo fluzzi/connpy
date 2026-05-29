@@ -192,3 +192,6 @@ response = myai.ask("What is the status of the BGP neighbors in the office?")
 
 ---
 *For detailed developer notes and plugin hooks documentation, see the [Documentation](https://fluzzi.github.io/connpy/).*
+
+## 📜 License
+[PolyForm Noncommercial 1.0.0](LICENSE)

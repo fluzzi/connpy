@@ -765,13 +765,11 @@ class ai:
                 if self.interrupted:
                     raise KeyboardInterrupt
                 
-                # Soft limit warning
-                if iteration == self.soft_limit_iterations and not soft_limit_warned:
-                    self.console.print(f"[warning]⚠ Engineer has performed {iteration} steps. This is taking longer than expected.[/warning]")
-                    self.console.print(f"[warning]  You can press Ctrl+C to interrupt and get a summary.[/warning]")
-                    soft_limit_warned = True
-                
-                if status and not chat_history: status.update(f"[ai_status]Engineer: Analyzing mission... (step {iteration})")
+                if status and not chat_history:
+                    status_text = f"[ai_status]Engineer: Analyzing mission... (step {iteration})"
+                    if iteration >= self.soft_limit_iterations:
+                        status_text += " [warning]⚠ Taking longer than expected (Ctrl+C to interrupt)[/warning]"
+                    status.update(status_text)
                 
                 try:
                     safe_messages = self._sanitize_messages(messages)
@@ -796,17 +794,23 @@ class ai:
                     
                     # Notificación en tiempo real de la tarea técnica (Only if not in Architect loop)
                     if status and not chat_history:
-                        if fn == "list_nodes": status.update(f"[ai_status]Engineer: [SEARCH] {args.get('filter_pattern','.*')}")
+                        s_text = ""
+                        if fn == "list_nodes": s_text = f"[ai_status]Engineer: [SEARCH] {args.get('filter_pattern','.*')}"
                         elif fn == "run_commands": 
                             cmds = args.get('commands', [])
                             cmd_str = cmds[0] if cmds else ""
-                            status.update(f"[ai_status]Engineer: [CMD] {cmd_str}")
-                        elif fn == "get_node_info": status.update(f"[ai_status]Engineer: [INSPECT] {args.get('node_name','')}")
+                            s_text = f"[ai_status]Engineer: [CMD] {cmd_str}"
+                        elif fn == "get_node_info": s_text = f"[ai_status]Engineer: [INSPECT] {args.get('node_name','')}"
                         elif fn.startswith("mcp_"):
                             server = fn.split("__")[0].replace("mcp_", "")
                             tool = fn.split("__")[1] if "__" in fn else fn
-                            status.update(f"[ai_status]Engineer: [MCP:{server}] {tool}")
-                        elif fn in self.tool_status_formatters: status.update(self.tool_status_formatters[fn](args))
+                            s_text = f"[ai_status]Engineer: [MCP:{server}] {tool}"
+                        elif fn in self.tool_status_formatters: s_text = self.tool_status_formatters[fn](args)
+                        
+                        if s_text:
+                            if iteration >= self.soft_limit_iterations:
+                                s_text += " [warning]⚠ Taking longer than expected (Ctrl+C to interrupt)[/warning]"
+                            status.update(s_text)
 
                     if debug:
                         self._print_debug_observation(f"Decision: {fn}", args, status=status)
@@ -1011,11 +1015,18 @@ class ai:
 
     @MethodHook
     def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=False, stream=True, session_id=None, chunk_callback=None):
-        soft_limit_warned = False
         is_engineer_keyless = "vertex" in self.engineer_model.lower() or "ollama" in self.engineer_model.lower() or "local" in self.engineer_model.lower()
         if not self.engineer_key and not self.engineer_auth and not is_engineer_keyless:
             raise ValueError("Engineer API key or authentication not configured. Use 'connpy config --engineer-auth <auth>' to set it.")
 
+        def update_status(text):
+            if not status:
+                return
+            if iteration >= self.soft_limit_iterations:
+                warning_suffix = " [warning]⚠ Taking longer than expected (Ctrl+C to interrupt)[/warning]"
+                if warning_suffix not in text:
+                    text += warning_suffix
+            status.update(text)
             
         if chat_history is None: chat_history = []
         
@@ -1106,18 +1117,14 @@ class ai:
                 if self.interrupted:
                     raise KeyboardInterrupt
                 
-                # Soft limit warning
-                if iteration == self.soft_limit_iterations and not soft_limit_warned:
-                    self.console.print(f"[warning]⚠ Agent has performed {iteration} steps. This is taking longer than expected.[/warning]")
-                    self.console.print(f"[warning]  You can press Ctrl+C to interrupt and get a summary of progress.[/warning]")
-                    soft_limit_warned = True
+                # Soft limit warning - handled inline within update_status
                 
                 label = "[architect][bold]Architect[/bold][/architect]" if current_brain == "architect" else "[engineer][bold]Engineer[/bold][/engineer]"
                 if status: 
                     # Notify responder identity for web/remote clients
                     if getattr(status, "is_web", False) or getattr(status, "is_remote", False):
                         status.update(f"__RESPONDER__:{current_brain}")
-                    status.update(f"{label} is thinking... (step {iteration})")
+                    update_status(f"{label} is thinking... (step {iteration})")
                 
                 streamed_response = False
                 try:
@@ -1132,7 +1139,7 @@ class ai:
                         response = completion(model=model, messages=safe_messages, tools=tools, num_retries=3, **current_auth)
                 except Exception as e:
                     if current_brain == "architect":
-                        if status: status.update("[unavailable]Architect unavailable! Falling back to Engineer...")
+                        if status: update_status("[unavailable]Architect unavailable! Falling back to Engineer...")
                         # Preserve context when falling back - use clean_input directly
                         current_brain = "engineer"
                         model = self.engineer_model
@@ -1189,8 +1196,8 @@ class ai:
                         continue
                     
                     if status:
-                        if fn == "delegate_to_engineer": status.update(f"[architect]Architect: [DELEGATING MISSION] {args.get('task','')[:40]}...")
-                        elif fn == "manage_memory_tool": status.update(f"[architect]Architect: [UPDATING MEMORY]")
+                        if fn == "delegate_to_engineer": update_status(f"[architect]Architect: [DELEGATING MISSION] {args.get('task','')[:40]}...")
+                        elif fn == "manage_memory_tool": update_status(f"[architect]Architect: [UPDATING MEMORY]")
 
                     if debug:
                         self._print_debug_observation(f"Decision: {fn}", args, status=status)
@@ -1199,7 +1206,7 @@ class ai:
                         obs, eng_usage = self._engineer_loop(args["task"], status=status, debug=debug, chat_history=messages[:-1])
                         usage["input"] += eng_usage["input"]; usage["output"] += eng_usage["output"]; usage["total"] += eng_usage["total"]
                     elif fn == "consult_architect":
-                        if status: status.update("[architect]Engineer consulting Architect...")
+                        if status: update_status("[architect]Engineer consulting Architect...")
                         try:
                             # Consultation only - Engineer stays in control
                             claude_resp = completion(
@@ -1221,11 +1228,11 @@ class ai:
                                     try: status.start()
                                     except: pass
                         except Exception as e:
-                            if status: status.update("[unavailable]Architect unavailable! Engineer continuing alone...")
+                            if status: update_status("[unavailable]Architect unavailable! Engineer continuing alone...")
                             obs = f"Architect unavailable ({str(e)}). Proceeding with your best technical judgment."
                     
                     elif fn == "escalate_to_architect":
-                        if status: status.update("[architect]Transferring control to Architect...")
+                        if status: update_status("[architect]Transferring control to Architect...")
                         # Full escalation - Architect takes over
                         current_brain = "architect"
                         model = self.architect_model
@@ -1247,7 +1254,7 @@ class ai:
                                 except: pass
                     
                     elif fn == "return_to_engineer":
-                        if status: status.update("[engineer]Transferring control back to Engineer...")
+                        if status: update_status("[engineer]Transferring control back to Engineer...")
                         # Architect returns control to Engineer
                         current_brain = "engineer"
                         model = self.engineer_model
@@ -1300,7 +1307,7 @@ class ai:
                         messages.append(resp_msg.model_dump(exclude_none=True))
                     except Exception as e:
                         if status:
-                            status.update(f"[error]Error fetching summary: {e}[/error]")
+                            update_status(f"[error]Error fetching summary: {e}[/error]")
                         printer.warning(f"Failed to fetch final summary from LLM: {e}")
         except KeyboardInterrupt:
             if status: status.update("[error]Interrupted! Closing pending tasks...")
