@@ -53,7 +53,6 @@ service ExecutionService {
     rpc run_commands (RunRequest) returns (stream NodeRunResult) {}
     rpc test_commands (TestRequest) returns (stream NodeRunResult) {}
     rpc run_cli_script (ScriptRequest) returns (StructResponse) {}
-    rpc run_yaml_playbook (ScriptRequest) returns (StructResponse) {}
 }
 
 service ImportExportService {
@@ -72,6 +71,9 @@ service AIService {
     rpc configure_mcp (MCPRequest) returns (google.protobuf.Empty) {}
     rpc list_mcp_servers (google.protobuf.Empty) returns (ValueResponse) {}
     rpc load_session_data (StringRequest) returns (StructResponse) {}
+    rpc build_playbook_chat (stream AskRequest) returns (stream AIResponse) {}
+    rpc analyze_execution_results (AnalyzeRequest) returns (stream AIResponse) {}
+    rpc predict_execution_results (PreflightRequest) returns (stream AIResponse) {}
 }
 
 service SystemService {
@@ -316,4 +318,14 @@ message LoginResponse {
 message ChangePasswordRequest {
     string old_password = 1;
     string new_password = 2;
+}
+
+message AnalyzeRequest {
+    google.protobuf.Struct results = 1;
+    string query = 2;
+}
+
+message PreflightRequest {
+    repeated string target_nodes = 1;
+    repeated string commands = 2;
 }

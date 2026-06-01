@@ -303,6 +303,9 @@ class connapp:
         runparser.add_argument("run", nargs='+', action=self._store_type, help=get_help("run"), default="run").completer = nodes_completer
         runparser.add_argument("-t", "--test", dest="test_expected", nargs='+', help="Expected text(s) to validate in output. Converts the action from 'run' to 'test'")
         runparser.add_argument("-g","--generate", dest="action", action="store_const", help="Generate yaml file template", const="generate", default="run")
+        runparser.add_argument("--generate-ai", dest="action", action="store_const", help="Generate a playbook interactively with AI assistance", const="generate_ai")
+        runparser.add_argument("--analyze", nargs='?', const="", help="Analyze actual command execution results using AI")
+        runparser.add_argument("--preflight-ai", action="store_true", help="Simulate and predict command execution on devices using AI preventively")
         runparser.set_defaults(func=self._run.dispatch)
         #APIPARSER
         apiparser = subparsers.add_parser("api", help="Start and stop connpy API", description="Start and stop connpy API", formatter_class=RichHelpFormatter) 

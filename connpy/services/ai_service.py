@@ -319,3 +319,37 @@ class AIService(BaseService):
         agent = ai(self.config)
         return agent.load_session_data(session_id)
 
+    def build_playbook_chat(self, user_input: str, chat_history: list = None, status=None, chunk_callback=None):
+        """Interact with the specialized Playbook Builder Agent."""
+        from connpy.ai import PlaybookBuilderAgent
+        agent = PlaybookBuilderAgent(self.config)
+        return agent.ask(user_input, chat_history=chat_history, status=status, chunk_callback=chunk_callback)
+
+    def analyze_execution_results(self, results: dict, query: str = None, status=None, chunk_callback=None):
+        """Analyze actual command execution results using Network Architect 1-shot."""
+        import json
+        results_str = json.dumps(results, indent=2)
+        
+        prompt = f"@architect: Please analyze the following actual execution results. Diagnose any issues, highlight successful actions, and suggest strategic remediation steps if needed."
+        if query:
+            prompt += f"\nSpecific user request: {query}"
+        prompt += f"\n\nResults Data:\n{results_str}"
+        prompt += "\n\nCRITICAL DIRECTIVE: You are running in a strictly 1-shot offline diagnostics mode (--analyze). There is no active conversation loop, and you are NOT conversing with a Network Engineer. You MUST deliver your complete strategic analysis immediately. DO NOT suggest, mention, or attempt to delegate the session back to the engineer."
+        
+        # Delegate to self.ask, setting stream=True and forwarding callback/status.
+        # This will invoke standard ai.ask with '@architect:' prefix, forcing 1-shot architect brain.
+        return self.ask(prompt, status=status, chunk_callback=chunk_callback, one_shot=True)
+
+    def predict_execution_results(self, target_nodes: list, commands: list, status=None, chunk_callback=None):
+        """Predict and simulate execution results preventively using the Preflight Simulation Agent (1-shot)."""
+        nodes_str = ", ".join(target_nodes)
+        commands_str = "\n".join(f"- {cmd}" for cmd in commands)
+        
+        prompt = f"@engineer: Act as a Preflight Simulation Agent. Simulate and predict the expected outputs and behaviors of the following commands on the target nodes. Alert about potential safety or configuration risks based on node profiles."
+        prompt += f"\n\nTarget Nodes: {nodes_str}"
+        prompt += f"\nCommands to simulate:\n{commands_str}"
+        prompt += "\n\nCRITICAL SCALABILITY DIRECTIVE: If there are many target nodes, DO NOT list predictions node-by-node. Instead, group them by Operating System, vendor, or platform, and provide a highly concise Executive Summary. Detail individual risks only for nodes that present specific anomalies or security concerns. Focus on overall impact."
+        
+        # Delegate to self.ask, using the standard engineer brain but with the simulated preflight prompt.
+        return self.ask(prompt, status=status, chunk_callback=chunk_callback)
+

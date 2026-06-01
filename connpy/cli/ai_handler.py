@@ -94,7 +94,7 @@ class AIHandler:
             
     def single_question(self, args, session_id):
         query = " ".join(args.ask)
-        with console.status("[ai_status]Agent is thinking and analyzing...") as status:
+        with console.status("[ai_status]Agent is thinking and analyzing...[/ai_status]") as status:
             result = self.app.myai.ask(query, status=status, debug=args.debug, session_id=session_id, trust=args.trust, **self.ai_overrides)
         
         responder = result.get("responder", "engineer")
@@ -131,7 +131,7 @@ class AIHandler:
                 if not user_query.strip(): continue
                 if user_query.lower() in ['exit', 'quit', 'bye', 'cancel']: break
                 
-                with console.status("[ai_status]Agent is thinking...") as status:
+                with console.status("[ai_status]Agent is thinking...[/ai_status]") as status:
                     result = self.app.myai.ask(user_query, chat_history=history, status=status, debug=args.debug, trust=args.trust, session_id=session_id, **self.ai_overrides)
                 
                 new_history = result.get("chat_history")

@@ -63,7 +63,12 @@ el.replaceWith(d);
     def dispatch(self, args):
         if len(args.data) &gt; 1:
             args.action = &#34;noderun&#34;
-        actions = {&#34;noderun&#34;: self.node_run, &#34;generate&#34;: self.yaml_generate, &#34;run&#34;: self.yaml_run}
+        actions = {
+            &#34;noderun&#34;: self.node_run,
+            &#34;generate&#34;: self.yaml_generate,
+            &#34;generate_ai&#34;: self.ai_generate,
+            &#34;run&#34;: self.yaml_run
+        }
         return actions.get(args.action)(args)
 
     def node_run(self, args):
@@ -80,6 +85,41 @@ el.replaceWith(d);
             sys.exit(2)
             
         commands = [&#34; &#34;.join(args.data[1:])]
+
+        # Check for Preflight AI simulation
+        if getattr(args, &#34;preflight_ai&#34;, False):
+            matched_node_names = [n.get(&#34;name&#34;) if isinstance(n, dict) else n for n in matched_nodes]
+            
+            renderer = printer.BlockMarkdownRenderer()
+            first_chunk = True
+            status_context = printer.console.status(&#34;[ai_status]Simulating execution...[/ai_status]&#34;)
+            
+            def callback(chunk):
+                nonlocal first_chunk
+                if first_chunk:
+                    try: status_context.stop()
+                    except: pass
+                    printer.console.print(Rule(title=&#34;[engineer][bold]Preflight AI Simulation[/bold][/engineer]&#34;, style=&#34;engineer&#34;))
+                    first_chunk = False
+                renderer.feed(chunk)
+            
+            try:
+                status_context.start()
+                self.app.services.ai.predict_execution_results(
+                    matched_node_names,
+                    commands,
+                    chunk_callback=callback
+                )
+                if first_chunk:
+                    try: status_context.stop()
+                    except: pass
+                    printer.console.print(Rule(title=&#34;[engineer][bold]Preflight AI Simulation[/bold][/engineer]&#34;, style=&#34;engineer&#34;))
+                renderer.flush()
+                printer.console.print(Rule(style=&#34;engineer&#34;))
+            except Exception as e:
+                printer.error(f&#34;Preflight AI simulation failed: {e}&#34;)
+                sys.exit(1)
+            sys.exit(0)
 
         try:
             header_printed = False
@@ -118,6 +158,40 @@ el.replaceWith(d);
                 )
                 printer.run_summary(results)
 
+            # Analyze execution results if requested
+            if getattr(args, &#34;analyze&#34;, None) is not None:
+                printer.console.print()
+                
+                renderer = printer.BlockMarkdownRenderer()
+                first_chunk = True
+                status_context = printer.console.status(&#34;[ai_status]Analyzing execution results...[/ai_status]&#34;)
+                
+                def callback(chunk):
+                    nonlocal first_chunk
+                    if first_chunk:
+                        try: status_context.stop()
+                        except: pass
+                        printer.console.print(Rule(title=&#34;[architect][bold]Network Architect AI Analysis[/bold][/architect]&#34;, style=&#34;architect&#34;))
+                        first_chunk = False
+                    renderer.feed(chunk)
+                
+                query = args.analyze if args.analyze else &#34; &#34;.join(args.data[1:])
+                try:
+                    status_context.start()
+                    self.app.services.ai.analyze_execution_results(
+                        results,
+                        query=query,
+                        chunk_callback=callback
+                    )
+                    if first_chunk:
+                        try: status_context.stop()
+                        except: pass
+                        printer.console.print(Rule(title=&#34;[architect][bold]Network Architect AI Analysis[/bold][/architect]&#34;, style=&#34;architect&#34;))
+                    renderer.flush()
+                    printer.console.print(Rule(style=&#34;architect&#34;))
+                except Exception as e:
+                    printer.error(f&#34;AI Analysis failed: {e}&#34;)
+
         except ConnpyError as e:
             printer.error(str(e))
             sys.exit(1)
@@ -138,8 +212,105 @@ el.replaceWith(d);
             with open(path, &#34;r&#34;) as f:
                 playbook = yaml.load(f, Loader=yaml.FullLoader)
 
+            # Check preflight first before any task runs
+            if getattr(args, &#34;preflight_ai&#34;, False):
+                preflight_failed = False
+                for task in playbook.get(&#34;tasks&#34;, []):
+                    name = task.get(&#34;name&#34;, &#34;Task&#34;)
+                    nodelist = task.get(&#34;nodes&#34;, [])
+                    commands = task.get(&#34;commands&#34;, [])
+                    
+                    # Resolve nodes to names
+                    try:
+                        if isinstance(nodelist, str):
+                            resolved_nodes = self.app.services.nodes.list_nodes(nodelist)
+                        elif isinstance(nodelist, list):
+                            resolved_nodes = []
+                            for item in nodelist:
+                                matches = self.app.services.nodes.list_nodes(item)
+                                for m in matches:
+                                    if m not in resolved_nodes:
+                                        resolved_nodes.append(m)
+                        else:
+                            resolved_nodes = []
+                    except Exception:
+                        resolved_nodes = []
+                    
+                    resolved_names = [n.get(&#34;name&#34;) if isinstance(n, dict) else n for n in resolved_nodes]
+                    printer.console.print(f&#34;\n[bold]Task: {name}[/bold] (Preflight for {len(resolved_names)} nodes)&#34;)
+                    
+                    renderer = printer.BlockMarkdownRenderer()
+                    first_chunk = True
+                    status_context = printer.console.status(&#34;[ai_status]Simulating execution...[/ai_status]&#34;)
+                    
+                    def callback(chunk):
+                        nonlocal first_chunk
+                        if first_chunk:
+                            try: status_context.stop()
+                            except: pass
+                            printer.console.print(Rule(title=f&#34;[engineer][bold]Preflight AI Simulation: {name}[/bold][/engineer]&#34;, style=&#34;engineer&#34;))
+                            first_chunk = False
+                        renderer.feed(chunk)
+                    try:
+                        status_context.start()
+                        self.app.services.ai.predict_execution_results(
+                            resolved_names,
+                            commands,
+                            chunk_callback=callback
+                        )
+                        if first_chunk:
+                            try: status_context.stop()
+                            except: pass
+                            printer.console.print(Rule(title=f&#34;[engineer][bold]Preflight AI Simulation: {name}[/bold][/engineer]&#34;, style=&#34;engineer&#34;))
+                        renderer.flush()
+                        printer.console.print(Rule(style=&#34;engineer&#34;))
+                    except Exception as e:
+                        printer.error(f&#34;Preflight AI simulation failed for task {name}: {e}&#34;)
+                        preflight_failed = True
+                if preflight_failed:
+                    sys.exit(1)
+                sys.exit(0)
+
+            # Standard run
+            results_all = {}
             for task in playbook.get(&#34;tasks&#34;, []):
-                self.cli_run(task)
+                task_res = self.cli_run(task)
+                if task_res:
+                    results_all.update(task_res)
+
+            # If analyze is enabled, run analysis on accumulated results
+            if getattr(args, &#34;analyze&#34;, None) is not None:
+                printer.console.print()
+                
+                renderer = printer.BlockMarkdownRenderer()
+                first_chunk = True
+                status_context = printer.console.status(&#34;[ai_status]Analyzing playbook execution results...[/ai_status]&#34;)
+                
+                def callback(chunk):
+                    nonlocal first_chunk
+                    if first_chunk:
+                        try: status_context.stop()
+                        except: pass
+                        printer.console.print(Rule(title=&#34;[architect][bold]Network Architect AI Playbook Analysis[/bold][/architect]&#34;, style=&#34;architect&#34;))
+                        first_chunk = False
+                    renderer.feed(chunk)
+                
+                query = args.analyze if args.analyze else f&#34;Playbook: {path}&#34;
+                try:
+                    status_context.start()
+                    self.app.services.ai.analyze_execution_results(
+                        results_all,
+                        query=query,
+                        chunk_callback=callback
+                    )
+                    if first_chunk:
+                        try: status_context.stop()
+                        except: pass
+                        printer.console.print(Rule(title=&#34;[architect][bold]Network Architect AI Playbook Analysis[/bold][/architect]&#34;, style=&#34;architect&#34;))
+                    renderer.flush()
+                    printer.console.print(Rule(style=&#34;architect&#34;))
+                except Exception as e:
+                    printer.error(f&#34;AI Analysis failed: {e}&#34;)
 
         except Exception as e:
             printer.error(f&#34;Failed to run playbook {path}: {e}&#34;)
@@ -184,6 +355,7 @@ el.replaceWith(d);
 
         nodelist = resolved_nodes
 
+        results = {}
         try:
             header_printed = False
             if action == &#34;run&#34;:
@@ -243,13 +415,244 @@ el.replaceWith(d);
                 )
                 # ALWAYS show the aggregate summary at the end
                 printer.test_summary(results)
+                
+            return results
 
         except ConnpyError as e:
-            printer.error(str(e))</code></pre>
+            printer.error(str(e))
+            return {}
+
+    def ai_generate(self, args):
+        from rich.prompt import Prompt
+        from rich.rule import Rule
+        from rich.panel import Panel
+        from rich.syntax import Syntax
+
+        dest_file = args.data[0]
+        if os.path.exists(dest_file):
+            printer.error(f&#34;File &#39;{dest_file}&#39; already exists.&#34;)
+            sys.exit(14)
+
+        chat_history = []
+        
+        # Consistent layout opening matching global AI (engineer style)
+        from rich.markdown import Markdown
+        printer.console.print(Rule(style=&#34;engineer&#34;))
+        printer.console.print(Markdown(&#34;**Playbook Builder AI**: Welcome! Describe the automation workflow you want to design.\nType **exit** to quit.\n&#34;))
+        printer.console.print(Rule(style=&#34;engineer&#34;))
+        
+        while True:
+            try:
+                user_prompt = Prompt.ask(&#34;[user_prompt]User[/user_prompt]&#34;)
+            except (KeyboardInterrupt, EOFError):
+                printer.console.print()
+                printer.warning(&#34;Operation cancelled by user.&#34;)
+                break
+                
+            if user_prompt.strip().lower() in [&#34;exit&#34;, &#34;quit&#34;]:
+                printer.info(&#34;Exiting AI Assistant.&#34;)
+                break
+                
+            if not user_prompt.strip():
+                continue
+                
+            printer.console.print()
+            
+            renderer = printer.BlockMarkdownRenderer()
+            first_chunk = True
+            status_context = printer.console.status(&#34;[ai_status]Agent is thinking...[/ai_status]&#34;)
+            
+            def callback(chunk):
+                nonlocal first_chunk
+                if first_chunk:
+                    try:
+                        status_context.stop()
+                    except:
+                        pass
+                    printer.console.print(Rule(title=&#34;[engineer][bold]Playbook Builder AI[/bold][/engineer]&#34;, style=&#34;engineer&#34;))
+                    first_chunk = False
+                renderer.feed(chunk)
+                
+            try:
+                status_context.start()
+                res = self.app.services.ai.build_playbook_chat(
+                    user_prompt,
+                    chat_history=chat_history,
+                    chunk_callback=callback
+                )
+                if first_chunk:
+                    try:
+                        status_context.stop()
+                    except:
+                        pass
+                renderer.flush()
+                if not first_chunk:
+                    printer.console.print(Rule(style=&#34;engineer&#34;))
+                
+                # Update history
+                if res and &#34;chat_history&#34; in res:
+                    chat_history = res[&#34;chat_history&#34;]
+                
+                # Check if the agent returned a validated playbook YAML
+                if res and &#34;playbook_yaml&#34; in res and res[&#34;playbook_yaml&#34;]:
+                    yaml_content = res[&#34;playbook_yaml&#34;]
+                    printer.console.print()
+                    printer.success(&#34;Playbook YAML successfully generated and validated.&#34;)
+                    
+                    # Show the YAML inside a beautiful panel matching AI style (with engineer borders)
+                    syntax = Syntax(yaml_content, &#34;yaml&#34;, theme=&#34;ansi_dark&#34;, word_wrap=True, background_color=&#34;default&#34;)
+                    panel = Panel(syntax, title=&#34;[engineer][bold]Resulting Playbook[/bold][/engineer]&#34;, border_style=&#34;engineer&#34;, expand=False)
+                    printer.console.print(panel)
+                    
+                    # Ask if the user wants to save it
+                    try:
+                        save_confirm = Prompt.ask(
+                            f&#34;\nDo you want to save this playbook to &#39;{dest_file}&#39;?&#34;,
+                            choices=[&#34;y&#34;, &#34;n&#34;, &#34;run&#34;],
+                            default=&#34;y&#34;
+                        )
+                    except (KeyboardInterrupt, EOFError):
+                        printer.console.print()
+                        printer.warning(&#34;Saving skipped.&#34;)
+                        break
+                        
+                    choice = save_confirm.strip().lower()
+                    if choice in [&#34;y&#34;, &#34;yes&#34;, &#34;run&#34;]:
+                        with open(dest_file, &#34;w&#34;) as f:
+                            f.write(yaml_content)
+                        printer.success(f&#34;Playbook saved successfully to &#39;{dest_file}&#39;&#34;)
+                        if choice == &#34;run&#34;:
+                            printer.console.print()
+                            printer.info(&#34;Executing the saved playbook...&#34;)
+                            self.yaml_run(args)
+                        break
+                    else:
+                        printer.warning(&#34;Playbook not saved. You can continue describing changes or exit.&#34;)
+            except Exception as e:
+                printer.error(f&#34;Error in AI chat: {e}&#34;)</code></pre>
 </details>
 <div class="desc"></div>
 <h3>Methods</h3>
 <dl>
+<dt id="connpy.cli.run_handler.RunHandler.ai_generate"><code class="name flex">
+<span>def <span class="ident">ai_generate</span></span>(<span>self, args)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def ai_generate(self, args):
+    from rich.prompt import Prompt
+    from rich.rule import Rule
+    from rich.panel import Panel
+    from rich.syntax import Syntax
+
+    dest_file = args.data[0]
+    if os.path.exists(dest_file):
+        printer.error(f&#34;File &#39;{dest_file}&#39; already exists.&#34;)
+        sys.exit(14)
+
+    chat_history = []
+    
+    # Consistent layout opening matching global AI (engineer style)
+    from rich.markdown import Markdown
+    printer.console.print(Rule(style=&#34;engineer&#34;))
+    printer.console.print(Markdown(&#34;**Playbook Builder AI**: Welcome! Describe the automation workflow you want to design.\nType **exit** to quit.\n&#34;))
+    printer.console.print(Rule(style=&#34;engineer&#34;))
+    
+    while True:
+        try:
+            user_prompt = Prompt.ask(&#34;[user_prompt]User[/user_prompt]&#34;)
+        except (KeyboardInterrupt, EOFError):
+            printer.console.print()
+            printer.warning(&#34;Operation cancelled by user.&#34;)
+            break
+            
+        if user_prompt.strip().lower() in [&#34;exit&#34;, &#34;quit&#34;]:
+            printer.info(&#34;Exiting AI Assistant.&#34;)
+            break
+            
+        if not user_prompt.strip():
+            continue
+            
+        printer.console.print()
+        
+        renderer = printer.BlockMarkdownRenderer()
+        first_chunk = True
+        status_context = printer.console.status(&#34;[ai_status]Agent is thinking...[/ai_status]&#34;)
+        
+        def callback(chunk):
+            nonlocal first_chunk
+            if first_chunk:
+                try:
+                    status_context.stop()
+                except:
+                    pass
+                printer.console.print(Rule(title=&#34;[engineer][bold]Playbook Builder AI[/bold][/engineer]&#34;, style=&#34;engineer&#34;))
+                first_chunk = False
+            renderer.feed(chunk)
+            
+        try:
+            status_context.start()
+            res = self.app.services.ai.build_playbook_chat(
+                user_prompt,
+                chat_history=chat_history,
+                chunk_callback=callback
+            )
+            if first_chunk:
+                try:
+                    status_context.stop()
+                except:
+                    pass
+            renderer.flush()
+            if not first_chunk:
+                printer.console.print(Rule(style=&#34;engineer&#34;))
+            
+            # Update history
+            if res and &#34;chat_history&#34; in res:
+                chat_history = res[&#34;chat_history&#34;]
+            
+            # Check if the agent returned a validated playbook YAML
+            if res and &#34;playbook_yaml&#34; in res and res[&#34;playbook_yaml&#34;]:
+                yaml_content = res[&#34;playbook_yaml&#34;]
+                printer.console.print()
+                printer.success(&#34;Playbook YAML successfully generated and validated.&#34;)
+                
+                # Show the YAML inside a beautiful panel matching AI style (with engineer borders)
+                syntax = Syntax(yaml_content, &#34;yaml&#34;, theme=&#34;ansi_dark&#34;, word_wrap=True, background_color=&#34;default&#34;)
+                panel = Panel(syntax, title=&#34;[engineer][bold]Resulting Playbook[/bold][/engineer]&#34;, border_style=&#34;engineer&#34;, expand=False)
+                printer.console.print(panel)
+                
+                # Ask if the user wants to save it
+                try:
+                    save_confirm = Prompt.ask(
+                        f&#34;\nDo you want to save this playbook to &#39;{dest_file}&#39;?&#34;,
+                        choices=[&#34;y&#34;, &#34;n&#34;, &#34;run&#34;],
+                        default=&#34;y&#34;
+                    )
+                except (KeyboardInterrupt, EOFError):
+                    printer.console.print()
+                    printer.warning(&#34;Saving skipped.&#34;)
+                    break
+                    
+                choice = save_confirm.strip().lower()
+                if choice in [&#34;y&#34;, &#34;yes&#34;, &#34;run&#34;]:
+                    with open(dest_file, &#34;w&#34;) as f:
+                        f.write(yaml_content)
+                    printer.success(f&#34;Playbook saved successfully to &#39;{dest_file}&#39;&#34;)
+                    if choice == &#34;run&#34;:
+                        printer.console.print()
+                        printer.info(&#34;Executing the saved playbook...&#34;)
+                        self.yaml_run(args)
+                    break
+                else:
+                    printer.warning(&#34;Playbook not saved. You can continue describing changes or exit.&#34;)
+        except Exception as e:
+            printer.error(f&#34;Error in AI chat: {e}&#34;)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
 <dt id="connpy.cli.run_handler.RunHandler.cli_run"><code class="name flex">
 <span>def <span class="ident">cli_run</span></span>(<span>self, script)</span>
 </code></dt>
@@ -297,6 +700,7 @@ el.replaceWith(d);
 
     nodelist = resolved_nodes
 
+    results = {}
     try:
         header_printed = False
         if action == &#34;run&#34;:
@@ -356,9 +760,12 @@ el.replaceWith(d);
             )
             # ALWAYS show the aggregate summary at the end
             printer.test_summary(results)
+            
+        return results
 
     except ConnpyError as e:
-        printer.error(str(e))</code></pre>
+        printer.error(str(e))
+        return {}</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -373,7 +780,12 @@ el.replaceWith(d);
 <pre><code class="python">def dispatch(self, args):
     if len(args.data) &gt; 1:
         args.action = &#34;noderun&#34;
-    actions = {&#34;noderun&#34;: self.node_run, &#34;generate&#34;: self.yaml_generate, &#34;run&#34;: self.yaml_run}
+    actions = {
+        &#34;noderun&#34;: self.node_run,
+        &#34;generate&#34;: self.yaml_generate,
+        &#34;generate_ai&#34;: self.ai_generate,
+        &#34;run&#34;: self.yaml_run
+    }
     return actions.get(args.action)(args)</code></pre>
 </details>
 <div class="desc"></div>
@@ -400,6 +812,41 @@ el.replaceWith(d);
         sys.exit(2)
         
     commands = [&#34; &#34;.join(args.data[1:])]
+
+    # Check for Preflight AI simulation
+    if getattr(args, &#34;preflight_ai&#34;, False):
+        matched_node_names = [n.get(&#34;name&#34;) if isinstance(n, dict) else n for n in matched_nodes]
+        
+        renderer = printer.BlockMarkdownRenderer()
+        first_chunk = True
+        status_context = printer.console.status(&#34;[ai_status]Simulating execution...[/ai_status]&#34;)
+        
+        def callback(chunk):
+            nonlocal first_chunk
+            if first_chunk:
+                try: status_context.stop()
+                except: pass
+                printer.console.print(Rule(title=&#34;[engineer][bold]Preflight AI Simulation[/bold][/engineer]&#34;, style=&#34;engineer&#34;))
+                first_chunk = False
+            renderer.feed(chunk)
+        
+        try:
+            status_context.start()
+            self.app.services.ai.predict_execution_results(
+                matched_node_names,
+                commands,
+                chunk_callback=callback
+            )
+            if first_chunk:
+                try: status_context.stop()
+                except: pass
+                printer.console.print(Rule(title=&#34;[engineer][bold]Preflight AI Simulation[/bold][/engineer]&#34;, style=&#34;engineer&#34;))
+            renderer.flush()
+            printer.console.print(Rule(style=&#34;engineer&#34;))
+        except Exception as e:
+            printer.error(f&#34;Preflight AI simulation failed: {e}&#34;)
+            sys.exit(1)
+        sys.exit(0)
 
     try:
         header_printed = False
@@ -437,6 +884,40 @@ el.replaceWith(d);
                 on_node_complete=_on_node_complete
             )
             printer.run_summary(results)
+
+        # Analyze execution results if requested
+        if getattr(args, &#34;analyze&#34;, None) is not None:
+            printer.console.print()
+            
+            renderer = printer.BlockMarkdownRenderer()
+            first_chunk = True
+            status_context = printer.console.status(&#34;[ai_status]Analyzing execution results...[/ai_status]&#34;)
+            
+            def callback(chunk):
+                nonlocal first_chunk
+                if first_chunk:
+                    try: status_context.stop()
+                    except: pass
+                    printer.console.print(Rule(title=&#34;[architect][bold]Network Architect AI Analysis[/bold][/architect]&#34;, style=&#34;architect&#34;))
+                    first_chunk = False
+                renderer.feed(chunk)
+            
+            query = args.analyze if args.analyze else &#34; &#34;.join(args.data[1:])
+            try:
+                status_context.start()
+                self.app.services.ai.analyze_execution_results(
+                    results,
+                    query=query,
+                    chunk_callback=callback
+                )
+                if first_chunk:
+                    try: status_context.stop()
+                    except: pass
+                    printer.console.print(Rule(title=&#34;[architect][bold]Network Architect AI Analysis[/bold][/architect]&#34;, style=&#34;architect&#34;))
+                renderer.flush()
+                printer.console.print(Rule(style=&#34;architect&#34;))
+            except Exception as e:
+                printer.error(f&#34;AI Analysis failed: {e}&#34;)
 
     except ConnpyError as e:
         printer.error(str(e))
@@ -478,8 +959,105 @@ el.replaceWith(d);
         with open(path, &#34;r&#34;) as f:
             playbook = yaml.load(f, Loader=yaml.FullLoader)
 
+        # Check preflight first before any task runs
+        if getattr(args, &#34;preflight_ai&#34;, False):
+            preflight_failed = False
+            for task in playbook.get(&#34;tasks&#34;, []):
+                name = task.get(&#34;name&#34;, &#34;Task&#34;)
+                nodelist = task.get(&#34;nodes&#34;, [])
+                commands = task.get(&#34;commands&#34;, [])
+                
+                # Resolve nodes to names
+                try:
+                    if isinstance(nodelist, str):
+                        resolved_nodes = self.app.services.nodes.list_nodes(nodelist)
+                    elif isinstance(nodelist, list):
+                        resolved_nodes = []
+                        for item in nodelist:
+                            matches = self.app.services.nodes.list_nodes(item)
+                            for m in matches:
+                                if m not in resolved_nodes:
+                                    resolved_nodes.append(m)
+                    else:
+                        resolved_nodes = []
+                except Exception:
+                    resolved_nodes = []
+                
+                resolved_names = [n.get(&#34;name&#34;) if isinstance(n, dict) else n for n in resolved_nodes]
+                printer.console.print(f&#34;\n[bold]Task: {name}[/bold] (Preflight for {len(resolved_names)} nodes)&#34;)
+                
+                renderer = printer.BlockMarkdownRenderer()
+                first_chunk = True
+                status_context = printer.console.status(&#34;[ai_status]Simulating execution...[/ai_status]&#34;)
+                
+                def callback(chunk):
+                    nonlocal first_chunk
+                    if first_chunk:
+                        try: status_context.stop()
+                        except: pass
+                        printer.console.print(Rule(title=f&#34;[engineer][bold]Preflight AI Simulation: {name}[/bold][/engineer]&#34;, style=&#34;engineer&#34;))
+                        first_chunk = False
+                    renderer.feed(chunk)
+                try:
+                    status_context.start()
+                    self.app.services.ai.predict_execution_results(
+                        resolved_names,
+                        commands,
+                        chunk_callback=callback
+                    )
+                    if first_chunk:
+                        try: status_context.stop()
+                        except: pass
+                        printer.console.print(Rule(title=f&#34;[engineer][bold]Preflight AI Simulation: {name}[/bold][/engineer]&#34;, style=&#34;engineer&#34;))
+                    renderer.flush()
+                    printer.console.print(Rule(style=&#34;engineer&#34;))
+                except Exception as e:
+                    printer.error(f&#34;Preflight AI simulation failed for task {name}: {e}&#34;)
+                    preflight_failed = True
+            if preflight_failed:
+                sys.exit(1)
+            sys.exit(0)
+
+        # Standard run
+        results_all = {}
         for task in playbook.get(&#34;tasks&#34;, []):
-            self.cli_run(task)
+            task_res = self.cli_run(task)
+            if task_res:
+                results_all.update(task_res)
+
+        # If analyze is enabled, run analysis on accumulated results
+        if getattr(args, &#34;analyze&#34;, None) is not None:
+            printer.console.print()
+            
+            renderer = printer.BlockMarkdownRenderer()
+            first_chunk = True
+            status_context = printer.console.status(&#34;[ai_status]Analyzing playbook execution results...[/ai_status]&#34;)
+            
+            def callback(chunk):
+                nonlocal first_chunk
+                if first_chunk:
+                    try: status_context.stop()
+                    except: pass
+                    printer.console.print(Rule(title=&#34;[architect][bold]Network Architect AI Playbook Analysis[/bold][/architect]&#34;, style=&#34;architect&#34;))
+                    first_chunk = False
+                renderer.feed(chunk)
+            
+            query = args.analyze if args.analyze else f&#34;Playbook: {path}&#34;
+            try:
+                status_context.start()
+                self.app.services.ai.analyze_execution_results(
+                    results_all,
+                    query=query,
+                    chunk_callback=callback
+                )
+                if first_chunk:
+                    try: status_context.stop()
+                    except: pass
+                    printer.console.print(Rule(title=&#34;[architect][bold]Network Architect AI Playbook Analysis[/bold][/architect]&#34;, style=&#34;architect&#34;))
+                renderer.flush()
+                printer.console.print(Rule(style=&#34;architect&#34;))
+            except Exception as e:
+                printer.error(f&#34;AI Analysis failed: {e}&#34;)
 
     except Exception as e:
         printer.error(f&#34;Failed to run playbook {path}: {e}&#34;)
@@ -506,7 +1084,8 @@ el.replaceWith(d);
 <ul>
 <li>
 <h4><code><a title="connpy.cli.run_handler.RunHandler" href="#connpy.cli.run_handler.RunHandler">RunHandler</a></code></h4>
-<ul class="">
+<ul class="two-column">
+<li><code><a title="connpy.cli.run_handler.RunHandler.ai_generate" href="#connpy.cli.run_handler.RunHandler.ai_generate">ai_generate</a></code></li>
 <li><code><a title="connpy.cli.run_handler.RunHandler.cli_run" href="#connpy.cli.run_handler.RunHandler.cli_run">cli_run</a></code></li>
 <li><code><a title="connpy.cli.run_handler.RunHandler.dispatch" href="#connpy.cli.run_handler.RunHandler.dispatch">dispatch</a></code></li>
 <li><code><a title="connpy.cli.run_handler.RunHandler.node_run" href="#connpy.cli.run_handler.RunHandler.node_run">node_run</a></code></li>

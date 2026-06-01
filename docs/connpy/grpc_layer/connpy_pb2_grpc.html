@@ -100,6 +100,21 @@ el.replaceWith(d);
                     request_deserializer=connpy__pb2.StringRequest.FromString,
                     response_serializer=connpy__pb2.StructResponse.SerializeToString,
             ),
+            &#39;build_playbook_chat&#39;: grpc.stream_stream_rpc_method_handler(
+                    servicer.build_playbook_chat,
+                    request_deserializer=connpy__pb2.AskRequest.FromString,
+                    response_serializer=connpy__pb2.AIResponse.SerializeToString,
+            ),
+            &#39;analyze_execution_results&#39;: grpc.unary_stream_rpc_method_handler(
+                    servicer.analyze_execution_results,
+                    request_deserializer=connpy__pb2.AnalyzeRequest.FromString,
+                    response_serializer=connpy__pb2.AIResponse.SerializeToString,
+            ),
+            &#39;predict_execution_results&#39;: grpc.unary_stream_rpc_method_handler(
+                    servicer.predict_execution_results,
+                    request_deserializer=connpy__pb2.PreflightRequest.FromString,
+                    response_serializer=connpy__pb2.AIResponse.SerializeToString,
+            ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
             &#39;connpy.AIService&#39;, rpc_method_handlers)
@@ -206,11 +221,6 @@ el.replaceWith(d);
             ),
             &#39;run_cli_script&#39;: grpc.unary_unary_rpc_method_handler(
                     servicer.run_cli_script,
-                    request_deserializer=connpy__pb2.ScriptRequest.FromString,
-                    response_serializer=connpy__pb2.StructResponse.SerializeToString,
-            ),
-            &#39;run_yaml_playbook&#39;: grpc.unary_unary_rpc_method_handler(
-                    servicer.run_yaml_playbook,
                     request_deserializer=connpy__pb2.ScriptRequest.FromString,
                     response_serializer=connpy__pb2.StructResponse.SerializeToString,
             ),
@@ -739,11 +749,129 @@ el.replaceWith(d);
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def build_playbook_chat(request_iterator,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.stream_stream(
+            request_iterator,
+            target,
+            &#39;/connpy.AIService/build_playbook_chat&#39;,
+            connpy__pb2.AskRequest.SerializeToString,
+            connpy__pb2.AIResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def analyze_execution_results(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            &#39;/connpy.AIService/analyze_execution_results&#39;,
+            connpy__pb2.AnalyzeRequest.SerializeToString,
+            connpy__pb2.AIResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def predict_execution_results(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            &#39;/connpy.AIService/predict_execution_results&#39;,
+            connpy__pb2.PreflightRequest.SerializeToString,
+            connpy__pb2.AIResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
             _registered_method=True)</code></pre>
 </details>
 <div class="desc"><p>Missing associated documentation comment in .proto file.</p></div>
 <h3>Static methods</h3>
 <dl>
+<dt id="connpy.grpc_layer.connpy_pb2_grpc.AIService.analyze_execution_results"><code class="name flex">
+<span>def <span class="ident">analyze_execution_results</span></span>(<span>request,<br>target,<br>options=(),<br>channel_credentials=None,<br>call_credentials=None,<br>insecure=False,<br>compression=None,<br>wait_for_ready=None,<br>timeout=None,<br>metadata=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@staticmethod
+def analyze_execution_results(request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None):
+    return grpc.experimental.unary_stream(
+        request,
+        target,
+        &#39;/connpy.AIService/analyze_execution_results&#39;,
+        connpy__pb2.AnalyzeRequest.SerializeToString,
+        connpy__pb2.AIResponse.FromString,
+        options,
+        channel_credentials,
+        insecure,
+        call_credentials,
+        compression,
+        wait_for_ready,
+        timeout,
+        metadata,
+        _registered_method=True)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
 <dt id="connpy.grpc_layer.connpy_pb2_grpc.AIService.ask"><code class="name flex">
 <span>def <span class="ident">ask</span></span>(<span>request_iterator,<br>target,<br>options=(),<br>channel_credentials=None,<br>call_credentials=None,<br>insecure=False,<br>compression=None,<br>wait_for_ready=None,<br>timeout=None,<br>metadata=None)</span>
 </code></dt>
@@ -806,6 +934,43 @@ def ask_copilot(request,
         &#39;/connpy.AIService/ask_copilot&#39;,
         connpy__pb2.CopilotRequest.SerializeToString,
         connpy__pb2.CopilotResponse.FromString,
+        options,
+        channel_credentials,
+        insecure,
+        call_credentials,
+        compression,
+        wait_for_ready,
+        timeout,
+        metadata,
+        _registered_method=True)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.connpy_pb2_grpc.AIService.build_playbook_chat"><code class="name flex">
+<span>def <span class="ident">build_playbook_chat</span></span>(<span>request_iterator,<br>target,<br>options=(),<br>channel_credentials=None,<br>call_credentials=None,<br>insecure=False,<br>compression=None,<br>wait_for_ready=None,<br>timeout=None,<br>metadata=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@staticmethod
+def build_playbook_chat(request_iterator,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None):
+    return grpc.experimental.stream_stream(
+        request_iterator,
+        target,
+        &#39;/connpy.AIService/build_playbook_chat&#39;,
+        connpy__pb2.AskRequest.SerializeToString,
+        connpy__pb2.AIResponse.FromString,
         options,
         channel_credentials,
         insecure,
@@ -1077,6 +1242,43 @@ def load_session_data(request,
 </details>
 <div class="desc"></div>
 </dd>
+<dt id="connpy.grpc_layer.connpy_pb2_grpc.AIService.predict_execution_results"><code class="name flex">
+<span>def <span class="ident">predict_execution_results</span></span>(<span>request,<br>target,<br>options=(),<br>channel_credentials=None,<br>call_credentials=None,<br>insecure=False,<br>compression=None,<br>wait_for_ready=None,<br>timeout=None,<br>metadata=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@staticmethod
+def predict_execution_results(request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None):
+    return grpc.experimental.unary_stream(
+        request,
+        target,
+        &#39;/connpy.AIService/predict_execution_results&#39;,
+        connpy__pb2.PreflightRequest.SerializeToString,
+        connpy__pb2.AIResponse.FromString,
+        options,
+        channel_credentials,
+        insecure,
+        call_credentials,
+        compression,
+        wait_for_ready,
+        timeout,
+        metadata,
+        _registered_method=True)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
 </dl>
 </dd>
 <dt id="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer"><code class="flex name class">
@@ -1142,6 +1344,24 @@ def load_session_data(request,
         &#34;&#34;&#34;Missing associated documentation comment in .proto file.&#34;&#34;&#34;
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details(&#39;Method not implemented!&#39;)
+        raise NotImplementedError(&#39;Method not implemented!&#39;)
+
+    def build_playbook_chat(self, request_iterator, context):
+        &#34;&#34;&#34;Missing associated documentation comment in .proto file.&#34;&#34;&#34;
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details(&#39;Method not implemented!&#39;)
+        raise NotImplementedError(&#39;Method not implemented!&#39;)
+
+    def analyze_execution_results(self, request, context):
+        &#34;&#34;&#34;Missing associated documentation comment in .proto file.&#34;&#34;&#34;
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details(&#39;Method not implemented!&#39;)
+        raise NotImplementedError(&#39;Method not implemented!&#39;)
+
+    def predict_execution_results(self, request, context):
+        &#34;&#34;&#34;Missing associated documentation comment in .proto file.&#34;&#34;&#34;
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details(&#39;Method not implemented!&#39;)
         raise NotImplementedError(&#39;Method not implemented!&#39;)</code></pre>
 </details>
 <div class="desc"><p>Missing associated documentation comment in .proto file.</p></div>
@@ -1151,6 +1371,22 @@ def load_session_data(request,
 </ul>
 <h3>Methods</h3>
 <dl>
+<dt id="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.analyze_execution_results"><code class="name flex">
+<span>def <span class="ident">analyze_execution_results</span></span>(<span>self, request, context)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def analyze_execution_results(self, request, context):
+    &#34;&#34;&#34;Missing associated documentation comment in .proto file.&#34;&#34;&#34;
+    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+    context.set_details(&#39;Method not implemented!&#39;)
+    raise NotImplementedError(&#39;Method not implemented!&#39;)</code></pre>
+</details>
+<div class="desc"><p>Missing associated documentation comment in .proto file.</p></div>
+</dd>
 <dt id="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.ask"><code class="name flex">
 <span>def <span class="ident">ask</span></span>(<span>self, request_iterator, context)</span>
 </code></dt>
@@ -1176,6 +1412,22 @@ def load_session_data(request,
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def ask_copilot(self, request, context):
+    &#34;&#34;&#34;Missing associated documentation comment in .proto file.&#34;&#34;&#34;
+    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+    context.set_details(&#39;Method not implemented!&#39;)
+    raise NotImplementedError(&#39;Method not implemented!&#39;)</code></pre>
+</details>
+<div class="desc"><p>Missing associated documentation comment in .proto file.</p></div>
+</dd>
+<dt id="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.build_playbook_chat"><code class="name flex">
+<span>def <span class="ident">build_playbook_chat</span></span>(<span>self, request_iterator, context)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def build_playbook_chat(self, request_iterator, context):
     &#34;&#34;&#34;Missing associated documentation comment in .proto file.&#34;&#34;&#34;
     context.set_code(grpc.StatusCode.UNIMPLEMENTED)
     context.set_details(&#39;Method not implemented!&#39;)
@@ -1295,6 +1547,22 @@ def load_session_data(request,
 </details>
 <div class="desc"><p>Missing associated documentation comment in .proto file.</p></div>
 </dd>
+<dt id="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.predict_execution_results"><code class="name flex">
+<span>def <span class="ident">predict_execution_results</span></span>(<span>self, request, context)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def predict_execution_results(self, request, context):
+    &#34;&#34;&#34;Missing associated documentation comment in .proto file.&#34;&#34;&#34;
+    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+    context.set_details(&#39;Method not implemented!&#39;)
+    raise NotImplementedError(&#39;Method not implemented!&#39;)</code></pre>
+</details>
+<div class="desc"><p>Missing associated documentation comment in .proto file.</p></div>
+</dd>
 </dl>
 </dd>
 <dt id="connpy.grpc_layer.connpy_pb2_grpc.AIServiceStub"><code class="flex name class">
@@ -1359,6 +1627,21 @@ def load_session_data(request,
                 &#39;/connpy.AIService/load_session_data&#39;,
                 request_serializer=connpy__pb2.StringRequest.SerializeToString,
                 response_deserializer=connpy__pb2.StructResponse.FromString,
+                _registered_method=True)
+        self.build_playbook_chat = channel.stream_stream(
+                &#39;/connpy.AIService/build_playbook_chat&#39;,
+                request_serializer=connpy__pb2.AskRequest.SerializeToString,
+                response_deserializer=connpy__pb2.AIResponse.FromString,
+                _registered_method=True)
+        self.analyze_execution_results = channel.unary_stream(
+                &#39;/connpy.AIService/analyze_execution_results&#39;,
+                request_serializer=connpy__pb2.AnalyzeRequest.SerializeToString,
+                response_deserializer=connpy__pb2.AIResponse.FromString,
+                _registered_method=True)
+        self.predict_execution_results = channel.unary_stream(
+                &#39;/connpy.AIService/predict_execution_results&#39;,
+                request_serializer=connpy__pb2.PreflightRequest.SerializeToString,
+                response_deserializer=connpy__pb2.AIResponse.FromString,
                 _registered_method=True)</code></pre>
 </details>
 <div class="desc"><p>Missing associated documentation comment in .proto file.</p>
@@ -2313,33 +2596,6 @@ def update_setting(request,
             wait_for_ready,
             timeout,
             metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def run_yaml_playbook(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            &#39;/connpy.ExecutionService/run_yaml_playbook&#39;,
-            connpy__pb2.ScriptRequest.SerializeToString,
-            connpy__pb2.StructResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
             _registered_method=True)</code></pre>
 </details>
 <div class="desc"><p>Missing associated documentation comment in .proto file.</p></div>
@@ -2419,43 +2675,6 @@ def run_commands(request,
 </details>
 <div class="desc"></div>
 </dd>
-<dt id="connpy.grpc_layer.connpy_pb2_grpc.ExecutionService.run_yaml_playbook"><code class="name flex">
-<span>def <span class="ident">run_yaml_playbook</span></span>(<span>request,<br>target,<br>options=(),<br>channel_credentials=None,<br>call_credentials=None,<br>insecure=False,<br>compression=None,<br>wait_for_ready=None,<br>timeout=None,<br>metadata=None)</span>
-</code></dt>
-<dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">@staticmethod
-def run_yaml_playbook(request,
-        target,
-        options=(),
-        channel_credentials=None,
-        call_credentials=None,
-        insecure=False,
-        compression=None,
-        wait_for_ready=None,
-        timeout=None,
-        metadata=None):
-    return grpc.experimental.unary_unary(
-        request,
-        target,
-        &#39;/connpy.ExecutionService/run_yaml_playbook&#39;,
-        connpy__pb2.ScriptRequest.SerializeToString,
-        connpy__pb2.StructResponse.FromString,
-        options,
-        channel_credentials,
-        insecure,
-        call_credentials,
-        compression,
-        wait_for_ready,
-        timeout,
-        metadata,
-        _registered_method=True)</code></pre>
-</details>
-<div class="desc"></div>
-</dd>
 <dt id="connpy.grpc_layer.connpy_pb2_grpc.ExecutionService.test_commands"><code class="name flex">
 <span>def <span class="ident">test_commands</span></span>(<span>request,<br>target,<br>options=(),<br>channel_credentials=None,<br>call_credentials=None,<br>insecure=False,<br>compression=None,<br>wait_for_ready=None,<br>timeout=None,<br>metadata=None)</span>
 </code></dt>
@@ -2522,12 +2741,6 @@ def test_commands(request,
         &#34;&#34;&#34;Missing associated documentation comment in .proto file.&#34;&#34;&#34;
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details(&#39;Method not implemented!&#39;)
-        raise NotImplementedError(&#39;Method not implemented!&#39;)
-
-    def run_yaml_playbook(self, request, context):
-        &#34;&#34;&#34;Missing associated documentation comment in .proto file.&#34;&#34;&#34;
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details(&#39;Method not implemented!&#39;)
         raise NotImplementedError(&#39;Method not implemented!&#39;)</code></pre>
 </details>
 <div class="desc"><p>Missing associated documentation comment in .proto file.</p></div>
@@ -2562,22 +2775,6 @@ def test_commands(request,
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def run_commands(self, request, context):
-    &#34;&#34;&#34;Missing associated documentation comment in .proto file.&#34;&#34;&#34;
-    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-    context.set_details(&#39;Method not implemented!&#39;)
-    raise NotImplementedError(&#39;Method not implemented!&#39;)</code></pre>
-</details>
-<div class="desc"><p>Missing associated documentation comment in .proto file.</p></div>
-</dd>
-<dt id="connpy.grpc_layer.connpy_pb2_grpc.ExecutionServiceServicer.run_yaml_playbook"><code class="name flex">
-<span>def <span class="ident">run_yaml_playbook</span></span>(<span>self, request, context)</span>
-</code></dt>
-<dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def run_yaml_playbook(self, request, context):
     &#34;&#34;&#34;Missing associated documentation comment in .proto file.&#34;&#34;&#34;
     context.set_code(grpc.StatusCode.UNIMPLEMENTED)
     context.set_details(&#39;Method not implemented!&#39;)
@@ -2633,11 +2830,6 @@ def test_commands(request,
                 _registered_method=True)
         self.run_cli_script = channel.unary_unary(
                 &#39;/connpy.ExecutionService/run_cli_script&#39;,
-                request_serializer=connpy__pb2.ScriptRequest.SerializeToString,
-                response_deserializer=connpy__pb2.StructResponse.FromString,
-                _registered_method=True)
-        self.run_yaml_playbook = channel.unary_unary(
-                &#39;/connpy.ExecutionService/run_yaml_playbook&#39;,
                 request_serializer=connpy__pb2.ScriptRequest.SerializeToString,
                 response_deserializer=connpy__pb2.StructResponse.FromString,
                 _registered_method=True)</code></pre>
@@ -6089,9 +6281,11 @@ def stop_api(request,
 <ul>
 <li>
 <h4><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIService" href="#connpy.grpc_layer.connpy_pb2_grpc.AIService">AIService</a></code></h4>
-<ul class="two-column">
+<ul class="">
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIService.analyze_execution_results" href="#connpy.grpc_layer.connpy_pb2_grpc.AIService.analyze_execution_results">analyze_execution_results</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIService.ask" href="#connpy.grpc_layer.connpy_pb2_grpc.AIService.ask">ask</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIService.ask_copilot" href="#connpy.grpc_layer.connpy_pb2_grpc.AIService.ask_copilot">ask_copilot</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIService.build_playbook_chat" href="#connpy.grpc_layer.connpy_pb2_grpc.AIService.build_playbook_chat">build_playbook_chat</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIService.configure_mcp" href="#connpy.grpc_layer.connpy_pb2_grpc.AIService.configure_mcp">configure_mcp</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIService.configure_provider" href="#connpy.grpc_layer.connpy_pb2_grpc.AIService.configure_provider">configure_provider</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIService.confirm" href="#connpy.grpc_layer.connpy_pb2_grpc.AIService.confirm">confirm</a></code></li>
@@ -6099,13 +6293,16 @@ def stop_api(request,
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIService.list_mcp_servers" href="#connpy.grpc_layer.connpy_pb2_grpc.AIService.list_mcp_servers">list_mcp_servers</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIService.list_sessions" href="#connpy.grpc_layer.connpy_pb2_grpc.AIService.list_sessions">list_sessions</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIService.load_session_data" href="#connpy.grpc_layer.connpy_pb2_grpc.AIService.load_session_data">load_session_data</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIService.predict_execution_results" href="#connpy.grpc_layer.connpy_pb2_grpc.AIService.predict_execution_results">predict_execution_results</a></code></li>
 </ul>
 </li>
 <li>
 <h4><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer" href="#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer">AIServiceServicer</a></code></h4>
-<ul class="two-column">
+<ul class="">
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.analyze_execution_results" href="#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.analyze_execution_results">analyze_execution_results</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.ask" href="#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.ask">ask</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.ask_copilot" href="#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.ask_copilot">ask_copilot</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.build_playbook_chat" href="#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.build_playbook_chat">build_playbook_chat</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.configure_mcp" href="#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.configure_mcp">configure_mcp</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.configure_provider" href="#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.configure_provider">configure_provider</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.confirm" href="#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.confirm">confirm</a></code></li>
@@ -6113,6 +6310,7 @@ def stop_api(request,
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.list_mcp_servers" href="#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.list_mcp_servers">list_mcp_servers</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.list_sessions" href="#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.list_sessions">list_sessions</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.load_session_data" href="#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.load_session_data">load_session_data</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.predict_execution_results" href="#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.predict_execution_results">predict_execution_results</a></code></li>
 </ul>
 </li>
 <li>
@@ -6165,7 +6363,6 @@ def stop_api(request,
 <ul class="">
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.ExecutionService.run_cli_script" href="#connpy.grpc_layer.connpy_pb2_grpc.ExecutionService.run_cli_script">run_cli_script</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.ExecutionService.run_commands" href="#connpy.grpc_layer.connpy_pb2_grpc.ExecutionService.run_commands">run_commands</a></code></li>
-<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.ExecutionService.run_yaml_playbook" href="#connpy.grpc_layer.connpy_pb2_grpc.ExecutionService.run_yaml_playbook">run_yaml_playbook</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.ExecutionService.test_commands" href="#connpy.grpc_layer.connpy_pb2_grpc.ExecutionService.test_commands">test_commands</a></code></li>
 </ul>
 </li>
@@ -6174,7 +6371,6 @@ def stop_api(request,
 <ul class="">
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.ExecutionServiceServicer.run_cli_script" href="#connpy.grpc_layer.connpy_pb2_grpc.ExecutionServiceServicer.run_cli_script">run_cli_script</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.ExecutionServiceServicer.run_commands" href="#connpy.grpc_layer.connpy_pb2_grpc.ExecutionServiceServicer.run_commands">run_commands</a></code></li>
-<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.ExecutionServiceServicer.run_yaml_playbook" href="#connpy.grpc_layer.connpy_pb2_grpc.ExecutionServiceServicer.run_yaml_playbook">run_yaml_playbook</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.ExecutionServiceServicer.test_commands" href="#connpy.grpc_layer.connpy_pb2_grpc.ExecutionServiceServicer.test_commands">test_commands</a></code></li>
 </ul>
 </li>

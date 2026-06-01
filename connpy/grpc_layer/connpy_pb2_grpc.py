@@ -1542,11 +1542,6 @@ class ExecutionServiceStub(object):
                 request_serializer=connpy__pb2.ScriptRequest.SerializeToString,
                 response_deserializer=connpy__pb2.StructResponse.FromString,
                 _registered_method=True)
-        self.run_yaml_playbook = channel.unary_unary(
-                '/connpy.ExecutionService/run_yaml_playbook',
-                request_serializer=connpy__pb2.ScriptRequest.SerializeToString,
-                response_deserializer=connpy__pb2.StructResponse.FromString,
-                _registered_method=True)
 
 
 class ExecutionServiceServicer(object):
@@ -1570,12 +1565,6 @@ class ExecutionServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def run_yaml_playbook(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
 
 def add_ExecutionServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -1591,11 +1580,6 @@ def add_ExecutionServiceServicer_to_server(servicer, server):
             ),
             'run_cli_script': grpc.unary_unary_rpc_method_handler(
                     servicer.run_cli_script,
-                    request_deserializer=connpy__pb2.ScriptRequest.FromString,
-                    response_serializer=connpy__pb2.StructResponse.SerializeToString,
-            ),
-            'run_yaml_playbook': grpc.unary_unary_rpc_method_handler(
-                    servicer.run_yaml_playbook,
                     request_deserializer=connpy__pb2.ScriptRequest.FromString,
                     response_serializer=connpy__pb2.StructResponse.SerializeToString,
             ),
@@ -1679,33 +1663,6 @@ class ExecutionService(object):
             request,
             target,
             '/connpy.ExecutionService/run_cli_script',
-            connpy__pb2.ScriptRequest.SerializeToString,
-            connpy__pb2.StructResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def run_yaml_playbook(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/connpy.ExecutionService/run_yaml_playbook',
             connpy__pb2.ScriptRequest.SerializeToString,
             connpy__pb2.StructResponse.FromString,
             options,
@@ -1931,6 +1888,21 @@ class AIServiceStub(object):
                 request_serializer=connpy__pb2.StringRequest.SerializeToString,
                 response_deserializer=connpy__pb2.StructResponse.FromString,
                 _registered_method=True)
+        self.build_playbook_chat = channel.stream_stream(
+                '/connpy.AIService/build_playbook_chat',
+                request_serializer=connpy__pb2.AskRequest.SerializeToString,
+                response_deserializer=connpy__pb2.AIResponse.FromString,
+                _registered_method=True)
+        self.analyze_execution_results = channel.unary_stream(
+                '/connpy.AIService/analyze_execution_results',
+                request_serializer=connpy__pb2.AnalyzeRequest.SerializeToString,
+                response_deserializer=connpy__pb2.AIResponse.FromString,
+                _registered_method=True)
+        self.predict_execution_results = channel.unary_stream(
+                '/connpy.AIService/predict_execution_results',
+                request_serializer=connpy__pb2.PreflightRequest.SerializeToString,
+                response_deserializer=connpy__pb2.AIResponse.FromString,
+                _registered_method=True)
 
 
 class AIServiceServicer(object):
@@ -1990,6 +1962,24 @@ class AIServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def build_playbook_chat(self, request_iterator, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def analyze_execution_results(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def predict_execution_results(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_AIServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -2037,6 +2027,21 @@ def add_AIServiceServicer_to_server(servicer, server):
                     servicer.load_session_data,
                     request_deserializer=connpy__pb2.StringRequest.FromString,
                     response_serializer=connpy__pb2.StructResponse.SerializeToString,
+            ),
+            'build_playbook_chat': grpc.stream_stream_rpc_method_handler(
+                    servicer.build_playbook_chat,
+                    request_deserializer=connpy__pb2.AskRequest.FromString,
+                    response_serializer=connpy__pb2.AIResponse.SerializeToString,
+            ),
+            'analyze_execution_results': grpc.unary_stream_rpc_method_handler(
+                    servicer.analyze_execution_results,
+                    request_deserializer=connpy__pb2.AnalyzeRequest.FromString,
+                    response_serializer=connpy__pb2.AIResponse.SerializeToString,
+            ),
+            'predict_execution_results': grpc.unary_stream_rpc_method_handler(
+                    servicer.predict_execution_results,
+                    request_deserializer=connpy__pb2.PreflightRequest.FromString,
+                    response_serializer=connpy__pb2.AIResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -2282,6 +2287,87 @@ class AIService(object):
             '/connpy.AIService/load_session_data',
             connpy__pb2.StringRequest.SerializeToString,
             connpy__pb2.StructResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def build_playbook_chat(request_iterator,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.stream_stream(
+            request_iterator,
+            target,
+            '/connpy.AIService/build_playbook_chat',
+            connpy__pb2.AskRequest.SerializeToString,
+            connpy__pb2.AIResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def analyze_execution_results(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            '/connpy.AIService/analyze_execution_results',
+            connpy__pb2.AnalyzeRequest.SerializeToString,
+            connpy__pb2.AIResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def predict_execution_results(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            '/connpy.AIService/predict_execution_results',
+            connpy__pb2.PreflightRequest.SerializeToString,
+            connpy__pb2.AIResponse.FromString,
             options,
             channel_credentials,
             insecure,

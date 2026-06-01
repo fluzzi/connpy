@@ -480,6 +480,15 @@ class TestToolDefinitions:
         names = [t["function"]["name"] for t in tools]
         assert "arch_tool" in names
 
+    def test_architect_tools_one_shot(self, ai_config):
+        from connpy.ai import ai
+        one_shot_ai = ai(ai_config, one_shot=True)
+        tools = one_shot_ai._get_architect_tools()
+        names = [t["function"]["name"] for t in tools]
+        assert "delegate_to_engineer" not in names
+        assert "return_to_engineer" not in names
+        assert "manage_memory_tool" in names
+
 
 # =========================================================================
 # AI Session Management tests

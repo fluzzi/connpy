@@ -573,7 +573,7 @@ class BlockMarkdownRenderer:
         if not block_text:
             return
         from rich.markdown import Markdown
-        self._console.print(Markdown(block_text))
+        self._console.print(Markdown(block_text, code_theme="ansi_dark"))
 
 # Alias for backward compatibility
 IncrementalMarkdownParser = BlockMarkdownRenderer

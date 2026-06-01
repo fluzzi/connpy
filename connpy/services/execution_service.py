@@ -1,6 +1,5 @@
 from typing import List, Dict, Any, Callable, Optional
 import os
-import yaml
 from .base import BaseService
 from connpy.core import nodes as Nodes
 from .exceptions import ConnpyError
@@ -107,53 +106,4 @@ class ExecutionService(BaseService):
             raise ConnpyError(f"Failed to read script {script_path}: {e}")
             
         return self.run_commands(nodes_filter, commands, parallel=parallel)
-
-    def run_yaml_playbook(self, playbook_data: str, parallel: int = 10) -> Dict[str, Any]:
-        """Run a structured Connpy YAML automation playbook (from path or content)."""
-        playbook = None
-        if playbook_data.startswith("---YAML---\n"):
-            try:
-                content = playbook_data[len("---YAML---\n"):]
-                playbook = yaml.load(content, Loader=yaml.FullLoader)
-            except Exception as e:
-                raise ConnpyError(f"Failed to parse YAML content: {e}")
-        else:
-            if not os.path.exists(playbook_data):
-                raise ConnpyError(f"Playbook file not found: {playbook_data}")
-            try:
-                with open(playbook_data, "r") as f:
-                    playbook = yaml.load(f, Loader=yaml.FullLoader)
-            except Exception as e:
-                raise ConnpyError(f"Failed to load playbook {playbook_data}: {e}")
-            
-        # Basic validation
-        if not isinstance(playbook, dict) or "nodes" not in playbook or "commands" not in playbook:
-            raise ConnpyError("Invalid playbook format: missing 'nodes' or 'commands' keys.")
-            
-        action = playbook.get("action", "run")
-        options = playbook.get("options", {})
-        
-        # Extract all fields similar to RunHandler.cli_run
-        exec_args = {
-            "nodes_filter": playbook["nodes"],
-            "commands": playbook["commands"],
-            "variables": playbook.get("variables"),
-            "parallel": options.get("parallel", parallel),
-            "timeout": playbook.get("timeout", options.get("timeout", 20)),
-            "prompt": options.get("prompt"),
-            "name": playbook.get("name", "Task")
-        }
-
-        # Map 'output' field to folder path if it's not stdout/null
-        output_cfg = playbook.get("output")
-        if output_cfg not in [None, "stdout"]:
-            exec_args["folder"] = output_cfg
-
-        if action == "run":
-            return self.run_commands(**exec_args)
-        elif action == "test":
-            exec_args["expected"] = playbook.get("expected", [])
-            return self.test_commands(**exec_args)
-        else:
-            raise ConnpyError(f"Unsupported playbook action: {action}")
 

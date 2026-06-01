@@ -692,11 +692,6 @@ class ExecutionStub:
         req = connpy_pb2.ScriptRequest(param1=nodes_filter, param2=script_path, parallel=parallel)
         return from_struct(self.stub.run_cli_script(req).data)
 
-    @handle_errors
-    def run_yaml_playbook(self, playbook_path, parallel=10):
-        req = connpy_pb2.ScriptRequest(param1=playbook_path, parallel=parallel)
-        return from_struct(self.stub.run_yaml_playbook(req).data)
-
 class ImportExportStub:
     def __init__(self, channel, remote_host):
         self.stub = connpy_pb2_grpc.ImportExportServiceStub(channel)
@@ -724,8 +719,7 @@ class AIStub:
         self.stub = connpy_pb2_grpc.AIServiceStub(channel)
         self.remote_host = remote_host
 
-    @handle_errors
-    def ask(self, input_text, dryrun=False, chat_history=None, session_id=None, debug=False, status=None, **overrides):
+    def _ai_chat_stream(self, stub_method, input_text, dryrun=False, chat_history=None, session_id=None, debug=False, status=None, chunk_callback=None, **overrides):
         import queue
         from rich.prompt import Prompt
         from rich.text import Text
@@ -760,7 +754,7 @@ class AIStub:
                 if req is None: break
                 yield req
 
-        responses = self.stub.ask(request_generator())
+        responses = stub_method(request_generator())
         
         full_content = ""
         header_printed = False
@@ -859,26 +853,32 @@ class AIStub:
                                 try: status.stop()
                                 except: pass
                             
-                            from rich.console import Console as RichConsole
-                            from rich.rule import Rule
-                            from ..printer import connpy_theme, get_original_stdout, IncrementalMarkdownParser
-                            stable_console = RichConsole(theme=connpy_theme, file=get_original_stdout())
-                            
-                            # Print header on first chunk
-                            alias = "architect" if current_responder == "architect" else "engineer"
-                            role_label = "Network Architect" if current_responder == "architect" else "Network Engineer"
-                            stable_console.print(Rule(f"[bold {alias}]{role_label}[/bold {alias}]", style=alias))
-                            header_printed = True
-                            
-                            # Initialize parser
-                            md_parser = IncrementalMarkdownParser(console=stable_console)
+                            if chunk_callback:
+                                header_printed = True
+                            else:
+                                from rich.console import Console as RichConsole
+                                from rich.rule import Rule
+                                from ..printer import connpy_theme, get_original_stdout, IncrementalMarkdownParser
+                                stable_console = RichConsole(theme=connpy_theme, file=get_original_stdout())
+                                
+                                # Print header on first chunk
+                                alias = "architect" if current_responder == "architect" else "engineer"
+                                role_label = "Network Architect" if current_responder == "architect" else "Network Engineer"
+                                stable_console.print(Rule(f"[bold {alias}]{role_label}[/bold {alias}]", style=alias))
+                                header_printed = True
+                                
+                                # Initialize parser
+                                md_parser = IncrementalMarkdownParser(console=stable_console)
                         
                         full_content += response.text_chunk
-                        md_parser.feed(response.text_chunk)
+                        if chunk_callback:
+                            chunk_callback(response.text_chunk)
+                        elif md_parser:
+                            md_parser.feed(response.text_chunk)
                     continue
                 
                 if response.is_final:
-                    if header_printed:
+                    if not chunk_callback and header_printed:
                         from rich.rule import Rule
                         md_parser.flush()
                         
@@ -887,12 +887,8 @@ class AIStub:
                         except: pass
 
                     final_result = from_struct(response.full_result)
-                    responder = final_result.get("responder", "engineer")
-                    alias = "architect" if responder == "architect" else "engineer"
-                    role_label = "Network Architect" if responder == "architect" else "Network Engineer"
-                    title = f"[bold {alias}]{role_label}[/bold {alias}]"
                     
-                    if header_printed:
+                    if not chunk_callback and header_printed:
                         from rich.console import Console as RichConsole
                         from ..printer import connpy_theme, get_original_stdout
                         stable_console = RichConsole(theme=connpy_theme, file=get_original_stdout())
@@ -910,6 +906,104 @@ class AIStub:
             final_result["streamed"] = True
             
         return final_result
+
+    @handle_errors
+    def ask(self, input_text, dryrun=False, chat_history=None, session_id=None, debug=False, status=None, **overrides):
+        return self._ai_chat_stream(self.stub.ask, input_text, dryrun=dryrun, chat_history=chat_history, session_id=session_id, debug=debug, status=status, **overrides)
+
+    @handle_errors
+    def build_playbook_chat(self, user_input, chat_history=None, status=None, chunk_callback=None):
+        return self._ai_chat_stream(self.stub.build_playbook_chat, user_input, chat_history=chat_history, status=status, chunk_callback=chunk_callback)
+
+    def _process_unary_stream(self, responses, status=None, chunk_callback=None):
+        full_content = ""
+        header_printed = False
+        final_result = {"response": "", "chat_history": []}
+        md_parser = None
+
+        try:
+            for response in responses:
+                if response.status_update:
+                    if status:
+                        status.update(response.status_update)
+                    continue
+                
+                if response.important_message:
+                    if status:
+                        try: status.stop()
+                        except: pass
+                    printer.console.print(Text.from_ansi(response.important_message))
+                    if status:
+                        try: status.start()
+                        except: pass
+                    continue
+
+                if not response.is_final:
+                    if response.text_chunk:
+                        if not header_printed:
+                            if status:
+                                try: status.stop()
+                                except: pass
+                            
+                            if chunk_callback:
+                                header_printed = True
+                            else:
+                                from rich.console import Console as RichConsole
+                                from rich.rule import Rule
+                                from ..printer import connpy_theme, get_original_stdout, IncrementalMarkdownParser
+                                stable_console = RichConsole(theme=connpy_theme, file=get_original_stdout())
+                                
+                                # Print default header
+                                stable_console.print(Rule("[bold engineer]AI Analysis[/bold engineer]", style="engineer"))
+                                header_printed = True
+                                md_parser = IncrementalMarkdownParser(console=stable_console)
+                        
+                        full_content += response.text_chunk
+                        if chunk_callback:
+                            chunk_callback(response.text_chunk)
+                        elif md_parser:
+                            md_parser.feed(response.text_chunk)
+                    continue
+                
+                if response.is_final:
+                    if md_parser:
+                        md_parser.flush()
+                        
+                    if status:
+                        try: status.stop()
+                        except: pass
+
+                    final_result = from_struct(response.full_result)
+                    
+                    if md_parser:
+                        from rich.console import Console as RichConsole
+                        from rich.rule import Rule
+                        from ..printer import connpy_theme, get_original_stdout
+                        stable_console = RichConsole(theme=connpy_theme, file=get_original_stdout())
+                        stable_console.print(Rule(style="engineer"))
+                    break
+        except Exception as e:
+            if isinstance(e, grpc.RpcError):
+                raise
+            printer.warning(f"Stream interrupted: {e}")
+            
+        if full_content:
+            final_result["streamed"] = True
+            
+        return final_result
+
+    @handle_errors
+    def analyze_execution_results(self, results, query=None, status=None, chunk_callback=None):
+        req = connpy_pb2.AnalyzeRequest(query=query or "")
+        req.results.CopyFrom(to_struct(results))
+        responses = self.stub.analyze_execution_results(req)
+        return self._process_unary_stream(responses, status, chunk_callback)
+
+    @handle_errors
+    def predict_execution_results(self, target_nodes, commands, status=None, chunk_callback=None):
+        req = connpy_pb2.PreflightRequest(target_nodes=target_nodes, commands=commands)
+        responses = self.stub.predict_execution_results(req)
+        return self._process_unary_stream(responses, status, chunk_callback)
 
     @handle_errors
     def confirm(self, input_text, console=None):

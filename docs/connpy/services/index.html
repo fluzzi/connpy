@@ -428,7 +428,41 @@ el.replaceWith(d);
         &#34;&#34;&#34;Load a session&#39;s raw data by ID.&#34;&#34;&#34;
         from connpy.ai import ai
         agent = ai(self.config)
-        return agent.load_session_data(session_id)</code></pre>
+        return agent.load_session_data(session_id)
+
+    def build_playbook_chat(self, user_input: str, chat_history: list = None, status=None, chunk_callback=None):
+        &#34;&#34;&#34;Interact with the specialized Playbook Builder Agent.&#34;&#34;&#34;
+        from connpy.ai import PlaybookBuilderAgent
+        agent = PlaybookBuilderAgent(self.config)
+        return agent.ask(user_input, chat_history=chat_history, status=status, chunk_callback=chunk_callback)
+
+    def analyze_execution_results(self, results: dict, query: str = None, status=None, chunk_callback=None):
+        &#34;&#34;&#34;Analyze actual command execution results using Network Architect 1-shot.&#34;&#34;&#34;
+        import json
+        results_str = json.dumps(results, indent=2)
+        
+        prompt = f&#34;@architect: Please analyze the following actual execution results. Diagnose any issues, highlight successful actions, and suggest strategic remediation steps if needed.&#34;
+        if query:
+            prompt += f&#34;\nSpecific user request: {query}&#34;
+        prompt += f&#34;\n\nResults Data:\n{results_str}&#34;
+        prompt += &#34;\n\nCRITICAL DIRECTIVE: You are running in a strictly 1-shot offline diagnostics mode (--analyze). There is no active conversation loop, and you are NOT conversing with a Network Engineer. You MUST deliver your complete strategic analysis immediately. DO NOT suggest, mention, or attempt to delegate the session back to the engineer.&#34;
+        
+        # Delegate to self.ask, setting stream=True and forwarding callback/status.
+        # This will invoke standard ai.ask with &#39;@architect:&#39; prefix, forcing 1-shot architect brain.
+        return self.ask(prompt, status=status, chunk_callback=chunk_callback, one_shot=True)
+
+    def predict_execution_results(self, target_nodes: list, commands: list, status=None, chunk_callback=None):
+        &#34;&#34;&#34;Predict and simulate execution results preventively using the Preflight Simulation Agent (1-shot).&#34;&#34;&#34;
+        nodes_str = &#34;, &#34;.join(target_nodes)
+        commands_str = &#34;\n&#34;.join(f&#34;- {cmd}&#34; for cmd in commands)
+        
+        prompt = f&#34;@engineer: Act as a Preflight Simulation Agent. Simulate and predict the expected outputs and behaviors of the following commands on the target nodes. Alert about potential safety or configuration risks based on node profiles.&#34;
+        prompt += f&#34;\n\nTarget Nodes: {nodes_str}&#34;
+        prompt += f&#34;\nCommands to simulate:\n{commands_str}&#34;
+        prompt += &#34;\n\nCRITICAL SCALABILITY DIRECTIVE: If there are many target nodes, DO NOT list predictions node-by-node. Instead, group them by Operating System, vendor, or platform, and provide a highly concise Executive Summary. Detail individual risks only for nodes that present specific anomalies or security concerns. Focus on overall impact.&#34;
+        
+        # Delegate to self.ask, using the standard engineer brain but with the simulated preflight prompt.
+        return self.ask(prompt, status=status, chunk_callback=chunk_callback)</code></pre>
 </details>
 <div class="desc"><p>Business logic for interacting with AI agents and LLM configurations.</p>
 <p>Initialize the service.</p>
@@ -460,6 +494,31 @@ el.replaceWith(d);
     return await asyncio.wrap_future(future)</code></pre>
 </details>
 <div class="desc"><p>Ask the AI copilot for terminal assistance asynchronously.</p></div>
+</dd>
+<dt id="connpy.services.AIService.analyze_execution_results"><code class="name flex">
+<span>def <span class="ident">analyze_execution_results</span></span>(<span>self, results: dict, query: str = None, status=None, chunk_callback=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def analyze_execution_results(self, results: dict, query: str = None, status=None, chunk_callback=None):
+    &#34;&#34;&#34;Analyze actual command execution results using Network Architect 1-shot.&#34;&#34;&#34;
+    import json
+    results_str = json.dumps(results, indent=2)
+    
+    prompt = f&#34;@architect: Please analyze the following actual execution results. Diagnose any issues, highlight successful actions, and suggest strategic remediation steps if needed.&#34;
+    if query:
+        prompt += f&#34;\nSpecific user request: {query}&#34;
+    prompt += f&#34;\n\nResults Data:\n{results_str}&#34;
+    prompt += &#34;\n\nCRITICAL DIRECTIVE: You are running in a strictly 1-shot offline diagnostics mode (--analyze). There is no active conversation loop, and you are NOT conversing with a Network Engineer. You MUST deliver your complete strategic analysis immediately. DO NOT suggest, mention, or attempt to delegate the session back to the engineer.&#34;
+    
+    # Delegate to self.ask, setting stream=True and forwarding callback/status.
+    # This will invoke standard ai.ask with &#39;@architect:&#39; prefix, forcing 1-shot architect brain.
+    return self.ask(prompt, status=status, chunk_callback=chunk_callback, one_shot=True)</code></pre>
+</details>
+<div class="desc"><p>Analyze actual command execution results using Network Architect 1-shot.</p></div>
 </dd>
 <dt id="connpy.services.AIService.ask"><code class="name flex">
 <span>def <span class="ident">ask</span></span>(<span>self,<br>input_text,<br>dryrun=False,<br>chat_history=None,<br>status=None,<br>debug=False,<br>session_id=None,<br>console=None,<br>chunk_callback=None,<br>confirm_handler=None,<br>trust=False,<br>**overrides)</span>
@@ -618,6 +677,22 @@ el.replaceWith(d);
 </details>
 <div class="desc"><p>Identifies command blocks in the terminal history.</p></div>
 </dd>
+<dt id="connpy.services.AIService.build_playbook_chat"><code class="name flex">
+<span>def <span class="ident">build_playbook_chat</span></span>(<span>self, user_input: str, chat_history: list = None, status=None, chunk_callback=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def build_playbook_chat(self, user_input: str, chat_history: list = None, status=None, chunk_callback=None):
+    &#34;&#34;&#34;Interact with the specialized Playbook Builder Agent.&#34;&#34;&#34;
+    from connpy.ai import PlaybookBuilderAgent
+    agent = PlaybookBuilderAgent(self.config)
+    return agent.ask(user_input, chat_history=chat_history, status=status, chunk_callback=chunk_callback)</code></pre>
+</details>
+<div class="desc"><p>Interact with the specialized Playbook Builder Agent.</p></div>
+</dd>
 <dt id="connpy.services.AIService.configure_mcp"><code class="name flex">
 <span>def <span class="ident">configure_mcp</span></span>(<span>self, name, url=None, enabled=None, auto_load_on_os=None, remove=False)</span>
 </code></dt>
@@ -773,6 +848,29 @@ el.replaceWith(d);
     return agent.load_session_data(session_id)</code></pre>
 </details>
 <div class="desc"><p>Load a session's raw data by ID.</p></div>
+</dd>
+<dt id="connpy.services.AIService.predict_execution_results"><code class="name flex">
+<span>def <span class="ident">predict_execution_results</span></span>(<span>self, target_nodes: list, commands: list, status=None, chunk_callback=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def predict_execution_results(self, target_nodes: list, commands: list, status=None, chunk_callback=None):
+    &#34;&#34;&#34;Predict and simulate execution results preventively using the Preflight Simulation Agent (1-shot).&#34;&#34;&#34;
+    nodes_str = &#34;, &#34;.join(target_nodes)
+    commands_str = &#34;\n&#34;.join(f&#34;- {cmd}&#34; for cmd in commands)
+    
+    prompt = f&#34;@engineer: Act as a Preflight Simulation Agent. Simulate and predict the expected outputs and behaviors of the following commands on the target nodes. Alert about potential safety or configuration risks based on node profiles.&#34;
+    prompt += f&#34;\n\nTarget Nodes: {nodes_str}&#34;
+    prompt += f&#34;\nCommands to simulate:\n{commands_str}&#34;
+    prompt += &#34;\n\nCRITICAL SCALABILITY DIRECTIVE: If there are many target nodes, DO NOT list predictions node-by-node. Instead, group them by Operating System, vendor, or platform, and provide a highly concise Executive Summary. Detail individual risks only for nodes that present specific anomalies or security concerns. Focus on overall impact.&#34;
+    
+    # Delegate to self.ask, using the standard engineer brain but with the simulated preflight prompt.
+    return self.ask(prompt, status=status, chunk_callback=chunk_callback)</code></pre>
+</details>
+<div class="desc"><p>Predict and simulate execution results preventively using the Preflight Simulation Agent (1-shot).</p></div>
 </dd>
 <dt id="connpy.services.AIService.process_copilot_input"><code class="name flex">
 <span>def <span class="ident">process_copilot_input</span></span>(<span>self, input_text: str, session_state: dict) ‑> dict</span>
@@ -1255,56 +1353,7 @@ el.replaceWith(d);
         except Exception as e:
             raise ConnpyError(f&#34;Failed to read script {script_path}: {e}&#34;)
             
-        return self.run_commands(nodes_filter, commands, parallel=parallel)
-
-    def run_yaml_playbook(self, playbook_data: str, parallel: int = 10) -&gt; Dict[str, Any]:
-        &#34;&#34;&#34;Run a structured Connpy YAML automation playbook (from path or content).&#34;&#34;&#34;
-        playbook = None
-        if playbook_data.startswith(&#34;---YAML---\n&#34;):
-            try:
-                content = playbook_data[len(&#34;---YAML---\n&#34;):]
-                playbook = yaml.load(content, Loader=yaml.FullLoader)
-            except Exception as e:
-                raise ConnpyError(f&#34;Failed to parse YAML content: {e}&#34;)
-        else:
-            if not os.path.exists(playbook_data):
-                raise ConnpyError(f&#34;Playbook file not found: {playbook_data}&#34;)
-            try:
-                with open(playbook_data, &#34;r&#34;) as f:
-                    playbook = yaml.load(f, Loader=yaml.FullLoader)
-            except Exception as e:
-                raise ConnpyError(f&#34;Failed to load playbook {playbook_data}: {e}&#34;)
-            
-        # Basic validation
-        if not isinstance(playbook, dict) or &#34;nodes&#34; not in playbook or &#34;commands&#34; not in playbook:
-            raise ConnpyError(&#34;Invalid playbook format: missing &#39;nodes&#39; or &#39;commands&#39; keys.&#34;)
-            
-        action = playbook.get(&#34;action&#34;, &#34;run&#34;)
-        options = playbook.get(&#34;options&#34;, {})
-        
-        # Extract all fields similar to RunHandler.cli_run
-        exec_args = {
-            &#34;nodes_filter&#34;: playbook[&#34;nodes&#34;],
-            &#34;commands&#34;: playbook[&#34;commands&#34;],
-            &#34;variables&#34;: playbook.get(&#34;variables&#34;),
-            &#34;parallel&#34;: options.get(&#34;parallel&#34;, parallel),
-            &#34;timeout&#34;: playbook.get(&#34;timeout&#34;, options.get(&#34;timeout&#34;, 20)),
-            &#34;prompt&#34;: options.get(&#34;prompt&#34;),
-            &#34;name&#34;: playbook.get(&#34;name&#34;, &#34;Task&#34;)
-        }
-
-        # Map &#39;output&#39; field to folder path if it&#39;s not stdout/null
-        output_cfg = playbook.get(&#34;output&#34;)
-        if output_cfg not in [None, &#34;stdout&#34;]:
-            exec_args[&#34;folder&#34;] = output_cfg
-
-        if action == &#34;run&#34;:
-            return self.run_commands(**exec_args)
-        elif action == &#34;test&#34;:
-            exec_args[&#34;expected&#34;] = playbook.get(&#34;expected&#34;, [])
-            return self.test_commands(**exec_args)
-        else:
-            raise ConnpyError(f&#34;Unsupported playbook action: {action}&#34;)</code></pre>
+        return self.run_commands(nodes_filter, commands, parallel=parallel)</code></pre>
 </details>
 <div class="desc"><p>Business logic for executing commands on nodes and running automation scripts.</p>
 <p>Initialize the service.</p>
@@ -1398,65 +1447,6 @@ el.replaceWith(d);
         raise ConnpyError(f&#34;Execution failed: {e}&#34;)</code></pre>
 </details>
 <div class="desc"><p>Execute commands on a set of nodes.</p></div>
-</dd>
-<dt id="connpy.services.ExecutionService.run_yaml_playbook"><code class="name flex">
-<span>def <span class="ident">run_yaml_playbook</span></span>(<span>self, playbook_data: str, parallel: int = 10) ‑> Dict[str, Any]</span>
-</code></dt>
-<dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def run_yaml_playbook(self, playbook_data: str, parallel: int = 10) -&gt; Dict[str, Any]:
-    &#34;&#34;&#34;Run a structured Connpy YAML automation playbook (from path or content).&#34;&#34;&#34;
-    playbook = None
-    if playbook_data.startswith(&#34;---YAML---\n&#34;):
-        try:
-            content = playbook_data[len(&#34;---YAML---\n&#34;):]
-            playbook = yaml.load(content, Loader=yaml.FullLoader)
-        except Exception as e:
-            raise ConnpyError(f&#34;Failed to parse YAML content: {e}&#34;)
-    else:
-        if not os.path.exists(playbook_data):
-            raise ConnpyError(f&#34;Playbook file not found: {playbook_data}&#34;)
-        try:
-            with open(playbook_data, &#34;r&#34;) as f:
-                playbook = yaml.load(f, Loader=yaml.FullLoader)
-        except Exception as e:
-            raise ConnpyError(f&#34;Failed to load playbook {playbook_data}: {e}&#34;)
-        
-    # Basic validation
-    if not isinstance(playbook, dict) or &#34;nodes&#34; not in playbook or &#34;commands&#34; not in playbook:
-        raise ConnpyError(&#34;Invalid playbook format: missing &#39;nodes&#39; or &#39;commands&#39; keys.&#34;)
-        
-    action = playbook.get(&#34;action&#34;, &#34;run&#34;)
-    options = playbook.get(&#34;options&#34;, {})
-    
-    # Extract all fields similar to RunHandler.cli_run
-    exec_args = {
-        &#34;nodes_filter&#34;: playbook[&#34;nodes&#34;],
-        &#34;commands&#34;: playbook[&#34;commands&#34;],
-        &#34;variables&#34;: playbook.get(&#34;variables&#34;),
-        &#34;parallel&#34;: options.get(&#34;parallel&#34;, parallel),
-        &#34;timeout&#34;: playbook.get(&#34;timeout&#34;, options.get(&#34;timeout&#34;, 20)),
-        &#34;prompt&#34;: options.get(&#34;prompt&#34;),
-        &#34;name&#34;: playbook.get(&#34;name&#34;, &#34;Task&#34;)
-    }
-
-    # Map &#39;output&#39; field to folder path if it&#39;s not stdout/null
-    output_cfg = playbook.get(&#34;output&#34;)
-    if output_cfg not in [None, &#34;stdout&#34;]:
-        exec_args[&#34;folder&#34;] = output_cfg
-
-    if action == &#34;run&#34;:
-        return self.run_commands(**exec_args)
-    elif action == &#34;test&#34;:
-        exec_args[&#34;expected&#34;] = playbook.get(&#34;expected&#34;, [])
-        return self.test_commands(**exec_args)
-    else:
-        raise ConnpyError(f&#34;Unsupported playbook action: {action}&#34;)</code></pre>
-</details>
-<div class="desc"><p>Run a structured Connpy YAML automation playbook (from path or content).</p></div>
 </dd>
 <dt id="connpy.services.ExecutionService.test_commands"><code class="name flex">
 <span>def <span class="ident">test_commands</span></span>(<span>self,<br>nodes_filter: str,<br>commands: List[str],<br>expected: List[str],<br>variables: Dict[str, Any] | None = None,<br>parallel: int = 10,<br>timeout: int = 20,<br>folder: str | None = None,<br>prompt: str | None = None,<br>on_node_complete: Callable | None = None,<br>logger: Callable | None = None,<br>name: str | None = None) ‑> Dict[str, Dict[str, bool]]</span>
@@ -4006,9 +3996,11 @@ el.replaceWith(d);
 <h4><code><a title="connpy.services.AIService" href="#connpy.services.AIService">AIService</a></code></h4>
 <ul class="">
 <li><code><a title="connpy.services.AIService.aask_copilot" href="#connpy.services.AIService.aask_copilot">aask_copilot</a></code></li>
+<li><code><a title="connpy.services.AIService.analyze_execution_results" href="#connpy.services.AIService.analyze_execution_results">analyze_execution_results</a></code></li>
 <li><code><a title="connpy.services.AIService.ask" href="#connpy.services.AIService.ask">ask</a></code></li>
 <li><code><a title="connpy.services.AIService.ask_copilot" href="#connpy.services.AIService.ask_copilot">ask_copilot</a></code></li>
 <li><code><a title="connpy.services.AIService.build_context_blocks" href="#connpy.services.AIService.build_context_blocks">build_context_blocks</a></code></li>
+<li><code><a title="connpy.services.AIService.build_playbook_chat" href="#connpy.services.AIService.build_playbook_chat">build_playbook_chat</a></code></li>
 <li><code><a title="connpy.services.AIService.configure_mcp" href="#connpy.services.AIService.configure_mcp">configure_mcp</a></code></li>
 <li><code><a title="connpy.services.AIService.configure_provider" href="#connpy.services.AIService.configure_provider">configure_provider</a></code></li>
 <li><code><a title="connpy.services.AIService.confirm" href="#connpy.services.AIService.confirm">confirm</a></code></li>
@@ -4016,6 +4008,7 @@ el.replaceWith(d);
 <li><code><a title="connpy.services.AIService.list_mcp_servers" href="#connpy.services.AIService.list_mcp_servers">list_mcp_servers</a></code></li>
 <li><code><a title="connpy.services.AIService.list_sessions" href="#connpy.services.AIService.list_sessions">list_sessions</a></code></li>
 <li><code><a title="connpy.services.AIService.load_session_data" href="#connpy.services.AIService.load_session_data">load_session_data</a></code></li>
+<li><code><a title="connpy.services.AIService.predict_execution_results" href="#connpy.services.AIService.predict_execution_results">predict_execution_results</a></code></li>
 <li><code><a title="connpy.services.AIService.process_copilot_input" href="#connpy.services.AIService.process_copilot_input">process_copilot_input</a></code></li>
 </ul>
 </li>
@@ -4041,7 +4034,6 @@ el.replaceWith(d);
 <ul class="">
 <li><code><a title="connpy.services.ExecutionService.run_cli_script" href="#connpy.services.ExecutionService.run_cli_script">run_cli_script</a></code></li>
 <li><code><a title="connpy.services.ExecutionService.run_commands" href="#connpy.services.ExecutionService.run_commands">run_commands</a></code></li>
-<li><code><a title="connpy.services.ExecutionService.run_yaml_playbook" href="#connpy.services.ExecutionService.run_yaml_playbook">run_yaml_playbook</a></code></li>
 <li><code><a title="connpy.services.ExecutionService.test_commands" href="#connpy.services.ExecutionService.test_commands">test_commands</a></code></li>
 </ul>
 </li>

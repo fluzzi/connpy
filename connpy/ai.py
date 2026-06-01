@@ -114,6 +114,7 @@ class ai:
         self.confirm_handler = confirm_handler or self._local_confirm_handler
         self.trusted_session = trust  # Trust mode for the entire session
         self.interrupted = False
+        self.one_shot = kwargs.get("one_shot", False)
 
         
         # 1. Cargar configuración genérica con herencia/merge global
@@ -285,10 +286,13 @@ class ai:
     @property
     def architect_system_prompt(self):
         """Build architect system prompt with plugin extensions."""
+        prompt = self._architect_base_prompt
+        if getattr(self, "one_shot", False):
+            prompt += "\n\nCRITICAL 1-SHOT DIAGNOSTICS DIRECTIVE:\nYou are running in a 1-shot offline diagnostics mode. There is no active conversation loop, and you are NOT conversing with a Network Engineer. You MUST deliver your complete strategic analysis immediately and directly to the user. Do not suggest or attempt to delegate/return control to the engineer."
         if self.architect_prompt_extensions:
             extensions = "\n".join(self.architect_prompt_extensions)
-            return self._architect_base_prompt + f"\n\nPlugin Capabilities:\n{extensions}"
-        return self._architect_base_prompt
+            return prompt + f"\n\nPlugin Capabilities:\n{extensions}"
+        return prompt
 
     def register_ai_tool(self, tool_definition, handler, target="engineer", engineer_prompt=None, architect_prompt=None, status_formatter=None):
         """Register an external tool for the AI system.
@@ -880,6 +884,8 @@ class ai:
             {"type": "function", "function": {"name": "return_to_engineer", "description": "Return control to the Engineer. Use this when your strategic analysis is complete and the Engineer should handle the rest of the conversation.", "parameters": {"type": "object", "properties": {"summary": {"type": "string", "description": "Brief summary of your analysis to hand over to the Engineer."}}, "required": ["summary"]}}},
             {"type": "function", "function": {"name": "manage_memory_tool", "description": "Saves information to long-term memory. MANDATORY: Only use this if the user explicitly asks to remember or save something.", "parameters": {"type": "object", "properties": {"content": {"type": "string"}, "action": {"type": "string", "enum": ["append", "replace"]}}, "required": ["content"]}}}
         ]
+        if getattr(self, "one_shot", False):
+            base_tools = [t for t in base_tools if t["function"]["name"] not in ("delegate_to_engineer", "return_to_engineer")]
         
         all_tools = base_tools + self.external_architect_tools
         seen_names = set()
@@ -1624,3 +1630,310 @@ Node: {node_name}"""
 
     @MethodHook
     def confirm(self, user_input): return True
+
+
+PLAYBOOK_BUILDER_SYSTEM_PROMPT = """
+You are a Connpy Playbook Builder Agent, a specialist in creating structured Connpy automation playbooks in YAML format.
+Your primary mission is to help the user build, refine, and validate playbooks.
+
+You MUST follow the Connpy canonical playbook format strictly:
+The playbook MUST always use the `tasks[]` array structure as the root key, where each task is sequential and independent.
+
+Connpy YAML Playbook Canonical Schema:
+---
+tasks:
+- name: "Task Description"
+  action: 'run' # Can be 'run' or 'test'. Mandatory.
+  nodes: # List of nodes filter or regular expressions to work on. Mandatory. Can be a string or array of strings. Supports regex (e.g. 'router.*@office' to match all routers in the 'office' folder).
+  - 'router1@office'
+  - 'router.*@office' # Regex filters are fully supported to match multiple nodes dynamically.
+  - '@aws'
+  commands: # List of CLI commands to execute. Mandatory.
+  - 'show version'
+  variables: # Key-value pairs for variables replacement in commands and expected. Optional.
+    __global__: # Global variables fallback. Optional.
+      key: value
+    node_name@folder: # Node-specific variables. Optional.
+      key: value
+  output: stdout # Mandatory. Output configuration. Choices: 'stdout', 'null', or a folder path like '/path/to/folder'.
+  options: # Execution options. Optional.
+    prompt: 'regex_prompt' # Optional prompt to expect.
+    parallel: 10 # Optional number of parallel threads. Default 10.
+    timeout: 20 # Optional execution timeout in seconds. Default 20.
+
+- name: "Verification Task"
+  action: 'test'
+  nodes:
+  - 'router1@office'
+  commands:
+  - 'ping 10.100.100.1'
+  expected: '!' # Expected text pattern to search in output. Mandatory ONLY for 'test' action.
+
+Connpy Variable Templating & Usage:
+- Variables defined under the `variables` key (either globally under `__global__` or for specific nodes) are used in commands or expected output by surrounding the variable name with single curly braces: `{variable_name}`.
+- Example: If you define a variable `ip` with a value of `10.100.100.1`, you use it in commands as `'ping {ip}'`.
+- Recommendation (Important): Variables are not limited to simple words or values. You can define entire CLI commands as variables to abstract vendor-specific syntax! This is highly recommended when executing the same logical operation across different operating systems (OS) or vendors.
+  - Example: You can define `show_interface_cmd` under a specific node's variables to be `'show ip interface brief'` for Cisco, and `'show interfaces terse'` for Juniper, and then write a single generic command under `commands`:
+    `- '{show_interface_cmd}'`
+
+Guidelines:
+1. When the user requests a playbook, you should guide them and output the YAML.
+2. IMPORTANT: You have access to the `list_nodes` tool. Proactively use it to inspect the user's real inventory. This allows you to discover correct node names, folders, or device tags, and construct precise regex filters for the `nodes` field based on real assets.
+3. IMPORTANT: Before presenting the playbook, you MUST call the `validate_playbook` tool with the YAML to let the backend check for syntax and schema correctness.
+4. If `validate_playbook` returns errors, fix them in your YAML and validate again before responding to the user.
+5. When the playbook is complete, validated, and the user approves it, you MUST call the `return_playbook` tool to return the final YAML.
+6. All text responses must be in the same language the user uses in their prompt.
+"""
+
+PLAYBOOK_BUILDER_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "list_nodes",
+            "description": "[Universal Platform] Lists available nodes in the inventory. Use this to discover device names, folders, or operating systems to build proper regex filters.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "filter_pattern": {
+                        "type": "STRING",
+                        "description": "Regex or pattern to filter nodes (e.g. '.*', 'border.*', '@office')."
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "validate_playbook",
+            "description": "Validates the Connpy YAML playbook structure, syntax, and schema correctness with the backend.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "playbook_yaml": {
+                        "type": "STRING",
+                        "description": "The YAML content of the playbook to validate."
+                    }
+                },
+                "required": ["playbook_yaml"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "return_playbook",
+            "description": "Returns the final validated YAML playbook to the calling application when the user is satisfied.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "playbook_yaml": {
+                        "type": "STRING",
+                        "description": "The final YAML content of the playbook."
+                    }
+                },
+                "required": ["playbook_yaml"]
+            }
+        }
+    }
+]
+
+class PlaybookBuilderAgent:
+    """Specialized AI agent for building, validating, and generating Connpy YAML playbooks."""
+
+    def __init__(self, config, console=None, confirm_handler=None, trust=False, **kwargs):
+        self.config = config
+        self.console = console or printer.console
+        self.interrupted = False
+        
+        # Load AI configuration
+        if hasattr(self.config, "get_effective_setting"):
+            aiconfig = self.config.get_effective_setting("ai", {})
+        else:
+            aiconfig = self.config.config.get("ai", {}) if hasattr(self.config, "config") else {}
+
+        # Default model for technical tasks
+        self.model = kwargs.get("engineer_model") or aiconfig.get("engineer_model") or "gemini/gemini-3.1-flash-lite"
+        self.key = kwargs.get("engineer_api_key") or aiconfig.get("engineer_api_key")
+        self.auth = kwargs.get("engineer_auth") or aiconfig.get("engineer_auth") or {}
+        if self.key and "api_key" not in self.auth:
+            self.auth = self.auth.copy()
+            self.auth["api_key"] = self.key
+
+    def validate_playbook(self, playbook_yaml: str) -> dict:
+        """Sintactical and schema validation of Connpy Playbook YAML."""
+        import yaml
+        try:
+            # 1. Parse YAML
+            data = yaml.load(playbook_yaml, Loader=yaml.FullLoader)
+        except Exception as e:
+            return {"valid": False, "error": f"YAML Syntax Error: {e}"}
+
+        # 2. Check structure
+        if not isinstance(data, dict):
+            return {"valid": False, "error": "Playbook must be a YAML dictionary."}
+        
+        if "tasks" not in data:
+            return {"valid": False, "error": "Playbook missing mandatory root 'tasks' key."}
+            
+        tasks = data["tasks"]
+        if not isinstance(tasks, list):
+            return {"valid": False, "error": "'tasks' must be a list of tasks."}
+
+        # 3. Check individual tasks
+        for idx, task in enumerate(tasks):
+            if not isinstance(task, dict):
+                return {"valid": False, "error": f"Task index {idx} must be a dictionary."}
+            
+            name = task.get("name", f"Task {idx}")
+            
+            # Mandatory fields
+            mandatory = ["name", "action", "nodes", "commands", "output"]
+            missing = [field for field in mandatory if field not in task]
+            if missing:
+                return {"valid": False, "error": f"Task '{name}' (index {idx}) is missing mandatory fields: {missing}"}
+
+            # Validate nodes field type (supports string regexes or array of string regexes)
+            nodes = task["nodes"]
+            if not isinstance(nodes, (str, list)):
+                return {"valid": False, "error": f"Task '{name}' (index {idx}) 'nodes' must be a string (regex) or a list of strings (regexes)."}
+            
+            if isinstance(nodes, list):
+                for n_idx, node_item in enumerate(nodes):
+                    if not isinstance(node_item, str):
+                        return {"valid": False, "error": f"Task '{name}' (index {idx}) 'nodes' list contains a non-string value at index {n_idx}: {node_item}"}
+
+            action = task["action"]
+            if action not in ["run", "test"]:
+                return {"valid": False, "error": f"Task '{name}' (index {idx}) has invalid action '{action}'. Choices are: 'run', 'test'."}
+
+            if action == "test" and "expected" not in task:
+                return {"valid": False, "error": f"Task '{name}' (index {idx}) has action 'test' but is missing the mandatory 'expected' key."}
+
+            output = task["output"]
+            if output not in [None, "stdout"] and not output.startswith("/"):
+                return {"valid": False, "error": f"Task '{name}' (index {idx}) output '{output}' is invalid. Must be 'stdout', 'null' or an absolute path."}
+
+        return {"valid": True, "message": "Playbook schema and syntax is valid."}
+
+    def ask(self, user_input, chat_history=None, status=None, debug=False, chunk_callback=None):
+        """Standard conversation step with tool loop for PlaybookBuilderAgent."""
+        if chat_history is None:
+            chat_history = []
+
+        # System prompt and tool definition
+        system_prompt = PLAYBOOK_BUILDER_SYSTEM_PROMPT
+        tools = PLAYBOOK_BUILDER_TOOLS
+        messages = [{"role": "system", "content": system_prompt}]
+
+        for msg in chat_history:
+            m = msg if isinstance(msg, dict) else msg.copy()
+            if m.get('role') == 'assistant' and m.get('tool_calls') and m.get('content') == "":
+                m['content'] = None
+            messages.append(m)
+
+        messages.append({"role": "user", "content": user_input})
+
+        final_playbook_yaml = None
+        iteration = 0
+        max_iterations = 10
+
+        while iteration < max_iterations:
+            iteration += 1
+
+            if status:
+                status.update(f"Playbook Agent is thinking... (step {iteration})")
+
+            # Call LiteLLM completion
+            from connpy.ai import completion
+            try:
+                response = completion(
+                    model=self.model,
+                    messages=messages,
+                    tools=tools,
+                    num_retries=3,
+                    **self.auth
+                )
+            except Exception as e:
+                return {"response": f"Playbook Agent failed: {str(e)}", "chat_history": messages[1:]}
+
+            resp_msg = response.choices[0].message
+            msg_dict = resp_msg.model_dump(exclude_none=True)
+            if msg_dict.get("tool_calls") and msg_dict.get("content") == "":
+                msg_dict["content"] = None
+            
+            messages.append(msg_dict)
+
+            # If the model sends content, stream or yield it
+            if resp_msg.content:
+                if chunk_callback:
+                    chunk_callback(resp_msg.content)
+                elif not resp_msg.tool_calls:
+                    # In direct non-streaming output, print markdown
+                    self.console.print(Markdown(resp_msg.content))
+
+            if not resp_msg.tool_calls:
+                break
+
+            for tc in resp_msg.tool_calls:
+                fn = tc.function.name
+                args = json.loads(tc.function.arguments)
+
+                if fn == "list_nodes":
+                    filter_pattern = args.get("filter_pattern", ".*")
+                    try:
+                        matched_names = self.config._getallnodes(filter_pattern)
+                        if not matched_names:
+                            obs = "No nodes found matching the filter."
+                        else:
+                            if len(matched_names) <= 5:
+                                matched_data = self.config.getitems(matched_names, extract=True)
+                                res = {}
+                                for name, data in matched_data.items():
+                                    os_tag = "unknown"
+                                    if isinstance(data, dict):
+                                        ts = data.get("tags")
+                                        if isinstance(ts, dict): os_tag = ts.get("os", "unknown")
+                                    res[name] = {"os": os_tag}
+                                obs = json.dumps(res)
+                            else:
+                                obs = json.dumps({
+                                    "matched_count": len(matched_names),
+                                    "message": "Too many nodes matched. Showing names only.",
+                                    "node_names": matched_names
+                                })
+                    except Exception as e:
+                        obs = f"Error listing nodes: {e}"
+                    messages.append({
+                        "tool_call_id": tc.id,
+                        "role": "tool",
+                        "name": fn,
+                        "content": obs
+                    })
+                elif fn == "validate_playbook":
+                    playbook_yaml = args.get("playbook_yaml", "")
+                    validation_res = self.validate_playbook(playbook_yaml)
+                    messages.append({
+                        "tool_call_id": tc.id,
+                        "role": "tool",
+                        "name": fn,
+                        "content": json.dumps(validation_res)
+                    })
+                elif fn == "return_playbook":
+                    final_playbook_yaml = args.get("playbook_yaml", "")
+                    messages.append({
+                        "tool_call_id": tc.id,
+                        "role": "tool",
+                        "name": fn,
+                        "content": json.dumps({"success": True, "message": "Playbook returned successfully."})
+                    })
+
+            # If return_playbook was called, we can terminate early
+            if final_playbook_yaml is not None:
+                break
+
+        return {
+            "response": resp_msg.content or "",
+            "chat_history": messages[1:],
+            "playbook_yaml": final_playbook_yaml
+        }

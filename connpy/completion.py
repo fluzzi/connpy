@@ -169,12 +169,17 @@ def _build_tree(nodes, folders, profiles, plugins, configdir):
     run_after_node.update({
         "--test": {"*": run_after_node},
         "-t": {"*": run_after_node},
+        "--analyze": {"*": run_after_node},
+        "--preflight-ai": run_after_node,
         "*": run_after_node  # Consume commands
     })
 
     run_dict = {
         "--generate": {"__extra__": lambda w: get_cwd(w, "--generate")},
         "-g": {"__extra__": lambda w: get_cwd(w, "-g")},
+        "--generate-ai": {"__extra__": lambda w: get_cwd(w, "--generate-ai")},
+        "--analyze": {"*": run_after_node},
+        "--preflight-ai": run_after_node,
         "--test": {"*": None},
         "-t": {"*": None},
         "--help": None,

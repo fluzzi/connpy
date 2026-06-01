@@ -99,8 +99,7 @@ el.replaceWith(d);
         self.stub = connpy_pb2_grpc.AIServiceStub(channel)
         self.remote_host = remote_host
 
-    @handle_errors
-    def ask(self, input_text, dryrun=False, chat_history=None, session_id=None, debug=False, status=None, **overrides):
+    def _ai_chat_stream(self, stub_method, input_text, dryrun=False, chat_history=None, session_id=None, debug=False, status=None, chunk_callback=None, **overrides):
         import queue
         from rich.prompt import Prompt
         from rich.text import Text
@@ -135,7 +134,7 @@ el.replaceWith(d);
                 if req is None: break
                 yield req
 
-        responses = self.stub.ask(request_generator())
+        responses = stub_method(request_generator())
         
         full_content = &#34;&#34;
         header_printed = False
@@ -234,26 +233,32 @@ el.replaceWith(d);
                                 try: status.stop()
                                 except: pass
                             
-                            from rich.console import Console as RichConsole
-                            from rich.rule import Rule
-                            from ..printer import connpy_theme, get_original_stdout, IncrementalMarkdownParser
-                            stable_console = RichConsole(theme=connpy_theme, file=get_original_stdout())
-                            
-                            # Print header on first chunk
-                            alias = &#34;architect&#34; if current_responder == &#34;architect&#34; else &#34;engineer&#34;
-                            role_label = &#34;Network Architect&#34; if current_responder == &#34;architect&#34; else &#34;Network Engineer&#34;
-                            stable_console.print(Rule(f&#34;[bold {alias}]{role_label}[/bold {alias}]&#34;, style=alias))
-                            header_printed = True
-                            
-                            # Initialize parser
-                            md_parser = IncrementalMarkdownParser(console=stable_console)
+                            if chunk_callback:
+                                header_printed = True
+                            else:
+                                from rich.console import Console as RichConsole
+                                from rich.rule import Rule
+                                from ..printer import connpy_theme, get_original_stdout, IncrementalMarkdownParser
+                                stable_console = RichConsole(theme=connpy_theme, file=get_original_stdout())
+                                
+                                # Print header on first chunk
+                                alias = &#34;architect&#34; if current_responder == &#34;architect&#34; else &#34;engineer&#34;
+                                role_label = &#34;Network Architect&#34; if current_responder == &#34;architect&#34; else &#34;Network Engineer&#34;
+                                stable_console.print(Rule(f&#34;[bold {alias}]{role_label}[/bold {alias}]&#34;, style=alias))
+                                header_printed = True
+                                
+                                # Initialize parser
+                                md_parser = IncrementalMarkdownParser(console=stable_console)
                         
                         full_content += response.text_chunk
-                        md_parser.feed(response.text_chunk)
+                        if chunk_callback:
+                            chunk_callback(response.text_chunk)
+                        elif md_parser:
+                            md_parser.feed(response.text_chunk)
                     continue
                 
                 if response.is_final:
-                    if header_printed:
+                    if not chunk_callback and header_printed:
                         from rich.rule import Rule
                         md_parser.flush()
                         
@@ -262,12 +267,8 @@ el.replaceWith(d);
                         except: pass
 
                     final_result = from_struct(response.full_result)
-                    responder = final_result.get(&#34;responder&#34;, &#34;engineer&#34;)
-                    alias = &#34;architect&#34; if responder == &#34;architect&#34; else &#34;engineer&#34;
-                    role_label = &#34;Network Architect&#34; if responder == &#34;architect&#34; else &#34;Network Engineer&#34;
-                    title = f&#34;[bold {alias}]{role_label}[/bold {alias}]&#34;
                     
-                    if header_printed:
+                    if not chunk_callback and header_printed:
                         from rich.console import Console as RichConsole
                         from ..printer import connpy_theme, get_original_stdout
                         stable_console = RichConsole(theme=connpy_theme, file=get_original_stdout())
@@ -285,6 +286,104 @@ el.replaceWith(d);
             final_result[&#34;streamed&#34;] = True
             
         return final_result
+
+    @handle_errors
+    def ask(self, input_text, dryrun=False, chat_history=None, session_id=None, debug=False, status=None, **overrides):
+        return self._ai_chat_stream(self.stub.ask, input_text, dryrun=dryrun, chat_history=chat_history, session_id=session_id, debug=debug, status=status, **overrides)
+
+    @handle_errors
+    def build_playbook_chat(self, user_input, chat_history=None, status=None, chunk_callback=None):
+        return self._ai_chat_stream(self.stub.build_playbook_chat, user_input, chat_history=chat_history, status=status, chunk_callback=chunk_callback)
+
+    def _process_unary_stream(self, responses, status=None, chunk_callback=None):
+        full_content = &#34;&#34;
+        header_printed = False
+        final_result = {&#34;response&#34;: &#34;&#34;, &#34;chat_history&#34;: []}
+        md_parser = None
+
+        try:
+            for response in responses:
+                if response.status_update:
+                    if status:
+                        status.update(response.status_update)
+                    continue
+                
+                if response.important_message:
+                    if status:
+                        try: status.stop()
+                        except: pass
+                    printer.console.print(Text.from_ansi(response.important_message))
+                    if status:
+                        try: status.start()
+                        except: pass
+                    continue
+
+                if not response.is_final:
+                    if response.text_chunk:
+                        if not header_printed:
+                            if status:
+                                try: status.stop()
+                                except: pass
+                            
+                            if chunk_callback:
+                                header_printed = True
+                            else:
+                                from rich.console import Console as RichConsole
+                                from rich.rule import Rule
+                                from ..printer import connpy_theme, get_original_stdout, IncrementalMarkdownParser
+                                stable_console = RichConsole(theme=connpy_theme, file=get_original_stdout())
+                                
+                                # Print default header
+                                stable_console.print(Rule(&#34;[bold engineer]AI Analysis[/bold engineer]&#34;, style=&#34;engineer&#34;))
+                                header_printed = True
+                                md_parser = IncrementalMarkdownParser(console=stable_console)
+                        
+                        full_content += response.text_chunk
+                        if chunk_callback:
+                            chunk_callback(response.text_chunk)
+                        elif md_parser:
+                            md_parser.feed(response.text_chunk)
+                    continue
+                
+                if response.is_final:
+                    if md_parser:
+                        md_parser.flush()
+                        
+                    if status:
+                        try: status.stop()
+                        except: pass
+
+                    final_result = from_struct(response.full_result)
+                    
+                    if md_parser:
+                        from rich.console import Console as RichConsole
+                        from rich.rule import Rule
+                        from ..printer import connpy_theme, get_original_stdout
+                        stable_console = RichConsole(theme=connpy_theme, file=get_original_stdout())
+                        stable_console.print(Rule(style=&#34;engineer&#34;))
+                    break
+        except Exception as e:
+            if isinstance(e, grpc.RpcError):
+                raise
+            printer.warning(f&#34;Stream interrupted: {e}&#34;)
+            
+        if full_content:
+            final_result[&#34;streamed&#34;] = True
+            
+        return final_result
+
+    @handle_errors
+    def analyze_execution_results(self, results, query=None, status=None, chunk_callback=None):
+        req = connpy_pb2.AnalyzeRequest(query=query or &#34;&#34;)
+        req.results.CopyFrom(to_struct(results))
+        responses = self.stub.analyze_execution_results(req)
+        return self._process_unary_stream(responses, status, chunk_callback)
+
+    @handle_errors
+    def predict_execution_results(self, target_nodes, commands, status=None, chunk_callback=None):
+        req = connpy_pb2.PreflightRequest(target_nodes=target_nodes, commands=commands)
+        responses = self.stub.predict_execution_results(req)
+        return self._process_unary_stream(responses, status, chunk_callback)
 
     @handle_errors
     def confirm(self, input_text, console=None):
@@ -333,6 +432,23 @@ el.replaceWith(d);
 <div class="desc"></div>
 <h3>Methods</h3>
 <dl>
+<dt id="connpy.grpc_layer.stubs.AIStub.analyze_execution_results"><code class="name flex">
+<span>def <span class="ident">analyze_execution_results</span></span>(<span>self, results, query=None, status=None, chunk_callback=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def analyze_execution_results(self, results, query=None, status=None, chunk_callback=None):
+    req = connpy_pb2.AnalyzeRequest(query=query or &#34;&#34;)
+    req.results.CopyFrom(to_struct(results))
+    responses = self.stub.analyze_execution_results(req)
+    return self._process_unary_stream(responses, status, chunk_callback)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
 <dt id="connpy.grpc_layer.stubs.AIStub.ask"><code class="name flex">
 <span>def <span class="ident">ask</span></span>(<span>self,<br>input_text,<br>dryrun=False,<br>chat_history=None,<br>session_id=None,<br>debug=False,<br>status=None,<br>**overrides)</span>
 </code></dt>
@@ -343,190 +459,21 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">@handle_errors
 def ask(self, input_text, dryrun=False, chat_history=None, session_id=None, debug=False, status=None, **overrides):
-    import queue
-    from rich.prompt import Prompt
-    from rich.text import Text
-    from rich.panel import Panel
-    from rich.markdown import Markdown
-    
-    req_queue = queue.Queue()
-    
-    initial_req = connpy_pb2.AskRequest(
-        input_text=input_text,
-        dryrun=dryrun,
-        session_id=session_id or &#34;&#34;,
-        debug=debug,
-        engineer_model=overrides.get(&#34;engineer_model&#34;, &#34;&#34;),
-        engineer_api_key=overrides.get(&#34;engineer_api_key&#34;, &#34;&#34;),
-        architect_model=overrides.get(&#34;architect_model&#34;, &#34;&#34;),
-        architect_api_key=overrides.get(&#34;architect_api_key&#34;, &#34;&#34;),
-        trust=overrides.get(&#34;trust&#34;, False)
-    )
-    if chat_history is not None:
-        initial_req.chat_history.CopyFrom(to_value(chat_history))
-    if &#34;engineer_auth&#34; in overrides and overrides[&#34;engineer_auth&#34;]:
-        initial_req.engineer_auth.CopyFrom(to_struct(overrides[&#34;engineer_auth&#34;]))
-    if &#34;architect_auth&#34; in overrides and overrides[&#34;architect_auth&#34;]:
-        initial_req.architect_auth.CopyFrom(to_struct(overrides[&#34;architect_auth&#34;]))
-        
-    req_queue.put(initial_req)
-
-    def request_generator():
-        while True:
-            req = req_queue.get()
-            if req is None: break
-            yield req
-
-    responses = self.stub.ask(request_generator())
-    
-    full_content = &#34;&#34;
-    header_printed = False
-    current_responder = &#34;engineer&#34;
-    final_result = {&#34;response&#34;: &#34;&#34;, &#34;chat_history&#34;: []}
-
-    # Background thread to pull responses from gRPC into a local queue
-    # This prevents KeyboardInterrupt from corrupting the gRPC iterator state
-    response_queue = queue.Queue()
-    
-    def pull_responses():
-        try:
-            for response in responses:
-                response_queue.put((&#34;data&#34;, response))
-        except Exception as e:
-            response_queue.put((&#34;error&#34;, e))
-        finally:
-            response_queue.put((None, None))
-
-    threading.Thread(target=pull_responses, daemon=True).start()
-
-    try:
-        while True:
-            try:
-                # BLOCKING GET from local queue (interruptible by signal)
-                msg_type, response = response_queue.get()
-            except KeyboardInterrupt:
-                # Signal interruption to the server
-                if status:
-                    status.update(&#34;[error]Interrupted! Closing pending tasks...&#34;)
-                
-                # Send the interrupt signal to the server
-                req_queue.put(connpy_pb2.AskRequest(interrupt=True))
-                
-                # CONTINUE the loop to receive remaining data and summary from the queue
-                continue
-            
-            if msg_type is None: # Sentinel
-                break
-            
-            if msg_type == &#34;error&#34;:
-                # Re-raise or handle gRPC error from background thread
-                if isinstance(response, grpc.RpcError):
-                    raise response
-                printer.warning(f&#34;Stream interrupted: {response}&#34;)
-                break
-
-            if response.status_update:
-                if response.status_update.startswith(&#34;__RESPONDER__:&#34;):
-                    current_responder = response.status_update.split(&#34;:&#34;)[1].lower()
-                    continue
-                    
-                if response.requires_confirmation:
-                    if status: status.stop()
-                    
-                    # Show prompt and wait for answer
-                    prompt_text = Text.from_ansi(response.status_update)
-                    ans = Prompt.ask(prompt_text)
-                    
-                    if status: 
-                        status.update(&#34;[ai_status]Agent: Resuming...&#34;)
-                        status.start()
-                    
-                    req_queue.put(connpy_pb2.AskRequest(confirmation_answer=ans))
-                    continue
-                    
-                if status:
-                    status.update(response.status_update)
-                continue
-            
-            if response.debug_message:
-                if debug:
-                    if status:
-                        try: status.stop()
-                        except: pass
-                    printer.console.print(Text.from_ansi(response.debug_message))
-                    if status:
-                        try: status.start()
-                        except: pass
-                continue
-            
-            if response.important_message:
-                if status:
-                    try: status.stop()
-                    except: pass
-                printer.console.print(Text.from_ansi(response.important_message))
-                if status:
-                    try: status.start()
-                    except: pass
-                continue
-
-            if not response.is_final:
-                if response.text_chunk:
-                    if not header_printed:
-                        if status:
-                            try: status.stop()
-                            except: pass
-                        
-                        from rich.console import Console as RichConsole
-                        from rich.rule import Rule
-                        from ..printer import connpy_theme, get_original_stdout, IncrementalMarkdownParser
-                        stable_console = RichConsole(theme=connpy_theme, file=get_original_stdout())
-                        
-                        # Print header on first chunk
-                        alias = &#34;architect&#34; if current_responder == &#34;architect&#34; else &#34;engineer&#34;
-                        role_label = &#34;Network Architect&#34; if current_responder == &#34;architect&#34; else &#34;Network Engineer&#34;
-                        stable_console.print(Rule(f&#34;[bold {alias}]{role_label}[/bold {alias}]&#34;, style=alias))
-                        header_printed = True
-                        
-                        # Initialize parser
-                        md_parser = IncrementalMarkdownParser(console=stable_console)
-                    
-                    full_content += response.text_chunk
-                    md_parser.feed(response.text_chunk)
-                continue
-            
-            if response.is_final:
-                if header_printed:
-                    from rich.rule import Rule
-                    md_parser.flush()
-                    
-                if status:
-                    try: status.stop()
-                    except: pass
-
-                final_result = from_struct(response.full_result)
-                responder = final_result.get(&#34;responder&#34;, &#34;engineer&#34;)
-                alias = &#34;architect&#34; if responder == &#34;architect&#34; else &#34;engineer&#34;
-                role_label = &#34;Network Architect&#34; if responder == &#34;architect&#34; else &#34;Network Engineer&#34;
-                title = f&#34;[bold {alias}]{role_label}[/bold {alias}]&#34;
-                
-                if header_printed:
-                    from rich.console import Console as RichConsole
-                    from ..printer import connpy_theme, get_original_stdout
-                    stable_console = RichConsole(theme=connpy_theme, file=get_original_stdout())
-                    stable_console.print(Rule(style=alias))
-                break
-    except Exception as e:
-        # Check if it was a gRPC error that we should let handle_errors catch
-        if isinstance(e, grpc.RpcError):
-            raise
-        printer.warning(f&#34;Stream interrupted: {e}&#34;)
-    finally:
-        req_queue.put(None)
-    
-    if full_content:
-        final_result[&#34;streamed&#34;] = True
-        
-    return final_result</code></pre>
+    return self._ai_chat_stream(self.stub.ask, input_text, dryrun=dryrun, chat_history=chat_history, session_id=session_id, debug=debug, status=status, **overrides)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.AIStub.build_playbook_chat"><code class="name flex">
+<span>def <span class="ident">build_playbook_chat</span></span>(<span>self, user_input, chat_history=None, status=None, chunk_callback=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def build_playbook_chat(self, user_input, chat_history=None, status=None, chunk_callback=None):
+    return self._ai_chat_stream(self.stub.build_playbook_chat, user_input, chat_history=chat_history, status=status, chunk_callback=chunk_callback)</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -641,6 +588,22 @@ def list_sessions(self, limit=None):
 <pre><code class="python">@handle_errors
 def load_session_data(self, session_id):
     return from_struct(self.stub.load_session_data(connpy_pb2.StringRequest(value=session_id)).data)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.AIStub.predict_execution_results"><code class="name flex">
+<span>def <span class="ident">predict_execution_results</span></span>(<span>self, target_nodes, commands, status=None, chunk_callback=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def predict_execution_results(self, target_nodes, commands, status=None, chunk_callback=None):
+    req = connpy_pb2.PreflightRequest(target_nodes=target_nodes, commands=commands)
+    responses = self.stub.predict_execution_results(req)
+    return self._process_unary_stream(responses, status, chunk_callback)</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -1124,12 +1087,7 @@ def update_setting(self, key, value):
     @handle_errors
     def run_cli_script(self, nodes_filter, script_path, parallel=10):
         req = connpy_pb2.ScriptRequest(param1=nodes_filter, param2=script_path, parallel=parallel)
-        return from_struct(self.stub.run_cli_script(req).data)
-
-    @handle_errors
-    def run_yaml_playbook(self, playbook_path, parallel=10):
-        req = connpy_pb2.ScriptRequest(param1=playbook_path, parallel=parallel)
-        return from_struct(self.stub.run_yaml_playbook(req).data)</code></pre>
+        return from_struct(self.stub.run_cli_script(req).data)</code></pre>
 </details>
 <div class="desc"></div>
 <h3>Methods</h3>
@@ -1184,21 +1142,6 @@ def run_commands(self, nodes_filter, commands, variables=None, parallel=10, time
         }
             
     return final_results</code></pre>
-</details>
-<div class="desc"></div>
-</dd>
-<dt id="connpy.grpc_layer.stubs.ExecutionStub.run_yaml_playbook"><code class="name flex">
-<span>def <span class="ident">run_yaml_playbook</span></span>(<span>self, playbook_path, parallel=10)</span>
-</code></dt>
-<dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">@handle_errors
-def run_yaml_playbook(self, playbook_path, parallel=10):
-    req = connpy_pb2.ScriptRequest(param1=playbook_path, parallel=parallel)
-    return from_struct(self.stub.run_yaml_playbook(req).data)</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -2815,8 +2758,10 @@ def stop_api(self):
 <ul>
 <li>
 <h4><code><a title="connpy.grpc_layer.stubs.AIStub" href="#connpy.grpc_layer.stubs.AIStub">AIStub</a></code></h4>
-<ul class="two-column">
+<ul class="">
+<li><code><a title="connpy.grpc_layer.stubs.AIStub.analyze_execution_results" href="#connpy.grpc_layer.stubs.AIStub.analyze_execution_results">analyze_execution_results</a></code></li>
 <li><code><a title="connpy.grpc_layer.stubs.AIStub.ask" href="#connpy.grpc_layer.stubs.AIStub.ask">ask</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.AIStub.build_playbook_chat" href="#connpy.grpc_layer.stubs.AIStub.build_playbook_chat">build_playbook_chat</a></code></li>
 <li><code><a title="connpy.grpc_layer.stubs.AIStub.configure_mcp" href="#connpy.grpc_layer.stubs.AIStub.configure_mcp">configure_mcp</a></code></li>
 <li><code><a title="connpy.grpc_layer.stubs.AIStub.configure_provider" href="#connpy.grpc_layer.stubs.AIStub.configure_provider">configure_provider</a></code></li>
 <li><code><a title="connpy.grpc_layer.stubs.AIStub.confirm" href="#connpy.grpc_layer.stubs.AIStub.confirm">confirm</a></code></li>
@@ -2824,6 +2769,7 @@ def stop_api(self):
 <li><code><a title="connpy.grpc_layer.stubs.AIStub.list_mcp_servers" href="#connpy.grpc_layer.stubs.AIStub.list_mcp_servers">list_mcp_servers</a></code></li>
 <li><code><a title="connpy.grpc_layer.stubs.AIStub.list_sessions" href="#connpy.grpc_layer.stubs.AIStub.list_sessions">list_sessions</a></code></li>
 <li><code><a title="connpy.grpc_layer.stubs.AIStub.load_session_data" href="#connpy.grpc_layer.stubs.AIStub.load_session_data">load_session_data</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.AIStub.predict_execution_results" href="#connpy.grpc_layer.stubs.AIStub.predict_execution_results">predict_execution_results</a></code></li>
 </ul>
 </li>
 <li>
@@ -2857,7 +2803,6 @@ def stop_api(self):
 <ul class="">
 <li><code><a title="connpy.grpc_layer.stubs.ExecutionStub.run_cli_script" href="#connpy.grpc_layer.stubs.ExecutionStub.run_cli_script">run_cli_script</a></code></li>
 <li><code><a title="connpy.grpc_layer.stubs.ExecutionStub.run_commands" href="#connpy.grpc_layer.stubs.ExecutionStub.run_commands">run_commands</a></code></li>
-<li><code><a title="connpy.grpc_layer.stubs.ExecutionStub.run_yaml_playbook" href="#connpy.grpc_layer.stubs.ExecutionStub.run_yaml_playbook">run_yaml_playbook</a></code></li>
 <li><code><a title="connpy.grpc_layer.stubs.ExecutionStub.test_commands" href="#connpy.grpc_layer.stubs.ExecutionStub.test_commands">test_commands</a></code></li>
 </ul>
 </li>

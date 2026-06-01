@@ -369,7 +369,41 @@ el.replaceWith(d);
         &#34;&#34;&#34;Load a session&#39;s raw data by ID.&#34;&#34;&#34;
         from connpy.ai import ai
         agent = ai(self.config)
-        return agent.load_session_data(session_id)</code></pre>
+        return agent.load_session_data(session_id)
+
+    def build_playbook_chat(self, user_input: str, chat_history: list = None, status=None, chunk_callback=None):
+        &#34;&#34;&#34;Interact with the specialized Playbook Builder Agent.&#34;&#34;&#34;
+        from connpy.ai import PlaybookBuilderAgent
+        agent = PlaybookBuilderAgent(self.config)
+        return agent.ask(user_input, chat_history=chat_history, status=status, chunk_callback=chunk_callback)
+
+    def analyze_execution_results(self, results: dict, query: str = None, status=None, chunk_callback=None):
+        &#34;&#34;&#34;Analyze actual command execution results using Network Architect 1-shot.&#34;&#34;&#34;
+        import json
+        results_str = json.dumps(results, indent=2)
+        
+        prompt = f&#34;@architect: Please analyze the following actual execution results. Diagnose any issues, highlight successful actions, and suggest strategic remediation steps if needed.&#34;
+        if query:
+            prompt += f&#34;\nSpecific user request: {query}&#34;
+        prompt += f&#34;\n\nResults Data:\n{results_str}&#34;
+        prompt += &#34;\n\nCRITICAL DIRECTIVE: You are running in a strictly 1-shot offline diagnostics mode (--analyze). There is no active conversation loop, and you are NOT conversing with a Network Engineer. You MUST deliver your complete strategic analysis immediately. DO NOT suggest, mention, or attempt to delegate the session back to the engineer.&#34;
+        
+        # Delegate to self.ask, setting stream=True and forwarding callback/status.
+        # This will invoke standard ai.ask with &#39;@architect:&#39; prefix, forcing 1-shot architect brain.
+        return self.ask(prompt, status=status, chunk_callback=chunk_callback, one_shot=True)
+
+    def predict_execution_results(self, target_nodes: list, commands: list, status=None, chunk_callback=None):
+        &#34;&#34;&#34;Predict and simulate execution results preventively using the Preflight Simulation Agent (1-shot).&#34;&#34;&#34;
+        nodes_str = &#34;, &#34;.join(target_nodes)
+        commands_str = &#34;\n&#34;.join(f&#34;- {cmd}&#34; for cmd in commands)
+        
+        prompt = f&#34;@engineer: Act as a Preflight Simulation Agent. Simulate and predict the expected outputs and behaviors of the following commands on the target nodes. Alert about potential safety or configuration risks based on node profiles.&#34;
+        prompt += f&#34;\n\nTarget Nodes: {nodes_str}&#34;
+        prompt += f&#34;\nCommands to simulate:\n{commands_str}&#34;
+        prompt += &#34;\n\nCRITICAL SCALABILITY DIRECTIVE: If there are many target nodes, DO NOT list predictions node-by-node. Instead, group them by Operating System, vendor, or platform, and provide a highly concise Executive Summary. Detail individual risks only for nodes that present specific anomalies or security concerns. Focus on overall impact.&#34;
+        
+        # Delegate to self.ask, using the standard engineer brain but with the simulated preflight prompt.
+        return self.ask(prompt, status=status, chunk_callback=chunk_callback)</code></pre>
 </details>
 <div class="desc"><p>Business logic for interacting with AI agents and LLM configurations.</p>
 <p>Initialize the service.</p>
@@ -401,6 +435,31 @@ el.replaceWith(d);
     return await asyncio.wrap_future(future)</code></pre>
 </details>
 <div class="desc"><p>Ask the AI copilot for terminal assistance asynchronously.</p></div>
+</dd>
+<dt id="connpy.services.ai_service.AIService.analyze_execution_results"><code class="name flex">
+<span>def <span class="ident">analyze_execution_results</span></span>(<span>self, results: dict, query: str = None, status=None, chunk_callback=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def analyze_execution_results(self, results: dict, query: str = None, status=None, chunk_callback=None):
+    &#34;&#34;&#34;Analyze actual command execution results using Network Architect 1-shot.&#34;&#34;&#34;
+    import json
+    results_str = json.dumps(results, indent=2)
+    
+    prompt = f&#34;@architect: Please analyze the following actual execution results. Diagnose any issues, highlight successful actions, and suggest strategic remediation steps if needed.&#34;
+    if query:
+        prompt += f&#34;\nSpecific user request: {query}&#34;
+    prompt += f&#34;\n\nResults Data:\n{results_str}&#34;
+    prompt += &#34;\n\nCRITICAL DIRECTIVE: You are running in a strictly 1-shot offline diagnostics mode (--analyze). There is no active conversation loop, and you are NOT conversing with a Network Engineer. You MUST deliver your complete strategic analysis immediately. DO NOT suggest, mention, or attempt to delegate the session back to the engineer.&#34;
+    
+    # Delegate to self.ask, setting stream=True and forwarding callback/status.
+    # This will invoke standard ai.ask with &#39;@architect:&#39; prefix, forcing 1-shot architect brain.
+    return self.ask(prompt, status=status, chunk_callback=chunk_callback, one_shot=True)</code></pre>
+</details>
+<div class="desc"><p>Analyze actual command execution results using Network Architect 1-shot.</p></div>
 </dd>
 <dt id="connpy.services.ai_service.AIService.ask"><code class="name flex">
 <span>def <span class="ident">ask</span></span>(<span>self,<br>input_text,<br>dryrun=False,<br>chat_history=None,<br>status=None,<br>debug=False,<br>session_id=None,<br>console=None,<br>chunk_callback=None,<br>confirm_handler=None,<br>trust=False,<br>**overrides)</span>
@@ -559,6 +618,22 @@ el.replaceWith(d);
 </details>
 <div class="desc"><p>Identifies command blocks in the terminal history.</p></div>
 </dd>
+<dt id="connpy.services.ai_service.AIService.build_playbook_chat"><code class="name flex">
+<span>def <span class="ident">build_playbook_chat</span></span>(<span>self, user_input: str, chat_history: list = None, status=None, chunk_callback=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def build_playbook_chat(self, user_input: str, chat_history: list = None, status=None, chunk_callback=None):
+    &#34;&#34;&#34;Interact with the specialized Playbook Builder Agent.&#34;&#34;&#34;
+    from connpy.ai import PlaybookBuilderAgent
+    agent = PlaybookBuilderAgent(self.config)
+    return agent.ask(user_input, chat_history=chat_history, status=status, chunk_callback=chunk_callback)</code></pre>
+</details>
+<div class="desc"><p>Interact with the specialized Playbook Builder Agent.</p></div>
+</dd>
 <dt id="connpy.services.ai_service.AIService.configure_mcp"><code class="name flex">
 <span>def <span class="ident">configure_mcp</span></span>(<span>self, name, url=None, enabled=None, auto_load_on_os=None, remove=False)</span>
 </code></dt>
@@ -715,6 +790,29 @@ el.replaceWith(d);
 </details>
 <div class="desc"><p>Load a session's raw data by ID.</p></div>
 </dd>
+<dt id="connpy.services.ai_service.AIService.predict_execution_results"><code class="name flex">
+<span>def <span class="ident">predict_execution_results</span></span>(<span>self, target_nodes: list, commands: list, status=None, chunk_callback=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def predict_execution_results(self, target_nodes: list, commands: list, status=None, chunk_callback=None):
+    &#34;&#34;&#34;Predict and simulate execution results preventively using the Preflight Simulation Agent (1-shot).&#34;&#34;&#34;
+    nodes_str = &#34;, &#34;.join(target_nodes)
+    commands_str = &#34;\n&#34;.join(f&#34;- {cmd}&#34; for cmd in commands)
+    
+    prompt = f&#34;@engineer: Act as a Preflight Simulation Agent. Simulate and predict the expected outputs and behaviors of the following commands on the target nodes. Alert about potential safety or configuration risks based on node profiles.&#34;
+    prompt += f&#34;\n\nTarget Nodes: {nodes_str}&#34;
+    prompt += f&#34;\nCommands to simulate:\n{commands_str}&#34;
+    prompt += &#34;\n\nCRITICAL SCALABILITY DIRECTIVE: If there are many target nodes, DO NOT list predictions node-by-node. Instead, group them by Operating System, vendor, or platform, and provide a highly concise Executive Summary. Detail individual risks only for nodes that present specific anomalies or security concerns. Focus on overall impact.&#34;
+    
+    # Delegate to self.ask, using the standard engineer brain but with the simulated preflight prompt.
+    return self.ask(prompt, status=status, chunk_callback=chunk_callback)</code></pre>
+</details>
+<div class="desc"><p>Predict and simulate execution results preventively using the Preflight Simulation Agent (1-shot).</p></div>
+</dd>
 <dt id="connpy.services.ai_service.AIService.process_copilot_input"><code class="name flex">
 <span>def <span class="ident">process_copilot_input</span></span>(<span>self, input_text: str, session_state: dict) ‑> dict</span>
 </code></dt>
@@ -813,9 +911,11 @@ el.replaceWith(d);
 <h4><code><a title="connpy.services.ai_service.AIService" href="#connpy.services.ai_service.AIService">AIService</a></code></h4>
 <ul class="">
 <li><code><a title="connpy.services.ai_service.AIService.aask_copilot" href="#connpy.services.ai_service.AIService.aask_copilot">aask_copilot</a></code></li>
+<li><code><a title="connpy.services.ai_service.AIService.analyze_execution_results" href="#connpy.services.ai_service.AIService.analyze_execution_results">analyze_execution_results</a></code></li>
 <li><code><a title="connpy.services.ai_service.AIService.ask" href="#connpy.services.ai_service.AIService.ask">ask</a></code></li>
 <li><code><a title="connpy.services.ai_service.AIService.ask_copilot" href="#connpy.services.ai_service.AIService.ask_copilot">ask_copilot</a></code></li>
 <li><code><a title="connpy.services.ai_service.AIService.build_context_blocks" href="#connpy.services.ai_service.AIService.build_context_blocks">build_context_blocks</a></code></li>
+<li><code><a title="connpy.services.ai_service.AIService.build_playbook_chat" href="#connpy.services.ai_service.AIService.build_playbook_chat">build_playbook_chat</a></code></li>
 <li><code><a title="connpy.services.ai_service.AIService.configure_mcp" href="#connpy.services.ai_service.AIService.configure_mcp">configure_mcp</a></code></li>
 <li><code><a title="connpy.services.ai_service.AIService.configure_provider" href="#connpy.services.ai_service.AIService.configure_provider">configure_provider</a></code></li>
 <li><code><a title="connpy.services.ai_service.AIService.confirm" href="#connpy.services.ai_service.AIService.confirm">confirm</a></code></li>
@@ -823,6 +923,7 @@ el.replaceWith(d);
 <li><code><a title="connpy.services.ai_service.AIService.list_mcp_servers" href="#connpy.services.ai_service.AIService.list_mcp_servers">list_mcp_servers</a></code></li>
 <li><code><a title="connpy.services.ai_service.AIService.list_sessions" href="#connpy.services.ai_service.AIService.list_sessions">list_sessions</a></code></li>
 <li><code><a title="connpy.services.ai_service.AIService.load_session_data" href="#connpy.services.ai_service.AIService.load_session_data">load_session_data</a></code></li>
+<li><code><a title="connpy.services.ai_service.AIService.predict_execution_results" href="#connpy.services.ai_service.AIService.predict_execution_results">predict_execution_results</a></code></li>
 <li><code><a title="connpy.services.ai_service.AIService.process_copilot_input" href="#connpy.services.ai_service.AIService.process_copilot_input">process_copilot_input</a></code></li>
 </ul>
 </li>

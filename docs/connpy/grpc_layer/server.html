@@ -174,12 +174,10 @@ el.replaceWith(d);
     def service(self):
         return self._get_provider().ai
 
-    @handle_errors
-    def ask(self, request_iterator, context):
+    def _handle_chat_stream(self, request_iterator, context, service_method):
         import queue
         import threading
 
-        ai_service = self.service
         chunk_queue = queue.Queue()
         request_queue = queue.Queue()
         bridge = None
@@ -197,21 +195,28 @@ el.replaceWith(d);
             nonlocal history, bridge, agent_instance
             try:
                 # Run the AI interaction (this blocks this specific thread)
-                res = ai_service.ask(
-                    input_text,
-                    chat_history=history if history else None,
-                    session_id=session_id,
-                    debug=debug,
-                    status=bridge,
-                    console=bridge,
-                    confirm_handler=bridge.confirm,
-                    chunk_callback=callback,
-                    trust=trust,
-                    **overrides
-                )
+                if getattr(service_method, &#34;__name__&#34;, None) == &#34;build_playbook_chat&#34;:
+                    res = service_method(
+                        input_text,
+                        chat_history=history if history else None,
+                        status=bridge,
+                        chunk_callback=callback
+                    )
+                else:
+                    res = service_method(
+                        input_text,
+                        chat_history=history if history else None,
+                        session_id=session_id,
+                        debug=debug,
+                        status=bridge,
+                        confirm_handler=bridge.confirm,
+                        chunk_callback=callback,
+                        trust=trust,
+                        **overrides
+                    )
 
                 # Update history for next message
-                if &#34;chat_history&#34; in res:
+                if res and &#34;chat_history&#34; in res:
                     history = res[&#34;chat_history&#34;]
 
                 # Send final chunk marker
@@ -305,6 +310,71 @@ el.replaceWith(d);
             elif msg_type == &#34;final_mark&#34;:
                 yield connpy_pb2.AIResponse(is_final=True, full_result=to_struct(val))
 
+    def _handle_unary_stream(self, service_method, *args, **kwargs):
+        import queue
+        import threading
+        
+        chunk_queue = queue.Queue()
+        bridge = StatusBridge(chunk_queue, is_web=False)
+        
+        def callback(chunk):
+            chunk_queue.put((&#34;text&#34;, chunk))
+            
+        def _worker():
+            try:
+                res = service_method(*args, chunk_callback=callback, status=bridge, **kwargs)
+                chunk_queue.put((&#34;final_mark&#34;, res))
+            except Exception as e:
+                import traceback
+                print(f&#34;gRPC Unary Stream error: {e}&#34;)
+                traceback.print_exc()
+                chunk_queue.put((&#34;status&#34;, f&#34;Error: {str(e)}&#34;))
+                chunk_queue.put((&#34;final_mark&#34;, {&#34;response&#34;: f&#34;Error: {str(e)}&#34;, &#34;error&#34;: True}))
+            finally:
+                chunk_queue.put((None, None))
+                
+        threading.Thread(target=_worker, daemon=True).start()
+        
+        while True:
+            item = chunk_queue.get()
+            if item == (None, None):
+                break
+                
+            msg_type, val = item
+            if msg_type == &#34;text&#34;:
+                yield connpy_pb2.AIResponse(text_chunk=val, is_final=False)
+            elif msg_type == &#34;status&#34;:
+                clean_val = val.replace(&#34;[ai_status]&#34;, &#34;&#34;).replace(&#34;[/ai_status]&#34;, &#34;&#34;)
+                yield connpy_pb2.AIResponse(status_update=clean_val, is_final=False)
+            elif msg_type == &#34;debug&#34;:
+                yield connpy_pb2.AIResponse(debug_message=val, is_final=False)
+            elif msg_type == &#34;important&#34;:
+                yield connpy_pb2.AIResponse(important_message=val, is_final=False)
+            elif msg_type == &#34;confirm&#34;:
+                yield connpy_pb2.AIResponse(status_update=val, requires_confirmation=True, is_final=False)
+            elif msg_type == &#34;final_mark&#34;:
+                yield connpy_pb2.AIResponse(is_final=True, full_result=to_struct(val))
+
+    @handle_errors
+    def ask(self, request_iterator, context):
+        yield from self._handle_chat_stream(request_iterator, context, self.service.ask)
+
+    @handle_errors
+    def build_playbook_chat(self, request_iterator, context):
+        yield from self._handle_chat_stream(request_iterator, context, self.service.build_playbook_chat)
+
+    @handle_errors
+    def analyze_execution_results(self, request, context):
+        results = from_struct(request.results)
+        query = request.query if request.query else None
+        yield from self._handle_unary_stream(self.service.analyze_execution_results, results, query=query)
+
+    @handle_errors
+    def predict_execution_results(self, request, context):
+        target_nodes = list(request.target_nodes)
+        commands = list(request.commands)
+        yield from self._handle_unary_stream(self.service.predict_execution_results, target_nodes, commands)
+
     @handle_errors
     def confirm(self, request, context):
         res = self.service.confirm(request.value)
@@ -386,8 +456,10 @@ def service(self):
 <ul class="hlist">
 <li><code><b><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer">AIServiceServicer</a></b></code>:
 <ul class="hlist">
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.analyze_execution_results" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.analyze_execution_results">analyze_execution_results</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.ask" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.ask">ask</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.ask_copilot" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.ask_copilot">ask_copilot</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.build_playbook_chat" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.build_playbook_chat">build_playbook_chat</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.configure_mcp" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.configure_mcp">configure_mcp</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.configure_provider" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.configure_provider">configure_provider</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.confirm" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.confirm">confirm</a></code></li>
@@ -395,6 +467,7 @@ def service(self):
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.list_mcp_servers" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.list_mcp_servers">list_mcp_servers</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.list_sessions" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.list_sessions">list_sessions</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.load_session_data" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.load_session_data">load_session_data</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.predict_execution_results" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AIServiceServicer.predict_execution_results">predict_execution_results</a></code></li>
 </ul>
 </li>
 </ul>
@@ -855,11 +928,6 @@ def service(self):
     @handle_errors
     def run_cli_script(self, request, context):
         res = self.service.run_cli_script(request.param1, request.param2, request.parallel)
-        return connpy_pb2.StructResponse(data=to_struct(res))
-
-    @handle_errors
-    def run_yaml_playbook(self, request, context):
-        res = self.service.run_yaml_playbook(request.param1, request.parallel)
         return connpy_pb2.StructResponse(data=to_struct(res))</code></pre>
 </details>
 <div class="desc"><p>Missing associated documentation comment in .proto file.</p></div>
@@ -888,7 +956,6 @@ def service(self):
 <ul class="hlist">
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.ExecutionServiceServicer.run_cli_script" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ExecutionServiceServicer.run_cli_script">run_cli_script</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.ExecutionServiceServicer.run_commands" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ExecutionServiceServicer.run_commands">run_commands</a></code></li>
-<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.ExecutionServiceServicer.run_yaml_playbook" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ExecutionServiceServicer.run_yaml_playbook">run_yaml_playbook</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.ExecutionServiceServicer.test_commands" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.ExecutionServiceServicer.test_commands">test_commands</a></code></li>
 </ul>
 </li>

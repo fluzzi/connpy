@@ -140,7 +140,7 @@ el.replaceWith(d);
             
     def single_question(self, args, session_id):
         query = &#34; &#34;.join(args.ask)
-        with console.status(&#34;[ai_status]Agent is thinking and analyzing...&#34;) as status:
+        with console.status(&#34;[ai_status]Agent is thinking and analyzing...[/ai_status]&#34;) as status:
             result = self.app.myai.ask(query, status=status, debug=args.debug, session_id=session_id, trust=args.trust, **self.ai_overrides)
         
         responder = result.get(&#34;responder&#34;, &#34;engineer&#34;)
@@ -177,7 +177,7 @@ el.replaceWith(d);
                 if not user_query.strip(): continue
                 if user_query.lower() in [&#39;exit&#39;, &#39;quit&#39;, &#39;bye&#39;, &#39;cancel&#39;]: break
                 
-                with console.status(&#34;[ai_status]Agent is thinking...&#34;) as status:
+                with console.status(&#34;[ai_status]Agent is thinking...[/ai_status]&#34;) as status:
                     result = self.app.myai.ask(user_query, chat_history=history, status=status, debug=args.debug, trust=args.trust, session_id=session_id, **self.ai_overrides)
                 
                 new_history = result.get(&#34;chat_history&#34;)
@@ -583,7 +583,7 @@ el.replaceWith(d);
             if not user_query.strip(): continue
             if user_query.lower() in [&#39;exit&#39;, &#39;quit&#39;, &#39;bye&#39;, &#39;cancel&#39;]: break
             
-            with console.status(&#34;[ai_status]Agent is thinking...&#34;) as status:
+            with console.status(&#34;[ai_status]Agent is thinking...[/ai_status]&#34;) as status:
                 result = self.app.myai.ask(user_query, chat_history=history, status=status, debug=args.debug, trust=args.trust, session_id=session_id, **self.ai_overrides)
             
             new_history = result.get(&#34;chat_history&#34;)
@@ -618,7 +618,7 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def single_question(self, args, session_id):
     query = &#34; &#34;.join(args.ask)
-    with console.status(&#34;[ai_status]Agent is thinking and analyzing...&#34;) as status:
+    with console.status(&#34;[ai_status]Agent is thinking and analyzing...[/ai_status]&#34;) as status:
         result = self.app.myai.ask(query, status=status, debug=args.debug, session_id=session_id, trust=args.trust, **self.ai_overrides)
     
     responder = result.get(&#34;responder&#34;, &#34;engineer&#34;)

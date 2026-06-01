@@ -791,11 +791,6 @@ class ExecutionServicer(connpy_pb2_grpc.ExecutionServiceServicer):
         res = self.service.run_cli_script(request.param1, request.param2, request.parallel)
         return connpy_pb2.StructResponse(data=to_struct(res))
 
-    @handle_errors
-    def run_yaml_playbook(self, request, context):
-        res = self.service.run_yaml_playbook(request.param1, request.parallel)
-        return connpy_pb2.StructResponse(data=to_struct(res))
-
 class ImportExportServicer(connpy_pb2_grpc.ImportExportServiceServicer):
     def __init__(self, provider, registry=None):
         if not hasattr(provider, "mode"):
@@ -955,12 +950,10 @@ class AIServicer(connpy_pb2_grpc.AIServiceServicer):
     def service(self):
         return self._get_provider().ai
 
-    @handle_errors
-    def ask(self, request_iterator, context):
+    def _handle_chat_stream(self, request_iterator, context, service_method):
         import queue
         import threading
 
-        ai_service = self.service
         chunk_queue = queue.Queue()
         request_queue = queue.Queue()
         bridge = None
@@ -978,21 +971,28 @@ class AIServicer(connpy_pb2_grpc.AIServiceServicer):
             nonlocal history, bridge, agent_instance
             try:
                 # Run the AI interaction (this blocks this specific thread)
-                res = ai_service.ask(
-                    input_text,
-                    chat_history=history if history else None,
-                    session_id=session_id,
-                    debug=debug,
-                    status=bridge,
-                    console=bridge,
-                    confirm_handler=bridge.confirm,
-                    chunk_callback=callback,
-                    trust=trust,
-                    **overrides
-                )
+                if getattr(service_method, "__name__", None) == "build_playbook_chat":
+                    res = service_method(
+                        input_text,
+                        chat_history=history if history else None,
+                        status=bridge,
+                        chunk_callback=callback
+                    )
+                else:
+                    res = service_method(
+                        input_text,
+                        chat_history=history if history else None,
+                        session_id=session_id,
+                        debug=debug,
+                        status=bridge,
+                        confirm_handler=bridge.confirm,
+                        chunk_callback=callback,
+                        trust=trust,
+                        **overrides
+                    )
 
                 # Update history for next message
-                if "chat_history" in res:
+                if res and "chat_history" in res:
                     history = res["chat_history"]
 
                 # Send final chunk marker
@@ -1085,6 +1085,71 @@ class AIServicer(connpy_pb2_grpc.AIServiceServicer):
                 yield connpy_pb2.AIResponse(status_update=val, requires_confirmation=True, is_final=False)
             elif msg_type == "final_mark":
                 yield connpy_pb2.AIResponse(is_final=True, full_result=to_struct(val))
+
+    def _handle_unary_stream(self, service_method, *args, **kwargs):
+        import queue
+        import threading
+        
+        chunk_queue = queue.Queue()
+        bridge = StatusBridge(chunk_queue, is_web=False)
+        
+        def callback(chunk):
+            chunk_queue.put(("text", chunk))
+            
+        def _worker():
+            try:
+                res = service_method(*args, chunk_callback=callback, status=bridge, **kwargs)
+                chunk_queue.put(("final_mark", res))
+            except Exception as e:
+                import traceback
+                print(f"gRPC Unary Stream error: {e}")
+                traceback.print_exc()
+                chunk_queue.put(("status", f"Error: {str(e)}"))
+                chunk_queue.put(("final_mark", {"response": f"Error: {str(e)}", "error": True}))
+            finally:
+                chunk_queue.put((None, None))
+                
+        threading.Thread(target=_worker, daemon=True).start()
+        
+        while True:
+            item = chunk_queue.get()
+            if item == (None, None):
+                break
+                
+            msg_type, val = item
+            if msg_type == "text":
+                yield connpy_pb2.AIResponse(text_chunk=val, is_final=False)
+            elif msg_type == "status":
+                clean_val = val.replace("[ai_status]", "").replace("[/ai_status]", "")
+                yield connpy_pb2.AIResponse(status_update=clean_val, is_final=False)
+            elif msg_type == "debug":
+                yield connpy_pb2.AIResponse(debug_message=val, is_final=False)
+            elif msg_type == "important":
+                yield connpy_pb2.AIResponse(important_message=val, is_final=False)
+            elif msg_type == "confirm":
+                yield connpy_pb2.AIResponse(status_update=val, requires_confirmation=True, is_final=False)
+            elif msg_type == "final_mark":
+                yield connpy_pb2.AIResponse(is_final=True, full_result=to_struct(val))
+
+    @handle_errors
+    def ask(self, request_iterator, context):
+        yield from self._handle_chat_stream(request_iterator, context, self.service.ask)
+
+    @handle_errors
+    def build_playbook_chat(self, request_iterator, context):
+        yield from self._handle_chat_stream(request_iterator, context, self.service.build_playbook_chat)
+
+    @handle_errors
+    def analyze_execution_results(self, request, context):
+        results = from_struct(request.results)
+        query = request.query if request.query else None
+        yield from self._handle_unary_stream(self.service.analyze_execution_results, results, query=query)
+
+    @handle_errors
+    def predict_execution_results(self, request, context):
+        target_nodes = list(request.target_nodes)
+        commands = list(request.commands)
+        yield from self._handle_unary_stream(self.service.predict_execution_results, target_nodes, commands)
 
     @handle_errors
     def confirm(self, request, context):
