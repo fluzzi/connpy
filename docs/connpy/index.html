@@ -649,7 +649,7 @@ class ai:
         self.one_shot = kwargs.get(&#34;one_shot&#34;, False)
 
         
-        # 1. Cargar configuración genérica con herencia/merge global
+        # 1. Load generic configuration with global inheritance/merge
         if hasattr(self.config, &#34;get_effective_setting&#34;):
             aiconfig = self.config.get_effective_setting(&#34;ai&#34;, {})
         else:
@@ -692,7 +692,7 @@ class ai:
             custom_trusted = [c.strip() for c in custom_trusted.split(&#34;,&#34;) if c.strip()]
         self.safe_commands = list(self.SAFE_COMMANDS) + (custom_trusted if isinstance(custom_trusted, list) else [])
         
-        # Límites
+        # Limits
         self.max_history = 30
         self.max_truncate = 50000
         self.soft_limit_iterations = 20  # Show warning and suggest Ctrl+C
@@ -729,7 +729,7 @@ class ai:
         self.session_id = getattr(self.config, &#34;session_id&#34;, None)
         self.session_path = os.path.join(self.sessions_dir, f&#34;{self.session_id}.json&#34;) if self.session_id else None
 
-        # Prompts base agnósticos
+        # Agnostic base prompts
         architect_instructions = &#34;&#34;
         if self.has_architect:
             architect_instructions = &#34;&#34;&#34;
@@ -1269,7 +1269,7 @@ class ai:
 
     def _engineer_loop(self, task, status=None, debug=False, chat_history=None):
         &#34;&#34;&#34;Internal loop where the Engineer executes technical tasks for the Architect.&#34;&#34;&#34;
-        # Optimización de caché para el Ingeniero (Solo para Anthropic directo, Vertex tiene reglas distintas)
+        # Cache optimization for the Engineer (Only for direct Anthropic, Vertex has different rules)
         if &#34;claude&#34; in self.engineer_model.lower() and &#34;vertex&#34; not in self.engineer_model.lower():
             messages = [{&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: [{&#34;type&#34;: &#34;text&#34;, &#34;text&#34;: self.engineer_system_prompt, &#34;cache_control&#34;: {&#34;type&#34;: &#34;ephemeral&#34;}}]}]
         else:
@@ -1328,7 +1328,7 @@ class ai:
                 for tc in resp_msg.tool_calls:
                     fn, args = tc.function.name, json.loads(tc.function.arguments)
                     
-                    # Notificación en tiempo real de la tarea técnica (Only if not in Architect loop)
+                    # Real-time notification of the technical task (Only if not in Architect loop)
                     if status and not chat_history:
                         s_text = &#34;&#34;
                         if fn == &#34;list_nodes&#34;: s_text = f&#34;[ai_status]Engineer: [SEARCH] {args.get(&#39;filter_pattern&#39;,&#39;.*&#39;)}&#34;
@@ -1583,7 +1583,7 @@ class ai:
 
         usage = {&#34;input&#34;: 0, &#34;output&#34;: 0, &#34;total&#34;: 0}
         
-        # 1. Selector de Rol inicial (Sticky Brain)
+        # 1. Initial Role Selector (Sticky Brain)
         explicit_architect = re.match(r&#39;^(architect|arquitecto|@architect)[:\s]&#39;, user_input, re.I)
         explicit_engineer = re.match(r&#39;^(engineer|ingeniero|@engineer)[:\s]&#39;, user_input, re.I)
         
@@ -1592,7 +1592,7 @@ class ai:
         elif explicit_engineer:
             current_brain = &#34;engineer&#34;
         else:
-            # Sticky Brain: Detectar si el Arquitecto estaba al mando en el historial reciente
+            # Sticky Brain: Detect if the Architect was in control in recent history
             is_architect_active = False
             for msg in reversed(chat_history[-5:]):
                 tcs = msg.get(&#39;tool_calls&#39;) if isinstance(msg, dict) else getattr(msg, &#39;tool_calls&#39;, None)
@@ -1606,7 +1606,7 @@ class ai:
                 if is_architect_active: break
             current_brain = &#34;architect&#34; if is_architect_active else &#34;engineer&#34;
         
-        # 2. Preparación de mensajes y limpieza
+        # 2. Message preparation and cleaning
         clean_input = re.sub(r&#39;^(architect|arquitecto|engineer|ingeniero|@architect|@engineer)[:\s]+&#39;, &#39;&#39;, user_input, flags=re.IGNORECASE).strip()
         
         system_prompt = self.architect_system_prompt if current_brain == &#34;architect&#34; else self.engineer_system_prompt
@@ -1615,13 +1615,13 @@ class ai:
         key = self.architect_key if current_brain == &#34;architect&#34; else self.engineer_key
         current_auth = self.architect_auth if current_brain == &#34;architect&#34; else self.engineer_auth
 
-        # Estructura optimizada para Prompt Caching (Solo para Anthropic directo, Vertex tiene reglas distintas)
+        # Optimized structure for Prompt Caching (Only for direct Anthropic, Vertex has different rules)
         if &#34;claude&#34; in model.lower() and &#34;vertex&#34; not in model.lower():
             messages = [{&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: [{&#34;type&#34;: &#34;text&#34;, &#34;text&#34;: system_prompt, &#34;cache_control&#34;: {&#34;type&#34;: &#34;ephemeral&#34;}}]}]
         else:
             messages = [{&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: system_prompt}]
         
-        # Interleaving de historial
+        # History interleaving
         last_role = &#34;system&#34;
         # Sanitize history if the current target model is not compatible with cache_control
         history_to_process = chat_history[-self.max_history:]
@@ -1641,7 +1641,7 @@ class ai:
         if last_role == &#39;user&#39;: messages[-1][&#39;content&#39;] += &#34;\n&#34; + clean_input
         else: messages.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: clean_input})
 
-        # 3. Bucle de ejecución
+        # 3. Execution loop
         iteration = 0
         try:
             # Set up remote interrupt callback if bridge is provided
@@ -2536,7 +2536,7 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
 
     usage = {&#34;input&#34;: 0, &#34;output&#34;: 0, &#34;total&#34;: 0}
     
-    # 1. Selector de Rol inicial (Sticky Brain)
+    # 1. Initial Role Selector (Sticky Brain)
     explicit_architect = re.match(r&#39;^(architect|arquitecto|@architect)[:\s]&#39;, user_input, re.I)
     explicit_engineer = re.match(r&#39;^(engineer|ingeniero|@engineer)[:\s]&#39;, user_input, re.I)
     
@@ -2545,7 +2545,7 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
     elif explicit_engineer:
         current_brain = &#34;engineer&#34;
     else:
-        # Sticky Brain: Detectar si el Arquitecto estaba al mando en el historial reciente
+        # Sticky Brain: Detect if the Architect was in control in recent history
         is_architect_active = False
         for msg in reversed(chat_history[-5:]):
             tcs = msg.get(&#39;tool_calls&#39;) if isinstance(msg, dict) else getattr(msg, &#39;tool_calls&#39;, None)
@@ -2559,7 +2559,7 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
             if is_architect_active: break
         current_brain = &#34;architect&#34; if is_architect_active else &#34;engineer&#34;
     
-    # 2. Preparación de mensajes y limpieza
+    # 2. Message preparation and cleaning
     clean_input = re.sub(r&#39;^(architect|arquitecto|engineer|ingeniero|@architect|@engineer)[:\s]+&#39;, &#39;&#39;, user_input, flags=re.IGNORECASE).strip()
     
     system_prompt = self.architect_system_prompt if current_brain == &#34;architect&#34; else self.engineer_system_prompt
@@ -2568,13 +2568,13 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
     key = self.architect_key if current_brain == &#34;architect&#34; else self.engineer_key
     current_auth = self.architect_auth if current_brain == &#34;architect&#34; else self.engineer_auth
 
-    # Estructura optimizada para Prompt Caching (Solo para Anthropic directo, Vertex tiene reglas distintas)
+    # Optimized structure for Prompt Caching (Only for direct Anthropic, Vertex has different rules)
     if &#34;claude&#34; in model.lower() and &#34;vertex&#34; not in model.lower():
         messages = [{&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: [{&#34;type&#34;: &#34;text&#34;, &#34;text&#34;: system_prompt, &#34;cache_control&#34;: {&#34;type&#34;: &#34;ephemeral&#34;}}]}]
     else:
         messages = [{&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: system_prompt}]
     
-    # Interleaving de historial
+    # History interleaving
     last_role = &#34;system&#34;
     # Sanitize history if the current target model is not compatible with cache_control
     history_to_process = chat_history[-self.max_history:]
@@ -2594,7 +2594,7 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
     if last_role == &#39;user&#39;: messages[-1][&#39;content&#39;] += &#34;\n&#34; + clean_input
     else: messages.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: clean_input})
 
-    # 3. Bucle de ejecución
+    # 3. Execution loop
     iteration = 0
     try:
         # Set up remote interrupt callback if bridge is provided
@@ -4778,12 +4778,12 @@ class node:
                 # Get raw bytes from BytesIO
                 raw_bytes = self.mylog.getvalue()
                 
-                # Detener el lector de la terminal para que prompt_toolkit (en run_session) 
-                # tenga control exclusivo del stdin sin interferencias de LocalStream.
+                # Stop terminal reading so prompt_toolkit (in run_session) 
+                # has exclusive control of stdin without LocalStream interference.
                 if hasattr(stream, &#39;stop_reading&#39;):
                     stream.stop_reading()
                 elif hasattr(stream, &#39;_loop&#39;) and hasattr(stream, &#39;stdin_fd&#39;):
-                    # Fallback si no tiene el método (en LocalStream)
+                    # Fallback if the method is missing (in LocalStream)
                     stream._loop.remove_reader(stream.stdin_fd)
                 
                 try:
@@ -4800,7 +4800,7 @@ class node:
                             break
                 finally:
                     print(&#34;\033[2m Returning to session...\033[0m&#34;, flush=True)
-                    # Reiniciar el lector de la terminal para volver al modo interactivo SSH/Telnet
+                    # Restart terminal reading to return to interactive SSH/Telnet mode
                     if hasattr(stream, &#39;start_reading&#39;):
                         stream.start_reading()
                     elif hasattr(stream, &#39;_loop&#39;) and hasattr(stream, &#39;stdin_fd&#39;):
@@ -4868,14 +4868,6 @@ class node:
                 port_str = f&#34;:{self.port}&#34; if self.port and self.protocol not in [&#34;ssm&#34;, &#34;kubectl&#34;, &#34;docker&#34;] else &#34;&#34;
                 logger(&#34;success&#34;, f&#34;Connected to {self.unique} at {self.host}{port_str} via: {self.protocol}&#34;)
 
-            # Attempt to set the terminal size
-            try:
-                self.child.setwinsize(65535, 65535)
-            except Exception:
-                try:
-                    self.child.setwinsize(10000, 10000)
-                except Exception:
-                    pass
             if &#34;prompt&#34; in self.tags:
                 prompt = self.tags[&#34;prompt&#34;]
             expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
@@ -4896,6 +4888,20 @@ class node:
                         self.status = 1
                         return self.output
                 result = self.child.expect(expects, timeout = timeout)
+                # Only set terminal size on devices without a
+                # screen_length_command (e.g. Linux/bash servers).
+                # Routers already disable pagination via that command.
+                # After setwinsize, consume any SIGWINCH re-render
+                # prompt (~40ms on bash) with a short timeout.
+                if c == commands[0] and &#34;screen_length_command&#34; not in self.tags:
+                    try:
+                        self.child.setwinsize(65535, 65535)
+                    except Exception:
+                        try:
+                            self.child.setwinsize(10000, 10000)
+                        except Exception:
+                            pass
+                    self.child.expect(expects, timeout = 1)
                 self.child.sendline(c)
                 if result == 2:
                     break
@@ -4978,14 +4984,6 @@ class node:
                 port_str = f&#34;:{self.port}&#34; if self.port and self.protocol not in [&#34;ssm&#34;, &#34;kubectl&#34;, &#34;docker&#34;] else &#34;&#34;
                 logger(&#34;success&#34;, f&#34;Connected to {self.unique} at {self.host}{port_str} via: {self.protocol}&#34;)
 
-            # Attempt to set the terminal size
-            try:
-                self.child.setwinsize(65535, 65535)
-            except Exception:
-                try:
-                    self.child.setwinsize(10000, 10000)
-                except Exception:
-                    pass
             if &#34;prompt&#34; in self.tags:
                 prompt = self.tags[&#34;prompt&#34;]
             expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
@@ -5007,6 +5005,15 @@ class node:
                         self.status = 1
                         return self.output
                 result = self.child.expect(expects, timeout = timeout)
+                if c == commands[0] and &#34;screen_length_command&#34; not in self.tags:
+                    try:
+                        self.child.setwinsize(65535, 65535)
+                    except Exception:
+                        try:
+                            self.child.setwinsize(10000, 10000)
+                        except Exception:
+                            pass
+                    self.child.expect(expects, timeout = 1)
                 self.child.sendline(c)
                 if result == 2:
                     break
@@ -5032,13 +5039,28 @@ class node:
                     if vars is not None:
                         e = e.format(**vars)
                     updatedprompt = re.sub(r&#39;(?&lt;!\\)\$&#39;, &#39;&#39;, prompt)
-                    newpattern = f&#34;.*({updatedprompt}).*{e}.*&#34;
                     cleaned_output = output
-                    cleaned_output = re.sub(newpattern, &#39;&#39;, cleaned_output)
+                    try:
+                        newpattern = f&#34;.*({updatedprompt}).*{e}.*&#34;
+                        cleaned_output = re.sub(newpattern, &#39;&#39;, cleaned_output)
+                    except re.error:
+                        try:
+                            escaped_e = re.escape(e)
+                            newpattern = f&#34;.*({updatedprompt}).*{escaped_e}.*&#34;
+                            cleaned_output = re.sub(newpattern, &#39;&#39;, cleaned_output)
+                        except re.error:
+                            pass
+
                     if e in cleaned_output:
                         self.result[e] = True
                     else:
-                        self.result[e]= False
+                        try:
+                            if re.search(e, cleaned_output):
+                                self.result[e] = True
+                            else:
+                                self.result[e] = False
+                        except re.error:
+                            self.result[e] = False
                 self.status = 0
                 return self.result
             if result == 2:
@@ -5446,14 +5468,6 @@ def run(self, commands, vars = None,*, folder = &#39;&#39;, prompt = r&#39;&gt;$
             port_str = f&#34;:{self.port}&#34; if self.port and self.protocol not in [&#34;ssm&#34;, &#34;kubectl&#34;, &#34;docker&#34;] else &#34;&#34;
             logger(&#34;success&#34;, f&#34;Connected to {self.unique} at {self.host}{port_str} via: {self.protocol}&#34;)
 
-        # Attempt to set the terminal size
-        try:
-            self.child.setwinsize(65535, 65535)
-        except Exception:
-            try:
-                self.child.setwinsize(10000, 10000)
-            except Exception:
-                pass
         if &#34;prompt&#34; in self.tags:
             prompt = self.tags[&#34;prompt&#34;]
         expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
@@ -5474,6 +5488,20 @@ def run(self, commands, vars = None,*, folder = &#39;&#39;, prompt = r&#39;&gt;$
                     self.status = 1
                     return self.output
             result = self.child.expect(expects, timeout = timeout)
+            # Only set terminal size on devices without a
+            # screen_length_command (e.g. Linux/bash servers).
+            # Routers already disable pagination via that command.
+            # After setwinsize, consume any SIGWINCH re-render
+            # prompt (~40ms on bash) with a short timeout.
+            if c == commands[0] and &#34;screen_length_command&#34; not in self.tags:
+                try:
+                    self.child.setwinsize(65535, 65535)
+                except Exception:
+                    try:
+                        self.child.setwinsize(10000, 10000)
+                    except Exception:
+                        pass
+                self.child.expect(expects, timeout = 1)
             self.child.sendline(c)
             if result == 2:
                 break
@@ -5597,14 +5625,6 @@ def test(self, commands, expected, vars = None,*, folder = &#39;&#39;, prompt = 
             port_str = f&#34;:{self.port}&#34; if self.port and self.protocol not in [&#34;ssm&#34;, &#34;kubectl&#34;, &#34;docker&#34;] else &#34;&#34;
             logger(&#34;success&#34;, f&#34;Connected to {self.unique} at {self.host}{port_str} via: {self.protocol}&#34;)
 
-        # Attempt to set the terminal size
-        try:
-            self.child.setwinsize(65535, 65535)
-        except Exception:
-            try:
-                self.child.setwinsize(10000, 10000)
-            except Exception:
-                pass
         if &#34;prompt&#34; in self.tags:
             prompt = self.tags[&#34;prompt&#34;]
         expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
@@ -5626,6 +5646,15 @@ def test(self, commands, expected, vars = None,*, folder = &#39;&#39;, prompt = 
                     self.status = 1
                     return self.output
             result = self.child.expect(expects, timeout = timeout)
+            if c == commands[0] and &#34;screen_length_command&#34; not in self.tags:
+                try:
+                    self.child.setwinsize(65535, 65535)
+                except Exception:
+                    try:
+                        self.child.setwinsize(10000, 10000)
+                    except Exception:
+                        pass
+                self.child.expect(expects, timeout = 1)
             self.child.sendline(c)
             if result == 2:
                 break
@@ -5651,13 +5680,28 @@ def test(self, commands, expected, vars = None,*, folder = &#39;&#39;, prompt = 
                 if vars is not None:
                     e = e.format(**vars)
                 updatedprompt = re.sub(r&#39;(?&lt;!\\)\$&#39;, &#39;&#39;, prompt)
-                newpattern = f&#34;.*({updatedprompt}).*{e}.*&#34;
                 cleaned_output = output
-                cleaned_output = re.sub(newpattern, &#39;&#39;, cleaned_output)
+                try:
+                    newpattern = f&#34;.*({updatedprompt}).*{e}.*&#34;
+                    cleaned_output = re.sub(newpattern, &#39;&#39;, cleaned_output)
+                except re.error:
+                    try:
+                        escaped_e = re.escape(e)
+                        newpattern = f&#34;.*({updatedprompt}).*{escaped_e}.*&#34;
+                        cleaned_output = re.sub(newpattern, &#39;&#39;, cleaned_output)
+                    except re.error:
+                        pass
+
                 if e in cleaned_output:
                     self.result[e] = True
                 else:
-                    self.result[e]= False
+                    try:
+                        if re.search(e, cleaned_output):
+                            self.result[e] = True
+                        else:
+                            self.result[e] = False
+                    except re.error:
+                        self.result[e] = False
             self.status = 0
             return self.result
         if result == 2:

@@ -27,10 +27,10 @@ def copilot_terminal_mode():
     try:
         old_settings = termios.tcgetattr(fd)
         
-        # Primero pasamos a raw mode absoluto para matar ISIG, ICANON, ECHO, etc.
+        # First we switch to absolute raw mode to disable ISIG, ICANON, ECHO, etc.
         tty.setraw(fd)
         
-        # Luego rehabilitamos OPOST para que rich.Live se dibuje correctamente
+        # Then we re-enable OPOST so rich.Live renders correctly
         new_settings = termios.tcgetattr(fd)
         new_settings[1] = new_settings[1] | termios.OPOST
         termios.tcsetattr(fd, termios.TCSANOW, new_settings)
@@ -686,12 +686,12 @@ class node:
                 # Get raw bytes from BytesIO
                 raw_bytes = self.mylog.getvalue()
                 
-                # Detener el lector de la terminal para que prompt_toolkit (en run_session) 
-                # tenga control exclusivo del stdin sin interferencias de LocalStream.
+                # Stop terminal reading so prompt_toolkit (in run_session) 
+                # has exclusive control of stdin without LocalStream interference.
                 if hasattr(stream, 'stop_reading'):
                     stream.stop_reading()
                 elif hasattr(stream, '_loop') and hasattr(stream, 'stdin_fd'):
-                    # Fallback si no tiene el método (en LocalStream)
+                    # Fallback if the method is missing (in LocalStream)
                     stream._loop.remove_reader(stream.stdin_fd)
                 
                 try:
@@ -708,7 +708,7 @@ class node:
                             break
                 finally:
                     print("\033[2m Returning to session...\033[0m", flush=True)
-                    # Reiniciar el lector de la terminal para volver al modo interactivo SSH/Telnet
+                    # Restart terminal reading to return to interactive SSH/Telnet mode
                     if hasattr(stream, 'start_reading'):
                         stream.start_reading()
                     elif hasattr(stream, '_loop') and hasattr(stream, 'stdin_fd'):
@@ -776,14 +776,6 @@ class node:
                 port_str = f":{self.port}" if self.port and self.protocol not in ["ssm", "kubectl", "docker"] else ""
                 logger("success", f"Connected to {self.unique} at {self.host}{port_str} via: {self.protocol}")
 
-            # Attempt to set the terminal size
-            try:
-                self.child.setwinsize(65535, 65535)
-            except Exception:
-                try:
-                    self.child.setwinsize(10000, 10000)
-                except Exception:
-                    pass
             if "prompt" in self.tags:
                 prompt = self.tags["prompt"]
             expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
@@ -804,6 +796,20 @@ class node:
                         self.status = 1
                         return self.output
                 result = self.child.expect(expects, timeout = timeout)
+                # Only set terminal size on devices without a
+                # screen_length_command (e.g. Linux/bash servers).
+                # Routers already disable pagination via that command.
+                # After setwinsize, consume any SIGWINCH re-render
+                # prompt (~40ms on bash) with a short timeout.
+                if c == commands[0] and "screen_length_command" not in self.tags:
+                    try:
+                        self.child.setwinsize(65535, 65535)
+                    except Exception:
+                        try:
+                            self.child.setwinsize(10000, 10000)
+                        except Exception:
+                            pass
+                    self.child.expect(expects, timeout = 1)
                 self.child.sendline(c)
                 if result == 2:
                     break
@@ -886,14 +892,6 @@ class node:
                 port_str = f":{self.port}" if self.port and self.protocol not in ["ssm", "kubectl", "docker"] else ""
                 logger("success", f"Connected to {self.unique} at {self.host}{port_str} via: {self.protocol}")
 
-            # Attempt to set the terminal size
-            try:
-                self.child.setwinsize(65535, 65535)
-            except Exception:
-                try:
-                    self.child.setwinsize(10000, 10000)
-                except Exception:
-                    pass
             if "prompt" in self.tags:
                 prompt = self.tags["prompt"]
             expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
@@ -915,6 +913,15 @@ class node:
                         self.status = 1
                         return self.output
                 result = self.child.expect(expects, timeout = timeout)
+                if c == commands[0] and "screen_length_command" not in self.tags:
+                    try:
+                        self.child.setwinsize(65535, 65535)
+                    except Exception:
+                        try:
+                            self.child.setwinsize(10000, 10000)
+                        except Exception:
+                            pass
+                    self.child.expect(expects, timeout = 1)
                 self.child.sendline(c)
                 if result == 2:
                     break
@@ -940,13 +947,28 @@ class node:
                     if vars is not None:
                         e = e.format(**vars)
                     updatedprompt = re.sub(r'(?<!\\)\$', '', prompt)
-                    newpattern = f".*({updatedprompt}).*{e}.*"
                     cleaned_output = output
-                    cleaned_output = re.sub(newpattern, '', cleaned_output)
+                    try:
+                        newpattern = f".*({updatedprompt}).*{e}.*"
+                        cleaned_output = re.sub(newpattern, '', cleaned_output)
+                    except re.error:
+                        try:
+                            escaped_e = re.escape(e)
+                            newpattern = f".*({updatedprompt}).*{escaped_e}.*"
+                            cleaned_output = re.sub(newpattern, '', cleaned_output)
+                        except re.error:
+                            pass
+
                     if e in cleaned_output:
                         self.result[e] = True
                     else:
-                        self.result[e]= False
+                        try:
+                            if re.search(e, cleaned_output):
+                                self.result[e] = True
+                            else:
+                                self.result[e] = False
+                        except re.error:
+                            self.result[e] = False
                 self.status = 0
                 return self.result
             if result == 2:

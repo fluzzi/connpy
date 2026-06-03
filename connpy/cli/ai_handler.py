@@ -44,7 +44,7 @@ class AIHandler:
         if args.mcp is not None:
             return self.configure_mcp(args)
             
-        # Determinar session_id para retomar
+        # Determine session_id to resume
         session_id = None
         if args.resume:
             sessions, _ = self.app.services.ai.list_sessions()
@@ -54,8 +54,8 @@ class AIHandler:
         elif args.session:
             session_id = args.session[0]
 
-        # Configurar argumentos adicionales para el servicio de AI
-        # Prioridad: CLI Args > Configuración Local
+        # Configure additional arguments for the AI service
+        # Priority: CLI Args > Local Config
         settings = self.app.services.config_svc.get_settings().get("ai", {})
         arguments = {}
         
@@ -83,7 +83,7 @@ class AIHandler:
                 printer.warning("Architect API key/auth not configured. Architect will be unavailable.")
                 printer.info("Use 'connpy config --architect-api-key <key>' or 'connpy config --architect-auth <auth>' to enable it.")
 
-        # El resto de la interacción el CLI la maneja con el agente subyacente
+        # The rest of the interaction is handled by the CLI with the underlying agent
         self.app.myai = self.app.services.ai
         self.ai_overrides = arguments
         

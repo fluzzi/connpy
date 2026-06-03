@@ -719,7 +719,9 @@ class ExecutionServicer(connpy_pb2_grpc.ExecutionServiceServicer):
             finally:
                 q.put(None)
                 
-        threading.Thread(target=_worker, daemon=True).start()
+        import contextvars
+        ctx = contextvars.copy_context()
+        threading.Thread(target=lambda: ctx.run(_worker), daemon=True).start()
         
         while True:
             item = q.get()
@@ -768,7 +770,9 @@ class ExecutionServicer(connpy_pb2_grpc.ExecutionServiceServicer):
             finally:
                 q.put(None)
                 
-        threading.Thread(target=_worker, daemon=True).start()
+        import contextvars
+        ctx = contextvars.copy_context()
+        threading.Thread(target=lambda: ctx.run(_worker), daemon=True).start()
         
         while True:
             item = q.get()
@@ -953,6 +957,7 @@ class AIServicer(connpy_pb2_grpc.AIServiceServicer):
     def _handle_chat_stream(self, request_iterator, context, service_method):
         import queue
         import threading
+        import contextvars
 
         chunk_queue = queue.Queue()
         request_queue = queue.Queue()
@@ -985,6 +990,7 @@ class AIServicer(connpy_pb2_grpc.AIServiceServicer):
                         session_id=session_id,
                         debug=debug,
                         status=bridge,
+                        console=bridge,
                         confirm_handler=bridge.confirm,
                         chunk_callback=callback,
                         trust=trust,
@@ -1046,10 +1052,10 @@ class AIServicer(connpy_pb2_grpc.AIServiceServicer):
                         if req.HasField("engineer_auth"): overrides["engineer_auth"] = from_struct(req.engineer_auth)
                         if req.HasField("architect_auth"): overrides["architect_auth"] = from_struct(req.architect_auth)
                         
-                        # Start AI in its own thread so we can keep listening for interrupts
+                        # Start AI in its own thread with a fresh copy of context so we can keep listening for interrupts
+                        ctx_ai = contextvars.copy_context()
                         ai_thread = threading.Thread(
-                            target=run_ai_task,
-                            args=(req.input_text, req.session_id, req.debug, overrides, req.trust),
+                            target=lambda: ctx_ai.run(run_ai_task, req.input_text, req.session_id, req.debug, overrides, req.trust),
                             daemon=True
                         )
                         ai_thread.start()
@@ -1061,8 +1067,9 @@ class AIServicer(connpy_pb2_grpc.AIServiceServicer):
                 # When client closes stream, send sentinel
                 chunk_queue.put((None, None))
 
-        # Start listening for client requests/signals
-        threading.Thread(target=request_listener, daemon=True).start()
+        # Start listening for client requests/signals with a copied context
+        ctx_listener = contextvars.copy_context()
+        threading.Thread(target=lambda: ctx_listener.run(request_listener), daemon=True).start()
 
         # Main response loop (yields to gRPC)
         while True:
@@ -1109,7 +1116,9 @@ class AIServicer(connpy_pb2_grpc.AIServiceServicer):
             finally:
                 chunk_queue.put((None, None))
                 
-        threading.Thread(target=_worker, daemon=True).start()
+        import contextvars
+        ctx = contextvars.copy_context()
+        threading.Thread(target=lambda: ctx.run(_worker), daemon=True).start()
         
         while True:
             item = chunk_queue.get()

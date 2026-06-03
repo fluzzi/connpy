@@ -90,7 +90,7 @@ el.replaceWith(d);
         if args.mcp is not None:
             return self.configure_mcp(args)
             
-        # Determinar session_id para retomar
+        # Determine session_id to resume
         session_id = None
         if args.resume:
             sessions, _ = self.app.services.ai.list_sessions()
@@ -100,8 +100,8 @@ el.replaceWith(d);
         elif args.session:
             session_id = args.session[0]
 
-        # Configurar argumentos adicionales para el servicio de AI
-        # Prioridad: CLI Args &gt; Configuración Local
+        # Configure additional arguments for the AI service
+        # Priority: CLI Args &gt; Local Config
         settings = self.app.services.config_svc.get_settings().get(&#34;ai&#34;, {})
         arguments = {}
         
@@ -129,7 +129,7 @@ el.replaceWith(d);
                 printer.warning(&#34;Architect API key/auth not configured. Architect will be unavailable.&#34;)
                 printer.info(&#34;Use &#39;connpy config --architect-api-key &lt;key&gt;&#39; or &#39;connpy config --architect-auth &lt;auth&gt;&#39; to enable it.&#34;)
 
-        # El resto de la interacción el CLI la maneja con el agente subyacente
+        # The rest of the interaction is handled by the CLI with the underlying agent
         self.app.myai = self.app.services.ai
         self.ai_overrides = arguments
         
@@ -502,7 +502,7 @@ el.replaceWith(d);
     if args.mcp is not None:
         return self.configure_mcp(args)
         
-    # Determinar session_id para retomar
+    # Determine session_id to resume
     session_id = None
     if args.resume:
         sessions, _ = self.app.services.ai.list_sessions()
@@ -512,8 +512,8 @@ el.replaceWith(d);
     elif args.session:
         session_id = args.session[0]
 
-    # Configurar argumentos adicionales para el servicio de AI
-    # Prioridad: CLI Args &gt; Configuración Local
+    # Configure additional arguments for the AI service
+    # Priority: CLI Args &gt; Local Config
     settings = self.app.services.config_svc.get_settings().get(&#34;ai&#34;, {})
     arguments = {}
     
@@ -541,7 +541,7 @@ el.replaceWith(d);
             printer.warning(&#34;Architect API key/auth not configured. Architect will be unavailable.&#34;)
             printer.info(&#34;Use &#39;connpy config --architect-api-key &lt;key&gt;&#39; or &#39;connpy config --architect-auth &lt;auth&gt;&#39; to enable it.&#34;)
 
-    # El resto de la interacción el CLI la maneja con el agente subyacente
+    # The rest of the interaction is handled by the CLI with the underlying agent
     self.app.myai = self.app.services.ai
     self.ai_overrides = arguments
     

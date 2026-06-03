@@ -338,6 +338,58 @@ class TestNodeTest:
         assert isinstance(result, dict)
         assert result.get("1.1.1.1") == False
 
+    def test_test_expected_regex(self, mock_pexpect):
+        """Regex in expected matches correctly."""
+        child = mock_pexpect["child"]
+        child.expect.return_value = 0
+
+        from connpy.core import node
+        n = node("router1", "10.0.0.1", user="admin", password="")
+
+        with patch.object(n, '_connect', return_value=True):
+            n.child = child
+            n.mylog = io.BytesIO(b"Debian version 12.5")
+            with patch.object(n, '_logclean', return_value="Debian version 12.5"):
+                result = n.test(["cat /etc/debian_version"], "version \\d+\\.\\d+")
+
+        assert isinstance(result, dict)
+        assert result.get("version \\d+\\.\\d+") == True
+
+    def test_test_expected_invalid_regex(self, mock_pexpect):
+        """Malformed regex defaults to literal matching safely."""
+        child = mock_pexpect["child"]
+        child.expect.return_value = 0
+
+        from connpy.core import node
+        n = node("router1", "10.0.0.1", user="admin", password="")
+
+        with patch.object(n, '_connect', return_value=True):
+            n.child = child
+            # (invalid is a malformed regex (missing closing paren), but matches literally
+            n.mylog = io.BytesIO(b"some (invalid text")
+            with patch.object(n, '_logclean', return_value="some (invalid text"):
+                result = n.test(["echo"], "(invalid")
+
+        assert isinstance(result, dict)
+        assert result.get("(invalid") == True
+
+    def test_test_expected_with_vars(self, mock_pexpect):
+        """Expected output formats variables properly."""
+        child = mock_pexpect["child"]
+        child.expect.return_value = 0
+
+        from connpy.core import node
+        n = node("router1", "10.0.0.1", user="admin", password="")
+
+        with patch.object(n, '_connect', return_value=True):
+            n.child = child
+            n.mylog = io.BytesIO(b"Debian version 12")
+            with patch.object(n, '_logclean', return_value="Debian version 12"):
+                result = n.test(["echo"], "version {version_num}", vars={"version_num": "12"})
+
+        assert isinstance(result, dict)
+        assert result.get("version 12") == True
+
 
 # =========================================================================
 # nodes (parallel) tests

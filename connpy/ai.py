@@ -17,7 +17,7 @@ def _init_litellm():
     global _litellm_initialized
     if not _litellm_initialized:
         import litellm
-        # Silenciar feedback de litellm
+        # Silence litellm feedback
         litellm.suppress_debug_info = True
         litellm.set_verbose = False
         _litellm_initialized = True
@@ -117,7 +117,7 @@ class ai:
         self.one_shot = kwargs.get("one_shot", False)
 
         
-        # 1. Cargar configuración genérica con herencia/merge global
+        # 1. Load generic configuration with global inheritance/merge
         if hasattr(self.config, "get_effective_setting"):
             aiconfig = self.config.get_effective_setting("ai", {})
         else:
@@ -160,7 +160,7 @@ class ai:
             custom_trusted = [c.strip() for c in custom_trusted.split(",") if c.strip()]
         self.safe_commands = list(self.SAFE_COMMANDS) + (custom_trusted if isinstance(custom_trusted, list) else [])
         
-        # Límites
+        # Limits
         self.max_history = 30
         self.max_truncate = 50000
         self.soft_limit_iterations = 20  # Show warning and suggest Ctrl+C
@@ -197,7 +197,7 @@ class ai:
         self.session_id = getattr(self.config, "session_id", None)
         self.session_path = os.path.join(self.sessions_dir, f"{self.session_id}.json") if self.session_id else None
 
-        # Prompts base agnósticos
+        # Agnostic base prompts
         architect_instructions = ""
         if self.has_architect:
             architect_instructions = """
@@ -737,7 +737,7 @@ class ai:
 
     def _engineer_loop(self, task, status=None, debug=False, chat_history=None):
         """Internal loop where the Engineer executes technical tasks for the Architect."""
-        # Optimización de caché para el Ingeniero (Solo para Anthropic directo, Vertex tiene reglas distintas)
+        # Cache optimization for the Engineer (Only for direct Anthropic, Vertex has different rules)
         if "claude" in self.engineer_model.lower() and "vertex" not in self.engineer_model.lower():
             messages = [{"role": "system", "content": [{"type": "text", "text": self.engineer_system_prompt, "cache_control": {"type": "ephemeral"}}]}]
         else:
@@ -796,7 +796,7 @@ class ai:
                 for tc in resp_msg.tool_calls:
                     fn, args = tc.function.name, json.loads(tc.function.arguments)
                     
-                    # Notificación en tiempo real de la tarea técnica (Only if not in Architect loop)
+                    # Real-time notification of the technical task (Only if not in Architect loop)
                     if status and not chat_history:
                         s_text = ""
                         if fn == "list_nodes": s_text = f"[ai_status]Engineer: [SEARCH] {args.get('filter_pattern','.*')}"
@@ -1051,7 +1051,7 @@ class ai:
 
         usage = {"input": 0, "output": 0, "total": 0}
         
-        # 1. Selector de Rol inicial (Sticky Brain)
+        # 1. Initial Role Selector (Sticky Brain)
         explicit_architect = re.match(r'^(architect|arquitecto|@architect)[:\s]', user_input, re.I)
         explicit_engineer = re.match(r'^(engineer|ingeniero|@engineer)[:\s]', user_input, re.I)
         
@@ -1060,7 +1060,7 @@ class ai:
         elif explicit_engineer:
             current_brain = "engineer"
         else:
-            # Sticky Brain: Detectar si el Arquitecto estaba al mando en el historial reciente
+            # Sticky Brain: Detect if the Architect was in control in recent history
             is_architect_active = False
             for msg in reversed(chat_history[-5:]):
                 tcs = msg.get('tool_calls') if isinstance(msg, dict) else getattr(msg, 'tool_calls', None)
@@ -1074,7 +1074,7 @@ class ai:
                 if is_architect_active: break
             current_brain = "architect" if is_architect_active else "engineer"
         
-        # 2. Preparación de mensajes y limpieza
+        # 2. Message preparation and cleaning
         clean_input = re.sub(r'^(architect|arquitecto|engineer|ingeniero|@architect|@engineer)[:\s]+', '', user_input, flags=re.IGNORECASE).strip()
         
         system_prompt = self.architect_system_prompt if current_brain == "architect" else self.engineer_system_prompt
@@ -1083,13 +1083,13 @@ class ai:
         key = self.architect_key if current_brain == "architect" else self.engineer_key
         current_auth = self.architect_auth if current_brain == "architect" else self.engineer_auth
 
-        # Estructura optimizada para Prompt Caching (Solo para Anthropic directo, Vertex tiene reglas distintas)
+        # Optimized structure for Prompt Caching (Only for direct Anthropic, Vertex has different rules)
         if "claude" in model.lower() and "vertex" not in model.lower():
             messages = [{"role": "system", "content": [{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}]}]
         else:
             messages = [{"role": "system", "content": system_prompt}]
         
-        # Interleaving de historial
+        # History interleaving
         last_role = "system"
         # Sanitize history if the current target model is not compatible with cache_control
         history_to_process = chat_history[-self.max_history:]
@@ -1109,7 +1109,7 @@ class ai:
         if last_role == 'user': messages[-1]['content'] += "\n" + clean_input
         else: messages.append({"role": "user", "content": clean_input})
 
-        # 3. Bucle de ejecución
+        # 3. Execution loop
         iteration = 0
         try:
             # Set up remote interrupt callback if bridge is provided
@@ -1683,6 +1683,7 @@ Guidelines:
 4. If `validate_playbook` returns errors, fix them in your YAML and validate again before responding to the user.
 5. When the playbook is complete, validated, and the user approves it, you MUST call the `return_playbook` tool to return the final YAML.
 6. All text responses must be in the same language the user uses in their prompt.
+7. EFFICIENT TESTING: When the user asks to verify or check a condition (e.g. verify OS version, check port status), a single task with `action: 'test'` is completely self-sufficient. DO NOT generate an `action: 'run'` task followed by an `action: 'test'` task to perform the same check. The `test` action executes the commands, verifies the expectation, and displays the output if `output: stdout` is configured.
 """
 
 PLAYBOOK_BUILDER_TOOLS = [

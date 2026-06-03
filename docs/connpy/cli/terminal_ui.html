@@ -121,14 +121,14 @@ el.replaceWith(d);
             }
             
             # 1. Visual Separation
-            self.console.print(&#34;&#34;) # Salto de línea real
+            self.console.print(&#34;&#34;) # Real line break
             self.console.print(Rule(title=&#34;[bold cyan] AI TERMINAL COPILOT [/bold cyan]&#34;, style=&#34;cyan&#34;))
             self.console.print(Panel(
                 &#34;[dim]Type your question. Enter to send, Escape/Ctrl+C to cancel. Type / for commands.\n&#34;
                 &#34;Tab to change context mode. Ctrl+\u2191/\u2193 to adjust context. \u2191\u2193 for question history.[/dim]&#34;,
                 border_style=&#34;cyan&#34;
             ))
-            self.console.print(&#34;\n&#34;) # Pequeño espacio antes del prompt del copilot
+            self.console.print(&#34;\n&#34;) # Small space before the copilot prompt
 
             bindings = KeyBindings()
             @bindings.add(&#39;c-up&#39;)
@@ -195,7 +195,7 @@ el.replaceWith(d);
                 
                 if app and app.current_buffer:
                     text = app.current_buffer.text
-                    # Solo mostrar ayuda de comandos si estamos escribiendo el primer comando y no hay espacios
+                    # Only show command help if typing the first command and there are no spaces
                     if text.startswith(&#39;/&#39;) and &#39; &#39; not in text:
                         commands = [&#39;/os&#39;, &#39;/prompt&#39;, &#39;/architect&#39;, &#39;/engineer&#39;, &#39;/trust&#39;, &#39;/untrust&#39;, &#39;/memorize&#39;, &#39;/clear&#39;]
                         matches = [c for c in commands if c.startswith(text.lower())]
@@ -210,19 +210,19 @@ el.replaceWith(d);
                     idx = max(0, state[&#39;total_cmds&#39;] - state[&#39;context_cmd&#39;])
                     
                     def clean_preview(text):
-                        # Limpia saltos de línea y el prompt inicial (todo hasta #, &gt; o $) para que quede solo el comando
+                        # Clean newlines and the initial prompt (all up to #, &gt; or $) to leave only the command
                         original = text.strip().replace(&#39;\r&#39;, &#39;&#39;).replace(&#39;\n&#39;, &#39; &#39;)
                         cleaned = re.sub(r&#39;^.*?[#&gt;\$]\s*&#39;, &#39;&#39;, original)
-                        # Si limpiar el prompt nos deja con un string vacío (ej: era solo &#34;iol#&#34;), devolvemos el original
+                        # If cleaning the prompt leaves us with an empty string (e.g. it was just &#34;iol#&#34;), return the original
                         return cleaned if cleaned else original
 
                     if state[&#39;context_mode&#39;] == self.mode_range:
                         range_blocks = blocks[idx:]
-                        # Si hay más de un bloque, el último es siempre el prompt vacío/actual. Lo omitimos visualmente.
+                        # If there is more than one block, the last one is always the empty/current prompt. We omit it visually.
                         if len(range_blocks) &gt; 1:
                             range_blocks = range_blocks[:-1]
                             
-                        # Limpiar y truncar comandos muy largos para que no rompan la UI
+                        # Clean and truncate very long commands so they don&#39;t break the UI
                         previews = []
                         for b in range_blocks:
                             p = clean_preview(b[2])
@@ -300,8 +300,8 @@ el.replaceWith(d);
                     style=ui_style
                 )
                 try:
-                    # Usamos un try/finally interno para asegurar que si algo falla en prompt_async,
-                    # no nos quedemos con la terminal en un estado extraño.
+                    # We use an internal try/finally to ensure that if something fails in prompt_async,
+                    # we don&#39;t leave the terminal in a strange state.
                     question = await session.prompt_async(
                         get_prompt_text, 
                         key_bindings=bindings, 
@@ -333,12 +333,12 @@ el.replaceWith(d);
                             except: pass
                     asyncio.create_task(delayed_refresh())
 
-                    # Mover el cursor arriba y limpiar la línea para que el nuevo prompt reemplace al anterior
+                    # Move the cursor up and clean the line so the new prompt replaces the previous one
                     sys.stdout.write(&#39;\x1b[1A\x1b[2K&#39;)
                     sys.stdout.flush()
                     continue
                 else:
-                    # Limpiar el mensaje de la barra cuando se hace una pregunta real
+                    # Clean the toolbar message when a real question is asked
                     state[&#39;toolbar_msg&#39;] = &#39;&#39;
                 
                 clean_question = directive.get(&#34;clean_prompt&#34;, question)
@@ -575,14 +575,14 @@ el.replaceWith(d);
         }
         
         # 1. Visual Separation
-        self.console.print(&#34;&#34;) # Salto de línea real
+        self.console.print(&#34;&#34;) # Real line break
         self.console.print(Rule(title=&#34;[bold cyan] AI TERMINAL COPILOT [/bold cyan]&#34;, style=&#34;cyan&#34;))
         self.console.print(Panel(
             &#34;[dim]Type your question. Enter to send, Escape/Ctrl+C to cancel. Type / for commands.\n&#34;
             &#34;Tab to change context mode. Ctrl+\u2191/\u2193 to adjust context. \u2191\u2193 for question history.[/dim]&#34;,
             border_style=&#34;cyan&#34;
         ))
-        self.console.print(&#34;\n&#34;) # Pequeño espacio antes del prompt del copilot
+        self.console.print(&#34;\n&#34;) # Small space before the copilot prompt
 
         bindings = KeyBindings()
         @bindings.add(&#39;c-up&#39;)
@@ -649,7 +649,7 @@ el.replaceWith(d);
             
             if app and app.current_buffer:
                 text = app.current_buffer.text
-                # Solo mostrar ayuda de comandos si estamos escribiendo el primer comando y no hay espacios
+                # Only show command help if typing the first command and there are no spaces
                 if text.startswith(&#39;/&#39;) and &#39; &#39; not in text:
                     commands = [&#39;/os&#39;, &#39;/prompt&#39;, &#39;/architect&#39;, &#39;/engineer&#39;, &#39;/trust&#39;, &#39;/untrust&#39;, &#39;/memorize&#39;, &#39;/clear&#39;]
                     matches = [c for c in commands if c.startswith(text.lower())]
@@ -664,19 +664,19 @@ el.replaceWith(d);
                 idx = max(0, state[&#39;total_cmds&#39;] - state[&#39;context_cmd&#39;])
                 
                 def clean_preview(text):
-                    # Limpia saltos de línea y el prompt inicial (todo hasta #, &gt; o $) para que quede solo el comando
+                    # Clean newlines and the initial prompt (all up to #, &gt; or $) to leave only the command
                     original = text.strip().replace(&#39;\r&#39;, &#39;&#39;).replace(&#39;\n&#39;, &#39; &#39;)
                     cleaned = re.sub(r&#39;^.*?[#&gt;\$]\s*&#39;, &#39;&#39;, original)
-                    # Si limpiar el prompt nos deja con un string vacío (ej: era solo &#34;iol#&#34;), devolvemos el original
+                    # If cleaning the prompt leaves us with an empty string (e.g. it was just &#34;iol#&#34;), return the original
                     return cleaned if cleaned else original
 
                 if state[&#39;context_mode&#39;] == self.mode_range:
                     range_blocks = blocks[idx:]
-                    # Si hay más de un bloque, el último es siempre el prompt vacío/actual. Lo omitimos visualmente.
+                    # If there is more than one block, the last one is always the empty/current prompt. We omit it visually.
                     if len(range_blocks) &gt; 1:
                         range_blocks = range_blocks[:-1]
                         
-                    # Limpiar y truncar comandos muy largos para que no rompan la UI
+                    # Clean and truncate very long commands so they don&#39;t break the UI
                     previews = []
                     for b in range_blocks:
                         p = clean_preview(b[2])
@@ -754,8 +754,8 @@ el.replaceWith(d);
                 style=ui_style
             )
             try:
-                # Usamos un try/finally interno para asegurar que si algo falla en prompt_async,
-                # no nos quedemos con la terminal en un estado extraño.
+                # We use an internal try/finally to ensure that if something fails in prompt_async,
+                # we don&#39;t leave the terminal in a strange state.
                 question = await session.prompt_async(
                     get_prompt_text, 
                     key_bindings=bindings, 
@@ -787,12 +787,12 @@ el.replaceWith(d);
                         except: pass
                 asyncio.create_task(delayed_refresh())
 
-                # Mover el cursor arriba y limpiar la línea para que el nuevo prompt reemplace al anterior
+                # Move the cursor up and clean the line so the new prompt replaces the previous one
                 sys.stdout.write(&#39;\x1b[1A\x1b[2K&#39;)
                 sys.stdout.flush()
                 continue
             else:
-                # Limpiar el mensaje de la barra cuando se hace una pregunta real
+                # Clean the toolbar message when a real question is asked
                 state[&#39;toolbar_msg&#39;] = &#39;&#39;
             
             clean_question = directive.get(&#34;clean_prompt&#34;, question)
