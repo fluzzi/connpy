@@ -106,6 +106,29 @@ conn ai
 conn run @office "uptime"
 ```
 
+### 🔑 SSO / OIDC Provider Management
+In remote mode, `connpy` supports Single Sign-On (SSO) login. You can manage the configured identity providers (IdPs) directly from the local CLI using the `conn sso` command suite:
+
+- **List configured providers**:
+  ```bash
+  conn sso --list
+  ```
+- **Show provider details** (sensitive credentials like secrets are masked):
+  ```bash
+  conn sso --show <provider_name>
+  ```
+- **Add or update a provider** (opens an interactive configuration wizard):
+  ```bash
+  conn sso --add <provider_name>
+  ```
+- **Delete a provider**:
+  ```bash
+  conn sso --del <provider_name>
+  ```
+
+#### Security Recommendation (Secret Reference Env Vars)
+To keep sensitive client secrets or shared secrets out of git-tracked configuration files, you can input a variable name prefixed with a `$` instead of the literal secret during the `conn sso --add` prompts (e.g., `$CONN_SSO_MYPROVIDER_SECRET`). The backend gRPC server will dynamically resolve the value from its environment variables at runtime.
+
 ---
 
 ## Plugin Requirements for Connpy

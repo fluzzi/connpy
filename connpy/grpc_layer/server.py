@@ -1273,13 +1273,144 @@ class AuthServicer(connpy_pb2_grpc.AuthServiceServicer):
             context.abort(grpc.StatusCode.UNAUTHENTICATED, "Invalid username or password")
             
         token = self.registry.user_service.generate_jwt(username)
-        expires_at = int((datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=8)).timestamp())
+        expires_at = int((datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=12)).timestamp())
         
         return connpy_pb2.LoginResponse(
             token=token,
             username=username,
             expires_at=expires_at
         )
+
+    @handle_errors
+    def login_sso(self, request, context):
+        username = request.username
+        id_token = request.id_token
+        provider = request.provider
+
+        if not id_token or not provider:
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "id_token and provider are required")
+
+        # Load SSO configuration
+        sso_config = {}
+        if self.registry:
+            shared_config = self.registry.get_shared_config()
+            if shared_config:
+                sso_config = shared_config.config.get("sso", {})
+
+        providers = sso_config.get("providers", {})
+        if provider not in providers:
+            context.abort(grpc.StatusCode.FAILED_PRECONDITION, f"SSO Provider '{provider}' not configured in config.yaml")
+
+        p_config = providers[provider]
+        jwks_url = p_config.get("jwks_url")
+        secret = p_config.get("secret")
+
+        if secret and secret.startswith("$"):
+            import os
+            secret = os.getenv(secret[1:])
+
+        if not jwks_url and not secret:
+            context.abort(grpc.StatusCode.FAILED_PRECONDITION, f"Provider '{provider}' has no jwks_url or secret configured")
+
+        # Validate token
+        import jwt
+        try:
+            algorithms = p_config.get("algorithms", ["RS256"] if jwks_url else ["HS256"])
+            verify_aud = "audience" in p_config
+            audience = p_config.get("audience")
+            verify_iss = "issuer" in p_config
+            issuer = p_config.get("issuer")
+
+            options = {
+                "verify_signature": True,
+                "verify_exp": True,
+                "verify_aud": verify_aud,
+                "verify_iss": verify_iss
+            }
+
+            decode_kwargs = {
+                "algorithms": algorithms,
+                "options": options
+            }
+            if verify_aud:
+                decode_kwargs["audience"] = audience
+            if verify_iss:
+                decode_kwargs["issuer"] = issuer
+
+            if jwks_url:
+                from jwt import PyJWKClient
+                jwks_client = PyJWKClient(jwks_url)
+                signing_key = jwks_client.get_signing_key_from_jwt(id_token)
+                payload = jwt.decode(id_token, signing_key.key, **decode_kwargs)
+            else:
+                payload = jwt.decode(id_token, secret, **decode_kwargs)
+
+        except Exception as e:
+            context.abort(grpc.StatusCode.UNAUTHENTICATED, f"SSO Token validation failed: {str(e)}")
+
+        # Extract username from claim
+        username_claim = p_config.get("username_claim", "sub")
+        claim_username = payload.get(username_claim)
+        if not claim_username:
+            context.abort(grpc.StatusCode.UNAUTHENTICATED, f"Username claim '{username_claim}' not found in SSO Token")
+
+        # Check domain restrictions (allowed_domains)
+        allowed_domains = p_config.get("allowed_domains", [])
+        if allowed_domains:
+            email = payload.get("email")
+            if not email and claim_username and "@" in claim_username:
+                email = claim_username
+            
+            if not email:
+                context.abort(grpc.StatusCode.UNAUTHENTICATED, "Domain restriction enabled but no email claim found in SSO Token")
+            
+            try:
+                user_domain = email.split("@")[-1].strip().lower()
+            except Exception:
+                context.abort(grpc.StatusCode.UNAUTHENTICATED, f"Invalid email format in SSO Token: '{email}'")
+            
+            allowed_domains_lower = [d.strip().lower() for d in allowed_domains if d]
+            if user_domain not in allowed_domains_lower:
+                context.abort(grpc.StatusCode.UNAUTHENTICATED, f"SSO user domain '{user_domain}' not allowed")
+
+        # Normalize username to alphanumeric/dashes/underscores to match connpy's username regex
+        import re
+        normalized_username = re.sub(r'[^a-zA-Z0-9_-]', '_', claim_username.split('@')[0])
+
+        # If a requested username was sent, verify it matches
+        if username and username != normalized_username:
+            context.abort(grpc.StatusCode.UNAUTHENTICATED, f"Mismatched username. Expected '{normalized_username}', got '{username}'")
+
+        # Check if user exists in connpy registry, otherwise auto-provision
+        try:
+            user_exists = any(u["username"] == normalized_username for u in self.registry.user_service.list_users())
+            if not user_exists:
+                import secrets
+                # Provision new user with random password (never used directly)
+                self.registry.user_service.create_user(normalized_username, secrets.token_hex(32))
+        except Exception as e:
+            context.abort(grpc.StatusCode.INTERNAL, f"Failed to auto-provision user: {str(e)}")
+
+        # Generate native connpy JWT token
+        token = self.registry.user_service.generate_jwt(normalized_username)
+        expires_at = int((datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=12)).timestamp())
+
+        return connpy_pb2.LoginResponse(
+            token=token,
+            username=normalized_username,
+            expires_at=expires_at
+        )
+
+    @handle_errors
+    def get_sso_providers(self, request, context):
+        sso_config = {}
+        if self.registry:
+            shared_config = self.registry.get_shared_config()
+            if shared_config:
+                sso_config = shared_config.config.get("sso", {})
+        providers = list(sso_config.get("providers", {}).keys())
+        external_providers = [p for p in providers if p != "trusted_gateway"]
+        return connpy_pb2.SSOProvidersResponse(providers=external_providers)
 
     @handle_errors
     def change_password(self, request, context):
@@ -1296,7 +1427,7 @@ class AuthServicer(connpy_pb2_grpc.AuthServiceServicer):
         return Empty()
 
 class AuthInterceptor(grpc.ServerInterceptor):
-    OPEN_METHODS = ["/connpy.AuthService/login"]
+    OPEN_METHODS = ["/connpy.AuthService/login", "/connpy.AuthService/login_sso", "/connpy.AuthService/get_sso_providers"]
 
     def __init__(self, registry):
         self.registry = registry
@@ -1421,6 +1552,15 @@ def serve(config, port=8048, debug=False):
 
     fallback_provider = ServiceProvider(config, mode="local")
     registry = UserRegistry(config.defaultdir)
+
+    # Check if trusted_gateway provider is configured if SSO Gateway Secret is present in env
+    import os
+    if os.getenv("CONN_SSO_GATEWAY_SECRET") and registry._shared_config:
+        sso_config = registry._shared_config.config.get("sso", {})
+        providers = sso_config.get("providers", {})
+        if "trusted_gateway" not in providers:
+            from connpy import printer
+            printer.warning("CONN_SSO_GATEWAY_SECRET is defined in environment, but 'trusted_gateway' is not configured as an SSO provider in config.yaml. Forward Auth flow will not work.")
 
     interceptors = []
     if debug:

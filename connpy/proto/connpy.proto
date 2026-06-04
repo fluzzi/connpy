@@ -301,12 +301,24 @@ message MCPRequest {
 
 service AuthService {
     rpc login (LoginRequest) returns (LoginResponse) {}
+    rpc login_sso (LoginSSORequest) returns (LoginResponse) {}
     rpc change_password (ChangePasswordRequest) returns (google.protobuf.Empty) {}
+    rpc get_sso_providers (google.protobuf.Empty) returns (SSOProvidersResponse) {}
+}
+
+message SSOProvidersResponse {
+    repeated string providers = 1;
 }
 
 message LoginRequest {
     string username = 1;
     string password = 2;
+}
+
+message LoginSSORequest {
+    string username = 1;
+    string id_token = 2;
+    string provider = 3;
 }
 
 message LoginResponse {

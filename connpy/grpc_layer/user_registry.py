@@ -92,6 +92,12 @@ class UserRegistry:
     def has_users(self) -> bool:
         """Check if any users are registered (enables auth enforcement)."""
         return bool(self.user_service.list_users())
+
+    def get_shared_config(self):
+        """Thread-safe access to the hot-reloaded shared configuration."""
+        with self._lock:
+            self._refresh_shared()
+            return self._shared_config
     
     def evict(self, username):
         """Remove and cleanly shut down cached provider (after delete or password change)."""

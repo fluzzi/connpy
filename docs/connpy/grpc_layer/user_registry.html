@@ -143,6 +143,12 @@ el.replaceWith(d);
     def has_users(self) -&gt; bool:
         &#34;&#34;&#34;Check if any users are registered (enables auth enforcement).&#34;&#34;&#34;
         return bool(self.user_service.list_users())
+
+    def get_shared_config(self):
+        &#34;&#34;&#34;Thread-safe access to the hot-reloaded shared configuration.&#34;&#34;&#34;
+        with self._lock:
+            self._refresh_shared()
+            return self._shared_config
     
     def evict(self, username):
         &#34;&#34;&#34;Remove and cleanly shut down cached provider (after delete or password change).&#34;&#34;&#34;
@@ -244,6 +250,22 @@ el.replaceWith(d);
 </details>
 <div class="desc"><p>Get, lazy-load, or hot-reload a user's full ServiceProvider.</p></div>
 </dd>
+<dt id="connpy.grpc_layer.user_registry.UserRegistry.get_shared_config"><code class="name flex">
+<span>def <span class="ident">get_shared_config</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_shared_config(self):
+    &#34;&#34;&#34;Thread-safe access to the hot-reloaded shared configuration.&#34;&#34;&#34;
+    with self._lock:
+        self._refresh_shared()
+        return self._shared_config</code></pre>
+</details>
+<div class="desc"><p>Thread-safe access to the hot-reloaded shared configuration.</p></div>
+</dd>
 <dt id="connpy.grpc_layer.user_registry.UserRegistry.has_users"><code class="name flex">
 <span>def <span class="ident">has_users</span></span>(<span>self) ‑> bool</span>
 </code></dt>
@@ -280,6 +302,7 @@ el.replaceWith(d);
 <ul class="">
 <li><code><a title="connpy.grpc_layer.user_registry.UserRegistry.evict" href="#connpy.grpc_layer.user_registry.UserRegistry.evict">evict</a></code></li>
 <li><code><a title="connpy.grpc_layer.user_registry.UserRegistry.get_provider" href="#connpy.grpc_layer.user_registry.UserRegistry.get_provider">get_provider</a></code></li>
+<li><code><a title="connpy.grpc_layer.user_registry.UserRegistry.get_shared_config" href="#connpy.grpc_layer.user_registry.UserRegistry.get_shared_config">get_shared_config</a></code></li>
 <li><code><a title="connpy.grpc_layer.user_registry.UserRegistry.has_users" href="#connpy.grpc_layer.user_registry.UserRegistry.has_users">has_users</a></code></li>
 </ul>
 </li>

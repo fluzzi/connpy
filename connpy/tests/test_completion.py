@@ -199,4 +199,47 @@ class TestUserCompletions:
         assert "--help" in logout_completions
 
 
+class TestSsoCompletions:
+    def test_sso_command_options(self):
+        from connpy.completion import _build_tree, resolve_completion
+        tree = _build_tree([], [], [], {}, "/tmp")
+        
+        # Test options at the "sso" level
+        sso_completions = resolve_completion(["sso", ""], tree)
+        assert "--add" in sso_completions
+        assert "--del" in sso_completions
+        assert "--rm" in sso_completions
+        assert "--show" in sso_completions
+        assert "--list" in sso_completions
+        assert "--ls" in sso_completions
+
+    def test_sso_action_completed_providers(self, tmp_path):
+        from connpy.completion import _build_tree, resolve_completion
+        import yaml
+        
+        # Create mock config.yaml with SSO providers
+        config_file = tmp_path / "config.yaml"
+        config_data = {
+            "config": {
+                "sso": {
+                    "providers": {
+                        "google": {"username_claim": "email"},
+                        "authelia": {"username_claim": "sub"}
+                    }
+                }
+            }
+        }
+        with open(config_file, "w") as f:
+            yaml.dump(config_data, f)
+            
+        tree = _build_tree([], [], [], {}, str(tmp_path))
+        
+        # Resolve after --del, --rm, --show, --add
+        for action in ["--del", "--rm", "--show", "--add"]:
+            completions = resolve_completion(["sso", action, ""], tree)
+            assert "google" in completions
+            assert "authelia" in completions
+
+
+
 

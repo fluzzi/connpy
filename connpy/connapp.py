@@ -37,7 +37,7 @@ RichHelpFormatter.group_name_formatter = str.upper
 from .cli import (
     NodeHandler, ProfileHandler, ConfigHandler, RunHandler,
     AIHandler, APIHandler, PluginHandler, ImportExportHandler,
-    ContextHandler
+    ContextHandler, SSOHandler
 )
 from .cli.helpers import nodes_completer, folders_completer, profiles_completer
 from .cli.help_text import get_help
@@ -141,6 +141,7 @@ class connapp:
         from .cli.sync_handler import SyncHandler
         from .cli.user_handler import UserHandler
         from .cli.login_handler import LoginHandler
+        from .cli.sso_handler import SSOHandler
         
         # Instantiate Handlers
         self._node = NodeHandler(self)
@@ -155,6 +156,7 @@ class connapp:
         self._sync = SyncHandler(self)
         self._user = UserHandler(self)
         self._login = LoginHandler(self)
+        self._sso = SSOHandler(self)
 
         # Register auto-sync hook to trigger after config saves
         from .configfile import configfile
@@ -377,6 +379,16 @@ class connapp:
         
         userparser.add_argument("--path", dest="path", nargs=1, help="Custom configuration path for user configuration (in Mode B)")
         userparser.set_defaults(func=self._user.dispatch)
+
+        #SSOPARSER
+        ssoparser = subparsers.add_parser("sso", help="Manage SSO providers", description="Manage SSO providers", formatter_class=RichHelpFormatter)
+        ssoparser.error = self._custom_error
+        ssocrud = ssoparser.add_mutually_exclusive_group(required=True)
+        ssocrud.add_argument("--add", nargs=1, dest="add", help="Add or update SSO provider", metavar="PROVIDER_NAME")
+        ssocrud.add_argument("--del", "--rm", nargs=1, dest="delete", help="Delete SSO provider", metavar="PROVIDER_NAME")
+        ssocrud.add_argument("--list", "--ls", dest="list", action="store_true", help="List all configured SSO providers")
+        ssocrud.add_argument("--show", nargs=1, dest="show", help="Show SSO provider details", metavar="PROVIDER_NAME")
+        ssoparser.set_defaults(func=self._sso.dispatch)
 
         #LOGINPARSER
         loginparser = subparsers.add_parser("login", help="Login to remote connpy server", description="Login to remote connpy server", formatter_class=RichHelpFormatter)

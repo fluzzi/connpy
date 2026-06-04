@@ -125,6 +125,24 @@ conn ai
 # Run a command on all nodes in a folder
 conn run @office &quot;uptime&quot;
 </code></pre>
+<h3 id="sso-oidc-provider-management">🔑 SSO / OIDC Provider Management</h3>
+<p>In remote mode, <code><a title="connpy" href="#connpy">connpy</a></code> supports Single Sign-On (SSO) login. You can manage the configured identity providers (IdPs) directly from the local CLI using the <code>conn sso</code> command suite:</p>
+<ul>
+<li><strong>List configured providers</strong>:
+<code>bash
+conn sso --list</code></li>
+<li><strong>Show provider details</strong> (sensitive credentials like secrets are masked):
+<code>bash
+conn sso --show &lt;provider_name&gt;</code></li>
+<li><strong>Add or update a provider</strong> (opens an interactive configuration wizard):
+<code>bash
+conn sso --add &lt;provider_name&gt;</code></li>
+<li><strong>Delete a provider</strong>:
+<code>bash
+conn sso --del &lt;provider_name&gt;</code></li>
+</ul>
+<h4 id="security-recommendation-secret-reference-env-vars">Security Recommendation (Secret Reference Env Vars)</h4>
+<p>To keep sensitive client secrets or shared secrets out of git-tracked configuration files, you can input a variable name prefixed with a <code>$</code> instead of the literal secret during the <code>conn sso --add</code> prompts (e.g., <code>$CONN_SSO_MYPROVIDER_SECRET</code>). The backend gRPC server will dynamically resolve the value from its environment variables at runtime.</p>
 <hr>
 <h2 id="plugin-requirements-for-connpy">Plugin Requirements for Connpy</h2>
 <h3 id="remote-plugin-execution">Remote Plugin Execution</h3>
@@ -6433,6 +6451,10 @@ def test(self, commands, expected, vars = None,*, folder = None, prompt = None, 
 </li>
 <li><a href="#usage">Usage</a><ul>
 <li><a href="#basic-examples">Basic Examples:</a></li>
+<li><a href="#sso-oidc-provider-management">🔑 SSO / OIDC Provider Management</a><ul>
+<li><a href="#security-recommendation-secret-reference-env-vars">Security Recommendation (Secret Reference Env Vars)</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li><a href="#plugin-requirements-for-connpy">Plugin Requirements for Connpy</a><ul>

@@ -256,7 +256,7 @@ el.replaceWith(d);
         return bcrypt.checkpw(password.encode(&#34;utf-8&#34;), user_data[&#34;password_hash&#34;].encode(&#34;utf-8&#34;))
 
     def generate_jwt(self, username) -&gt; str:
-        &#34;&#34;&#34;Generates a secure JSON Web Token for the user expiring in 8 hours.&#34;&#34;&#34;
+        &#34;&#34;&#34;Generates a secure JSON Web Token for the user expiring in 12 hours.&#34;&#34;&#34;
         registry = self._load_registry()
         if username not in registry[&#34;users&#34;]:
             raise ValueError(f&#34;User &#39;{username}&#39; not found&#34;)
@@ -267,7 +267,8 @@ el.replaceWith(d);
             &#34;exp&#34;: expiration
         }
         
-        token = jwt.encode(payload, registry[&#34;jwt_secret&#34;], algorithm=&#34;HS256&#34;)
+        secret = os.environ.get(&#34;CONNPY_JWT_SECRET&#34;) or registry[&#34;jwt_secret&#34;]
+        token = jwt.encode(payload, secret, algorithm=&#34;HS256&#34;)
         if isinstance(token, bytes):
             token = token.decode(&#34;utf-8&#34;)
             
@@ -277,7 +278,8 @@ el.replaceWith(d);
         &#34;&#34;&#34;Decodes JWT and returns username if token is valid and unexpired.&#34;&#34;&#34;
         registry = self._load_registry()
         try:
-            payload = jwt.decode(token, registry[&#34;jwt_secret&#34;], algorithms=[&#34;HS256&#34;])
+            secret = os.environ.get(&#34;CONNPY_JWT_SECRET&#34;) or registry[&#34;jwt_secret&#34;]
+            payload = jwt.decode(token, secret, algorithms=[&#34;HS256&#34;])
             return payload.get(&#34;sub&#34;)
         except (jwt.ExpiredSignatureError, jwt.InvalidTokenError, KeyError):
             return None</code></pre>
@@ -468,7 +470,7 @@ Mode B: config_path set -&gt; Reuses existing directory after validating its str
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def generate_jwt(self, username) -&gt; str:
-    &#34;&#34;&#34;Generates a secure JSON Web Token for the user expiring in 8 hours.&#34;&#34;&#34;
+    &#34;&#34;&#34;Generates a secure JSON Web Token for the user expiring in 12 hours.&#34;&#34;&#34;
     registry = self._load_registry()
     if username not in registry[&#34;users&#34;]:
         raise ValueError(f&#34;User &#39;{username}&#39; not found&#34;)
@@ -479,13 +481,14 @@ Mode B: config_path set -&gt; Reuses existing directory after validating its str
         &#34;exp&#34;: expiration
     }
     
-    token = jwt.encode(payload, registry[&#34;jwt_secret&#34;], algorithm=&#34;HS256&#34;)
+    secret = os.environ.get(&#34;CONNPY_JWT_SECRET&#34;) or registry[&#34;jwt_secret&#34;]
+    token = jwt.encode(payload, secret, algorithm=&#34;HS256&#34;)
     if isinstance(token, bytes):
         token = token.decode(&#34;utf-8&#34;)
         
     return token</code></pre>
 </details>
-<div class="desc"><p>Generates a secure JSON Web Token for the user expiring in 8 hours.</p></div>
+<div class="desc"><p>Generates a secure JSON Web Token for the user expiring in 12 hours.</p></div>
 </dd>
 <dt id="connpy.services.user_service.UserService.get_user"><code class="name flex">
 <span>def <span class="ident">get_user</span></span>(<span>self, username) ‑> dict</span>
@@ -545,7 +548,8 @@ Mode B: config_path set -&gt; Reuses existing directory after validating its str
     &#34;&#34;&#34;Decodes JWT and returns username if token is valid and unexpired.&#34;&#34;&#34;
     registry = self._load_registry()
     try:
-        payload = jwt.decode(token, registry[&#34;jwt_secret&#34;], algorithms=[&#34;HS256&#34;])
+        secret = os.environ.get(&#34;CONNPY_JWT_SECRET&#34;) or registry[&#34;jwt_secret&#34;]
+        payload = jwt.decode(token, secret, algorithms=[&#34;HS256&#34;])
         return payload.get(&#34;sub&#34;)
     except (jwt.ExpiredSignatureError, jwt.InvalidTokenError, KeyError):
         return None</code></pre>

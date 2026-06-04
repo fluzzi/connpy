@@ -138,10 +138,20 @@ el.replaceWith(d);
                     request_deserializer=connpy__pb2.LoginRequest.FromString,
                     response_serializer=connpy__pb2.LoginResponse.SerializeToString,
             ),
+            &#39;login_sso&#39;: grpc.unary_unary_rpc_method_handler(
+                    servicer.login_sso,
+                    request_deserializer=connpy__pb2.LoginSSORequest.FromString,
+                    response_serializer=connpy__pb2.LoginResponse.SerializeToString,
+            ),
             &#39;change_password&#39;: grpc.unary_unary_rpc_method_handler(
                     servicer.change_password,
                     request_deserializer=connpy__pb2.ChangePasswordRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            ),
+            &#39;get_sso_providers&#39;: grpc.unary_unary_rpc_method_handler(
+                    servicer.get_sso_providers,
+                    request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                    response_serializer=connpy__pb2.SSOProvidersResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -1691,6 +1701,33 @@ def predict_execution_results(request,
             _registered_method=True)
 
     @staticmethod
+    def login_sso(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            &#39;/connpy.AuthService/login_sso&#39;,
+            connpy__pb2.LoginSSORequest.SerializeToString,
+            connpy__pb2.LoginResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
     def change_password(request,
             target,
             options=(),
@@ -1707,6 +1744,33 @@ def predict_execution_results(request,
             &#39;/connpy.AuthService/change_password&#39;,
             connpy__pb2.ChangePasswordRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def get_sso_providers(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            &#39;/connpy.AuthService/get_sso_providers&#39;,
+            google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            connpy__pb2.SSOProvidersResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -1757,6 +1821,43 @@ def change_password(request,
 </details>
 <div class="desc"></div>
 </dd>
+<dt id="connpy.grpc_layer.connpy_pb2_grpc.AuthService.get_sso_providers"><code class="name flex">
+<span>def <span class="ident">get_sso_providers</span></span>(<span>request,<br>target,<br>options=(),<br>channel_credentials=None,<br>call_credentials=None,<br>insecure=False,<br>compression=None,<br>wait_for_ready=None,<br>timeout=None,<br>metadata=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@staticmethod
+def get_sso_providers(request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None):
+    return grpc.experimental.unary_unary(
+        request,
+        target,
+        &#39;/connpy.AuthService/get_sso_providers&#39;,
+        google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+        connpy__pb2.SSOProvidersResponse.FromString,
+        options,
+        channel_credentials,
+        insecure,
+        call_credentials,
+        compression,
+        wait_for_ready,
+        timeout,
+        metadata,
+        _registered_method=True)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
 <dt id="connpy.grpc_layer.connpy_pb2_grpc.AuthService.login"><code class="name flex">
 <span>def <span class="ident">login</span></span>(<span>request,<br>target,<br>options=(),<br>channel_credentials=None,<br>call_credentials=None,<br>insecure=False,<br>compression=None,<br>wait_for_ready=None,<br>timeout=None,<br>metadata=None)</span>
 </code></dt>
@@ -1794,6 +1895,43 @@ def login(request,
 </details>
 <div class="desc"></div>
 </dd>
+<dt id="connpy.grpc_layer.connpy_pb2_grpc.AuthService.login_sso"><code class="name flex">
+<span>def <span class="ident">login_sso</span></span>(<span>request,<br>target,<br>options=(),<br>channel_credentials=None,<br>call_credentials=None,<br>insecure=False,<br>compression=None,<br>wait_for_ready=None,<br>timeout=None,<br>metadata=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@staticmethod
+def login_sso(request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None):
+    return grpc.experimental.unary_unary(
+        request,
+        target,
+        &#39;/connpy.AuthService/login_sso&#39;,
+        connpy__pb2.LoginSSORequest.SerializeToString,
+        connpy__pb2.LoginResponse.FromString,
+        options,
+        channel_credentials,
+        insecure,
+        call_credentials,
+        compression,
+        wait_for_ready,
+        timeout,
+        metadata,
+        _registered_method=True)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
 </dl>
 </dd>
 <dt id="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer"><code class="flex name class">
@@ -1813,7 +1951,19 @@ def login(request,
         context.set_details(&#39;Method not implemented!&#39;)
         raise NotImplementedError(&#39;Method not implemented!&#39;)
 
+    def login_sso(self, request, context):
+        &#34;&#34;&#34;Missing associated documentation comment in .proto file.&#34;&#34;&#34;
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details(&#39;Method not implemented!&#39;)
+        raise NotImplementedError(&#39;Method not implemented!&#39;)
+
     def change_password(self, request, context):
+        &#34;&#34;&#34;Missing associated documentation comment in .proto file.&#34;&#34;&#34;
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details(&#39;Method not implemented!&#39;)
+        raise NotImplementedError(&#39;Method not implemented!&#39;)
+
+    def get_sso_providers(self, request, context):
         &#34;&#34;&#34;Missing associated documentation comment in .proto file.&#34;&#34;&#34;
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details(&#39;Method not implemented!&#39;)
@@ -1842,6 +1992,22 @@ def login(request,
 </details>
 <div class="desc"><p>Missing associated documentation comment in .proto file.</p></div>
 </dd>
+<dt id="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.get_sso_providers"><code class="name flex">
+<span>def <span class="ident">get_sso_providers</span></span>(<span>self, request, context)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_sso_providers(self, request, context):
+    &#34;&#34;&#34;Missing associated documentation comment in .proto file.&#34;&#34;&#34;
+    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+    context.set_details(&#39;Method not implemented!&#39;)
+    raise NotImplementedError(&#39;Method not implemented!&#39;)</code></pre>
+</details>
+<div class="desc"><p>Missing associated documentation comment in .proto file.</p></div>
+</dd>
 <dt id="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.login"><code class="name flex">
 <span>def <span class="ident">login</span></span>(<span>self, request, context)</span>
 </code></dt>
@@ -1851,6 +2017,22 @@ def login(request,
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def login(self, request, context):
+    &#34;&#34;&#34;Missing associated documentation comment in .proto file.&#34;&#34;&#34;
+    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+    context.set_details(&#39;Method not implemented!&#39;)
+    raise NotImplementedError(&#39;Method not implemented!&#39;)</code></pre>
+</details>
+<div class="desc"><p>Missing associated documentation comment in .proto file.</p></div>
+</dd>
+<dt id="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.login_sso"><code class="name flex">
+<span>def <span class="ident">login_sso</span></span>(<span>self, request, context)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def login_sso(self, request, context):
     &#34;&#34;&#34;Missing associated documentation comment in .proto file.&#34;&#34;&#34;
     context.set_code(grpc.StatusCode.UNIMPLEMENTED)
     context.set_details(&#39;Method not implemented!&#39;)
@@ -1883,10 +2065,20 @@ def login(request,
                 request_serializer=connpy__pb2.LoginRequest.SerializeToString,
                 response_deserializer=connpy__pb2.LoginResponse.FromString,
                 _registered_method=True)
+        self.login_sso = channel.unary_unary(
+                &#39;/connpy.AuthService/login_sso&#39;,
+                request_serializer=connpy__pb2.LoginSSORequest.SerializeToString,
+                response_deserializer=connpy__pb2.LoginResponse.FromString,
+                _registered_method=True)
         self.change_password = channel.unary_unary(
                 &#39;/connpy.AuthService/change_password&#39;,
                 request_serializer=connpy__pb2.ChangePasswordRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                _registered_method=True)
+        self.get_sso_providers = channel.unary_unary(
+                &#39;/connpy.AuthService/get_sso_providers&#39;,
+                request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+                response_deserializer=connpy__pb2.SSOProvidersResponse.FromString,
                 _registered_method=True)</code></pre>
 </details>
 <div class="desc"><p>Missing associated documentation comment in .proto file.</p>
@@ -6320,14 +6512,18 @@ def stop_api(request,
 <h4><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthService" href="#connpy.grpc_layer.connpy_pb2_grpc.AuthService">AuthService</a></code></h4>
 <ul class="">
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthService.change_password" href="#connpy.grpc_layer.connpy_pb2_grpc.AuthService.change_password">change_password</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthService.get_sso_providers" href="#connpy.grpc_layer.connpy_pb2_grpc.AuthService.get_sso_providers">get_sso_providers</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthService.login" href="#connpy.grpc_layer.connpy_pb2_grpc.AuthService.login">login</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthService.login_sso" href="#connpy.grpc_layer.connpy_pb2_grpc.AuthService.login_sso">login_sso</a></code></li>
 </ul>
 </li>
 <li>
 <h4><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer" href="#connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer">AuthServiceServicer</a></code></h4>
 <ul class="">
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.change_password" href="#connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.change_password">change_password</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.get_sso_providers" href="#connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.get_sso_providers">get_sso_providers</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.login" href="#connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.login">login</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.login_sso" href="#connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.login_sso">login_sso</a></code></li>
 </ul>
 </li>
 <li>

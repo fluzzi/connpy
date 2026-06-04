@@ -210,7 +210,7 @@ class UserService:
         return bcrypt.checkpw(password.encode("utf-8"), user_data["password_hash"].encode("utf-8"))
 
     def generate_jwt(self, username) -> str:
-        """Generates a secure JSON Web Token for the user expiring in 8 hours."""
+        """Generates a secure JSON Web Token for the user expiring in 12 hours."""
         registry = self._load_registry()
         if username not in registry["users"]:
             raise ValueError(f"User '{username}' not found")
@@ -221,7 +221,8 @@ class UserService:
             "exp": expiration
         }
         
-        token = jwt.encode(payload, registry["jwt_secret"], algorithm="HS256")
+        secret = os.environ.get("CONNPY_JWT_SECRET") or registry["jwt_secret"]
+        token = jwt.encode(payload, secret, algorithm="HS256")
         if isinstance(token, bytes):
             token = token.decode("utf-8")
             
@@ -231,7 +232,8 @@ class UserService:
         """Decodes JWT and returns username if token is valid and unexpired."""
         registry = self._load_registry()
         try:
-            payload = jwt.decode(token, registry["jwt_secret"], algorithms=["HS256"])
+            secret = os.environ.get("CONNPY_JWT_SECRET") or registry["jwt_secret"]
+            payload = jwt.decode(token, secret, algorithms=["HS256"])
             return payload.get("sub")
         except (jwt.ExpiredSignatureError, jwt.InvalidTokenError, KeyError):
             return None

@@ -120,6 +120,27 @@ def _get_users(configdir):
     return []
 
 
+def _get_sso_providers(configdir):
+    import yaml
+    config_file = os.path.join(configdir, "config.yaml")
+    if not os.path.exists(config_file):
+        return []
+    try:
+        with open(config_file, "r") as f:
+            data = yaml.safe_load(f) or {}
+            config_data = data.get("config", {})
+            if isinstance(config_data, dict):
+                sso = config_data.get("sso", {})
+                if isinstance(sso, dict):
+                    providers = sso.get("providers", {})
+                    if isinstance(providers, dict):
+                        return list(providers.keys())
+    except Exception:
+        pass
+    return []
+
+
+
 def _build_tree(nodes, folders, profiles, plugins, configdir):
     """Build the declarative CLI navigation tree.
 
@@ -236,6 +257,18 @@ def _build_tree(nodes, folders, profiles, plugins, configdir):
         "--help": None, "-h": None
     }
 
+    _sso_providers = lambda w=None: _get_sso_providers(configdir)
+
+    sso_dict = {
+        "--add": {"__extra__": _sso_providers, "*": None},
+        "--del": {"__extra__": _sso_providers},
+        "--rm": {"__extra__": _sso_providers},
+        "--show": {"__extra__": _sso_providers},
+        "--list": None,
+        "--ls": None,
+        "--help": None, "-h": None
+    }
+
     mv_state = {"__extra__": _nodes, "--help": None, "-h": None}
     cp_state = {"__extra__": _nodes, "--help": None, "-h": None}
     ls_state = {
@@ -331,6 +364,7 @@ def _build_tree(nodes, folders, profiles, plugins, configdir):
             "-h": None,
         },
         "user": user_dict,
+        "sso": sso_dict,
         "login": {"--help": None, "-h": None, "*": None},
         "logout": {"--help": None, "-h": None},
         "config": config_dict,
