@@ -3,218 +3,275 @@
 </p>
 
 
-# Connpy
+# Connpy (v6.0.3)
 [![](https://img.shields.io/pypi/v/connpy.svg?style=flat-square)](https://pypi.org/pypi/connpy/)
 [![](https://img.shields.io/pypi/pyversions/connpy.svg?style=flat-square)](https://pypi.org/pypi/connpy/)
+[![](https://img.shields.io/pypi/dm/connpy.svg?style=flat-square&cacheSeconds=86400)](https://pypi.org/pypi/connpy/)
+[![](https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20docker-blue?style=flat-square)](https://github.com/fluzzi/connpy)
+[![](https://img.shields.io/badge/backend-gRPC-blue?style=flat-square)](https://github.com/fluzzi/connpy)
+[![](https://img.shields.io/badge/AI%20Core-LiteLLM-green?style=flat-square)](https://github.com/fluzzi/connpy)
+[![](https://img.shields.io/badge/MCP-compatible-orange?style=flat-square)](https://modelcontextprotocol.io)
 [![](https://img.shields.io/pypi/l/connpy.svg?style=flat-square)](https://github.com/fluzzi/connpy/blob/main/LICENSE)
-[![](https://img.shields.io/pypi/dm/connpy.svg?style=flat-square)](https://pypi.org/pypi/connpy/)
 
 **Connpy** is a powerful Connection Manager and Network Automation Platform for Linux, Mac, and Docker. It provides a unified interface for **SSH, SFTP, Telnet, kubectl, Docker pods, and AWS SSM**.
 
-The v6 release introduces the **AI Copilot**, an interactive terminal assistant that understands your network context and helps you manage your infrastructure more intelligently.
+The v6 release introduces a comprehensive **AI Copilot** and **AI Playbook Engine**, transforming your terminal into an interactive network assistant that understands your device outputs, configures parameters safely, and runs simulations.
 
 
-## 🤖 AI Copilot (New in v6)
-The AI Copilot is deeply integrated into your terminal workflow:
-- **Terminal Context Awareness**: The Copilot can "see" your screen output, helping you diagnose errors or analyze command results in real-time.
-- **Dynamic Context Selection**: Flexibly select single, range, or line-based terminal blocks to feed the Copilot, filtering out interactive scrolling garbage automatically (e.g., Cisco IOS/XR scrolling, paginators).
-- **Hybrid Multi-Agent System**: Automatically escalates complex tasks between the **Network Engineer** (execution) and the **Network Architect** (strategy).
-- **MCP Integration**: Dynamically load tools from external providers (6WIND, AWS, etc.) via the Model Context Protocol.
-- **Flexible Auth & Keyless AI**: Support for advanced LiteLLM credentials (`--engineer-auth` / `--architect-auth`) allowing keyless local models (Ollama), cloud engines (Vertex AI), or custom endpoints.
-- **Enhanced Session Management**: Uniquely generated sessions, robust pagination, and interactive styling translating prompt themes directly to terminal escapes.
-- **Semantic Prompt Integration**: Emit standard OSC prompt sequences (`\x1b]133;B`) for real-time remote/web front-end command tracking.
-- **Interactive Chat**: Launch with `conn ai` for a collaborative troubleshooting session.
+---
+
+## 1. 🤖 AI System
+
+### 1a. Terminal Copilot (Ctrl+Space)
+Invoke the context-aware AI Copilot directly inside any active terminal session by pressing **`Ctrl + Space`**. 
+* **Context Modes**: Cycles through `LINES` (sends raw scroll buffer), `SINGLE` (captures exactly one command + output block), and `RANGE` (logical group of recent commands) using **`Ctrl+Up/Down`**.
+* **Slash Commands (`/`)**: Control the AI persona and safety settings:
+  * `/architect` / `/engineer`: Swaps the agent between high-level strategist and technical executor.
+  * `/trust` / `/untrust`: Configures auto-run behavior for suggested non-destructive commands.
+  * `/os [system]`: Manually overrides target OS parsing rules (e.g. `/os cisco_ios`).
+  * `/prompt [regex]`: Overrides command prompt detection bounds.
+  * `/clear`: Clear context history.
+
+### 1b. AI Chat (conn ai)
+Start a standalone persistent session with the AI Copilot. Manage sessions using `--list`, `--resume`, `--session <id>` (to restore a specific history), `--delete <id>`, or send a quick single-shot question directly from the terminal prompt:
+```bash
+conn ai "how do i check bgp summary on cisco?"
+```
+
+### 1c. MCP Integration
+Connect to external data sources and tools dynamically via the Model Context Protocol (MCP). Use the interactive wizard or command actions to configure MCP servers:
+```bash
+conn ai --mcp
+```
 
 
-## Core Features
-- **Multi-Protocol**: Native support for SSH, SFTP, Telnet, kubectl, Docker exec, and AWS SSM.
-- **Context Management**: Set regex-based contexts to manage specific nodes across different environments (work, home, clients).
-- **Advanced Inventory**:
-    - Organize nodes in folders (`@folder`) and subfolders (`@subfolder@folder`).
-    - Use Global Profiles (`@profilename`) to manage shared credentials easily.
-    - Bulk creation, copying, moving, and export/import of nodes.
-- **Modern UI**: High-performance terminal experience with `prompt-toolkit`, including:
-    - Fuzzy search integration with `fzf`.
-    - Advanced tab completion.
-    - Syntax highlighting and customizable themes.
-- **Automation Engine**: Run parallel tasks and playbooks on multiple devices with variable support.
-- **Plugin System**: Build and execute custom Python scripts locally or on a remote gRPC server.
-- **gRPC Architecture**: Fully decoupled Client/Server model for distributed management.
-- **Privacy & Sync**: Local-first encrypted storage (RSA/OAEP) with optional Google Drive backup.
+---
+
+## 2. ⚙️ Automation & Playbooks
+
+### 2a. Quick Run (conn run)
+Run commands in parallel directly on target nodes or folder structures:
+```bash
+conn run router1 "show interface"
+```
+
+### 2b. YAML Playbook Engine
+Execute complex structured automation playbooks defined in YAML configuration files. Supports multi-task execution, variables (using global, per-node, or regex matching definitions), timeouts, and variable parallel execution bounds.
+
+```yaml
+# example_playbook.yaml
+- name: Verify Network Operations
+  hosts: "@office"
+  parallel: true
+  tasks:
+    - name: Get interface brief
+      run: "show ip interface brief"
+    - name: Check OSPF state
+      run: "show ip ospf neighbor"
+      test: "FULL"
+```
+Execute using the playbooks runner:
+```bash
+conn run example_playbook.yaml
+```
+
+### 2c. AI-Assisted Automation
+Leverage AI to generate playbook templates (`--generate-ai`), simulate command changes before execution (`--preflight-ai`), or analyze consolidated execution logs post-run (`--analyze`). Use `--test "expected text1" "expected text2"` to specify assert-style output validations.
+* *To generate an empty template:* `conn run --generate`
 
 
-## Installation
+---
 
+## 3. 📂 Inventory Management
+
+### 3a. Nodes
+Manage connections using standard commands: add (`conn --add node1`), edit (`conn --mod node1`), delete (`conn --del node1`), show configuration (`conn --show node1`), or connect (`conn node1`).
+
+### 3b. Profiles
+Define credentials and templates globally and reference them inside node fields using the `@profile_name` placeholder. Manage profiles interactively or via commands:
+```bash
+conn profile -a profile_name
+# Or equivalently:
+conn -a profile profile_name
+```
+During the interactive `conn --add` prompt, you can input `@profile_name` in the **username** or **password** fields to reference it.
+
+### 3c. Folders, Move, Copy, List
+Organize nodes into logical folder hierarchies (`@office`, `@datacenter@office`). Move items (`conn move [src] [dst]`), copy (`conn copy [src] [dst]`), or list items with custom filters and formatting:
+```bash
+conn list nodes --filter ".*-prod" --format "{name} ({host}) runs {protocol}"
+```
+
+### 3d. Bulk, Export, Import
+Bulk import connections from formatted text files (`conn bulk -f nodes.txt`), or export/import connection folders using YAML configurations (`conn export @folder > backup.yaml` / `conn import backup.yaml`).
+
+### 3e. Tags System
+Customize connection settings dynamically using tags. Configure per-node settings like custom OS types (`os`), prompt regex rules (`prompt`), and page length triggers (`screen_length_command`).
+```yaml
+# Custom tags dictionary (YANG / VSR context)
+tags: { "os": "cisco_ios", "prompt": ".*#", "screen_length_command": "terminal length 0" }
+```
+
+
+---
+
+## 4. 🔌 Protocols & Connection Features
+
+### 4a. SSH / SFTP / Telnet / kubectl / Docker / AWS SSM
+Connect to various architectures using native protocols:
+* **SSH / Telnet**: Standard CLI protocols.
+* **SFTP**: Transfer files securely (`conn --sftp node`).
+* **Docker**: Connect directly to local container names (host set to container name/ID).
+* **Kubernetes (kubectl)**: Connect to pods (namespace customizable via options).
+* **AWS SSM**: Connect to EC2 instances using Instance IDs as hosts.
+
+### 4b. Jumphosts
+Support for single or chained intermediate gateway nodes (SSH, SSM, kubectl, or docker jumphosts) to tunnel traffic safely into target environments.
+
+### 4c. Debug Mode, Keepalive, Logging
+Track connection steps (`conn --debug node`), set idle keepalive intervals (`conn config --keepalive <seconds>`), or define dynamic output log files using variables like `${unique}`, `${host}`, `${port}`, `${user}`, `${protocol}`, or `${date 'format'}`.
+
+
+---
+
+## 5. 🖥️ Remote Capture (conn capture - Core Plugin)
+Perform remote packet capture (`tcpdump`) on hosts over secure SSH reverse tunnels and stream packets live into your local Wireshark GUI:
+```bash
+conn capture router1 eth0 -w -f "port 80"
+```
+* **Requirements**: Local installation of Wireshark or `tshark` is required for live piping (`-w`).
+* **Advanced flags**: Specify network namespaces (`--ns <name>`), custom filters (`-f <filter>`), or configure the Wireshark local path (`--set-wireshark-path`).
+
+
+---
+
+## 6. 🛡️ Context Filtering
+Prevent accidental command execution in production by setting active regex contexts. This hides non-matching inventory items and restricts execution scope:
+```bash
+conn context production -a --regex ".*-prod"
+conn context production --set
+```
+* **Manage Contexts**: List defined filters (`conn context --ls`), show context details (`conn context production -s`), or delete contexts (`conn context production -r`).
+
+
+---
+
+## 7. 🔌 Plugin System
+Extend `connpy` features and hook into core execution events (pre/post hooks) by writing Python scripts. Add, update, delete, or list plugins locally, or execute them on remote instances:
+```bash
+conn plugin --add my_plugin script.py
+conn plugin --update my_plugin script.py
+conn plugin --remote --sync
+```
+
+
+---
+
+## 8. ⚙️ gRPC Client-Server Architecture
+
+### 8a. Server (start/stop/restart/debug)
+Execute tasks on a centralized remote host. Start gRPC server (`conn api -s 50051`), stop (`conn api -x`), restart (`conn api -r`), or debug in the foreground (`conn api -d`).
+
+### 8b. Client Config
+Shift the local CLI to communicate with a remote server instance:
+```bash
+conn config --service-mode remote
+conn config --remote localhost:50051
+```
+
+### 8c. User Management
+Manage server-side user credentials for distributed setups:
+```bash
+conn user --add username
+conn user --list
+conn user --regen-password username
+```
+Use `--path` to specify custom configuration folders in server Mode B.
+
+### 8d. SSO / OIDC
+Configure identity providers (e.g. Authelia, Keycloak) for SSO gRPC authentication using the interactive wizard:
+```bash
+conn sso --add provider_name
+```
+
+### 8e. Login / Logout
+Authenticate client sessions (`conn login [username]`), check connection status (`conn login --status`), or close sessions (`conn logout`).
+
+
+---
+
+## 9. ⚡ Installation & Configuration
+
+### 9a. pip install
 ```bash
 pip install connpy
 ```
 
-### Run it in Windows/Linux using Docker
+### 9b. Shell Completion + FZF
+Install autocompletions and fuzzy-search wrappers into your shell profile:
 ```bash
-git clone https://github.com/fluzzi/connpy
-cd connpy
-docker compose build
-
-# Run it like a native app (completely silent)
-docker compose run --rm --remove-orphans connpy-app [command]
-
-# Pro Tip: Add this alias for a 100% native experience from any folder
-alias conn='docker compose -f /path/to/connpy/docker-compose.yml run --rm --remove-orphans connpy-app'
+eval "$(conn config --completion bash)"
+eval "$(conn config --fzf-wrapper bash)"
 ```
 
----
+### 9c. conn config options
+View configuration details (`conn config`) or customize variables like case sensitivity (`--allow-uppercase`), FZF list picker (`--fzf true`), configurations directory (`--configfolder`), or persistent AI API keys and models (`--engineer-model`).
 
-## 🔒 Privacy & Integration
-
-### Privacy Policy
-Connpy is committed to protecting your privacy:
-- **Local Storage**: All server addresses, usernames, and passwords are encrypted and stored **only** on your machine. No data is transmitted to our servers.
-- **Data Access**: Data is used solely for managing and automating your connections.
-
-### Google Integration
-Used strictly for backup:
-- **Backup**: Sync your encrypted configuration with your Google Drive account.
-- **Scoped Access**: Connpy only accesses its own backup files.
-
----
-
-## Usage
-
+### 9d. Theming
+Customize CLI panel styles and colors by pointing to built-in presets or external YAML styles:
 ```bash
-usage: conn [-h] [--add | --del | --mod | --show | --debug] [node|folder] [--sftp]
-       conn {profile,move,copy,list,bulk,export,import,ai,run,api,plugin,config,sync,context} ...
+conn config --theme /path/to/theme.yaml
 ```
 
-### Basic Examples:
-```bash
-# Add a folder and subfolder
-conn --add @office
-conn --add @datacenter@office
-
-# Add a node with a profile
-conn --add server1@datacenter@office --profile @myuser
-
-# Connect to a node (fuzzy match)
-conn server1
-
-# Start the AI Copilot
-conn ai
-
-# Run a command on all nodes in a folder
-conn run @office "uptime"
-```
-
-### 🔑 SSO / OIDC Provider Management
-In remote mode, `connpy` supports Single Sign-On (SSO) login. You can manage the configured identity providers (IdPs) directly from the local CLI using the `conn sso` command suite:
-
-- **List configured providers**:
-  ```bash
-  conn sso --list
-  ```
-- **Show provider details** (sensitive credentials like secrets are masked):
-  ```bash
-  conn sso --show <provider_name>
-  ```
-- **Add or update a provider** (opens an interactive configuration wizard):
-  ```bash
-  conn sso --add <provider_name>
-  ```
-- **Delete a provider**:
-  ```bash
-  conn sso --del <provider_name>
-  ```
-
-#### Security Recommendation (Secret Reference Env Vars)
-To keep sensitive client secrets or shared secrets out of git-tracked configuration files, you can input a variable name prefixed with a `$` instead of the literal secret during the `conn sso --add` prompts (e.g., `$CONN_SSO_MYPROVIDER_SECRET`). The backend gRPC server will dynamically resolve the value from its environment variables at runtime.
 
 ---
 
-## 🔌 Plugin System
-Connpy supports a robust plugin architecture where scripts can run transparently on a remote gRPC server.
+## 10. 🔒 Privacy, Security & Synchronization (conn sync)
+Encrypts inventory and profiles locally via RSA/OAEP. Backup and sync configurations to Google Drive manually (`conn sync --once`, `--list`, `--restore`) or schedule auto-sync. Segregate restores (`--nodes` / `--config`) or sync remote nodes with `--sync-remote`.
 
-### Structure
-Plugins must be Python files containing:
-- **Class `Parser`**: Defines `argparse` arguments.
-- **Class `Entrypoint`**: Execution logic.
-- **Class `Preload`**: (Optional) Hooks and modifications to the core app.
-
-See the [Plugin Requirements section](#plugin-requirements-for-connpy) for full technical details.
 
 ---
 
-## Plugin Requirements for Connpy
+## 11. 🐍 Python API
+Embed connection and automation routines programmatically in Python:
 
-### Remote Plugin Execution
-When Connpy operates in remote mode, plugins are executed **transparently on the server**:
-- The client automatically downloads the plugin source code (`Parser` class context) to generate the local `argparse` structure and provide autocompletion.
-- The execution phase (`Entrypoint` class) is redirected via gRPC streams to execute in the server's memory.
-- You can manage remote plugins using the `--remote` flag.
-
-### General Structure
-- The plugin script must define specific classes:
-  1. **Class `Parser`**: Handles `argparse.ArgumentParser` initialization.
-  2. **Class `Entrypoint`**: Main execution logic (receives `args`, `parser`, and `connapp`).
-  3. **Class `Preload`**: (Optional) For modifying core app behavior or registering hooks.
-
-### Preload Modifications and Hooks
-You can customize the behavior of core classes using hooks:
-- **`modify(method)`**: Alter class instances (e.g., `connapp.config`, `connapp.ai`).
-- **`register_pre_hook(method)`**: Logic to run before a method execution.
-- **`register_post_hook(method)`**: Logic to run after a method execution.
-
-### Command Completion Support
-Plugins can provide intelligent tab completion:
-1. **Tree-based Completion (Recommended)**: Define `_connpy_tree(info)` returning a navigation dictionary.
-2. **Legacy Completion**: Define `_connpy_completion(wordsnumber, words, info)`.
-
----
-
-## ⚙️ gRPC Service Architecture
-Connpy can operate in a decoupled mode:
-1. **Start the API (Server)**: `conn api -s 50051`
-2. **Configure the Client**:
-   ```bash
-   conn config --service-mode remote
-   conn config --remote-host localhost:50051
-   ```
-All inventory management and execution will now happen on the server.
-
----
-
-## 🐍 Automation Module (API)
-You can use `connpy` as a Python library for your own scripts.
-
-### Basic Execution
 ```python
 import connpy
-router = connpy.node("uniqueName", "1.1.1.1", user="admin")
+
+# 1. Direct single node interaction
+router = connpy.node("router1", "1.1.1.1", user="admin")
 router.run(["show ip int brief"])
 print(router.output)
-```
 
-### Parallel Tasks with Variables
-```python
-import connpy
+# 2. Parallel nodes execution with variables
 config = connpy.configfile()
-nodes = config.getitem("@office", ["router1", "router2"])
-routers = connpy.nodes(nodes, config=config)
-
+nodes_info = config.getitem("@office", ["router1", "router2"])
+routers = connpy.nodes(nodes_info, config=config)
 variables = {
     "router1@office": {"id": "1"},
     "__global__": {"mask": "255.255.255.0"}
 }
 routers.run(["interface lo{id}", "ip address 10.0.0.{id} {mask}"], variables)
-```
 
-### AI Programmatic Use
-```python
-import connpy
+# 3. AI Copilot prompts
 myai = connpy.ai(connpy.configfile())
-response = myai.ask("What is the status of the BGP neighbors in the office?")
+response = myai.ask("Show BGP status.")
+print(response)
 ```
+*Supports additional programmatic features like `node.test()`, `node.interact()`, `configfile.encrypt()`, `connapp` embeds, and `ClassHook` / `MethodHook` plugin hooks.*
+
 
 ---
-*For detailed developer notes and plugin hooks documentation, see the [Documentation](https://fluzzi.github.io/connpy/).*
 
-## 📜 License
+## 12. 🐳 Docker Deployment
+Run `connpy` containerized and silent:
+```bash
+docker compose run --rm connpy-app [command]
+```
+Add `alias conn='docker compose run --rm connpy-app'` to your shell for a transparent container experience.
+
+
+---
+
+## 13. 📜 License
 [PolyForm Noncommercial 1.0.0](LICENSE)
