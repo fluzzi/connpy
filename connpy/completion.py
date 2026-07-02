@@ -89,9 +89,9 @@ def _get_plugins(which, defaultdir):
         if name not in final_all_plugins or preferences.get(name) == "remote":
             final_all_plugins[name] = path
 
-    # Combine enabled/disabled for the helper commands
-    enabled_files = list(set(user_enabled + core_enabled + [k for k,v in remote_all_plugins.items() if preferences.get(k) == "remote"]))
-    disabled_files = list(set(user_disabled + core_disabled))
+    # Combine enabled/disabled for the helper commands (excluding core plugins from management autocomplete)
+    enabled_files = list(set(user_enabled + [k for k,v in remote_all_plugins.items() if preferences.get(k) == "remote"]))
+    disabled_files = list(set(user_disabled))
 
     # Return based on the command
     if which == "--disable":
@@ -356,7 +356,10 @@ def _build_tree(nodes, folders, profiles, plugins, configdir):
         },
         "plugin": {
             "--add": {"*": lambda w: get_cwd(w, "--add")}, 
-            "--update": {"*": lambda w: get_cwd(w, "--update")},
+            "--update": {
+                "__extra__": lambda w: _get_plugins("--update", configdir),
+                "*": lambda w: get_cwd(w, "--update")
+            },
             "--del":     lambda w: _get_plugins("--del", configdir),
             "--enable":  lambda w: _get_plugins("--enable", configdir),
             "--disable": lambda w: _get_plugins("--disable", configdir),

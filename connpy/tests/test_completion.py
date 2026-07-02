@@ -241,5 +241,28 @@ class TestSsoCompletions:
             assert "authelia" in completions
 
 
+class TestPluginUpdateCompletion:
+    def test_plugin_update_first_arg_suggests_plugins(self, tmp_path):
+        from connpy.completion import _build_tree, resolve_completion
+        
+        # Create a mock user plugin
+        plugins_dir = tmp_path / "plugins"
+        plugins_dir.mkdir(parents=True, exist_ok=True)
+        (plugins_dir / "my_custom_plugin.py").touch()
+        
+        # Build tree with plugin mock dict
+        plugins = {"my_custom_plugin": str(plugins_dir / "my_custom_plugin.py")}
+        tree = _build_tree([], [], [], plugins, str(tmp_path))
+        
+        # First argument of --update should suggest my_custom_plugin
+        completions = resolve_completion(["plugin", "--update", ""], tree)
+        assert "my_custom_plugin" in completions
+        
+        # Second argument should suggest file paths (calling get_cwd)
+        # Type "plugin --update my_custom_plugin "
+        file_completions = resolve_completion(["plugin", "--update", "my_custom_plugin", ""], tree)
+        assert isinstance(file_completions, list)
+
+
 
 

@@ -64,7 +64,7 @@ class PluginService(BaseService):
                 if f.endswith(".py"):
                     name = f[:-3]
                     path = os.path.join(core_dir, f)
-                    all_plugin_info[name] = {"enabled": True, "hash": get_hash(path)}
+                    all_plugin_info[name] = {"enabled": True, "hash": get_hash(path), "origin": "core"}
 
         # 2. Scan shared plugins (medium priority)
         if hasattr(self.config, "_shared_config") and self.config._shared_config:
@@ -74,10 +74,10 @@ class PluginService(BaseService):
                     if f.endswith(".py"):
                         name = f[:-3]
                         path = os.path.join(shared_dir, f)
-                        all_plugin_info[name] = {"enabled": True, "hash": get_hash(path)}
+                        all_plugin_info[name] = {"enabled": True, "hash": get_hash(path), "origin": "shared"}
                     elif f.endswith(".py.bkp"):
                         name = f[:-7]
-                        all_plugin_info[name] = {"enabled": False}
+                        all_plugin_info[name] = {"enabled": False, "origin": "shared"}
 
         # 3. Scan user plugins (highest priority)
         user_dir = os.path.join(self.config.defaultdir, "plugins")
@@ -86,10 +86,10 @@ class PluginService(BaseService):
                 if f.endswith(".py"):
                     name = f[:-3]
                     path = os.path.join(user_dir, f)
-                    all_plugin_info[name] = {"enabled": True, "hash": get_hash(path)}
+                    all_plugin_info[name] = {"enabled": True, "hash": get_hash(path), "origin": "user"}
                 elif f.endswith(".py.bkp"):
                     name = f[:-7]
-                    all_plugin_info[name] = {"enabled": False}
+                    all_plugin_info[name] = {"enabled": False, "origin": "user"}
 
         return all_plugin_info
 

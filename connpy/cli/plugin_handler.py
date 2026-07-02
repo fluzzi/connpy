@@ -115,6 +115,8 @@ class PluginHandler:
 
                 # Populate local plugins
                 for name, details in local_plugins.items():
+                    if details.get("origin") == "core":
+                        continue
                     state = "Disabled" if not details.get("enabled", True) else "Active"
                     color = "red" if state == "Disabled" else "green"
                     
@@ -123,11 +125,14 @@ class PluginHandler:
                             state = "Shadowed (Override by Remote)"
                             color = "yellow"
                     
-                    table.add_row(name, f"[{color}]{state}[/{color}]", "Local")
+                    origin = details.get("origin", "Local").capitalize()
+                    table.add_row(name, f"[{color}]{state}[/{color}]", origin)
 
                 # Populate remote plugins
                 if self.app.services.mode == "remote":
                     for name, details in remote_plugins.items():
+                        if details.get("origin") == "core":
+                            continue
                         state = "Disabled" if not details.get("enabled", True) else "Active"
                         color = "red" if state == "Disabled" else "green"
                         
@@ -138,7 +143,8 @@ class PluginHandler:
                                 state = "Shadowed (Override by Local)"
                                 color = "yellow"
                                 
-                        table.add_row(name, f"[{color}]{state}[/{color}]", "Remote")
+                        origin = details.get("origin", "Remote").capitalize()
+                        table.add_row(name, f"[{color}]{state}[/{color}]", origin)
 
                 if not local_plugins and not remote_plugins:
                     printer.console.print("  No plugins found.")
