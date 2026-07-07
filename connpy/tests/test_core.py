@@ -487,3 +487,264 @@ class TestNodes:
 
         mynodes.run(["show version"], on_complete=on_done)
         assert "r1" in completed
+
+
+# =========================================================================
+# Jumphost chain tests
+# =========================================================================
+
+class TestJumphostChain:
+    """Tests for chained jumphost (multi-hop ProxyCommand) support."""
+
+    def _make_config_with_nodes(self, tmp_config_dir, nodes, profiles=None):
+        """Helper to create a config with custom nodes."""
+        import yaml
+        from connpy.configfile import configfile
+        if profiles is None:
+            profiles = {
+                "default": {
+                    "host": "", "protocol": "ssh", "port": "", "user": "",
+                    "password": "", "options": "", "logs": "", "tags": "", "jumphost": ""
+                }
+            }
+        data = {
+            "config": {"case": False, "idletime": 30, "fzf": False},
+            "connections": nodes,
+            "profiles": profiles
+        }
+        config_file = tmp_config_dir / "config.yaml"
+        config_file.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False))
+        import os
+        os.chmod(str(config_file), 0o600)
+        return configfile(conf=str(config_file), key=str(tmp_config_dir / ".osk"))
+
+    def test_single_jumphost(self, tmp_config_dir):
+        """Regression: single jumphost produces correct ProxyCommand."""
+        from connpy.core import node
+        nodes = {
+            "bastion": {
+                "host": "10.0.0.1", "protocol": "ssh", "port": "2222",
+                "user": "admin", "password": "", "options": "",
+                "logs": "", "tags": "", "jumphost": "", "type": "connection"
+            },
+            "dest": {
+                "host": "10.0.1.1", "protocol": "ssh", "port": "",
+                "user": "root", "password": "", "options": "",
+                "logs": "", "tags": "", "jumphost": "bastion", "type": "connection"
+            }
+        }
+        config = self._make_config_with_nodes(tmp_config_dir, nodes)
+        n = node("dest", "10.0.1.1", user="root", jumphost="bastion", config=config)
+        assert 'ProxyCommand=' in n.jumphost
+        assert '-W %h:%p' in n.jumphost
+        assert '-p 2222' in n.jumphost
+        assert 'admin@10.0.0.1' in n.jumphost
+
+    def test_two_hop_chain(self, tmp_config_dir):
+        """Two-hop SSH chain: dest -> bastionA -> bastionB."""
+        from connpy.core import node
+        nodes = {
+            "bastionB": {
+                "host": "10.0.0.1", "protocol": "ssh", "port": "",
+                "user": "userB", "password": "", "options": "",
+                "logs": "", "tags": "", "jumphost": "", "type": "connection"
+            },
+            "bastionA": {
+                "host": "10.0.0.2", "protocol": "ssh", "port": "",
+                "user": "userA", "password": "", "options": "",
+                "logs": "", "tags": "", "jumphost": "bastionB", "type": "connection"
+            },
+            "dest": {
+                "host": "10.0.1.1", "protocol": "ssh", "port": "",
+                "user": "root", "password": "", "options": "",
+                "logs": "", "tags": "", "jumphost": "bastionA", "type": "connection"
+            }
+        }
+        config = self._make_config_with_nodes(tmp_config_dir, nodes)
+        n = node("dest", "10.0.1.1", user="root", jumphost="bastionA", config=config)
+        # Should contain nested ProxyCommand
+        assert 'ProxyCommand=' in n.jumphost
+        assert 'userA@10.0.0.2' in n.jumphost
+        assert 'userB@10.0.0.1' in n.jumphost
+        # Inner proxy should be escaped
+        assert 'ProxyCommand=\\"' in n.jumphost or 'ProxyCommand=\\\\' in n.jumphost
+
+    def test_three_hop_chain(self, tmp_config_dir):
+        """Three-hop SSH chain: dest -> A -> B -> C."""
+        from connpy.core import node
+        nodes = {
+            "hopC": {
+                "host": "10.0.0.3", "protocol": "ssh", "port": "",
+                "user": "uc", "password": "", "options": "",
+                "logs": "", "tags": "", "jumphost": "", "type": "connection"
+            },
+            "hopB": {
+                "host": "10.0.0.2", "protocol": "ssh", "port": "",
+                "user": "ub", "password": "", "options": "",
+                "logs": "", "tags": "", "jumphost": "hopC", "type": "connection"
+            },
+            "hopA": {
+                "host": "10.0.0.1", "protocol": "ssh", "port": "",
+                "user": "ua", "password": "", "options": "",
+                "logs": "", "tags": "", "jumphost": "hopB", "type": "connection"
+            },
+            "dest": {
+                "host": "10.0.1.1", "protocol": "ssh", "port": "",
+                "user": "root", "password": "", "options": "",
+                "logs": "", "tags": "", "jumphost": "hopA", "type": "connection"
+            }
+        }
+        config = self._make_config_with_nodes(tmp_config_dir, nodes)
+        n = node("dest", "10.0.1.1", user="root", jumphost="hopA", config=config)
+        # All three hosts should appear in the command
+        assert 'uc@10.0.0.3' in n.jumphost
+        assert 'ub@10.0.0.2' in n.jumphost
+        assert 'ua@10.0.0.1' in n.jumphost
+
+    def test_circular_detection(self, tmp_config_dir):
+        """Circular jumphost reference raises ValueError."""
+        from connpy.core import node
+        nodes = {
+            "hopA": {
+                "host": "10.0.0.1", "protocol": "ssh", "port": "",
+                "user": "", "password": "", "options": "",
+                "logs": "", "tags": "", "jumphost": "hopB", "type": "connection"
+            },
+            "hopB": {
+                "host": "10.0.0.2", "protocol": "ssh", "port": "",
+                "user": "", "password": "", "options": "",
+                "logs": "", "tags": "", "jumphost": "hopA", "type": "connection"
+            },
+            "dest": {
+                "host": "10.0.1.1", "protocol": "ssh", "port": "",
+                "user": "", "password": "", "options": "",
+                "logs": "", "tags": "", "jumphost": "hopA", "type": "connection"
+            }
+        }
+        config = self._make_config_with_nodes(tmp_config_dir, nodes)
+        with pytest.raises(ValueError, match="Circular jumphost reference"):
+            node("dest", "10.0.1.1", jumphost="hopA", config=config)
+
+    def test_max_depth(self, tmp_config_dir):
+        """Chain exceeding 5 hops raises ValueError."""
+        from connpy.core import node
+        nodes = {}
+        # Build chain of 6 hops: hop0 -> hop1 -> ... -> hop5
+        for i in range(6):
+            jh = f"hop{i+1}" if i < 5 else ""
+            nodes[f"hop{i}"] = {
+                "host": f"10.0.0.{i}", "protocol": "ssh", "port": "",
+                "user": "", "password": "", "options": "",
+                "logs": "", "tags": "", "jumphost": jh, "type": "connection"
+            }
+        nodes["dest"] = {
+            "host": "10.0.1.1", "protocol": "ssh", "port": "",
+            "user": "", "password": "", "options": "",
+            "logs": "", "tags": "", "jumphost": "hop0", "type": "connection"
+        }
+        config = self._make_config_with_nodes(tmp_config_dir, nodes)
+        with pytest.raises(ValueError, match="maximum depth of 5"):
+            node("dest", "10.0.1.1", jumphost="hop0", config=config)
+
+    def test_kubectl_with_jumphost_error(self, tmp_config_dir):
+        """kubectl jumphost with its own jumphost raises ValueError."""
+        from connpy.core import node
+        nodes = {
+            "sshhost": {
+                "host": "10.0.0.1", "protocol": "ssh", "port": "",
+                "user": "", "password": "", "options": "",
+                "logs": "", "tags": "", "jumphost": "", "type": "connection"
+            },
+            "kubejump": {
+                "host": "my-pod", "protocol": "kubectl", "port": "",
+                "user": "", "password": "", "options": "",
+                "logs": "", "tags": "", "jumphost": "sshhost", "type": "connection"
+            },
+            "dest": {
+                "host": "10.0.1.1", "protocol": "ssh", "port": "",
+                "user": "", "password": "", "options": "",
+                "logs": "", "tags": "", "jumphost": "kubejump", "type": "connection"
+            }
+        }
+        config = self._make_config_with_nodes(tmp_config_dir, nodes)
+        with pytest.raises(ValueError, match="does not support chained jumphosts"):
+            node("dest", "10.0.1.1", jumphost="kubejump", config=config)
+
+    def test_password_chain_order(self, tmp_config_dir):
+        """Passwords are collected innermost-first: B, A, dest."""
+        from connpy.core import node
+        nodes = {
+            "bastionB": {
+                "host": "10.0.0.1", "protocol": "ssh", "port": "",
+                "user": "ub", "password": "passB", "options": "",
+                "logs": "", "tags": "", "jumphost": "", "type": "connection"
+            },
+            "bastionA": {
+                "host": "10.0.0.2", "protocol": "ssh", "port": "",
+                "user": "ua", "password": "passA", "options": "",
+                "logs": "", "tags": "", "jumphost": "bastionB", "type": "connection"
+            },
+            "dest": {
+                "host": "10.0.1.1", "protocol": "ssh", "port": "",
+                "user": "root", "password": "passDest", "options": "",
+                "logs": "", "tags": "", "jumphost": "bastionA", "type": "connection"
+            }
+        }
+        config = self._make_config_with_nodes(tmp_config_dir, nodes)
+        n = node("dest", "10.0.1.1", user="root", password="passDest",
+                 jumphost="bastionA", config=config)
+        # Order: innermost (B) -> outer (A) -> destination
+        assert n.password == ["passB", "passA", "passDest"]
+
+    def test_chain_with_options_and_port(self, tmp_config_dir):
+        """Options and ports are preserved for each hop in the chain."""
+        from connpy.core import node
+        nodes = {
+            "bastionB": {
+                "host": "10.0.0.1", "protocol": "ssh", "port": "2222",
+                "user": "ub", "password": "", "options": "-o StrictHostKeyChecking=no",
+                "logs": "", "tags": "", "jumphost": "", "type": "connection"
+            },
+            "bastionA": {
+                "host": "10.0.0.2", "protocol": "ssh", "port": "3333",
+                "user": "ua", "password": "", "options": "-i /tmp/key.pem",
+                "logs": "", "tags": "", "jumphost": "bastionB", "type": "connection"
+            },
+            "dest": {
+                "host": "10.0.1.1", "protocol": "ssh", "port": "",
+                "user": "root", "password": "", "options": "",
+                "logs": "", "tags": "", "jumphost": "bastionA", "type": "connection"
+            }
+        }
+        config = self._make_config_with_nodes(tmp_config_dir, nodes)
+        n = node("dest", "10.0.1.1", user="root", jumphost="bastionA", config=config)
+        assert '-p 2222' in n.jumphost
+        assert '-p 3333' in n.jumphost
+        assert 'StrictHostKeyChecking=no' in n.jumphost
+        assert '/tmp/key.pem' in n.jumphost
+
+    def test_chain_with_ssm_inner(self, tmp_config_dir):
+        """SSH outer jumphost with SSM inner jumphost works."""
+        from connpy.core import node
+        nodes = {
+            "ssm_bastion": {
+                "host": "i-12345", "protocol": "ssm", "port": "",
+                "user": "ec2-user", "password": "", "options": "",
+                "logs": "", "tags": {"region": "us-east-1"}, "jumphost": "", "type": "connection"
+            },
+            "ssh_jump": {
+                "host": "10.0.0.2", "protocol": "ssh", "port": "",
+                "user": "admin", "password": "", "options": "",
+                "logs": "", "tags": "", "jumphost": "ssm_bastion", "type": "connection"
+            },
+            "dest": {
+                "host": "10.0.1.1", "protocol": "ssh", "port": "",
+                "user": "root", "password": "", "options": "",
+                "logs": "", "tags": "", "jumphost": "ssh_jump", "type": "connection"
+            }
+        }
+        config = self._make_config_with_nodes(tmp_config_dir, nodes)
+        n = node("dest", "10.0.1.1", user="root", jumphost="ssh_jump", config=config)
+        assert 'aws ssm start-session' in n.jumphost
+        assert 'admin@10.0.0.2' in n.jumphost
+        assert '--region us-east-1' in n.jumphost

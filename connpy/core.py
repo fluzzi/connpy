@@ -3,6 +3,7 @@
 import os
 import re
 import pexpect
+import shlex
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 import ast
@@ -131,80 +132,12 @@ class node:
         else:
             self.password = [password]
         if self.jumphost != "" and config != '':
-            self.jumphost = config.getitem(self.jumphost)
-            for key in self.jumphost:
-                profile = re.search("^@(.*)", str(self.jumphost[key]))
-                if profile:
-                    try:
-                        self.jumphost[key] = config.profiles[profile.group(1)][key]
-                    except KeyError:
-                        self.jumphost[key] = ""
-                elif self.jumphost[key] == '' and key == "protocol":
-                    try:
-                        self.jumphost[key] = config.profiles["default"][key]
-                    except KeyError:
-                        self.jumphost[key] = "ssh"
-            if isinstance(self.jumphost["password"],list):
-                jumphost_password = []
-                for i, s in enumerate(self.jumphost["password"]):
-                    profile = re.search("^@(.*)", self.jumphost["password"][i])
-                    if profile:
-                        jumphost_password.append(config.profiles[profile.group(1)]["password"])
-                    else:
-                        jumphost_password.append(self.jumphost["password"][i])
-                self.jumphost["password"] = jumphost_password
-            else:
-                self.jumphost["password"] = [self.jumphost["password"]]
-            if self.jumphost["password"] != [""]:
-                self.password = self.jumphost["password"] + self.password
-
-            if self.jumphost["protocol"] == "ssh":
-                jumphost_cmd = self.jumphost["protocol"] + " -W %h:%p"
-                if self.jumphost["port"] != '':
-                    jumphost_cmd = jumphost_cmd + " -p " + self.jumphost["port"]
-                if self.jumphost["options"] != '':
-                    jumphost_cmd = jumphost_cmd + " " + self.jumphost["options"]
-                if self.jumphost["user"] == '':
-                    jumphost_cmd = jumphost_cmd + " {}".format(self.jumphost["host"])
-                else:
-                    jumphost_cmd = jumphost_cmd + " {}".format("@".join([self.jumphost["user"],self.jumphost["host"]]))
-                self.jumphost = f"-o ProxyCommand=\"{jumphost_cmd}\""
-            elif self.jumphost["protocol"] == "ssm":
-                ssm_target = self.jumphost["host"]
-                ssm_cmd = f"aws ssm start-session --target {ssm_target} --document-name AWS-StartSSHSession --parameters 'portNumber=22'"
-                if isinstance(self.jumphost.get("tags"), dict):
-                    if "profile" in self.jumphost["tags"]:
-                        ssm_cmd += f" --profile {self.jumphost['tags']['profile']}"
-                    if "region" in self.jumphost["tags"]:
-                        ssm_cmd += f" --region {self.jumphost['tags']['region']}"
-                if self.jumphost["options"] != '':
-                    ssm_cmd += f" {self.jumphost['options']}"
-                
-                bastion_user_part = f"{self.jumphost['user']}@{ssm_target}" if self.jumphost['user'] else ssm_target
-                
-                ssh_opts = ""
-                if isinstance(self.jumphost.get("tags"), dict) and "ssh_options" in self.jumphost["tags"]:
-                    ssh_opts = f" {self.jumphost['tags']['ssh_options']}"
-                
-                inner_ssh = f"ssh{ssh_opts} -o ProxyCommand='{ssm_cmd}' -W %h:%p {bastion_user_part}"
-                self.jumphost = f"-o ProxyCommand=\"{inner_ssh}\""
-            elif self.jumphost["protocol"] in ["kubectl", "docker"]:
-                nc_cmd = "nc"
-                if isinstance(self.jumphost.get("tags"), dict) and "nc_command" in self.jumphost["tags"]:
-                    nc_cmd = self.jumphost["tags"]["nc_command"]
-                    
-                if self.jumphost["protocol"] == "kubectl":
-                    proxy_cmd = f"kubectl exec "
-                    if self.jumphost["options"] != '':
-                        proxy_cmd += f"{self.jumphost['options']} "
-                    proxy_cmd += f"{self.jumphost['host']} -i -- {nc_cmd} %h %p"
-                else:
-                    proxy_cmd = f"docker "
-                    if self.jumphost["options"] != '':
-                        proxy_cmd += f"{self.jumphost['options']} "
-                    proxy_cmd += f"exec -i {self.jumphost['host']} {nc_cmd} %h %p"
-                    
-                self.jumphost = f"-o ProxyCommand=\"{proxy_cmd}\""
+            raw_cmd, jh_passwords = self._build_jumphost_chain(self.jumphost, config)
+            if jh_passwords:
+                self.password = jh_passwords + self.password
+            if raw_cmd:
+                escaped = raw_cmd.replace('\\', '\\\\').replace('"', '\\"')
+                self.jumphost = f'-o ProxyCommand="{escaped}"'
             else:
                 self.jumphost = ""
         
@@ -212,6 +145,127 @@ class node:
         self.status = 1
         self.result = {}
         self.cmd_byte_positions = [(0, None)]
+
+    @staticmethod
+    def _resolve_jumphost_data(jh_dict, config):
+        '''Resolve @profile references and normalize passwords in a jumphost dict.'''
+        for key in jh_dict:
+            profile = re.search("^@(.*)", str(jh_dict[key]))
+            if profile:
+                try:
+                    jh_dict[key] = config.profiles[profile.group(1)][key]
+                except KeyError:
+                    jh_dict[key] = ""
+            elif jh_dict[key] == '' and key == "protocol":
+                try:
+                    jh_dict[key] = config.profiles["default"][key]
+                except KeyError:
+                    jh_dict[key] = "ssh"
+        if isinstance(jh_dict["password"], list):
+            resolved = []
+            for p in jh_dict["password"]:
+                profile = re.search("^@(.*)", p)
+                if profile:
+                    resolved.append(config.profiles[profile.group(1)]["password"])
+                else:
+                    resolved.append(p)
+            jh_dict["password"] = resolved
+        else:
+            jh_dict["password"] = [jh_dict["password"]]
+        return jh_dict
+
+    def _build_jumphost_chain(self, jumphost_name, config, visited=None, depth=0, target_host="%h", target_port="%p"):
+        '''Recursively build ProxyCommand for chained jumphosts.
+
+        Returns:
+            tuple: (raw_proxy_command, passwords_list)
+                - raw_proxy_command: Command string to embed in ProxyCommand
+                - passwords_list: Ordered passwords (innermost first)
+
+        Raises:
+            ValueError: On circular references or exceeding max depth (5).
+        '''
+        if depth >= 5:
+            raise ValueError("Jumphost chain exceeds maximum depth of 5 hops")
+        if visited is None:
+            visited = []
+        if jumphost_name in visited:
+            cycle = " -> ".join(visited + [jumphost_name])
+            raise ValueError(f"Circular jumphost reference detected: {cycle}")
+        visited = visited + [jumphost_name]
+
+        jh = config.getitem(jumphost_name)
+        jh = self._resolve_jumphost_data(jh, config)
+
+        passwords = []
+        inner_proxy_opt = ""
+
+        # Recursively resolve inner jumphost
+        if jh.get("jumphost", "") != "":
+            if jh["protocol"] not in ["ssh"]:
+                raise ValueError(
+                    f"Jumphost '{jumphost_name}' uses protocol '{jh['protocol']}' "
+                    f"which does not support chained jumphosts. "
+                    f"Only SSH jumphosts can have their own jumphosts."
+                )
+            parent_port = jh["port"] if jh["port"] != "" else "22"
+            inner_raw_cmd, inner_passwords = self._build_jumphost_chain(
+                jh["jumphost"], config, visited, depth + 1, target_host=jh["host"], target_port=parent_port
+            )
+            passwords = inner_passwords
+            escaped = inner_raw_cmd.replace('\\', '\\\\').replace('"', '\\"')
+            inner_proxy_opt = f'-o ProxyCommand="{escaped}"'
+
+        # Collect this hop's passwords
+        if jh["password"] != [""]:
+            passwords = passwords + jh["password"]
+
+        t_port = target_port if target_port != "" else "22"
+
+        # Build raw command based on protocol
+        if jh["protocol"] == "ssh":
+            cmd = f"ssh -W {target_host}:{t_port}"
+            if inner_proxy_opt:
+                cmd += f" {inner_proxy_opt}"
+            if jh["port"] != '':
+                cmd += f" -p {jh['port']}"
+            if jh["options"] != '':
+                cmd += f" {jh['options']}"
+            user_host = f"{jh['user']}@{jh['host']}" if jh['user'] != '' else jh['host']
+            cmd += f" {user_host}"
+        elif jh["protocol"] == "ssm":
+            ssm_target = jh["host"]
+            ssm_cmd = f"aws ssm start-session --target {ssm_target} --document-name AWS-StartSSHSession --parameters 'portNumber=22'"
+            if isinstance(jh.get("tags"), dict):
+                if "profile" in jh["tags"]:
+                    ssm_cmd += f" --profile {jh['tags']['profile']}"
+                if "region" in jh["tags"]:
+                    ssm_cmd += f" --region {jh['tags']['region']}"
+            if jh["options"] != '':
+                ssm_cmd += f" {jh['options']}"
+            bastion_user_part = f"{jh['user']}@{ssm_target}" if jh['user'] else ssm_target
+            ssh_opts = ""
+            if isinstance(jh.get("tags"), dict) and "ssh_options" in jh["tags"]:
+                ssh_opts = f" {jh['tags']['ssh_options']}"
+            cmd = f"ssh{ssh_opts} -o ProxyCommand='{ssm_cmd}' -W {target_host}:{t_port} {bastion_user_part}"
+        elif jh["protocol"] in ["kubectl", "docker"]:
+            nc_cmd = "nc"
+            if isinstance(jh.get("tags"), dict) and "nc_command" in jh["tags"]:
+                nc_cmd = jh["tags"]["nc_command"]
+            if jh["protocol"] == "kubectl":
+                cmd = "kubectl exec "
+                if jh["options"] != '':
+                    cmd += f"{jh['options']} "
+                cmd += f"{jh['host']} -i -- {nc_cmd} {target_host} {t_port}"
+            else:
+                cmd = "docker "
+                if jh["options"] != '':
+                    cmd += f"{jh['options']} "
+                cmd += f"exec -i {jh['host']} {nc_cmd} {target_host} {t_port}"
+        else:
+            return "", passwords
+
+        return cmd, passwords
 
     @MethodHook
     def _passtx(self, passwords, *, keyfile=None):
@@ -1104,7 +1158,8 @@ class node:
 
         attempts = 1
         while attempts <= max_attempts:
-            child = pexpect.spawn(cmd)
+            args = shlex.split(cmd)
+            child = pexpect.spawn(args[0], args[1:])
             if isinstance(self.tags, dict) and self.tags.get("console"):
                 child.sendline()
             if debug:

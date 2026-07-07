@@ -76,7 +76,7 @@ class NodeHandler:
                 debug=args.debug, 
                 logger=self.app._service_logger
             )
-        except ConnpyError as e:
+        except (ConnpyError, ValueError) as e:
             printer.error(str(e))
             sys.exit(1)
 
