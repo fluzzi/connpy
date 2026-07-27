@@ -100,15 +100,16 @@ def test_ai_generate_wizard_save(app, tmp_path):
     })
     app.services.ai.build_playbook_chat = mock_chat
     
-    # Mock rich.prompt.Prompt.ask to simulate User inputting prompt and then 'y' to save
-    with patch("rich.prompt.Prompt.ask", side_effect=["create a basic task", "y"]):
-        app.start(["run", "--generate-ai", str(dest_yaml)])
+    # Mock prompt_toolkit PromptSession.prompt for user input, and Prompt.ask for save confirmation
+    with patch("prompt_toolkit.PromptSession.prompt", return_value="create a basic task"):
+        with patch("rich.prompt.Prompt.ask", return_value="y"):
+            app.start(["run", "--generate-ai", str(dest_yaml)])
         
-        mock_chat.assert_called_once_with("create a basic task", chat_history=[], chunk_callback=ANY)
-        assert os.path.exists(dest_yaml)
-        with open(dest_yaml) as f:
-            content = f.read()
-            assert "tasks:" in content
+            mock_chat.assert_called_once_with("create a basic task", chat_history=[], chunk_callback=ANY)
+            assert os.path.exists(dest_yaml)
+            with open(dest_yaml) as f:
+                content = f.read()
+                assert "tasks:" in content
 
 def test_ai_generate_wizard_run(app, tmp_path):
     """Test that ai_generate wizard runs, saves the playbook and executes it when choosing 'run'."""
@@ -121,16 +122,17 @@ def test_ai_generate_wizard_run(app, tmp_path):
     })
     app.services.ai.build_playbook_chat = mock_chat
     
-    with patch("rich.prompt.Prompt.ask", side_effect=["create task", "run"]):
-        with patch("connpy.cli.run_handler.RunHandler.yaml_run") as mock_yaml_run:
-            app.start(["run", "--generate-ai", str(dest_yaml)])
-            
-            mock_chat.assert_called_once_with("create task", chat_history=[], chunk_callback=ANY)
-            assert os.path.exists(dest_yaml)
-            with open(dest_yaml) as f:
-                content = f.read()
-                assert "tasks:" in content
-            
-            mock_yaml_run.assert_called_once()
-            args = mock_yaml_run.call_args[0][0]
-            assert args.data == [str(dest_yaml)]
+    with patch("prompt_toolkit.PromptSession.prompt", return_value="create task"):
+        with patch("rich.prompt.Prompt.ask", return_value="run"):
+            with patch("connpy.cli.run_handler.RunHandler.yaml_run") as mock_yaml_run:
+                app.start(["run", "--generate-ai", str(dest_yaml)])
+                
+                mock_chat.assert_called_once_with("create task", chat_history=[], chunk_callback=ANY)
+                assert os.path.exists(dest_yaml)
+                with open(dest_yaml) as f:
+                    content = f.read()
+                    assert "tasks:" in content
+                
+                mock_yaml_run.assert_called_once()
+                args = mock_yaml_run.call_args[0][0]
+                assert args.data == [str(dest_yaml)]

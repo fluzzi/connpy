@@ -2629,7 +2629,7 @@ el.replaceWith(d);
                 if f.endswith(&#34;.py&#34;):
                     name = f[:-3]
                     path = os.path.join(core_dir, f)
-                    all_plugin_info[name] = {&#34;enabled&#34;: True, &#34;hash&#34;: get_hash(path)}
+                    all_plugin_info[name] = {&#34;enabled&#34;: True, &#34;hash&#34;: get_hash(path), &#34;origin&#34;: &#34;core&#34;}
 
         # 2. Scan shared plugins (medium priority)
         if hasattr(self.config, &#34;_shared_config&#34;) and self.config._shared_config:
@@ -2639,10 +2639,10 @@ el.replaceWith(d);
                     if f.endswith(&#34;.py&#34;):
                         name = f[:-3]
                         path = os.path.join(shared_dir, f)
-                        all_plugin_info[name] = {&#34;enabled&#34;: True, &#34;hash&#34;: get_hash(path)}
+                        all_plugin_info[name] = {&#34;enabled&#34;: True, &#34;hash&#34;: get_hash(path), &#34;origin&#34;: &#34;shared&#34;}
                     elif f.endswith(&#34;.py.bkp&#34;):
                         name = f[:-7]
-                        all_plugin_info[name] = {&#34;enabled&#34;: False}
+                        all_plugin_info[name] = {&#34;enabled&#34;: False, &#34;origin&#34;: &#34;shared&#34;}
 
         # 3. Scan user plugins (highest priority)
         user_dir = os.path.join(self.config.defaultdir, &#34;plugins&#34;)
@@ -2651,10 +2651,10 @@ el.replaceWith(d);
                 if f.endswith(&#34;.py&#34;):
                     name = f[:-3]
                     path = os.path.join(user_dir, f)
-                    all_plugin_info[name] = {&#34;enabled&#34;: True, &#34;hash&#34;: get_hash(path)}
+                    all_plugin_info[name] = {&#34;enabled&#34;: True, &#34;hash&#34;: get_hash(path), &#34;origin&#34;: &#34;user&#34;}
                 elif f.endswith(&#34;.py.bkp&#34;):
                     name = f[:-7]
-                    all_plugin_info[name] = {&#34;enabled&#34;: False}
+                    all_plugin_info[name] = {&#34;enabled&#34;: False, &#34;origin&#34;: &#34;user&#34;}
 
         return all_plugin_info
 
@@ -3277,7 +3277,7 @@ el.replaceWith(d);
             if f.endswith(&#34;.py&#34;):
                 name = f[:-3]
                 path = os.path.join(core_dir, f)
-                all_plugin_info[name] = {&#34;enabled&#34;: True, &#34;hash&#34;: get_hash(path)}
+                all_plugin_info[name] = {&#34;enabled&#34;: True, &#34;hash&#34;: get_hash(path), &#34;origin&#34;: &#34;core&#34;}
 
     # 2. Scan shared plugins (medium priority)
     if hasattr(self.config, &#34;_shared_config&#34;) and self.config._shared_config:
@@ -3287,10 +3287,10 @@ el.replaceWith(d);
                 if f.endswith(&#34;.py&#34;):
                     name = f[:-3]
                     path = os.path.join(shared_dir, f)
-                    all_plugin_info[name] = {&#34;enabled&#34;: True, &#34;hash&#34;: get_hash(path)}
+                    all_plugin_info[name] = {&#34;enabled&#34;: True, &#34;hash&#34;: get_hash(path), &#34;origin&#34;: &#34;shared&#34;}
                 elif f.endswith(&#34;.py.bkp&#34;):
                     name = f[:-7]
-                    all_plugin_info[name] = {&#34;enabled&#34;: False}
+                    all_plugin_info[name] = {&#34;enabled&#34;: False, &#34;origin&#34;: &#34;shared&#34;}
 
     # 3. Scan user plugins (highest priority)
     user_dir = os.path.join(self.config.defaultdir, &#34;plugins&#34;)
@@ -3299,10 +3299,10 @@ el.replaceWith(d);
             if f.endswith(&#34;.py&#34;):
                 name = f[:-3]
                 path = os.path.join(user_dir, f)
-                all_plugin_info[name] = {&#34;enabled&#34;: True, &#34;hash&#34;: get_hash(path)}
+                all_plugin_info[name] = {&#34;enabled&#34;: True, &#34;hash&#34;: get_hash(path), &#34;origin&#34;: &#34;user&#34;}
             elif f.endswith(&#34;.py.bkp&#34;):
                 name = f[:-7]
-                all_plugin_info[name] = {&#34;enabled&#34;: False}
+                all_plugin_info[name] = {&#34;enabled&#34;: False, &#34;origin&#34;: &#34;user&#34;}
 
     return all_plugin_info</code></pre>
 </details>

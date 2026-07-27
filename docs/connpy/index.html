@@ -41,169 +41,196 @@ el.replaceWith(d);
 <p align="center">
 <img src="https://nginx.gederico.dynu.net/images/CONNPY-resized.png" alt="App Logo">
 </p>
-<h1 id="connpy">Connpy</h1>
+<h1 id="connpy-v603">Connpy (v6.0.3)</h1>
 <p><a href="https://pypi.org/pypi/connpy/"><img alt="" src="https://img.shields.io/pypi/v/connpy.svg?style=flat-square"></a>
 <a href="https://pypi.org/pypi/connpy/"><img alt="" src="https://img.shields.io/pypi/pyversions/connpy.svg?style=flat-square"></a>
-<a href="https://github.com/fluzzi/connpy/blob/main/LICENSE"><img alt="" src="https://img.shields.io/pypi/l/connpy.svg?style=flat-square"></a>
-<a href="https://pypi.org/pypi/connpy/"><img alt="" src="https://img.shields.io/pypi/dm/connpy.svg?style=flat-square"></a></p>
+<a href="https://pypi.org/pypi/connpy/"><img alt="" src="https://img.shields.io/pypi/dm/connpy.svg?style=flat-square&amp;cacheSeconds=86400"></a>
+<a href="https://github.com/fluzzi/connpy"><img alt="" src="https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20docker-blue?style=flat-square"></a>
+<a href="https://github.com/fluzzi/connpy"><img alt="" src="https://img.shields.io/badge/backend-gRPC-blue?style=flat-square"></a>
+<a href="https://github.com/fluzzi/connpy"><img alt="" src="https://img.shields.io/badge/AI%20Core-LiteLLM-green?style=flat-square"></a>
+<a href="https://modelcontextprotocol.io"><img alt="" src="https://img.shields.io/badge/MCP-compatible-orange?style=flat-square"></a>
+<a href="https://github.com/fluzzi/connpy/blob/main/LICENSE"><img alt="" src="https://img.shields.io/pypi/l/connpy.svg?style=flat-square"></a></p>
 <p><strong>Connpy</strong> is a powerful Connection Manager and Network Automation Platform for Linux, Mac, and Docker. It provides a unified interface for <strong>SSH, SFTP, Telnet, kubectl, Docker pods, and AWS SSM</strong>.</p>
-<p>The v6 release introduces the <strong>AI Copilot</strong>, an interactive terminal assistant that understands your network context and helps you manage your infrastructure more intelligently.</p>
-<h2 id="ai-copilot-new-in-v6">🤖 AI Copilot (New in v6)</h2>
-<p>The AI Copilot is deeply integrated into your terminal workflow:
-- <strong>Terminal Context Awareness</strong>: The Copilot can "see" your screen output, helping you diagnose errors or analyze command results in real-time.
-- <strong>Dynamic Context Selection</strong>: Flexibly select single, range, or line-based terminal blocks to feed the Copilot, filtering out interactive scrolling garbage automatically (e.g., Cisco IOS/XR scrolling, paginators).
-- <strong>Hybrid Multi-Agent System</strong>: Automatically escalates complex tasks between the <strong>Network Engineer</strong> (execution) and the <strong>Network Architect</strong> (strategy).
-- <strong>MCP Integration</strong>: Dynamically load tools from external providers (6WIND, AWS, etc.) via the Model Context Protocol.
-- <strong>Flexible Auth &amp; Keyless AI</strong>: Support for advanced LiteLLM credentials (<code>--engineer-auth</code> / <code>--architect-auth</code>) allowing keyless local models (Ollama), cloud engines (Vertex AI), or custom endpoints.
-- <strong>Enhanced Session Management</strong>: Uniquely generated sessions, robust pagination, and interactive styling translating prompt themes directly to terminal escapes.
-- <strong>Semantic Prompt Integration</strong>: Emit standard OSC prompt sequences (<code>]133;B</code>) for real-time remote/web front-end command tracking.
-- <strong>Interactive Chat</strong>: Launch with <code>conn <a title="connpy.ai" href="#connpy.ai">ai</a></code> for a collaborative troubleshooting session.</p>
-<h2 id="core-features">Core Features</h2>
+<p>The v6 release introduces a comprehensive <strong>AI Copilot</strong> and <strong>AI Playbook Engine</strong>, transforming your terminal into an interactive network assistant that understands your device outputs, configures parameters safely, and runs simulations.</p>
+<hr>
+<h2 id="1-ai-system">1. 🤖 AI System</h2>
+<h3 id="1a-terminal-copilot-ctrlspace">1a. Terminal Copilot (Ctrl+Space)</h3>
+<p>Invoke the context-aware AI Copilot directly inside any active terminal session by pressing <strong><code>Ctrl + Space</code></strong>.
+* <strong>Context Modes</strong>: Cycles through <code>LINES</code> (sends raw scroll buffer), <code>SINGLE</code> (captures exactly one command + output block), and <code>RANGE</code> (logical group of recent commands) using <strong><code>Ctrl+Up/Down</code></strong>.
+* <strong>Slash Commands (<code>/</code>)</strong>: Control the AI persona and safety settings:
+* <code>/architect</code> / <code>/engineer</code>: Swaps the agent between high-level strategist and technical executor.
+* <code>/trust</code> / <code>/untrust</code>: Configures auto-run behavior for suggested non-destructive commands.
+* <code>/os [system]</code>: Manually overrides target OS parsing rules (e.g. <code>/os cisco_ios</code>).
+* <code>/prompt [regex]</code>: Overrides command prompt detection bounds.
+* <code>/clear</code>: Clear context history.</p>
+<h3 id="1b-ai-chat-conn-ai">1b. AI Chat (conn ai)</h3>
+<p>Start a standalone persistent session with the AI Copilot. Manage sessions using <code>--list</code>, <code>--resume</code>, <code>--session &lt;id&gt;</code> (to restore a specific history), <code>--delete &lt;id&gt;</code>, or send a quick single-shot question directly from the terminal prompt:</p>
+<pre><code class="language-bash">conn ai &quot;how do i check bgp summary on cisco?&quot;
+</code></pre>
+<h3 id="1c-mcp-integration">1c. MCP Integration</h3>
+<p>Connect to external data sources and tools dynamically via the Model Context Protocol (MCP). Use the interactive wizard or command actions to configure MCP servers:</p>
+<pre><code class="language-bash">conn ai --mcp
+</code></pre>
+<hr>
+<h2 id="2-automation-playbooks">2. ⚙️ Automation &amp; Playbooks</h2>
+<h3 id="2a-quick-run-conn-run">2a. Quick Run (conn run)</h3>
+<p>Run commands in parallel directly on target nodes or folder structures:</p>
+<pre><code class="language-bash">conn run router1 &quot;show interface&quot;
+</code></pre>
+<h3 id="2b-yaml-playbook-engine">2b. YAML Playbook Engine</h3>
+<p>Execute complex structured automation playbooks defined in YAML configuration files. Supports multi-task execution, variables (using global, per-node, or regex matching definitions), timeouts, and variable parallel execution bounds.</p>
+<pre><code class="language-yaml"># example_playbook.yaml
+- name: Verify Network Operations
+  hosts: &quot;@office&quot;
+  parallel: true
+  tasks:
+    - name: Get interface brief
+      run: &quot;show ip interface brief&quot;
+    - name: Check OSPF state
+      run: &quot;show ip ospf neighbor&quot;
+      test: &quot;FULL&quot;
+</code></pre>
+<p>Execute using the playbooks runner:</p>
+<pre><code class="language-bash">conn run example_playbook.yaml
+</code></pre>
+<h3 id="2c-ai-assisted-automation">2c. AI-Assisted Automation</h3>
+<p>Leverage AI to generate playbook templates (<code>--generate-ai</code>), simulate command changes before execution (<code>--preflight-ai</code>), or analyze consolidated execution logs post-run (<code>--analyze</code>). Use <code>--test "expected text1" "expected text2"</code> to specify assert-style output validations.
+* <em>To generate an empty template:</em> <code>conn run --generate</code></p>
+<hr>
+<h2 id="3-inventory-management">3. 📂 Inventory Management</h2>
+<h3 id="3a-nodes">3a. Nodes</h3>
+<p>Manage connections using standard commands: add (<code>conn --add node1</code>), edit (<code>conn --mod node1</code>), delete (<code>conn --del node1</code>), show configuration (<code>conn --show node1</code>), or connect (<code>conn node1</code>).</p>
+<h3 id="3b-profiles">3b. Profiles</h3>
+<p>Define credentials and templates globally and reference them inside node fields using the <code>@profile_name</code> placeholder. Manage profiles interactively or via commands:</p>
+<pre><code class="language-bash">conn profile -a profile_name
+# Or equivalently:
+conn -a profile profile_name
+</code></pre>
+<p>During the interactive <code>conn --add</code> prompt, you can input <code>@profile_name</code> in the <strong>username</strong> or <strong>password</strong> fields to reference it.</p>
+<h3 id="3c-folders-move-copy-list">3c. Folders, Move, Copy, List</h3>
+<p>Organize nodes into logical folder hierarchies (<code>@office</code>, <code>@datacenter@office</code>). Move items (<code>conn move [src] [dst]</code>), copy (<code>conn copy [src] [dst]</code>), or list items with custom filters and formatting:</p>
+<pre><code class="language-bash">conn list nodes --filter &quot;.*-prod&quot; --format &quot;{name} ({host}) runs {protocol}&quot;
+</code></pre>
+<h3 id="3d-bulk-export-import">3d. Bulk, Export, Import</h3>
+<p>Bulk import connections from formatted text files (<code>conn bulk -f nodes.txt</code>), or export/import connection folders using YAML configurations (<code>conn export @folder &gt; backup.yaml</code> / <code>conn import backup.yaml</code>).</p>
+<h3 id="3e-tags-system">3e. Tags System</h3>
+<p>Customize connection settings dynamically using tags. Configure per-node settings like custom OS types (<code>os</code>), prompt regex rules (<code>prompt</code>), and page length triggers (<code>screen_length_command</code>).</p>
+<pre><code class="language-yaml"># Custom tags dictionary (YANG / VSR context)
+tags: { &quot;os&quot;: &quot;cisco_ios&quot;, &quot;prompt&quot;: &quot;.*#&quot;, &quot;screen_length_command&quot;: &quot;terminal length 0&quot; }
+</code></pre>
+<hr>
+<h2 id="4-protocols-connection-features">4. 🔌 Protocols &amp; Connection Features</h2>
+<h3 id="4a-ssh-sftp-telnet-kubectl-docker-aws-ssm">4a. SSH / SFTP / Telnet / kubectl / Docker / AWS SSM</h3>
+<p>Connect to various architectures using native protocols:
+* <strong>SSH / Telnet</strong>: Standard CLI protocols.
+* <strong>SFTP</strong>: Transfer files securely (<code>conn --sftp node</code>).
+* <strong>Docker</strong>: Connect directly to local container names (host set to container name/ID).
+* <strong>Kubernetes (kubectl)</strong>: Connect to pods (namespace customizable via options).
+* <strong>AWS SSM</strong>: Connect to EC2 instances using Instance IDs as hosts.</p>
+<h3 id="4b-jumphosts">4b. Jumphosts</h3>
+<p>Support for single or chained intermediate gateway nodes (SSH, SSM, kubectl, or docker jumphosts) to tunnel traffic safely into target environments.</p>
+<h3 id="4c-debug-mode-keepalive-logging">4c. Debug Mode, Keepalive, Logging</h3>
+<p>Track connection steps (<code>conn --debug node</code>), set idle keepalive intervals (<code>conn config --keepalive &lt;seconds&gt;</code>), or define dynamic output log files using variables like <code>${unique}</code>, <code>${host}</code>, <code>${port}</code>, <code>${user}</code>, <code>${protocol}</code>, or <code>${date 'format'}</code>.</p>
+<hr>
+<h2 id="5-remote-capture-conn-capture-core-plugin">5. 🖥️ Remote Capture (conn capture - Core Plugin)</h2>
+<p>Perform remote packet capture (<code>tcpdump</code>) on hosts over secure SSH reverse tunnels and stream packets live into your local Wireshark GUI:</p>
+<pre><code class="language-bash">conn capture router1 eth0 -w -f &quot;port 80&quot;
+</code></pre>
 <ul>
-<li><strong>Multi-Protocol</strong>: Native support for SSH, SFTP, Telnet, kubectl, Docker exec, and AWS SSM.</li>
-<li><strong>Context Management</strong>: Set regex-based contexts to manage specific nodes across different environments (work, home, clients).</li>
-<li><strong>Advanced Inventory</strong>:<ul>
-<li>Organize nodes in folders (<code>@folder</code>) and subfolders (<code>@subfolder@folder</code>).</li>
-<li>Use Global Profiles (<code>@profilename</code>) to manage shared credentials easily.</li>
-<li>Bulk creation, copying, moving, and export/import of nodes.</li>
+<li><strong>Requirements</strong>: Local installation of Wireshark or <code>tshark</code> is required for live piping (<code>-w</code>).</li>
+<li><strong>Advanced flags</strong>: Specify network namespaces (<code>--ns &lt;name&gt;</code>), custom filters (<code>-f &lt;filter&gt;</code>), or configure the Wireshark local path (<code>--set-wireshark-path</code>).</li>
 </ul>
-</li>
-<li><strong>Modern UI</strong>: High-performance terminal experience with <code>prompt-toolkit</code>, including:<ul>
-<li>Fuzzy search integration with <code>fzf</code>.</li>
-<li>Advanced tab completion.</li>
-<li>Syntax highlighting and customizable themes.</li>
+<hr>
+<h2 id="6-context-filtering">6. 🛡️ Context Filtering</h2>
+<p>Prevent accidental command execution in production by setting active regex contexts. This hides non-matching inventory items and restricts execution scope:</p>
+<pre><code class="language-bash">conn context production -a --regex &quot;.*-prod&quot;
+conn context production --set
+</code></pre>
+<ul>
+<li><strong>Manage Contexts</strong>: List defined filters (<code>conn context --ls</code>), show context details (<code>conn context production -s</code>), or delete contexts (<code>conn context production -r</code>).</li>
 </ul>
-</li>
-<li><strong>Automation Engine</strong>: Run parallel tasks and playbooks on multiple devices with variable support.</li>
-<li><strong>Plugin System</strong>: Build and execute custom Python scripts locally or on a remote gRPC server.</li>
-<li><strong>gRPC Architecture</strong>: Fully decoupled Client/Server model for distributed management.</li>
-<li><strong>Privacy &amp; Sync</strong>: Local-first encrypted storage (RSA/OAEP) with optional Google Drive backup.</li>
-</ul>
-<h2 id="installation">Installation</h2>
+<hr>
+<h2 id="7-plugin-system">7. 🔌 Plugin System</h2>
+<p>Extend <code><a title="connpy" href="#connpy">connpy</a></code> features and hook into core execution events (pre/post hooks) by writing Python scripts. Add, update, delete, or list plugins locally, or execute them on remote instances:</p>
+<pre><code class="language-bash">conn plugin --add my_plugin script.py
+conn plugin --update my_plugin script.py
+conn plugin --remote --sync
+</code></pre>
+<hr>
+<h2 id="8-grpc-client-server-architecture">8. ⚙️ gRPC Client-Server Architecture</h2>
+<h3 id="8a-server-startstoprestartdebug">8a. Server (start/stop/restart/debug)</h3>
+<p>Execute tasks on a centralized remote host. Start gRPC server (<code>conn api -s 50051</code>), stop (<code>conn api -x</code>), restart (<code>conn api -r</code>), or debug in the foreground (<code>conn api -d</code>).</p>
+<h3 id="8b-client-config">8b. Client Config</h3>
+<p>Shift the local CLI to communicate with a remote server instance:</p>
+<pre><code class="language-bash">conn config --service-mode remote
+conn config --remote localhost:50051
+</code></pre>
+<h3 id="8c-user-management">8c. User Management</h3>
+<p>Manage server-side user credentials for distributed setups:</p>
+<pre><code class="language-bash">conn user --add username
+conn user --list
+conn user --regen-password username
+</code></pre>
+<p>Use <code>--path</code> to specify custom configuration folders in server Mode B.</p>
+<h3 id="8d-sso-oidc">8d. SSO / OIDC</h3>
+<p>Configure identity providers (e.g. Authelia, Keycloak) for SSO gRPC authentication using the interactive wizard:</p>
+<pre><code class="language-bash">conn sso --add provider_name
+</code></pre>
+<h3 id="8e-login-logout">8e. Login / Logout</h3>
+<p>Authenticate client sessions (<code>conn login [username]</code>), check connection status (<code>conn login --status</code>), or close sessions (<code>conn logout</code>).</p>
+<hr>
+<h2 id="9-installation-configuration">9. ⚡ Installation &amp; Configuration</h2>
+<h3 id="9a-pip-install">9a. pip install</h3>
 <pre><code class="language-bash">pip install connpy
 </code></pre>
-<h3 id="run-it-in-windowslinux-using-docker">Run it in Windows/Linux using Docker</h3>
-<pre><code class="language-bash">git clone https://github.com/fluzzi/connpy
-cd connpy
-docker compose build
-
-# Run it like a native app (completely silent)
-docker compose run --rm --remove-orphans connpy-app [command]
-
-# Pro Tip: Add this alias for a 100% native experience from any folder
-alias conn='docker compose -f /path/to/connpy/docker-compose.yml run --rm --remove-orphans connpy-app'
+<h3 id="9b-shell-completion-fzf">9b. Shell Completion + FZF</h3>
+<p>Install autocompletions and fuzzy-search wrappers into your shell profile:</p>
+<pre><code class="language-bash">eval &quot;$(conn config --completion bash)&quot;
+eval &quot;$(conn config --fzf-wrapper bash)&quot;
+</code></pre>
+<h3 id="9c-conn-config-options">9c. conn config options</h3>
+<p>View configuration details (<code>conn config</code>) or customize variables like case sensitivity (<code>--allow-uppercase</code>), FZF list picker (<code>--fzf true</code>), configurations directory (<code>--configfolder</code>), or persistent AI API keys and models (<code>--engineer-model</code>).</p>
+<h3 id="9d-theming">9d. Theming</h3>
+<p>Customize CLI panel styles and colors by pointing to built-in presets or external YAML styles:</p>
+<pre><code class="language-bash">conn config --theme /path/to/theme.yaml
 </code></pre>
 <hr>
-<h2 id="privacy-integration">🔒 Privacy &amp; Integration</h2>
-<h3 id="privacy-policy">Privacy Policy</h3>
-<p>Connpy is committed to protecting your privacy:
-- <strong>Local Storage</strong>: All server addresses, usernames, and passwords are encrypted and stored <strong>only</strong> on your machine. No data is transmitted to our servers.
-- <strong>Data Access</strong>: Data is used solely for managing and automating your connections.</p>
-<h3 id="google-integration">Google Integration</h3>
-<p>Used strictly for backup:
-- <strong>Backup</strong>: Sync your encrypted configuration with your Google Drive account.
-- <strong>Scoped Access</strong>: Connpy only accesses its own backup files.</p>
+<h2 id="10-privacy-security-synchronization-conn-sync">10. 🔒 Privacy, Security &amp; Synchronization (conn sync)</h2>
+<p>Encrypts inventory and profiles locally via RSA/OAEP. Backup and sync configurations to Google Drive manually (<code>conn sync --once</code>, <code>--list</code>, <code>--restore</code>) or schedule auto-sync. Segregate restores (<code>--nodes</code> / <code>--config</code>) or sync remote nodes with <code>--sync-remote</code>.</p>
 <hr>
-<h2 id="usage">Usage</h2>
-<pre><code class="language-bash">usage: conn [-h] [--add | --del | --mod | --show | --debug] [node|folder] [--sftp]
-       conn {profile,move,copy,list,bulk,export,import,ai,run,api,plugin,config,sync,context} ...
-</code></pre>
-<h3 id="basic-examples">Basic Examples:</h3>
-<pre><code class="language-bash"># Add a folder and subfolder
-conn --add @office
-conn --add @datacenter@office
-
-# Add a node with a profile
-conn --add server1@datacenter@office --profile @myuser
-
-# Connect to a node (fuzzy match)
-conn server1
-
-# Start the AI Copilot
-conn ai
-
-# Run a command on all nodes in a folder
-conn run @office &quot;uptime&quot;
-</code></pre>
-<h3 id="sso-oidc-provider-management">🔑 SSO / OIDC Provider Management</h3>
-<p>In remote mode, <code><a title="connpy" href="#connpy">connpy</a></code> supports Single Sign-On (SSO) login. You can manage the configured identity providers (IdPs) directly from the local CLI using the <code>conn sso</code> command suite:</p>
-<ul>
-<li><strong>List configured providers</strong>:
-<code>bash
-conn sso --list</code></li>
-<li><strong>Show provider details</strong> (sensitive credentials like secrets are masked):
-<code>bash
-conn sso --show &lt;provider_name&gt;</code></li>
-<li><strong>Add or update a provider</strong> (opens an interactive configuration wizard):
-<code>bash
-conn sso --add &lt;provider_name&gt;</code></li>
-<li><strong>Delete a provider</strong>:
-<code>bash
-conn sso --del &lt;provider_name&gt;</code></li>
-</ul>
-<h4 id="security-recommendation-secret-reference-env-vars">Security Recommendation (Secret Reference Env Vars)</h4>
-<p>To keep sensitive client secrets or shared secrets out of git-tracked configuration files, you can input a variable name prefixed with a <code>$</code> instead of the literal secret during the <code>conn sso --add</code> prompts (e.g., <code>$CONN_SSO_MYPROVIDER_SECRET</code>). The backend gRPC server will dynamically resolve the value from its environment variables at runtime.</p>
-<hr>
-<h2 id="plugin-requirements-for-connpy">Plugin Requirements for Connpy</h2>
-<h3 id="remote-plugin-execution">Remote Plugin Execution</h3>
-<p>When Connpy operates in remote mode, plugins are executed <strong>transparently on the server</strong>:
-- The client automatically downloads the plugin source code (<code>Parser</code> class context) to generate the local <code>argparse</code> structure and provide autocompletion.
-- The execution phase (<code>Entrypoint</code> class) is redirected via gRPC streams to execute in the server's memory.
-- You can manage remote plugins using the <code>--remote</code> flag.</p>
-<h3 id="general-structure">General Structure</h3>
-<ul>
-<li>The plugin script must define specific classes:</li>
-<li><strong>Class <code>Parser</code></strong>: Handles <code>argparse.ArgumentParser</code> initialization.</li>
-<li><strong>Class <code>Entrypoint</code></strong>: Main execution logic (receives <code>args</code>, <code>parser</code>, and <code>connapp</code>).</li>
-<li><strong>Class <code>Preload</code></strong>: (Optional) For modifying core app behavior or registering hooks.</li>
-</ul>
-<h3 id="preload-modifications-and-hooks">Preload Modifications and Hooks</h3>
-<p>You can customize the behavior of core classes using hooks:
-- <strong><code>modify(method)</code></strong>: Alter class instances (e.g., <code>connapp.config</code>, <code>connapp.ai</code>).
-- <strong><code>register_pre_hook(method)</code></strong>: Logic to run before a method execution.
-- <strong><code>register_post_hook(method)</code></strong>: Logic to run after a method execution.</p>
-<h3 id="command-completion-support">Command Completion Support</h3>
-<p>Plugins can provide intelligent tab completion:
-1. <strong>Tree-based Completion (Recommended)</strong>: Define <code>_connpy_tree(info)</code> returning a navigation dictionary.
-2. <strong>Legacy Completion</strong>: Define <code>_connpy_completion(wordsnumber, words, info)</code>.</p>
-<hr>
-<h2 id="grpc-service-architecture">⚙️ gRPC Service Architecture</h2>
-<p>Connpy can operate in a decoupled mode:
-1. <strong>Start the API (Server)</strong>: <code>conn api -s 50051</code>
-2. <strong>Configure the Client</strong>:
-<code>bash
-conn config --service-mode remote
-conn config --remote-host localhost:50051</code>
-All inventory management and execution will now happen on the server.</p>
-<hr>
-<h2 id="automation-module-api">🐍 Automation Module (API)</h2>
-<p>You can use <code><a title="connpy" href="#connpy">connpy</a></code> as a Python library for your own scripts.</p>
-<h3 id="basic-execution">Basic Execution</h3>
+<h2 id="11-python-api">11. 🐍 Python API</h2>
+<p>Embed connection and automation routines programmatically in Python:</p>
 <pre><code class="language-python">import connpy
-router = connpy.node(&quot;uniqueName&quot;, &quot;1.1.1.1&quot;, user=&quot;admin&quot;)
+
+# 1. Direct single node interaction
+router = connpy.node(&quot;router1&quot;, &quot;1.1.1.1&quot;, user=&quot;admin&quot;)
 router.run([&quot;show ip int brief&quot;])
 print(router.output)
-</code></pre>
-<h3 id="parallel-tasks-with-variables">Parallel Tasks with Variables</h3>
-<pre><code class="language-python">import connpy
-config = connpy.configfile()
-nodes = config.getitem(&quot;@office&quot;, [&quot;router1&quot;, &quot;router2&quot;])
-routers = connpy.nodes(nodes, config=config)
 
+# 2. Parallel nodes execution with variables
+config = connpy.configfile()
+nodes_info = config.getitem(&quot;@office&quot;, [&quot;router1&quot;, &quot;router2&quot;])
+routers = connpy.nodes(nodes_info, config=config)
 variables = {
     &quot;router1@office&quot;: {&quot;id&quot;: &quot;1&quot;},
     &quot;__global__&quot;: {&quot;mask&quot;: &quot;255.255.255.0&quot;}
 }
 routers.run([&quot;interface lo{id}&quot;, &quot;ip address 10.0.0.{id} {mask}&quot;], variables)
-</code></pre>
-<h3 id="ai-programmatic-use">AI Programmatic Use</h3>
-<pre><code class="language-python">import connpy
+
+# 3. AI Copilot prompts
 myai = connpy.ai(connpy.configfile())
-response = myai.ask(&quot;What is the status of the BGP neighbors in the office?&quot;)
+response = myai.ask(&quot;Show BGP status.&quot;)
+print(response)
 </code></pre>
+<p><em>Supports additional programmatic features like <code><a title="connpy.node.test" href="#connpy.node.test">node.test()</a></code>, <code><a title="connpy.node.interact" href="#connpy.node.interact">node.interact()</a></code>, <code><a title="connpy.configfile.encrypt" href="#connpy.configfile.encrypt">configfile.encrypt()</a></code>, <code>connapp</code> embeds, and <code>ClassHook</code> / <code>MethodHook</code> plugin hooks.</em></p>
 <hr>
-<p><em>For detailed developer notes and plugin hooks documentation, see the <a href="https://fluzzi.github.io/connpy/">Documentation</a>.</em></p>
-<h2 id="license">📜 License</h2>
+<h2 id="12-docker-deployment">12. 🐳 Docker Deployment</h2>
+<p>Run <code><a title="connpy" href="#connpy">connpy</a></code> containerized and silent:</p>
+<pre><code class="language-bash">docker compose run --rm connpy-app [command]
+</code></pre>
+<p>Add <code>alias conn='docker compose run --rm connpy-app'</code> for a transparent container experience.</p>
+<hr>
+<h2 id="13-license">13. 📜 License</h2>
 <p><a href="LICENSE">PolyForm Noncommercial 1.0.0</a></p>
 </section>
 <section>
@@ -4241,80 +4268,12 @@ class node:
         else:
             self.password = [password]
         if self.jumphost != &#34;&#34; and config != &#39;&#39;:
-            self.jumphost = config.getitem(self.jumphost)
-            for key in self.jumphost:
-                profile = re.search(&#34;^@(.*)&#34;, str(self.jumphost[key]))
-                if profile:
-                    try:
-                        self.jumphost[key] = config.profiles[profile.group(1)][key]
-                    except KeyError:
-                        self.jumphost[key] = &#34;&#34;
-                elif self.jumphost[key] == &#39;&#39; and key == &#34;protocol&#34;:
-                    try:
-                        self.jumphost[key] = config.profiles[&#34;default&#34;][key]
-                    except KeyError:
-                        self.jumphost[key] = &#34;ssh&#34;
-            if isinstance(self.jumphost[&#34;password&#34;],list):
-                jumphost_password = []
-                for i, s in enumerate(self.jumphost[&#34;password&#34;]):
-                    profile = re.search(&#34;^@(.*)&#34;, self.jumphost[&#34;password&#34;][i])
-                    if profile:
-                        jumphost_password.append(config.profiles[profile.group(1)][&#34;password&#34;])
-                    else:
-                        jumphost_password.append(self.jumphost[&#34;password&#34;][i])
-                self.jumphost[&#34;password&#34;] = jumphost_password
-            else:
-                self.jumphost[&#34;password&#34;] = [self.jumphost[&#34;password&#34;]]
-            if self.jumphost[&#34;password&#34;] != [&#34;&#34;]:
-                self.password = self.jumphost[&#34;password&#34;] + self.password
-
-            if self.jumphost[&#34;protocol&#34;] == &#34;ssh&#34;:
-                jumphost_cmd = self.jumphost[&#34;protocol&#34;] + &#34; -W %h:%p&#34;
-                if self.jumphost[&#34;port&#34;] != &#39;&#39;:
-                    jumphost_cmd = jumphost_cmd + &#34; -p &#34; + self.jumphost[&#34;port&#34;]
-                if self.jumphost[&#34;options&#34;] != &#39;&#39;:
-                    jumphost_cmd = jumphost_cmd + &#34; &#34; + self.jumphost[&#34;options&#34;]
-                if self.jumphost[&#34;user&#34;] == &#39;&#39;:
-                    jumphost_cmd = jumphost_cmd + &#34; {}&#34;.format(self.jumphost[&#34;host&#34;])
-                else:
-                    jumphost_cmd = jumphost_cmd + &#34; {}&#34;.format(&#34;@&#34;.join([self.jumphost[&#34;user&#34;],self.jumphost[&#34;host&#34;]]))
-                self.jumphost = f&#34;-o ProxyCommand=\&#34;{jumphost_cmd}\&#34;&#34;
-            elif self.jumphost[&#34;protocol&#34;] == &#34;ssm&#34;:
-                ssm_target = self.jumphost[&#34;host&#34;]
-                ssm_cmd = f&#34;aws ssm start-session --target {ssm_target} --document-name AWS-StartSSHSession --parameters &#39;portNumber=22&#39;&#34;
-                if isinstance(self.jumphost.get(&#34;tags&#34;), dict):
-                    if &#34;profile&#34; in self.jumphost[&#34;tags&#34;]:
-                        ssm_cmd += f&#34; --profile {self.jumphost[&#39;tags&#39;][&#39;profile&#39;]}&#34;
-                    if &#34;region&#34; in self.jumphost[&#34;tags&#34;]:
-                        ssm_cmd += f&#34; --region {self.jumphost[&#39;tags&#39;][&#39;region&#39;]}&#34;
-                if self.jumphost[&#34;options&#34;] != &#39;&#39;:
-                    ssm_cmd += f&#34; {self.jumphost[&#39;options&#39;]}&#34;
-                
-                bastion_user_part = f&#34;{self.jumphost[&#39;user&#39;]}@{ssm_target}&#34; if self.jumphost[&#39;user&#39;] else ssm_target
-                
-                ssh_opts = &#34;&#34;
-                if isinstance(self.jumphost.get(&#34;tags&#34;), dict) and &#34;ssh_options&#34; in self.jumphost[&#34;tags&#34;]:
-                    ssh_opts = f&#34; {self.jumphost[&#39;tags&#39;][&#39;ssh_options&#39;]}&#34;
-                
-                inner_ssh = f&#34;ssh{ssh_opts} -o ProxyCommand=&#39;{ssm_cmd}&#39; -W %h:%p {bastion_user_part}&#34;
-                self.jumphost = f&#34;-o ProxyCommand=\&#34;{inner_ssh}\&#34;&#34;
-            elif self.jumphost[&#34;protocol&#34;] in [&#34;kubectl&#34;, &#34;docker&#34;]:
-                nc_cmd = &#34;nc&#34;
-                if isinstance(self.jumphost.get(&#34;tags&#34;), dict) and &#34;nc_command&#34; in self.jumphost[&#34;tags&#34;]:
-                    nc_cmd = self.jumphost[&#34;tags&#34;][&#34;nc_command&#34;]
-                    
-                if self.jumphost[&#34;protocol&#34;] == &#34;kubectl&#34;:
-                    proxy_cmd = f&#34;kubectl exec &#34;
-                    if self.jumphost[&#34;options&#34;] != &#39;&#39;:
-                        proxy_cmd += f&#34;{self.jumphost[&#39;options&#39;]} &#34;
-                    proxy_cmd += f&#34;{self.jumphost[&#39;host&#39;]} -i -- {nc_cmd} %h %p&#34;
-                else:
-                    proxy_cmd = f&#34;docker &#34;
-                    if self.jumphost[&#34;options&#34;] != &#39;&#39;:
-                        proxy_cmd += f&#34;{self.jumphost[&#39;options&#39;]} &#34;
-                    proxy_cmd += f&#34;exec -i {self.jumphost[&#39;host&#39;]} {nc_cmd} %h %p&#34;
-                    
-                self.jumphost = f&#34;-o ProxyCommand=\&#34;{proxy_cmd}\&#34;&#34;
+            raw_cmd, jh_passwords = self._build_jumphost_chain(self.jumphost, config)
+            if jh_passwords:
+                self.password = jh_passwords + self.password
+            if raw_cmd:
+                escaped = raw_cmd.replace(&#39;\\&#39;, &#39;\\\\&#39;).replace(&#39;&#34;&#39;, &#39;\\&#34;&#39;)
+                self.jumphost = f&#39;-o ProxyCommand=&#34;{escaped}&#34;&#39;
             else:
                 self.jumphost = &#34;&#34;
         
@@ -4322,6 +4281,127 @@ class node:
         self.status = 1
         self.result = {}
         self.cmd_byte_positions = [(0, None)]
+
+    @staticmethod
+    def _resolve_jumphost_data(jh_dict, config):
+        &#39;&#39;&#39;Resolve @profile references and normalize passwords in a jumphost dict.&#39;&#39;&#39;
+        for key in jh_dict:
+            profile = re.search(&#34;^@(.*)&#34;, str(jh_dict[key]))
+            if profile:
+                try:
+                    jh_dict[key] = config.profiles[profile.group(1)][key]
+                except KeyError:
+                    jh_dict[key] = &#34;&#34;
+            elif jh_dict[key] == &#39;&#39; and key == &#34;protocol&#34;:
+                try:
+                    jh_dict[key] = config.profiles[&#34;default&#34;][key]
+                except KeyError:
+                    jh_dict[key] = &#34;ssh&#34;
+        if isinstance(jh_dict[&#34;password&#34;], list):
+            resolved = []
+            for p in jh_dict[&#34;password&#34;]:
+                profile = re.search(&#34;^@(.*)&#34;, p)
+                if profile:
+                    resolved.append(config.profiles[profile.group(1)][&#34;password&#34;])
+                else:
+                    resolved.append(p)
+            jh_dict[&#34;password&#34;] = resolved
+        else:
+            jh_dict[&#34;password&#34;] = [jh_dict[&#34;password&#34;]]
+        return jh_dict
+
+    def _build_jumphost_chain(self, jumphost_name, config, visited=None, depth=0, target_host=&#34;%h&#34;, target_port=&#34;%p&#34;):
+        &#39;&#39;&#39;Recursively build ProxyCommand for chained jumphosts.
+
+        Returns:
+            tuple: (raw_proxy_command, passwords_list)
+                - raw_proxy_command: Command string to embed in ProxyCommand
+                - passwords_list: Ordered passwords (innermost first)
+
+        Raises:
+            ValueError: On circular references or exceeding max depth (5).
+        &#39;&#39;&#39;
+        if depth &gt;= 5:
+            raise ValueError(&#34;Jumphost chain exceeds maximum depth of 5 hops&#34;)
+        if visited is None:
+            visited = []
+        if jumphost_name in visited:
+            cycle = &#34; -&gt; &#34;.join(visited + [jumphost_name])
+            raise ValueError(f&#34;Circular jumphost reference detected: {cycle}&#34;)
+        visited = visited + [jumphost_name]
+
+        jh = config.getitem(jumphost_name)
+        jh = self._resolve_jumphost_data(jh, config)
+
+        passwords = []
+        inner_proxy_opt = &#34;&#34;
+
+        # Recursively resolve inner jumphost
+        if jh.get(&#34;jumphost&#34;, &#34;&#34;) != &#34;&#34;:
+            if jh[&#34;protocol&#34;] not in [&#34;ssh&#34;]:
+                raise ValueError(
+                    f&#34;Jumphost &#39;{jumphost_name}&#39; uses protocol &#39;{jh[&#39;protocol&#39;]}&#39; &#34;
+                    f&#34;which does not support chained jumphosts. &#34;
+                    f&#34;Only SSH jumphosts can have their own jumphosts.&#34;
+                )
+            parent_port = jh[&#34;port&#34;] if jh[&#34;port&#34;] != &#34;&#34; else &#34;22&#34;
+            inner_raw_cmd, inner_passwords = self._build_jumphost_chain(
+                jh[&#34;jumphost&#34;], config, visited, depth + 1, target_host=jh[&#34;host&#34;], target_port=parent_port
+            )
+            passwords = inner_passwords
+            escaped = inner_raw_cmd.replace(&#39;\\&#39;, &#39;\\\\&#39;).replace(&#39;&#34;&#39;, &#39;\\&#34;&#39;)
+            inner_proxy_opt = f&#39;-o ProxyCommand=&#34;{escaped}&#34;&#39;
+
+        # Collect this hop&#39;s passwords
+        if jh[&#34;password&#34;] != [&#34;&#34;]:
+            passwords = passwords + jh[&#34;password&#34;]
+
+        t_port = target_port if target_port != &#34;&#34; else &#34;22&#34;
+
+        # Build raw command based on protocol
+        if jh[&#34;protocol&#34;] == &#34;ssh&#34;:
+            cmd = f&#34;ssh -W {target_host}:{t_port}&#34;
+            if inner_proxy_opt:
+                cmd += f&#34; {inner_proxy_opt}&#34;
+            if jh[&#34;port&#34;] != &#39;&#39;:
+                cmd += f&#34; -p {jh[&#39;port&#39;]}&#34;
+            if jh[&#34;options&#34;] != &#39;&#39;:
+                cmd += f&#34; {jh[&#39;options&#39;]}&#34;
+            user_host = f&#34;{jh[&#39;user&#39;]}@{jh[&#39;host&#39;]}&#34; if jh[&#39;user&#39;] != &#39;&#39; else jh[&#39;host&#39;]
+            cmd += f&#34; {user_host}&#34;
+        elif jh[&#34;protocol&#34;] == &#34;ssm&#34;:
+            ssm_target = jh[&#34;host&#34;]
+            ssm_cmd = f&#34;aws ssm start-session --target {ssm_target} --document-name AWS-StartSSHSession --parameters &#39;portNumber=22&#39;&#34;
+            if isinstance(jh.get(&#34;tags&#34;), dict):
+                if &#34;profile&#34; in jh[&#34;tags&#34;]:
+                    ssm_cmd += f&#34; --profile {jh[&#39;tags&#39;][&#39;profile&#39;]}&#34;
+                if &#34;region&#34; in jh[&#34;tags&#34;]:
+                    ssm_cmd += f&#34; --region {jh[&#39;tags&#39;][&#39;region&#39;]}&#34;
+            if jh[&#34;options&#34;] != &#39;&#39;:
+                ssm_cmd += f&#34; {jh[&#39;options&#39;]}&#34;
+            bastion_user_part = f&#34;{jh[&#39;user&#39;]}@{ssm_target}&#34; if jh[&#39;user&#39;] else ssm_target
+            ssh_opts = &#34;&#34;
+            if isinstance(jh.get(&#34;tags&#34;), dict) and &#34;ssh_options&#34; in jh[&#34;tags&#34;]:
+                ssh_opts = f&#34; {jh[&#39;tags&#39;][&#39;ssh_options&#39;]}&#34;
+            cmd = f&#34;ssh{ssh_opts} -o ProxyCommand=&#39;{ssm_cmd}&#39; -W {target_host}:{t_port} {bastion_user_part}&#34;
+        elif jh[&#34;protocol&#34;] in [&#34;kubectl&#34;, &#34;docker&#34;]:
+            nc_cmd = &#34;nc&#34;
+            if isinstance(jh.get(&#34;tags&#34;), dict) and &#34;nc_command&#34; in jh[&#34;tags&#34;]:
+                nc_cmd = jh[&#34;tags&#34;][&#34;nc_command&#34;]
+            if jh[&#34;protocol&#34;] == &#34;kubectl&#34;:
+                cmd = &#34;kubectl exec &#34;
+                if jh[&#34;options&#34;] != &#39;&#39;:
+                    cmd += f&#34;{jh[&#39;options&#39;]} &#34;
+                cmd += f&#34;{jh[&#39;host&#39;]} -i -- {nc_cmd} {target_host} {t_port}&#34;
+            else:
+                cmd = &#34;docker &#34;
+                if jh[&#34;options&#34;] != &#39;&#39;:
+                    cmd += f&#34;{jh[&#39;options&#39;]} &#34;
+                cmd += f&#34;exec -i {jh[&#39;host&#39;]} {nc_cmd} {target_host} {t_port}&#34;
+        else:
+            return &#34;&#34;, passwords
+
+        return cmd, passwords
 
     @MethodHook
     def _passtx(self, passwords, *, keyfile=None):
@@ -5214,7 +5294,8 @@ class node:
 
         attempts = 1
         while attempts &lt;= max_attempts:
-            child = pexpect.spawn(cmd)
+            args = shlex.split(cmd)
+            child = pexpect.spawn(args[0], args[1:])
             if isinstance(self.tags, dict) and self.tags.get(&#34;console&#34;):
                 child.sendline()
             if debug:
@@ -6437,41 +6518,55 @@ def test(self, commands, expected, vars = None,*, folder = None, prompt = None, 
 <nav id="sidebar">
 <div class="toc">
 <ul>
-<li><a href="#connpy">Connpy</a><ul>
-<li><a href="#ai-copilot-new-in-v6">🤖 AI Copilot (New in v6)</a></li>
-<li><a href="#core-features">Core Features</a></li>
-<li><a href="#installation">Installation</a><ul>
-<li><a href="#run-it-in-windowslinux-using-docker">Run it in Windows/Linux using Docker</a></li>
+<li><a href="#connpy-v603">Connpy (v6.0.3)</a><ul>
+<li><a href="#1-ai-system">1. 🤖 AI System</a><ul>
+<li><a href="#1a-terminal-copilot-ctrlspace">1a. Terminal Copilot (Ctrl+Space)</a></li>
+<li><a href="#1b-ai-chat-conn-ai">1b. AI Chat (conn ai)</a></li>
+<li><a href="#1c-mcp-integration">1c. MCP Integration</a></li>
 </ul>
 </li>
-<li><a href="#privacy-integration">🔒 Privacy &amp; Integration</a><ul>
-<li><a href="#privacy-policy">Privacy Policy</a></li>
-<li><a href="#google-integration">Google Integration</a></li>
+<li><a href="#2-automation-playbooks">2. ⚙️ Automation &amp; Playbooks</a><ul>
+<li><a href="#2a-quick-run-conn-run">2a. Quick Run (conn run)</a></li>
+<li><a href="#2b-yaml-playbook-engine">2b. YAML Playbook Engine</a></li>
+<li><a href="#2c-ai-assisted-automation">2c. AI-Assisted Automation</a></li>
 </ul>
 </li>
-<li><a href="#usage">Usage</a><ul>
-<li><a href="#basic-examples">Basic Examples:</a></li>
-<li><a href="#sso-oidc-provider-management">🔑 SSO / OIDC Provider Management</a><ul>
-<li><a href="#security-recommendation-secret-reference-env-vars">Security Recommendation (Secret Reference Env Vars)</a></li>
+<li><a href="#3-inventory-management">3. 📂 Inventory Management</a><ul>
+<li><a href="#3a-nodes">3a. Nodes</a></li>
+<li><a href="#3b-profiles">3b. Profiles</a></li>
+<li><a href="#3c-folders-move-copy-list">3c. Folders, Move, Copy, List</a></li>
+<li><a href="#3d-bulk-export-import">3d. Bulk, Export, Import</a></li>
+<li><a href="#3e-tags-system">3e. Tags System</a></li>
 </ul>
 </li>
+<li><a href="#4-protocols-connection-features">4. 🔌 Protocols &amp; Connection Features</a><ul>
+<li><a href="#4a-ssh-sftp-telnet-kubectl-docker-aws-ssm">4a. SSH / SFTP / Telnet / kubectl / Docker / AWS SSM</a></li>
+<li><a href="#4b-jumphosts">4b. Jumphosts</a></li>
+<li><a href="#4c-debug-mode-keepalive-logging">4c. Debug Mode, Keepalive, Logging</a></li>
 </ul>
 </li>
-<li><a href="#plugin-requirements-for-connpy">Plugin Requirements for Connpy</a><ul>
-<li><a href="#remote-plugin-execution">Remote Plugin Execution</a></li>
-<li><a href="#general-structure">General Structure</a></li>
-<li><a href="#preload-modifications-and-hooks">Preload Modifications and Hooks</a></li>
-<li><a href="#command-completion-support">Command Completion Support</a></li>
+<li><a href="#5-remote-capture-conn-capture-core-plugin">5. 🖥️ Remote Capture (conn capture - Core Plugin)</a></li>
+<li><a href="#6-context-filtering">6. 🛡️ Context Filtering</a></li>
+<li><a href="#7-plugin-system">7. 🔌 Plugin System</a></li>
+<li><a href="#8-grpc-client-server-architecture">8. ⚙️ gRPC Client-Server Architecture</a><ul>
+<li><a href="#8a-server-startstoprestartdebug">8a. Server (start/stop/restart/debug)</a></li>
+<li><a href="#8b-client-config">8b. Client Config</a></li>
+<li><a href="#8c-user-management">8c. User Management</a></li>
+<li><a href="#8d-sso-oidc">8d. SSO / OIDC</a></li>
+<li><a href="#8e-login-logout">8e. Login / Logout</a></li>
 </ul>
 </li>
-<li><a href="#grpc-service-architecture">⚙️ gRPC Service Architecture</a></li>
-<li><a href="#automation-module-api">🐍 Automation Module (API)</a><ul>
-<li><a href="#basic-execution">Basic Execution</a></li>
-<li><a href="#parallel-tasks-with-variables">Parallel Tasks with Variables</a></li>
-<li><a href="#ai-programmatic-use">AI Programmatic Use</a></li>
+<li><a href="#9-installation-configuration">9. ⚡ Installation &amp; Configuration</a><ul>
+<li><a href="#9a-pip-install">9a. pip install</a></li>
+<li><a href="#9b-shell-completion-fzf">9b. Shell Completion + FZF</a></li>
+<li><a href="#9c-conn-config-options">9c. conn config options</a></li>
+<li><a href="#9d-theming">9d. Theming</a></li>
 </ul>
 </li>
-<li><a href="#license">📜 License</a></li>
+<li><a href="#10-privacy-security-synchronization-conn-sync">10. 🔒 Privacy, Security &amp; Synchronization (conn sync)</a></li>
+<li><a href="#11-python-api">11. 🐍 Python API</a></li>
+<li><a href="#12-docker-deployment">12. 🐳 Docker Deployment</a></li>
+<li><a href="#13-license">13. 📜 License</a></li>
 </ul>
 </li>
 </ul>

@@ -379,6 +379,35 @@ class RunHandler:
         from rich.rule import Rule
         from rich.panel import Panel
         from rich.syntax import Syntax
+        from prompt_toolkit import PromptSession
+        from prompt_toolkit.formatted_text import HTML
+        from prompt_toolkit.key_binding import KeyBindings
+
+        # Helper to get active theme color
+        def get_theme_color(style_name, fallback="white"):
+            try:
+                style = printer.connpy_theme.styles.get(style_name)
+                if style and style.color:
+                    if style.color.is_default: return fallback
+                    return style.color.triplet.hex if style.color.triplet else style.color.name
+            except: pass
+            return fallback
+
+        user_color = get_theme_color("user_prompt", "#00afd7")
+        
+        # Configure multiline key bindings: Enter to submit, Ctrl+Enter (c-j) or Alt+Enter for newlines
+        kb = KeyBindings()
+        
+        @kb.add('enter')
+        def _(event):
+            event.current_buffer.validate_and_handle()
+
+        @kb.add('c-j')
+        @kb.add('escape', 'enter')
+        def _(event):
+            event.current_buffer.insert_text('\n')
+
+        session = PromptSession(key_bindings=kb)
 
         dest_file = args.data[0]
         if os.path.exists(dest_file):
@@ -390,12 +419,15 @@ class RunHandler:
         # Consistent layout opening matching global AI (engineer style)
         from rich.markdown import Markdown
         printer.console.print(Rule(style="engineer"))
-        printer.console.print(Markdown("**Playbook Builder AI**: Welcome! Describe the automation workflow you want to design.\nType **exit** to quit.\n"))
+        printer.console.print(Markdown("**Playbook Builder AI**: Welcome! Describe the automation workflow you want to design.\nType **exit** to quit.\n*Press Enter to submit, or Ctrl+Enter (Alt+Enter) to add a new line.*\n"))
         printer.console.print(Rule(style="engineer"))
         
         while True:
             try:
-                user_prompt = Prompt.ask("[user_prompt]User[/user_prompt]")
+                user_prompt = session.prompt(
+                    HTML(f'<style fg="{user_color}">User (Enter to submit, Ctrl+Enter for newline):</style>\n'),
+                    multiline=True
+                )
             except (KeyboardInterrupt, EOFError):
                 printer.console.print()
                 printer.warning("Operation cancelled by user.")

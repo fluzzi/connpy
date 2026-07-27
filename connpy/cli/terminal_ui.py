@@ -14,6 +14,8 @@ from rich.panel import Panel
 from rich.markdown import Markdown
 from prompt_toolkit import PromptSession
 from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.filters import has_completions
+
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.history import InMemoryHistory
 
@@ -125,6 +127,16 @@ class CopilotInterface:
             def _(event):
                 state['cancelled'] = True
                 event.app.exit(result='')
+
+            # Multiline keybindings: Enter to submit, Ctrl+Enter (c-j) or Alt+Enter to add a newline
+            @bindings.add('enter', filter=~has_completions)
+            def _(event):
+                event.current_buffer.validate_and_handle()
+
+            @bindings.add('c-j')
+            @bindings.add('escape', 'enter')
+            def _(event):
+                event.current_buffer.insert_text('\n')
 
             def get_active_buffer():
                 if state['context_mode'] == self.mode_lines:
@@ -271,7 +283,8 @@ class CopilotInterface:
                     question = await session.prompt_async(
                         get_prompt_text, 
                         key_bindings=bindings, 
-                        bottom_toolbar=get_toolbar
+                        bottom_toolbar=get_toolbar,
+                        multiline=True
                     )
                 except (KeyboardInterrupt, EOFError):
                     state['cancelled'] = True
@@ -284,13 +297,14 @@ class CopilotInterface:
                 directive = self.ai_service.process_copilot_input(question, self.session_state)
                 
                 if directive["action"] == "state_update":
-                    state['toolbar_msg'] = directive['message']
+                    msg = directive['message']
+                    state['toolbar_msg'] = msg
                     state['msg_expiry'] = time.time() + 3 # 3 seconds timeout
                     
                     async def delayed_refresh():
                         await asyncio.sleep(3.1)
                         # Only invalidate if the message hasn't been replaced by a newer one
-                        if state.get('toolbar_msg') == directive['message']:
+                        if state.get('toolbar_msg') == msg:
                             state['toolbar_msg'] = '' # Explicitly clear
                             try:
                                 from prompt_toolkit.application.current import get_app

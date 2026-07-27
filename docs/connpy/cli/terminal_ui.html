@@ -160,6 +160,16 @@ el.replaceWith(d);
                 state[&#39;cancelled&#39;] = True
                 event.app.exit(result=&#39;&#39;)
 
+            # Multiline keybindings: Enter to submit, Ctrl+Enter (c-j) or Alt+Enter to add a newline
+            @bindings.add(&#39;enter&#39;, filter=~has_completions)
+            def _(event):
+                event.current_buffer.validate_and_handle()
+
+            @bindings.add(&#39;c-j&#39;)
+            @bindings.add(&#39;escape&#39;, &#39;enter&#39;)
+            def _(event):
+                event.current_buffer.insert_text(&#39;\n&#39;)
+
             def get_active_buffer():
                 if state[&#39;context_mode&#39;] == self.mode_lines:
                     return &#39;\n&#39;.join(buffer.split(&#39;\n&#39;)[-state[&#39;context_lines&#39;]:])
@@ -305,7 +315,8 @@ el.replaceWith(d);
                     question = await session.prompt_async(
                         get_prompt_text, 
                         key_bindings=bindings, 
-                        bottom_toolbar=get_toolbar
+                        bottom_toolbar=get_toolbar,
+                        multiline=True
                     )
                 except (KeyboardInterrupt, EOFError):
                     state[&#39;cancelled&#39;] = True
@@ -318,13 +329,14 @@ el.replaceWith(d);
                 directive = self.ai_service.process_copilot_input(question, self.session_state)
                 
                 if directive[&#34;action&#34;] == &#34;state_update&#34;:
-                    state[&#39;toolbar_msg&#39;] = directive[&#39;message&#39;]
+                    msg = directive[&#39;message&#39;]
+                    state[&#39;toolbar_msg&#39;] = msg
                     state[&#39;msg_expiry&#39;] = time.time() + 3 # 3 seconds timeout
                     
                     async def delayed_refresh():
                         await asyncio.sleep(3.1)
                         # Only invalidate if the message hasn&#39;t been replaced by a newer one
-                        if state.get(&#39;toolbar_msg&#39;) == directive[&#39;message&#39;]:
+                        if state.get(&#39;toolbar_msg&#39;) == msg:
                             state[&#39;toolbar_msg&#39;] = &#39;&#39; # Explicitly clear
                             try:
                                 from prompt_toolkit.application.current import get_app
@@ -614,6 +626,16 @@ el.replaceWith(d);
             state[&#39;cancelled&#39;] = True
             event.app.exit(result=&#39;&#39;)
 
+        # Multiline keybindings: Enter to submit, Ctrl+Enter (c-j) or Alt+Enter to add a newline
+        @bindings.add(&#39;enter&#39;, filter=~has_completions)
+        def _(event):
+            event.current_buffer.validate_and_handle()
+
+        @bindings.add(&#39;c-j&#39;)
+        @bindings.add(&#39;escape&#39;, &#39;enter&#39;)
+        def _(event):
+            event.current_buffer.insert_text(&#39;\n&#39;)
+
         def get_active_buffer():
             if state[&#39;context_mode&#39;] == self.mode_lines:
                 return &#39;\n&#39;.join(buffer.split(&#39;\n&#39;)[-state[&#39;context_lines&#39;]:])
@@ -759,7 +781,8 @@ el.replaceWith(d);
                 question = await session.prompt_async(
                     get_prompt_text, 
                     key_bindings=bindings, 
-                    bottom_toolbar=get_toolbar
+                    bottom_toolbar=get_toolbar,
+                    multiline=True
                 )
             except (KeyboardInterrupt, EOFError):
                 state[&#39;cancelled&#39;] = True
@@ -772,13 +795,14 @@ el.replaceWith(d);
             directive = self.ai_service.process_copilot_input(question, self.session_state)
             
             if directive[&#34;action&#34;] == &#34;state_update&#34;:
-                state[&#39;toolbar_msg&#39;] = directive[&#39;message&#39;]
+                msg = directive[&#39;message&#39;]
+                state[&#39;toolbar_msg&#39;] = msg
                 state[&#39;msg_expiry&#39;] = time.time() + 3 # 3 seconds timeout
                 
                 async def delayed_refresh():
                     await asyncio.sleep(3.1)
                     # Only invalidate if the message hasn&#39;t been replaced by a newer one
-                    if state.get(&#39;toolbar_msg&#39;) == directive[&#39;message&#39;]:
+                    if state.get(&#39;toolbar_msg&#39;) == msg:
                         state[&#39;toolbar_msg&#39;] = &#39;&#39; # Explicitly clear
                         try:
                             from prompt_toolkit.application.current import get_app
