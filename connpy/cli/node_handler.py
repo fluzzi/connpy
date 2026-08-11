@@ -1,18 +1,27 @@
 import sys
 import yaml
-import inquirer
 from rich.markdown import Markdown
 
 from .. import printer
 from ..services.exceptions import ConnpyError, InvalidConfigurationError
 from .helpers import choose
-from .forms import Forms
 from .help_text import get_instructions
 
 class NodeHandler:
     def __init__(self, app):
         self.app = app
-        self.forms = Forms(app)
+        self._forms = None
+
+    @property
+    def forms(self):
+        if self._forms is None:
+            from .forms import Forms
+            self._forms = Forms(self.app)
+        return self._forms
+
+    @forms.setter
+    def forms(self, value):
+        self._forms = value
 
     def _filter_exact_match(self, matches, query):
         if not query or len(matches) <= 1:
@@ -100,6 +109,7 @@ class NodeHandler:
             sys.exit(2)
 
         printer.info(f"Removing: {matches}")
+        import inquirer
         question = [inquirer.Confirm("delete", message="Are you sure you want to continue?")]
         confirm = inquirer.prompt(question)
         if confirm == None or not confirm["delete"]:

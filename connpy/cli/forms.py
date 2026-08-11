@@ -1,5 +1,4 @@
 import ast
-import inquirer
 from .validators import Validators
 
 class Forms:
@@ -8,6 +7,7 @@ class Forms:
         self.validators = Validators(app)
 
     def questions_edit(self):
+        import inquirer
         questions = []
         questions.append(inquirer.Confirm("host", message="Edit Hostname/IP?"))
         questions.append(inquirer.Confirm("protocol", message="Edit Protocol/app?"))
@@ -21,6 +21,7 @@ class Forms:
         return inquirer.prompt(questions)
 
     def questions_nodes(self, unique, uniques=None, edit=None):
+        import inquirer
         try:
             defaults = self.app.services.nodes.get_node_details(unique)
             if "tags" not in defaults:
@@ -98,6 +99,7 @@ class Forms:
         return result
 
     def questions_profiles(self, unique, edit=None):
+        import inquirer
         try:
             defaults = self.app.services.profiles.get_profile(unique, resolve=False)
             if "tags" not in defaults:
@@ -163,6 +165,7 @@ class Forms:
         return result
 
     def questions_bulk(self, nodes="", hosts=""):
+        import inquirer
         questions = []
         questions.append(inquirer.Text("ids", message="add a comma separated list of nodes to add", default=nodes, validate=self.validators.bulk_node_validation))
         questions.append(inquirer.Text("location", message="Add a @folder, @subfolder@folder or leave empty", validate=self.validators.bulk_folder_validation))
@@ -200,6 +203,7 @@ class Forms:
 
     def mcp_wizard(self, mcp_servers):
         """Interactive wizard to manage MCP servers."""
+        import inquirer
         from .helpers import theme
         
         while True:

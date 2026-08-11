@@ -1,15 +1,24 @@
 import sys
 import yaml
-import inquirer
 
 from .. import printer
 from ..services.exceptions import ConnpyError, ProfileNotFoundError
-from .forms import Forms
 
 class ProfileHandler:
     def __init__(self, app):
         self.app = app
-        self.forms = Forms(app)
+        self._forms = None
+
+    @property
+    def forms(self):
+        if self._forms is None:
+            from .forms import Forms
+            self._forms = Forms(self.app)
+        return self._forms
+
+    @forms.setter
+    def forms(self, value):
+        self._forms = value
 
     def dispatch(self, args):
         if not self.app.case:
@@ -29,6 +38,7 @@ class ProfileHandler:
             printer.error("Can't delete default profile")
             sys.exit(6)
             
+        import inquirer
         question = [inquirer.Confirm("delete", message=f"Are you sure you want to delete {name}?")]
         confirm = inquirer.prompt(question)
         if confirm == None or not confirm["delete"]:

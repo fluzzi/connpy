@@ -1,19 +1,29 @@
 import os
 import sys
-import inquirer
 from .. import printer
 from ..services.exceptions import ConnpyError
-from .forms import Forms
 
 class ImportExportHandler:
     def __init__(self, app):
         self.app = app
-        self.forms = Forms(app)
+        self._forms = None
+
+    @property
+    def forms(self):
+        if self._forms is None:
+            from .forms import Forms
+            self._forms = Forms(self.app)
+        return self._forms
+
+    @forms.setter
+    def forms(self, value):
+        self._forms = value
 
     def dispatch_import(self, args):
         file_path = args.data[0]
         try:
             printer.warning("This could overwrite your current configuration!")
+            import inquirer
             question = [inquirer.Confirm("import", message=f"Are you sure you want to import {file_path}?")]
             confirm = inquirer.prompt(question)
             if confirm == None or not confirm["import"]:

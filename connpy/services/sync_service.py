@@ -1,3 +1,4 @@
+import sys
 import os
 import time
 import zipfile
@@ -6,13 +7,46 @@ import io
 import yaml
 import threading
 from datetime import datetime
-from google.oauth2.credentials import Credentials
-from google.auth.transport.requests import Request
-from googleapiclient.discovery import build
-from google.auth.exceptions import RefreshError
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
-from googleapiclient.errors import HttpError
+
+def __getattr__(name: str):
+    if name == "Credentials":
+        from google.oauth2.credentials import Credentials
+        return Credentials
+    elif name == "Request":
+        from google.auth.transport.requests import Request
+        return Request
+    elif name == "build":
+        from googleapiclient.discovery import build
+        return build
+    elif name == "RefreshError":
+        from google.auth.exceptions import RefreshError
+        return RefreshError
+    elif name == "InstalledAppFlow":
+        from google_auth_oauthlib.flow import InstalledAppFlow
+        return InstalledAppFlow
+    elif name == "MediaFileUpload":
+        from googleapiclient.http import MediaFileUpload
+        return MediaFileUpload
+    elif name == "MediaIoBaseDownload":
+        from googleapiclient.http import MediaIoBaseDownload
+        return MediaIoBaseDownload
+    elif name == "HttpError":
+        from googleapiclient.errors import HttpError
+        return HttpError
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+
+def _get_google_libs():
+    mod = sys.modules[__name__]
+    return (
+        getattr(mod, "Credentials"),
+        getattr(mod, "Request"),
+        getattr(mod, "build"),
+        getattr(mod, "RefreshError"),
+        getattr(mod, "InstalledAppFlow"),
+        getattr(mod, "MediaFileUpload"),
+        getattr(mod, "MediaIoBaseDownload"),
+        getattr(mod, "HttpError"),
+    )
 
 from .base import BaseService
 from .. import printer
@@ -44,6 +78,7 @@ class SyncService(BaseService):
 
     def login(self):
         """Authenticate with Google Drive."""
+        Credentials, Request, _, RefreshError, InstalledAppFlow, _, _, _ = _get_google_libs()
         creds = None
         if os.path.exists(self.token_file):
             creds = Credentials.from_authorized_user_file(self.token_file, self.scopes)
@@ -81,6 +116,7 @@ class SyncService(BaseService):
 
     def get_credentials(self):
         """Get valid credentials, refreshing if necessary."""
+        Credentials, Request, _, RefreshError, _, _, _, _ = _get_google_libs()
         if os.path.exists(self.token_file):
             creds = Credentials.from_authorized_user_file(self.token_file, self.scopes)
         else:
@@ -98,6 +134,7 @@ class SyncService(BaseService):
 
     def check_login_status(self):
         """Check if logged in to Google Drive."""
+        Credentials, Request, _, RefreshError, _, _, _, _ = _get_google_libs()
         if os.path.exists(self.token_file):
             creds = Credentials.from_authorized_user_file(self.token_file)
             if creds and creds.expired and creds.refresh_token:
@@ -110,6 +147,7 @@ class SyncService(BaseService):
 
     def list_backups(self):
         """List files in Google Drive appDataFolder."""
+        _, _, build, _, _, _, _, HttpError = _get_google_libs()
         creds = self.get_credentials()
         if not creds:
             printer.error("Not logged in to Google Drive.")
@@ -168,6 +206,7 @@ class SyncService(BaseService):
 
     def upload_file(self, file_path, timestamp):
         """Internal method to upload to Drive."""
+        _, _, build, _, _, MediaFileUpload, _, _ = _get_google_libs()
         creds = self.get_credentials()
         if not creds: return False
         
@@ -193,6 +232,7 @@ class SyncService(BaseService):
 
     def delete_backup(self, file_id):
         """Delete a backup from Drive."""
+        _, _, build, _, _, _, _, _ = _get_google_libs()
         creds = self.get_credentials()
         if not creds: return False
         try:
@@ -226,6 +266,7 @@ class SyncService(BaseService):
 
     def download_file(self, file_id, dest):
         """Internal method to download from Drive."""
+        _, _, build, _, _, _, MediaIoBaseDownload, _ = _get_google_libs()
         creds = self.get_credentials()
         if not creds: return False
         try:

@@ -1,6 +1,4 @@
 import os
-import inquirer
-from inquirer.themes import Default, term
 
 try:
     from pyfzf.pyfzf import FzfPrompt
@@ -9,6 +7,7 @@ except ImportError:
 
 def hex_to_blessed(hex_str):
     """Convert hex color string to blessed/ansi format."""
+    from inquirer.themes import term
     if not hex_str or not isinstance(hex_str, str):
         return term.normal
     
@@ -42,27 +41,28 @@ def hex_to_blessed(hex_str):
     except:
         return prefix + term.normal
 
-# Custom inquirer theme matching connpy colors
-class ConnpyTheme(Default):
-    def __init__(self):
-        super().__init__()
-        try:
-            from ..printer import _global_active_styles
-            # Use user_prompt as primary accent, fallback to info/cyan
-            accent = _global_active_styles.get("user_prompt", _global_active_styles.get("info", "cyan"))
-            accent_color = hex_to_blessed(accent)
-            
-            self.Question.mark_color = accent_color
-            self.List.selection_color = accent_color
-            self.List.selection_cursor = ">"
-        except:
-            # Absolute fallback to standard cyan
-            self.Question.mark_color = term.cyan
-            self.List.selection_color = term.bold_cyan
-            self.List.selection_cursor = ">"
-
 def get_theme():
     """Returns a fresh instance of the theme with current colors."""
+    from inquirer.themes import Default, term
+
+    class ConnpyTheme(Default):
+        def __init__(self):
+            super().__init__()
+            try:
+                from ..printer import _global_active_styles
+                # Use user_prompt as primary accent, fallback to info/cyan
+                accent = _global_active_styles.get("user_prompt", _global_active_styles.get("info", "cyan"))
+                accent_color = hex_to_blessed(accent)
+                
+                self.Question.mark_color = accent_color
+                self.List.selection_color = accent_color
+                self.List.selection_cursor = ">"
+            except:
+                # Absolute fallback to standard cyan
+                self.Question.mark_color = term.cyan
+                self.List.selection_color = term.bold_cyan
+                self.List.selection_cursor = ">"
+
     return ConnpyTheme()
 
 class ThemeProxy:
@@ -126,6 +126,7 @@ def choose(app, list_, name, action):
         else:
             return answer[0]
     else:
+        import inquirer
         questions = [inquirer.List(name, message="Pick {} to {}:".format(name,action), choices=list_, carousel=True)]
         answer = inquirer.prompt(questions, theme=theme)
         if answer == None:

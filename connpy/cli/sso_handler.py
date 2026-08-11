@@ -1,6 +1,5 @@
 import sys
 import yaml
-import inquirer
 from .. import printer
 
 class SSOHandler:
@@ -40,6 +39,7 @@ class SSOHandler:
             sys.exit(1)
 
     def add_provider(self, args):
+        import inquirer
         provider = args.provider
         sso = self.app.config.config.get("sso", {})
         providers = sso.setdefault("providers", {})
@@ -113,6 +113,7 @@ class SSOHandler:
             sys.exit(1)
             
         # Confirm delete
+        import inquirer
         questions = [inquirer.Confirm("confirm", message=f"Are you sure you want to delete SSO Provider '{provider}'?", default=False)]
         answers = inquirer.prompt(questions)
         if not answers or not answers["confirm"]:

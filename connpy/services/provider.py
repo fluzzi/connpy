@@ -14,6 +14,11 @@ class ServiceProvider:
         self.mode = mode
         self.config = config
         self.remote_host = remote_host
+        self._system = None
+        self._execution = None
+        self._import_export = None
+        self._sync = None
+        self._users = None
         
         if mode == "local":
             self._init_local()
@@ -28,34 +33,21 @@ class ServiceProvider:
         from .config_service import ConfigService
         from .plugin_service import PluginService
         from .ai_service import AIService
-        from .system_service import SystemService
-        from .execution_service import ExecutionService
-        from .import_export_service import ImportExportService
         from .context_service import ContextService
-        from .sync_service import SyncService
-        from .user_service import UserService
         
         self.nodes = NodeService(self.config)
         self.profiles = ProfileService(self.config)
         self.config_svc = ConfigService(self.config)
         self.plugins = PluginService(self.config)
         self.ai = AIService(self.config)
-        self.system = SystemService(self.config)
-        self.execution = ExecutionService(self.config)
-        self.import_export = ImportExportService(self.config)
         self.context = ContextService(self.config)
-        self.sync = SyncService(self.config)
-        self.users = UserService(self.config.defaultdir)
     
     def _init_remote(self):
         # Allow ConfigService to work locally so the user can revert the mode
         from .config_service import ConfigService
         from .context_service import ContextService
-        from .sync_service import SyncService
         self.config_svc = ConfigService(self.config)
         self.context = ContextService(self.config)
-        self.sync = SyncService(self.config)
-        self.users = None
         
         if not self.remote_host:
             raise InvalidConfigurationError("Remote host must be specified in remote mode")
@@ -98,3 +90,58 @@ class ServiceProvider:
         self.execution = ExecutionStub(channel, remote_host=self.remote_host)
         self.import_export = ImportExportStub(channel, remote_host=self.remote_host)
         self.auth = AuthStub(channel, remote_host=self.remote_host)
+
+    @property
+    def system(self):
+        if self._system is None and self.mode == "local":
+            from .system_service import SystemService
+            self._system = SystemService(self.config)
+        return self._system
+
+    @system.setter
+    def system(self, value):
+        self._system = value
+
+    @property
+    def execution(self):
+        if self._execution is None and self.mode == "local":
+            from .execution_service import ExecutionService
+            self._execution = ExecutionService(self.config)
+        return self._execution
+
+    @execution.setter
+    def execution(self, value):
+        self._execution = value
+
+    @property
+    def import_export(self):
+        if self._import_export is None and self.mode == "local":
+            from .import_export_service import ImportExportService
+            self._import_export = ImportExportService(self.config)
+        return self._import_export
+
+    @import_export.setter
+    def import_export(self, value):
+        self._import_export = value
+
+    @property
+    def sync(self):
+        if self._sync is None:
+            from .sync_service import SyncService
+            self._sync = SyncService(self.config)
+        return self._sync
+
+    @sync.setter
+    def sync(self, value):
+        self._sync = value
+
+    @property
+    def users(self):
+        if self._users is None and self.mode == "local":
+            from .user_service import UserService
+            self._users = UserService(self.config.defaultdir)
+        return self._users
+
+    @users.setter
+    def users(self, value):
+        self._users = value
