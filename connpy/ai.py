@@ -1159,8 +1159,9 @@ class ai:
                             for msg in chat_history[-self.max_history:]:
                                 if msg.get('role') != 'system':
                                     messages.append(msg)
-                        # Add current user request
-                        messages.append({"role": "user", "content": clean_input})
+                        # Add current user request with a system note to prevent infinite escalation loops
+                        fallback_msg = clean_input + "\n\n[SYSTEM NOTE: The Architect is currently unavailable/failed to respond. You must handle the user's request directly as the Network Engineer. Do NOT attempt to escalate to the Architect again.]"
+                        messages.append({"role": "user", "content": fallback_msg})
                         continue
                     else: 
                         return {"response": f"Error: Both engines failed. {str(e)}", "chat_history": messages[1:], "usage": usage}

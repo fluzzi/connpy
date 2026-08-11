@@ -1148,3 +1148,33 @@ class AuthStub:
     def change_password(self, old_password, new_password):
         req = connpy_pb2.ChangePasswordRequest(old_password=old_password, new_password=new_password)
         self.stub.change_password(req)
+
+    @handle_errors
+    def create_api_token(self, name, expires_in_days=0):
+        req = connpy_pb2.CreateApiTokenRequest(name=name, expires_in_days=expires_in_days)
+        resp = self.stub.create_api_token(req)
+        return {
+            "token_id": resp.token_id,
+            "raw_token": resp.raw_token,
+            "name": resp.name,
+        }
+
+    @handle_errors
+    def list_api_tokens(self):
+        resp = self.stub.list_api_tokens(Empty())
+        return [
+            {
+                "token_id": t.token_id,
+                "name": t.name,
+                "token_prefix": t.token_prefix,
+                "created_at": t.created_at,
+                "last_used_at": t.last_used_at,
+                "expires_at": t.expires_at,
+            }
+            for t in resp.tokens
+        ]
+
+    @handle_errors
+    def revoke_api_token(self, token_id):
+        req = connpy_pb2.RevokeApiTokenRequest(token_id=token_id)
+        self.stub.revoke_api_token(req)

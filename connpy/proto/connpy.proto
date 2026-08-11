@@ -304,6 +304,9 @@ service AuthService {
     rpc login_sso (LoginSSORequest) returns (LoginResponse) {}
     rpc change_password (ChangePasswordRequest) returns (google.protobuf.Empty) {}
     rpc get_sso_providers (google.protobuf.Empty) returns (SSOProvidersResponse) {}
+    rpc create_api_token (CreateApiTokenRequest) returns (CreateApiTokenResponse) {}
+    rpc list_api_tokens (google.protobuf.Empty) returns (ListApiTokensResponse) {}
+    rpc revoke_api_token (RevokeApiTokenRequest) returns (google.protobuf.Empty) {}
 }
 
 message SSOProvidersResponse {
@@ -330,6 +333,34 @@ message LoginResponse {
 message ChangePasswordRequest {
     string old_password = 1;
     string new_password = 2;
+}
+
+message CreateApiTokenRequest {
+    string name = 1;
+    int32 expires_in_days = 2;
+}
+
+message CreateApiTokenResponse {
+    string token_id = 1;
+    string raw_token = 2;
+    string name = 3;
+}
+
+message ApiTokenInfo {
+    string token_id = 1;
+    string name = 2;
+    string token_prefix = 3;
+    string created_at = 4;
+    string last_used_at = 5;
+    string expires_at = 6;
+}
+
+message ListApiTokensResponse {
+    repeated ApiTokenInfo tokens = 1;
+}
+
+message RevokeApiTokenRequest {
+    string token_id = 1;
 }
 
 message AnalyzeRequest {

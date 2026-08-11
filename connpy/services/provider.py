@@ -69,6 +69,9 @@ class ServiceProvider:
         )
         
         def get_token():
+            env_token = os.environ.get("CONNPY_TOKEN")
+            if env_token:
+                return env_token
             token_path = os.path.join(self.config.defaultdir, ".token")
             if os.path.exists(token_path):
                 try:

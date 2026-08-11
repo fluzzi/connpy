@@ -368,7 +368,12 @@ def _build_tree(nodes, folders, profiles, plugins, configdir):
         },
         "user": user_dict,
         "sso": sso_dict,
-        "login": {"--help": None, "-h": None, "*": None},
+        "login": {
+            "--status": None, "-s": None,
+            "--create-token": None, "--list-tokens": None,
+            "--revoke-token": None, "--expires-days": None,
+            "--help": None, "-h": None, "*": None
+        },
         "logout": {"--help": None, "-h": None},
         "config": config_dict,
         "sync": {

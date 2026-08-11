@@ -1,4 +1,5 @@
 import os
+import hashlib
 import re
 import shutil
 import secrets
@@ -17,6 +18,9 @@ class UserService:
         
         # Ensure users directory exists
         os.makedirs(self.users_dir, exist_ok=True)
+        
+        # Reverse index cache: token_hash -> (username, token_id)
+        self._token_index: dict[str, tuple[str, str]] = {}
 
     def _load_registry(self) -> dict:
         """Loads registry from file. If it doesn't exist, initializes it with a new JWT secret."""
@@ -60,6 +64,16 @@ class UserService:
                 except OSError:
                     pass
             raise e
+
+    def _build_token_index(self, registry: dict) -> dict[str, tuple[str, str]]:
+        """Builds a reverse index of token_hash -> (username, token_id) for O(1) PAT lookup."""
+        index = {}
+        for username, user_data in registry.get("users", {}).items():
+            for token_id, token_meta in user_data.get("api_tokens", {}).items():
+                token_hash = token_meta.get("token_hash")
+                if token_hash:
+                    index[token_hash] = (username, token_id)
+        return index
 
     def create_user(self, username, password, config_path=None) -> dict:
         """Creates a new user with bcrypt-hashed credentials.
@@ -237,3 +251,125 @@ class UserService:
             return payload.get("sub")
         except (jwt.ExpiredSignatureError, jwt.InvalidTokenError, KeyError):
             return None
+
+    # --- Personal Access Token (PAT) Management ---
+
+    def create_api_token(self, username: str, name: str, expires_in_days: int | None = None) -> dict:
+        """Creates a Personal Access Token for the user.
+        
+        Returns the raw token ONCE. Only the SHA-256 hash is persisted.
+        """
+        if not name or not isinstance(name, str):
+            raise ValueError("Token name cannot be empty")
+        
+        registry = self._load_registry()
+        if username not in registry["users"]:
+            raise ValueError(f"User '{username}' not found")
+        
+        user_data = registry["users"][username]
+        if "api_tokens" not in user_data:
+            user_data["api_tokens"] = {}
+        
+        # Generate cryptographically secure token with recognizable prefix
+        raw_secret = secrets.token_hex(32)
+        raw_token = f"cnp_pat_{raw_secret}"
+        token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+        token_id = f"tok_{secrets.token_hex(4)}"
+        
+        now = datetime.datetime.now(datetime.timezone.utc)
+        expires_at = None
+        if expires_in_days and expires_in_days > 0:
+            expires_at = (now + datetime.timedelta(days=expires_in_days)).isoformat()
+        
+        user_data["api_tokens"][token_id] = {
+            "name": name,
+            "token_hash": token_hash,
+            "token_prefix": raw_token[:16],
+            "created_at": now.isoformat(),
+            "last_used_at": None,
+            "expires_at": expires_at,
+        }
+        
+        self._save_registry(registry)
+        self._token_index = self._build_token_index(registry)
+        
+        return {
+            "token_id": token_id,
+            "raw_token": raw_token,
+            "name": name,
+        }
+
+    def list_api_tokens(self, username: str) -> list[dict]:
+        """Lists all active API tokens for a user (without sensitive data)."""
+        registry = self._load_registry()
+        if username not in registry["users"]:
+            raise ValueError(f"User '{username}' not found")
+        
+        tokens = registry["users"][username].get("api_tokens", {})
+        return [
+            {
+                "token_id": tid,
+                "name": meta.get("name"),
+                "token_prefix": meta.get("token_prefix"),
+                "created_at": meta.get("created_at"),
+                "last_used_at": meta.get("last_used_at"),
+                "expires_at": meta.get("expires_at"),
+            }
+            for tid, meta in tokens.items()
+        ]
+
+    def revoke_api_token(self, username: str, token_id: str) -> bool:
+        """Revokes (deletes) a specific API token. Returns True if found and removed."""
+        registry = self._load_registry()
+        if username not in registry["users"]:
+            raise ValueError(f"User '{username}' not found")
+        
+        tokens = registry["users"][username].get("api_tokens", {})
+        if token_id not in tokens:
+            return False
+        
+        del tokens[token_id]
+        self._save_registry(registry)
+        self._token_index = self._build_token_index(registry)
+        return True
+
+    def verify_api_token(self, raw_token: str) -> str | None:
+        """Validates a PAT by hashing it and looking up the reverse index.
+        
+        Returns username if valid and not expired, None otherwise.
+        """
+        token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+        
+        # Rebuild index if empty (cold start or after process restart)
+        if not self._token_index:
+            registry = self._load_registry()
+            self._token_index = self._build_token_index(registry)
+        
+        match = self._token_index.get(token_hash)
+        if not match:
+            return None
+        
+        username, token_id = match
+        
+        # Validate token still exists and check expiration
+        registry = self._load_registry()
+        user_data = registry.get("users", {}).get(username, {})
+        token_meta = user_data.get("api_tokens", {}).get(token_id)
+        
+        if not token_meta:
+            # Token was revoked between index build and now
+            self._token_index = self._build_token_index(registry)
+            return None
+        
+        # Check expiration
+        expires_at = token_meta.get("expires_at")
+        if expires_at:
+            exp_dt = datetime.datetime.fromisoformat(expires_at)
+            if datetime.datetime.now(datetime.timezone.utc) > exp_dt:
+                return None
+        
+        # Update last_used_at
+        token_meta["last_used_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        self._save_registry(registry)
+        
+        return username

@@ -395,6 +395,10 @@ class connapp:
         loginparser.error = self._custom_error
         loginparser.add_argument("username", nargs='?', default=None, help="Username to authenticate")
         loginparser.add_argument("-s", "--status", action="store_true", help="Check current login status")
+        loginparser.add_argument("--create-token", dest="create_token", metavar="NAME", help="Create a permanent API token with the given name")
+        loginparser.add_argument("--list-tokens", dest="list_tokens", action="store_true", help="List all active API tokens")
+        loginparser.add_argument("--revoke-token", dest="revoke_token", metavar="TOKEN_ID", help="Revoke an API token by its ID")
+        loginparser.add_argument("--expires-days", dest="expires_days", type=int, default=0, metavar="DAYS", help="Optional expiration in days for --create-token (default: permanent)")
         loginparser.set_defaults(func=self._login.dispatch, action="login")
 
         #LOGOUTPARSER

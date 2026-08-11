@@ -249,10 +249,59 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
                         raw_bytes = str(raw_bytes).encode()
                     
                     from connpy.utils import log_cleaner
-                    last_line = log_cleaner(raw_bytes.decode(errors='replace')).split('\n')[-1].strip()
+                    cleaned_buffer = log_cleaner(raw_bytes.decode(errors='replace'))
+                    last_line = cleaned_buffer.split('\n')[-1].strip() if cleaned_buffer.strip() else "(prompt)"
                     blocks = service.build_context_blocks(raw_bytes, n.cmd_byte_positions, node_info, last_line=last_line)
                     node_info["context_blocks"] = blocks
 
+                    total_cmds = len(blocks)
+                    total_lines = len(cleaned_buffer.split('\n'))
+
+                    if not hasattr(remote_stream, 'copilot_state') or remote_stream.copilot_state is None:
+                        remote_stream.copilot_state = {}
+                    session_state = remote_stream.copilot_state
+
+                    if isinstance(node_info, dict):
+                        for k, v in node_info.items():
+                            if k in ('context_mode', 'context_cmd', 'context_lines', 'persona', 'trust', 'os', 'prompt'):
+                                session_state[k] = v
+
+                    saved_mode = session_state.get('context_mode', 0)
+                    saved_cmd = session_state.get('context_cmd', 1)
+                    saved_lines = session_state.get('context_lines', 50)
+                    last_total_cmds = session_state.get('last_total_cmds', None)
+                    last_total_lines = session_state.get('last_total_lines', None)
+
+                    is_range = saved_mode in (0, 'RANGE', 'range')
+                    is_lines = saved_mode in (2, 'LINES', 'lines')
+                    is_single = saved_mode in (1, 'SINGLE', 'single')
+
+                    if is_range or is_single:
+                        if last_total_cmds is not None and total_cmds > last_total_cmds and saved_cmd > 1:
+                            new_cmds = total_cmds - last_total_cmds
+                            initial_cmd = saved_cmd + new_cmds
+                        else:
+                            initial_cmd = saved_cmd
+                        initial_lines = saved_lines
+                    elif is_lines:
+                        if last_total_lines is not None and total_lines > last_total_lines and saved_lines > 50:
+                            new_lines = total_lines - last_total_lines
+                            initial_lines = saved_lines + new_lines
+                        else:
+                            initial_lines = saved_lines
+                        initial_cmd = saved_cmd
+                    else:
+                        initial_cmd = saved_cmd
+                        initial_lines = saved_lines
+
+                    session_state['context_cmd'] = max(1, initial_cmd)
+                    session_state['context_lines'] = max(1, initial_lines)
+                    session_state['last_total_cmds'] = total_cmds
+                    session_state['last_total_lines'] = total_lines
+
+                    node_info.update(session_state)
+                    node_info['context_cmd'] = min(session_state['context_cmd'], max(1, total_cmds))
+                    node_info['context_lines'] = min(session_state['context_lines'], max(1, total_lines))
                     node_info_json = json.dumps(node_info)
                     
                     # Convert buffer to string if it's bytes for the preview
@@ -297,6 +346,17 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
                             if req_session_id and req_session_id != copilot_session_id:
                                 continue # Ignore stale request from a previous session
 
+                            merged_node_info_str = req_data.get("node_info_json", "")
+                            if merged_node_info_str:
+                                try:
+                                    merged_node_info = json.loads(merged_node_info_str)
+                                    node_info.update(merged_node_info)
+                                    # Sync context state from frontend into session_state for persistence
+                                    for k in ('context_mode', 'context_cmd', 'context_lines'):
+                                        if k in merged_node_info:
+                                            session_state[k] = merged_node_info[k]
+                                except: pass
+
                             if "question" not in req_data or not req_data["question"] or req_data["question"] == "CANCEL" or req_data.get("action") in ("cancel", "web_cancel"):
                                 if req_data.get("action") == "web_cancel":
                                     os.write(child_fd, b'\x05')
@@ -304,13 +364,6 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
                                     os.write(child_fd, b'\x15\r')
                                 return
                             question = req_data["question"]
-                            
-                            merged_node_info_str = req_data.get("node_info_json", "")
-                            if merged_node_info_str:
-                                try:
-                                    merged_node_info = json.loads(merged_node_info_str)
-                                    node_info.update(merged_node_info)
-                                except: pass
 
                             context_buffer = req_data.get("context_buffer", "")
                             if context_buffer.startswith('{"context_start_pos"'):
@@ -373,6 +426,15 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
                             if not action_data: return
                             action = action_data.get("action", "cancel")
                             
+                            merged_node_info_str = action_data.get("node_info_json", "")
+                            if merged_node_info_str:
+                                try:
+                                    merged_node_info = json.loads(merged_node_info_str)
+                                    for k in ('context_mode', 'context_cmd', 'context_lines'):
+                                        if k in merged_node_info:
+                                            session_state[k] = merged_node_info[k]
+                                except: pass
+
                             if action == "continue":
                                 continue # Loop back for next question
                                 
@@ -1426,6 +1488,58 @@ class AuthServicer(connpy_pb2_grpc.AuthServiceServicer):
             
         return Empty()
 
+    @handle_errors
+    def create_api_token(self, request, context):
+        username = _current_user.get()
+        if not username:
+            context.abort(grpc.StatusCode.UNAUTHENTICATED, "Authentication required")
+        
+        try:
+            expires_in_days = request.expires_in_days if request.expires_in_days > 0 else None
+            result = self.registry.user_service.create_api_token(
+                username, request.name, expires_in_days=expires_in_days
+            )
+        except ValueError as e:
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(e))
+        
+        return connpy_pb2.CreateApiTokenResponse(
+            token_id=result["token_id"],
+            raw_token=result["raw_token"],
+            name=result["name"],
+        )
+
+    @handle_errors
+    def list_api_tokens(self, request, context):
+        username = _current_user.get()
+        if not username:
+            context.abort(grpc.StatusCode.UNAUTHENTICATED, "Authentication required")
+        
+        tokens = self.registry.user_service.list_api_tokens(username)
+        token_infos = [
+            connpy_pb2.ApiTokenInfo(
+                token_id=t["token_id"],
+                name=t.get("name") or "",
+                token_prefix=t.get("token_prefix") or "",
+                created_at=t.get("created_at") or "",
+                last_used_at=t.get("last_used_at") or "",
+                expires_at=t.get("expires_at") or "",
+            )
+            for t in tokens
+        ]
+        return connpy_pb2.ListApiTokensResponse(tokens=token_infos)
+
+    @handle_errors
+    def revoke_api_token(self, request, context):
+        username = _current_user.get()
+        if not username:
+            context.abort(grpc.StatusCode.UNAUTHENTICATED, "Authentication required")
+        
+        removed = self.registry.user_service.revoke_api_token(username, request.token_id)
+        if not removed:
+            context.abort(grpc.StatusCode.NOT_FOUND, f"Token '{request.token_id}' not found")
+        
+        return Empty()
+
 class AuthInterceptor(grpc.ServerInterceptor):
     OPEN_METHODS = ["/connpy.AuthService/login", "/connpy.AuthService/login_sso", "/connpy.AuthService/get_sso_providers"]
 
@@ -1445,6 +1559,8 @@ class AuthInterceptor(grpc.ServerInterceptor):
             return self._unauthenticated_handler(handler_call_details, "Authorization token is missing")
 
         username = self.registry.user_service.verify_jwt(token)
+        if not username and token.startswith("cnp_pat_"):
+            username = self.registry.user_service.verify_api_token(token)
         if not username:
             return self._unauthenticated_handler(handler_call_details, "Invalid or expired token")
 

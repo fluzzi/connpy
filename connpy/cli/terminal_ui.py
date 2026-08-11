@@ -30,20 +30,32 @@ class CopilotInterface:
         self.pt_input = pt_input
         self.pt_output = pt_output
         self.ai_service = AIService(config)
-        self.session_state = session_state if session_state is not None else {
-            'persona': 'engineer',
-            'trust_mode': False,
-            'memories': [],
-            'os': None,
-            'prompt': None
-        }
+        self.mode_range, self.mode_single, self.mode_lines = 0, 1, 2 
+
+        self.session_state = session_state if session_state is not None else {}
+        self.session_state.setdefault('persona', 'engineer')
+        self.session_state.setdefault('trust_mode', False)
+        self.session_state.setdefault('memories', [])
+        self.session_state.setdefault('os', None)
+        self.session_state.setdefault('prompt', None)
+        self.session_state.setdefault('context_mode', self.mode_range)
+        self.session_state.setdefault('context_cmd', 1)
+        self.session_state.setdefault('context_lines', 50)
+        self.session_state.setdefault('last_total_cmds', None)
+        self.session_state.setdefault('last_total_lines', None)
 
         if rich_file:
             self.console = Console(theme=connpy_theme, force_terminal=True, file=rich_file)
         else:
             self.console = Console(theme=connpy_theme)
 
-        self.mode_range, self.mode_single, self.mode_lines = 0, 1, 2 
+    def _sync_session_context(self, state: dict):
+        """Persist current context mode, depth, total commands, and total lines into session_state."""
+        self.session_state['context_mode'] = state['context_mode']
+        self.session_state['context_cmd'] = state['context_cmd']
+        self.session_state['context_lines'] = state['context_lines']
+        self.session_state['last_total_cmds'] = state['total_cmds']
+        self.session_state['last_total_lines'] = state['total_lines']
 
     def _get_theme_color(self, style_name: str, fallback: str = "white") -> str:
         """Extract Hex or ANSI color name from the active rich theme."""
@@ -77,16 +89,52 @@ class CopilotInterface:
                 last_line = buffer.split('\n')[-1].strip() if buffer.strip() else "(prompt)"
                 blocks = self.ai_service.build_context_blocks(raw_bytes, cmd_byte_positions, node_info, last_line=last_line)
             
+            total_cmds = len(blocks)
+            total_lines = len(buffer.split('\n'))
+
+            saved_mode = self.session_state.get('context_mode', self.mode_range)
+            saved_cmd = self.session_state.get('context_cmd', 1)
+            saved_lines = self.session_state.get('context_lines', min(50, total_lines))
+            last_total_cmds = self.session_state.get('last_total_cmds', None)
+            last_total_lines = self.session_state.get('last_total_lines', None)
+
+            is_range = saved_mode in (self.mode_range, 0, 'RANGE', 'range')
+            is_lines = saved_mode in (self.mode_lines, 2, 'LINES', 'lines')
+            is_single = saved_mode in (self.mode_single, 1, 'SINGLE', 'single')
+
+            if is_range or is_single:
+                if last_total_cmds is not None and total_cmds > last_total_cmds and saved_cmd > 1:
+                    new_cmds = total_cmds - last_total_cmds
+                    initial_cmd = saved_cmd + new_cmds
+                else:
+                    initial_cmd = saved_cmd
+                initial_lines = saved_lines
+            elif is_lines:
+                if last_total_lines is not None and total_lines > last_total_lines and saved_lines > 50:
+                    new_lines = total_lines - last_total_lines
+                    initial_lines = saved_lines + new_lines
+                else:
+                    initial_lines = saved_lines
+                initial_cmd = saved_cmd
+            else:
+                initial_cmd = saved_cmd
+                initial_lines = saved_lines
+
             state = {
-                'context_cmd': 1,
-                'total_cmds': len(blocks),
-                'total_lines': len(buffer.split('\n')),
-                'context_lines': min(50, len(buffer.split('\n'))),
-                'context_mode': self.mode_range,
+                'context_cmd': min(max(1, initial_cmd), max(1, total_cmds)),
+                'total_cmds': total_cmds,
+                'total_lines': total_lines,
+                'context_lines': min(max(1, initial_lines), max(1, total_lines)),
+                'context_mode': saved_mode,
                 'cancelled': False,
                 'toolbar_msg': '',
                 'msg_expiry': 0
             }
+            self.session_state['context_mode'] = saved_mode
+            self.session_state['context_cmd'] = max(1, initial_cmd)
+            self.session_state['context_lines'] = max(1, initial_lines)
+            self.session_state['last_total_cmds'] = total_cmds
+            self.session_state['last_total_lines'] = total_lines
             
             # 1. Visual Separation
             self.console.print("") # Real line break
@@ -105,6 +153,7 @@ class CopilotInterface:
                     state['context_lines'] = min(state['context_lines'] + 50, state['total_lines'])
                 else:
                     state['context_cmd'] = min(state['context_cmd'] + 1, state['total_cmds'])
+                self._sync_session_context(state)
                 event.app.invalidate()
             @bindings.add('c-down')
             def _(event):
@@ -112,6 +161,7 @@ class CopilotInterface:
                     state['context_lines'] = max(state['context_lines'] - 50, min(50, state['total_lines']))
                 else:
                     state['context_cmd'] = max(state['context_cmd'] - 1, 1)
+                self._sync_session_context(state)
                 event.app.invalidate()
             @bindings.add('tab')
             def _(event):
@@ -121,6 +171,7 @@ class CopilotInterface:
                     buf.complete_next()
                 else:
                     state['context_mode'] = (state['context_mode'] + 1) % 3
+                    self._sync_session_context(state)
                     event.app.invalidate()
             @bindings.add('escape', eager=True)
             @bindings.add('c-c')

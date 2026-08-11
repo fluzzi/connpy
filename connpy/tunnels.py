@@ -172,6 +172,8 @@ class RemoteStream:
                         })
                     if getattr(req, "copilot_action", ""):
                         copilot_msg["action"] = req.copilot_action
+                        if getattr(req, "copilot_node_info_json", ""):
+                            copilot_msg["node_info_json"] = req.copilot_node_info_json
                     
                     if copilot_msg:
                         self._loop.call_soon_threadsafe(self.copilot_queue.put_nowait, copilot_msg)

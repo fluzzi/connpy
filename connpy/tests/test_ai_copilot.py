@@ -400,3 +400,164 @@ def test_build_context_blocks_pager_scrolling_6wind_escapes():
 
 
 
+
+
+def test_copilot_context_state_persistence():
+    from connpy.cli.terminal_ui import CopilotInterface
+
+    class MockConfig:
+        def __init__(self):
+            self.config = {"ai": {}}
+            self.defaultdir = "/tmp"
+
+    session_state = {}
+    interface = CopilotInterface(MockConfig(), session_state=session_state)
+    
+    raw_bytes = b"router# show ip\r\nrouter# show run\r\nrouter# "
+    blocks = [
+        (0, 15, "router# show ip"),
+        (15, 30, "router# show run"),
+        (30, 40, "router#")
+    ]
+
+    async def mock_ai_call(active_buffer, question, on_chunk, node_info):
+        return {"guide": "Ok", "commands": [], "risk_level": "low"}
+
+    async def mock_prompt_async(self, *args, **kwargs):
+        kb = kwargs.get('key_bindings')
+        if kb:
+            class DummyApp:
+                def invalidate(self): pass
+            class DummyEvent:
+                app = DummyApp()
+                current_buffer = type('Buf', (), {'text': ''})()
+
+            # Trigger TAB key ('c-i' or 'tab') to switch mode from RANGE (0) to SINGLE (1)
+            for b in kb.bindings:
+                if any(k in ('c-i', 'tab') or 'tab' in str(k).lower() or 'c-i' in str(k).lower() for k in b.keys):
+                    b.handler(DummyEvent())
+                    break
+        return "test question"
+
+    with patch('prompt_toolkit.PromptSession.prompt_async', mock_prompt_async):
+        asyncio.run(interface.run_session(
+            raw_bytes=raw_bytes,
+            node_info={"name": "test"},
+            on_ai_call=mock_ai_call,
+            blocks=blocks
+        ))
+
+    assert interface.session_state.get('context_mode') == interface.mode_single
+    assert interface.session_state.get('last_total_cmds') == len(blocks)
+
+
+def test_copilot_range_mode_accumulation():
+    from connpy.cli.terminal_ui import CopilotInterface
+
+    class MockConfig:
+        def __init__(self):
+            self.config = {"ai": {}}
+            self.defaultdir = "/tmp"
+
+    raw_bytes = b"router# cmd1\r\nrouter# cmd2\r\nrouter# cmd3\r\nrouter# "
+    blocks = [
+        (0, 10, "router# cmd1"),
+        (10, 20, "router# cmd2"),
+        (20, 30, "router# cmd3"),
+        (30, 40, "router#")
+    ]
+
+    async def mock_ai_call(active_buffer, question, on_chunk, node_info):
+        return {"guide": "Ok", "commands": [], "risk_level": "low"}
+
+    async def mock_prompt_async(self, *args, **kwargs):
+        return "cancel"
+
+    # Test 1: RANGE mode at default (saved_cmd = 1) -> stays 1 (does not expand)
+    session_state_default = {'context_mode': 0, 'context_cmd': 1, 'last_total_cmds': 2}
+    interface_default = CopilotInterface(MockConfig(), session_state=session_state_default)
+    with patch('prompt_toolkit.PromptSession.prompt_async', mock_prompt_async):
+        asyncio.run(interface_default.run_session(raw_bytes=raw_bytes, node_info={"name": "test"}, on_ai_call=mock_ai_call, blocks=blocks))
+    assert interface_default.session_state.get('context_cmd') == 1
+
+    # Test 2: RANGE mode at expanded (saved_cmd = 2 > 1) -> expands to 2 + 2 = 4
+    session_state_expanded = {'context_mode': 0, 'context_cmd': 2, 'last_total_cmds': 2}
+    interface_expanded = CopilotInterface(MockConfig(), session_state=session_state_expanded)
+    with patch('prompt_toolkit.PromptSession.prompt_async', mock_prompt_async):
+        asyncio.run(interface_expanded.run_session(raw_bytes=raw_bytes, node_info={"name": "test"}, on_ai_call=mock_ai_call, blocks=blocks))
+    assert interface_expanded.session_state.get('context_cmd') == 4
+
+
+def test_copilot_lines_mode_accumulation():
+    from connpy.cli.terminal_ui import CopilotInterface
+
+    class MockConfig:
+        def __init__(self):
+            self.config = {"ai": {}}
+            self.defaultdir = "/tmp"
+
+    raw_bytes = ("line\n" * 130).encode()
+    blocks = [(0, 10, "router#")]
+
+    async def mock_ai_call(active_buffer, question, on_chunk, node_info):
+        return {"guide": "Ok", "commands": [], "risk_level": "low"}
+
+    async def mock_prompt_async(self, *args, **kwargs):
+        return "cancel"
+
+    # Test 1: LINES mode at default 50 lines -> stays 50
+    session_state_default = {'context_mode': 2, 'context_lines': 50, 'last_total_lines': 100}
+    interface_default = CopilotInterface(MockConfig(), session_state=session_state_default)
+    with patch('prompt_toolkit.PromptSession.prompt_async', mock_prompt_async):
+        asyncio.run(interface_default.run_session(raw_bytes=raw_bytes, node_info={"name": "test"}, on_ai_call=mock_ai_call, blocks=blocks))
+    assert interface_default.session_state.get('context_lines') == 50
+
+    # Test 2: LINES mode at expanded 100 lines -> expands beyond 100
+    session_state_expanded = {'context_mode': 2, 'context_lines': 100, 'last_total_lines': 100}
+    interface_expanded = CopilotInterface(MockConfig(), session_state=session_state_expanded)
+    with patch('prompt_toolkit.PromptSession.prompt_async', mock_prompt_async):
+        asyncio.run(interface_expanded.run_session(raw_bytes=raw_bytes, node_info={"name": "test"}, on_ai_call=mock_ai_call, blocks=blocks))
+    assert interface_expanded.session_state.get('context_lines') > 100
+
+
+def test_copilot_single_mode_retains_command_block():
+    from connpy.cli.terminal_ui import CopilotInterface
+
+    class MockConfig:
+        def __init__(self):
+            self.config = {"ai": {}}
+            self.defaultdir = "/tmp"
+
+    raw_bytes = b"router# cmd1\r\nrouter# cmd2\r\nrouter# cmd3\r\nrouter# "
+    blocks = [
+        (0, 10, "router# cmd1"),
+        (10, 20, "router# cmd2"),
+        (20, 30, "router# cmd3"),
+        (30, 40, "router#")
+    ]
+
+    async def mock_ai_call(active_buffer, question, on_chunk, node_info):
+        return {"guide": "Ok", "commands": [], "risk_level": "low"}
+
+    async def mock_prompt_async(self, *args, **kwargs):
+        return "cancel"
+
+    # Test 1: In SINGLE mode at default (context_cmd = 1), stays at 1
+    session_state_default = {'context_mode': 1, 'context_cmd': 1, 'last_total_cmds': 2}
+    interface_default = CopilotInterface(MockConfig(), session_state=session_state_default)
+    with patch('prompt_toolkit.PromptSession.prompt_async', mock_prompt_async):
+        asyncio.run(interface_default.run_session(raw_bytes=raw_bytes, node_info={"name": "test"}, on_ai_call=mock_ai_call, blocks=blocks))
+    assert interface_default.session_state.get('context_cmd') == 1
+
+    # Test 2: In SINGLE mode at past command (context_cmd = 2 > 1), becomes 2 + 2 = 4 to stay locked on past command
+    session_state_custom = {'context_mode': 1, 'context_cmd': 2, 'last_total_cmds': 2}
+    interface_custom = CopilotInterface(MockConfig(), session_state=session_state_custom)
+    with patch('prompt_toolkit.PromptSession.prompt_async', mock_prompt_async):
+        asyncio.run(interface_custom.run_session(raw_bytes=raw_bytes, node_info={"name": "test"}, on_ai_call=mock_ai_call, blocks=blocks))
+    assert interface_custom.session_state.get('context_cmd') == 4
+
+
+
+
+
+
