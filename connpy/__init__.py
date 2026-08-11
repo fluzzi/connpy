@@ -282,12 +282,18 @@ from .core import node,nodes
 from .configfile import configfile
 from .connapp import connapp
 from .api import *
-from .ai import ai
 from .plugins import Plugins
 from ._version import __version__
 from . import printer
 
-__all__ = ["node", "nodes", "configfile", "connapp", "ai", "Plugins", "printer"]
+def __getattr__(name: str):
+    if name == "ai":
+        from .ai import ai
+        globals()["ai"] = ai
+        return ai
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+
+__all__ = ["node", "nodes", "configfile", "connapp", "Plugins", "printer"]
 __author__ = "Federico Luzzi"
 __pdoc__ = {
     'core': False,

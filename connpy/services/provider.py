@@ -19,6 +19,7 @@ class ServiceProvider:
         self._import_export = None
         self._sync = None
         self._users = None
+        self._ai = None
         
         if mode == "local":
             self._init_local()
@@ -32,14 +33,12 @@ class ServiceProvider:
         from .profile_service import ProfileService
         from .config_service import ConfigService
         from .plugin_service import PluginService
-        from .ai_service import AIService
         from .context_service import ContextService
         
         self.nodes = NodeService(self.config)
         self.profiles = ProfileService(self.config)
         self.config_svc = ConfigService(self.config)
         self.plugins = PluginService(self.config)
-        self.ai = AIService(self.config)
         self.context = ContextService(self.config)
     
     def _init_remote(self):
@@ -145,3 +144,14 @@ class ServiceProvider:
     @users.setter
     def users(self, value):
         self._users = value
+
+    @property
+    def ai(self):
+        if self._ai is None and self.mode == "local":
+            from .ai_service import AIService
+            self._ai = AIService(self.config)
+        return self._ai
+
+    @ai.setter
+    def ai(self, value):
+        self._ai = value

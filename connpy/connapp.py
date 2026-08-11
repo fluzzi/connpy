@@ -10,7 +10,6 @@ from .core import node,nodes
 from ._version import __version__
 from . import printer
 from .api import start_api,stop_api,debug_api
-from .ai import ai
 
 from .plugins import Plugins
 from .services.exceptions import ConnpyError, ProfileNotFoundError, ReservedNameError
@@ -40,6 +39,32 @@ from .cli.help_text import get_help
 console = printer.console
 
 #functions and classes
+
+class DeferredAIProxy:
+    """Proxy for connapp.ai that defers importing connpy.ai until ai is actually invoked or accessed."""
+    def __init__(self):
+        self._deferred_modifications = []
+        self._real_ai = None
+
+    def _load_real_ai(self):
+        if self._real_ai is None:
+            from .ai import ai
+            self._real_ai = ai
+            for mod in self._deferred_modifications:
+                self._real_ai.modify(mod)
+        return self._real_ai
+
+    def modify(self, modification_func):
+        if self._real_ai is not None:
+            self._real_ai.modify(modification_func)
+        else:
+            self._deferred_modifications.append(modification_func)
+
+    def __call__(self, *args, **kwargs):
+        return self._load_real_ai()(*args, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(self._load_real_ai(), name)
 
 class connapp:
     ''' This class starts the connection manager app. It's normally used by connection manager but you can use it on a script to run the connection manager your way and use a different configfile and key.
@@ -72,8 +97,8 @@ class connapp:
         self.start_api = start_api
         self.stop_api = stop_api # Using SystemService logic eventually
         self.debug_api = debug_api
-        self.ai = ai
-        
+        self.ai = DeferredAIProxy()
+
         # Register context filtering hooks (only on Client CLI, bypass on gRPC Server)
         is_api_server = len(sys.argv) > 1 and sys.argv[1] == "api"
         if not is_api_server:
@@ -524,12 +549,13 @@ class connapp:
             printer.warning("Operation cancelled by user.")
             sys.exit(130)
         finally:
-            # Safely cleanup AI sessions (litellm)
-            try:
-                from .ai import cleanup
-                cleanup()
-            except ImportError:
-                pass
+            # Safely cleanup AI sessions (litellm) if AI was loaded
+            if "connpy.ai" in sys.modules:
+                try:
+                    from .ai import cleanup
+                    cleanup()
+                except (ImportError, Exception):
+                    pass
 
     class _store_type(argparse.Action):
         #Custom store type for cli app.

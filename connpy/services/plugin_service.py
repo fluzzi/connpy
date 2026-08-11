@@ -271,13 +271,13 @@ class PluginService(BaseService):
             is_mock = True
             def __init__(self, config):
                 from ..core import node, nodes
-                from ..ai import ai
+                from ..connapp import DeferredAIProxy
                 from ..services.provider import ServiceProvider
                 
                 self.config = config
                 self.node = node
                 self.nodes = nodes
-                self.ai = ai
+                self.ai = DeferredAIProxy()
                 
                 self.services = ServiceProvider(config, mode="local")
                 

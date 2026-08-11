@@ -21,14 +21,15 @@ from prompt_toolkit.history import InMemoryHistory
 
 from ..printer import connpy_theme
 from connpy.utils import log_cleaner
-from ..services.ai_service import AIService
 
 class CopilotInterface:
     def __init__(self, config, history=None, pt_input=None, pt_output=None, rich_file=None, session_state=None):
+        from ..services.ai_service import AIService
         self.config = config
         self.history = history or InMemoryHistory()
         self.pt_input = pt_input
         self.pt_output = pt_output
+        self.rich_file = rich_file
         self.ai_service = AIService(config)
         self.mode_range, self.mode_single, self.mode_lines = 0, 1, 2 
 

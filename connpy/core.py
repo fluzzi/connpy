@@ -712,13 +712,14 @@ class node:
 
     def _copilot_handler(self, config):
         """Unified copilot handler for local session."""
-        from .cli.terminal_ui import CopilotInterface
-        from .services.ai_service import AIService
         import asyncio
         import os
 
         async def handler(buffer, node_info, stream, child_fd, cmd_byte_positions=None):
             try:
+                from .cli.terminal_ui import CopilotInterface
+                from .services.ai_service import AIService
+
                 interface = CopilotInterface(
                     config, 
                     history=getattr(stream, 'copilot_history', None),
