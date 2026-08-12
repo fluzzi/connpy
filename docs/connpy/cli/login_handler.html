@@ -70,6 +70,14 @@ el.replaceWith(d);
             sys.exit(1)
 
     def login(self, args):
+        # Handle token management actions first
+        if getattr(args, &#34;create_token&#34;, None):
+            return self.create_token(args)
+        if getattr(args, &#34;list_tokens&#34;, False):
+            return self.list_tokens(args)
+        if getattr(args, &#34;revoke_token&#34;, None):
+            return self.revoke_token(args)
+
         if getattr(args, &#34;status&#34;, False):
             return self.show_status()
 
@@ -191,11 +199,137 @@ el.replaceWith(d);
             exp_dt = datetime.datetime.fromtimestamp(exp, datetime.timezone.utc)
             printer.info(f&#34;Expires at: {exp_dt.strftime(&#39;%Y-%m-%d %H:%M:%S UTC&#39;)}&#34;)
         except Exception as e:
-            printer.error(f&#34;Failed to check local session status: {e}&#34;)</code></pre>
+            printer.error(f&#34;Failed to check local session status: {e}&#34;)
+
+    def _get_auth_service(self):
+        &#34;&#34;&#34;Gets an authenticated auth service stub, reusing existing or creating one.&#34;&#34;&#34;
+        auth_service = getattr(self.app.services, &#34;auth&#34;, None)
+        if not auth_service:
+            import grpc
+            from ..grpc_layer.stubs import AuthStub
+            remote_host = self.app.services.remote_host or self.app.config.config.get(&#34;remote_host&#34;)
+            if not remote_host:
+                printer.error(&#34;Remote host is not configured. Run &#39;connpy config --remote HOST:PORT&#39; first.&#34;)
+                sys.exit(1)
+            try:
+                # Load existing session token for authentication
+                token_path = os.path.join(self.app.config.defaultdir, &#34;.token&#34;)
+                if not os.path.exists(token_path):
+                    printer.error(&#34;No active session. Please log in first using &#39;connpy login&#39;.&#34;)
+                    sys.exit(1)
+                with open(token_path, &#34;r&#34;) as f:
+                    session_token = f.read().strip()
+                
+                from ..grpc_layer.stubs import AuthClientInterceptor
+                interceptor = AuthClientInterceptor(lambda: session_token)
+                channel = grpc.intercept_channel(grpc.insecure_channel(remote_host), interceptor)
+                auth_service = AuthStub(channel, remote_host=remote_host)
+            except Exception as e:
+                printer.error(f&#34;Failed to connect to remote server: {e}&#34;)
+                sys.exit(1)
+        return auth_service
+
+    def create_token(self, args):
+        auth_service = self._get_auth_service()
+        name = args.create_token
+        expires_days = getattr(args, &#34;expires_days&#34;, 0) or 0
+
+        try:
+            result = auth_service.create_api_token(name, expires_in_days=expires_days)
+            printer.success(f&#34;API token &#39;{name}&#39; created successfully.&#34;)
+            printer.warning(&#34;⚠  Copy this token now. It will NOT be shown again:&#34;)
+            printer.data(&#34;Token&#34;, result[&#34;raw_token&#34;])
+            printer.info(f&#34;Token ID: {result[&#39;token_id&#39;]}&#34;)
+            if expires_days &gt; 0:
+                printer.info(f&#34;Expires in: {expires_days} days&#34;)
+            else:
+                printer.info(&#34;Expires: Never (permanent)&#34;)
+        except ConnpyError as e:
+            printer.error(f&#34;Failed to create token: {e}&#34;)
+            sys.exit(1)
+        except Exception as e:
+            printer.error(f&#34;Failed to create token: {e}&#34;)
+            sys.exit(1)
+
+    def list_tokens(self, args):
+        auth_service = self._get_auth_service()
+
+        try:
+            tokens = auth_service.list_api_tokens()
+            if not tokens:
+                printer.info(&#34;No API tokens found.&#34;)
+                return
+
+            import yaml
+            # Clean up empty strings from protobuf defaults
+            cleaned = []
+            for t in tokens:
+                cleaned.append({
+                    &#34;token_id&#34;: t[&#34;token_id&#34;],
+                    &#34;name&#34;: t[&#34;name&#34;],
+                    &#34;prefix&#34;: t[&#34;token_prefix&#34;],
+                    &#34;created&#34;: t[&#34;created_at&#34;] or &#34;N/A&#34;,
+                    &#34;last_used&#34;: t[&#34;last_used_at&#34;] or &#34;Never&#34;,
+                    &#34;expires&#34;: t[&#34;expires_at&#34;] or &#34;Never&#34;,
+                })
+            yaml_str = yaml.dump(cleaned, sort_keys=False, default_flow_style=False)
+            printer.data(&#34;API Tokens&#34;, yaml_str)
+        except ConnpyError as e:
+            printer.error(f&#34;Failed to list tokens: {e}&#34;)
+            sys.exit(1)
+        except Exception as e:
+            printer.error(f&#34;Failed to list tokens: {e}&#34;)
+            sys.exit(1)
+
+    def revoke_token(self, args):
+        auth_service = self._get_auth_service()
+        token_id = args.revoke_token
+
+        try:
+            auth_service.revoke_api_token(token_id)
+            printer.success(f&#34;Token &#39;{token_id}&#39; revoked successfully.&#34;)
+        except ConnpyError as e:
+            printer.error(f&#34;Failed to revoke token: {e}&#34;)
+            sys.exit(1)
+        except Exception as e:
+            printer.error(f&#34;Failed to revoke token: {e}&#34;)
+            sys.exit(1)</code></pre>
 </details>
 <div class="desc"></div>
 <h3>Methods</h3>
 <dl>
+<dt id="connpy.cli.login_handler.LoginHandler.create_token"><code class="name flex">
+<span>def <span class="ident">create_token</span></span>(<span>self, args)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def create_token(self, args):
+    auth_service = self._get_auth_service()
+    name = args.create_token
+    expires_days = getattr(args, &#34;expires_days&#34;, 0) or 0
+
+    try:
+        result = auth_service.create_api_token(name, expires_in_days=expires_days)
+        printer.success(f&#34;API token &#39;{name}&#39; created successfully.&#34;)
+        printer.warning(&#34;⚠  Copy this token now. It will NOT be shown again:&#34;)
+        printer.data(&#34;Token&#34;, result[&#34;raw_token&#34;])
+        printer.info(f&#34;Token ID: {result[&#39;token_id&#39;]}&#34;)
+        if expires_days &gt; 0:
+            printer.info(f&#34;Expires in: {expires_days} days&#34;)
+        else:
+            printer.info(&#34;Expires: Never (permanent)&#34;)
+    except ConnpyError as e:
+        printer.error(f&#34;Failed to create token: {e}&#34;)
+        sys.exit(1)
+    except Exception as e:
+        printer.error(f&#34;Failed to create token: {e}&#34;)
+        sys.exit(1)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
 <dt id="connpy.cli.login_handler.LoginHandler.dispatch"><code class="name flex">
 <span>def <span class="ident">dispatch</span></span>(<span>self, args)</span>
 </code></dt>
@@ -216,6 +350,46 @@ el.replaceWith(d);
 </details>
 <div class="desc"></div>
 </dd>
+<dt id="connpy.cli.login_handler.LoginHandler.list_tokens"><code class="name flex">
+<span>def <span class="ident">list_tokens</span></span>(<span>self, args)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def list_tokens(self, args):
+    auth_service = self._get_auth_service()
+
+    try:
+        tokens = auth_service.list_api_tokens()
+        if not tokens:
+            printer.info(&#34;No API tokens found.&#34;)
+            return
+
+        import yaml
+        # Clean up empty strings from protobuf defaults
+        cleaned = []
+        for t in tokens:
+            cleaned.append({
+                &#34;token_id&#34;: t[&#34;token_id&#34;],
+                &#34;name&#34;: t[&#34;name&#34;],
+                &#34;prefix&#34;: t[&#34;token_prefix&#34;],
+                &#34;created&#34;: t[&#34;created_at&#34;] or &#34;N/A&#34;,
+                &#34;last_used&#34;: t[&#34;last_used_at&#34;] or &#34;Never&#34;,
+                &#34;expires&#34;: t[&#34;expires_at&#34;] or &#34;Never&#34;,
+            })
+        yaml_str = yaml.dump(cleaned, sort_keys=False, default_flow_style=False)
+        printer.data(&#34;API Tokens&#34;, yaml_str)
+    except ConnpyError as e:
+        printer.error(f&#34;Failed to list tokens: {e}&#34;)
+        sys.exit(1)
+    except Exception as e:
+        printer.error(f&#34;Failed to list tokens: {e}&#34;)
+        sys.exit(1)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
 <dt id="connpy.cli.login_handler.LoginHandler.login"><code class="name flex">
 <span>def <span class="ident">login</span></span>(<span>self, args)</span>
 </code></dt>
@@ -225,6 +399,14 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def login(self, args):
+    # Handle token management actions first
+    if getattr(args, &#34;create_token&#34;, None):
+        return self.create_token(args)
+    if getattr(args, &#34;list_tokens&#34;, False):
+        return self.list_tokens(args)
+    if getattr(args, &#34;revoke_token&#34;, None):
+        return self.revoke_token(args)
+
     if getattr(args, &#34;status&#34;, False):
         return self.show_status()
 
@@ -312,6 +494,30 @@ el.replaceWith(d);
 </details>
 <div class="desc"></div>
 </dd>
+<dt id="connpy.cli.login_handler.LoginHandler.revoke_token"><code class="name flex">
+<span>def <span class="ident">revoke_token</span></span>(<span>self, args)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def revoke_token(self, args):
+    auth_service = self._get_auth_service()
+    token_id = args.revoke_token
+
+    try:
+        auth_service.revoke_api_token(token_id)
+        printer.success(f&#34;Token &#39;{token_id}&#39; revoked successfully.&#34;)
+    except ConnpyError as e:
+        printer.error(f&#34;Failed to revoke token: {e}&#34;)
+        sys.exit(1)
+    except Exception as e:
+        printer.error(f&#34;Failed to revoke token: {e}&#34;)
+        sys.exit(1)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
 <dt id="connpy.cli.login_handler.LoginHandler.show_status"><code class="name flex">
 <span>def <span class="ident">show_status</span></span>(<span>self)</span>
 </code></dt>
@@ -389,10 +595,13 @@ el.replaceWith(d);
 <ul>
 <li>
 <h4><code><a title="connpy.cli.login_handler.LoginHandler" href="#connpy.cli.login_handler.LoginHandler">LoginHandler</a></code></h4>
-<ul class="">
+<ul class="two-column">
+<li><code><a title="connpy.cli.login_handler.LoginHandler.create_token" href="#connpy.cli.login_handler.LoginHandler.create_token">create_token</a></code></li>
 <li><code><a title="connpy.cli.login_handler.LoginHandler.dispatch" href="#connpy.cli.login_handler.LoginHandler.dispatch">dispatch</a></code></li>
+<li><code><a title="connpy.cli.login_handler.LoginHandler.list_tokens" href="#connpy.cli.login_handler.LoginHandler.list_tokens">list_tokens</a></code></li>
 <li><code><a title="connpy.cli.login_handler.LoginHandler.login" href="#connpy.cli.login_handler.LoginHandler.login">login</a></code></li>
 <li><code><a title="connpy.cli.login_handler.LoginHandler.logout" href="#connpy.cli.login_handler.LoginHandler.logout">logout</a></code></li>
+<li><code><a title="connpy.cli.login_handler.LoginHandler.revoke_token" href="#connpy.cli.login_handler.LoginHandler.revoke_token">revoke_token</a></code></li>
 <li><code><a title="connpy.cli.login_handler.LoginHandler.show_status" href="#connpy.cli.login_handler.LoginHandler.show_status">show_status</a></code></li>
 </ul>
 </li>

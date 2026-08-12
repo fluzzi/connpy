@@ -376,6 +376,8 @@ Handles terminal raw mode, async I/O, and SIGWINCH signals.</p></div>
                         })
                     if getattr(req, &#34;copilot_action&#34;, &#34;&#34;):
                         copilot_msg[&#34;action&#34;] = req.copilot_action
+                        if getattr(req, &#34;copilot_node_info_json&#34;, &#34;&#34;):
+                            copilot_msg[&#34;node_info_json&#34;] = req.copilot_node_info_json
                     
                     if copilot_msg:
                         self._loop.call_soon_threadsafe(self.copilot_queue.put_nowait, copilot_msg)
@@ -454,6 +456,8 @@ Bridges the blocking gRPC iterators with the async _async_interact_loop.</p></di
                     })
                 if getattr(req, &#34;copilot_action&#34;, &#34;&#34;):
                     copilot_msg[&#34;action&#34;] = req.copilot_action
+                    if getattr(req, &#34;copilot_node_info_json&#34;, &#34;&#34;):
+                        copilot_msg[&#34;node_info_json&#34;] = req.copilot_node_info_json
                 
                 if copilot_msg:
                     self._loop.call_soon_threadsafe(self.copilot_queue.put_nowait, copilot_msg)

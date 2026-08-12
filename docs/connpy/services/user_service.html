@@ -63,6 +63,9 @@ el.replaceWith(d);
         
         # Ensure users directory exists
         os.makedirs(self.users_dir, exist_ok=True)
+        
+        # Reverse index cache: token_hash -&gt; (username, token_id)
+        self._token_index: dict[str, tuple[str, str]] = {}
 
     def _load_registry(self) -&gt; dict:
         &#34;&#34;&#34;Loads registry from file. If it doesn&#39;t exist, initializes it with a new JWT secret.&#34;&#34;&#34;
@@ -106,6 +109,16 @@ el.replaceWith(d);
                 except OSError:
                     pass
             raise e
+
+    def _build_token_index(self, registry: dict) -&gt; dict[str, tuple[str, str]]:
+        &#34;&#34;&#34;Builds a reverse index of token_hash -&gt; (username, token_id) for O(1) PAT lookup.&#34;&#34;&#34;
+        index = {}
+        for username, user_data in registry.get(&#34;users&#34;, {}).items():
+            for token_id, token_meta in user_data.get(&#34;api_tokens&#34;, {}).items():
+                token_hash = token_meta.get(&#34;token_hash&#34;)
+                if token_hash:
+                    index[token_hash] = (username, token_id)
+        return index
 
     def create_user(self, username, password, config_path=None) -&gt; dict:
         &#34;&#34;&#34;Creates a new user with bcrypt-hashed credentials.
@@ -282,7 +295,129 @@ el.replaceWith(d);
             payload = jwt.decode(token, secret, algorithms=[&#34;HS256&#34;])
             return payload.get(&#34;sub&#34;)
         except (jwt.ExpiredSignatureError, jwt.InvalidTokenError, KeyError):
-            return None</code></pre>
+            return None
+
+    # --- Personal Access Token (PAT) Management ---
+
+    def create_api_token(self, username: str, name: str, expires_in_days: int | None = None) -&gt; dict:
+        &#34;&#34;&#34;Creates a Personal Access Token for the user.
+        
+        Returns the raw token ONCE. Only the SHA-256 hash is persisted.
+        &#34;&#34;&#34;
+        if not name or not isinstance(name, str):
+            raise ValueError(&#34;Token name cannot be empty&#34;)
+        
+        registry = self._load_registry()
+        if username not in registry[&#34;users&#34;]:
+            raise ValueError(f&#34;User &#39;{username}&#39; not found&#34;)
+        
+        user_data = registry[&#34;users&#34;][username]
+        if &#34;api_tokens&#34; not in user_data:
+            user_data[&#34;api_tokens&#34;] = {}
+        
+        # Generate cryptographically secure token with recognizable prefix
+        raw_secret = secrets.token_hex(32)
+        raw_token = f&#34;cnp_pat_{raw_secret}&#34;
+        token_hash = hashlib.sha256(raw_token.encode(&#34;utf-8&#34;)).hexdigest()
+        token_id = f&#34;tok_{secrets.token_hex(4)}&#34;
+        
+        now = datetime.datetime.now(datetime.timezone.utc)
+        expires_at = None
+        if expires_in_days and expires_in_days &gt; 0:
+            expires_at = (now + datetime.timedelta(days=expires_in_days)).isoformat()
+        
+        user_data[&#34;api_tokens&#34;][token_id] = {
+            &#34;name&#34;: name,
+            &#34;token_hash&#34;: token_hash,
+            &#34;token_prefix&#34;: raw_token[:16],
+            &#34;created_at&#34;: now.isoformat(),
+            &#34;last_used_at&#34;: None,
+            &#34;expires_at&#34;: expires_at,
+        }
+        
+        self._save_registry(registry)
+        self._token_index = self._build_token_index(registry)
+        
+        return {
+            &#34;token_id&#34;: token_id,
+            &#34;raw_token&#34;: raw_token,
+            &#34;name&#34;: name,
+        }
+
+    def list_api_tokens(self, username: str) -&gt; list[dict]:
+        &#34;&#34;&#34;Lists all active API tokens for a user (without sensitive data).&#34;&#34;&#34;
+        registry = self._load_registry()
+        if username not in registry[&#34;users&#34;]:
+            raise ValueError(f&#34;User &#39;{username}&#39; not found&#34;)
+        
+        tokens = registry[&#34;users&#34;][username].get(&#34;api_tokens&#34;, {})
+        return [
+            {
+                &#34;token_id&#34;: tid,
+                &#34;name&#34;: meta.get(&#34;name&#34;),
+                &#34;token_prefix&#34;: meta.get(&#34;token_prefix&#34;),
+                &#34;created_at&#34;: meta.get(&#34;created_at&#34;),
+                &#34;last_used_at&#34;: meta.get(&#34;last_used_at&#34;),
+                &#34;expires_at&#34;: meta.get(&#34;expires_at&#34;),
+            }
+            for tid, meta in tokens.items()
+        ]
+
+    def revoke_api_token(self, username: str, token_id: str) -&gt; bool:
+        &#34;&#34;&#34;Revokes (deletes) a specific API token. Returns True if found and removed.&#34;&#34;&#34;
+        registry = self._load_registry()
+        if username not in registry[&#34;users&#34;]:
+            raise ValueError(f&#34;User &#39;{username}&#39; not found&#34;)
+        
+        tokens = registry[&#34;users&#34;][username].get(&#34;api_tokens&#34;, {})
+        if token_id not in tokens:
+            return False
+        
+        del tokens[token_id]
+        self._save_registry(registry)
+        self._token_index = self._build_token_index(registry)
+        return True
+
+    def verify_api_token(self, raw_token: str) -&gt; str | None:
+        &#34;&#34;&#34;Validates a PAT by hashing it and looking up the reverse index.
+        
+        Returns username if valid and not expired, None otherwise.
+        &#34;&#34;&#34;
+        token_hash = hashlib.sha256(raw_token.encode(&#34;utf-8&#34;)).hexdigest()
+        
+        # Rebuild index if empty (cold start or after process restart)
+        if not self._token_index:
+            registry = self._load_registry()
+            self._token_index = self._build_token_index(registry)
+        
+        match = self._token_index.get(token_hash)
+        if not match:
+            return None
+        
+        username, token_id = match
+        
+        # Validate token still exists and check expiration
+        registry = self._load_registry()
+        user_data = registry.get(&#34;users&#34;, {}).get(username, {})
+        token_meta = user_data.get(&#34;api_tokens&#34;, {}).get(token_id)
+        
+        if not token_meta:
+            # Token was revoked between index build and now
+            self._token_index = self._build_token_index(registry)
+            return None
+        
+        # Check expiration
+        expires_at = token_meta.get(&#34;expires_at&#34;)
+        if expires_at:
+            exp_dt = datetime.datetime.fromisoformat(expires_at)
+            if datetime.datetime.now(datetime.timezone.utc) &gt; exp_dt:
+                return None
+        
+        # Update last_used_at
+        token_meta[&#34;last_used_at&#34;] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        self._save_registry(registry)
+        
+        return username</code></pre>
 </details>
 <div class="desc"></div>
 <h3>Methods</h3>
@@ -355,6 +490,62 @@ el.replaceWith(d);
     self._save_registry(registry)</code></pre>
 </details>
 <div class="desc"><p>Verifies old password and updates registry with new hashed password.</p></div>
+</dd>
+<dt id="connpy.services.user_service.UserService.create_api_token"><code class="name flex">
+<span>def <span class="ident">create_api_token</span></span>(<span>self, username: str, name: str, expires_in_days: int | None = None) ‑> dict</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def create_api_token(self, username: str, name: str, expires_in_days: int | None = None) -&gt; dict:
+    &#34;&#34;&#34;Creates a Personal Access Token for the user.
+    
+    Returns the raw token ONCE. Only the SHA-256 hash is persisted.
+    &#34;&#34;&#34;
+    if not name or not isinstance(name, str):
+        raise ValueError(&#34;Token name cannot be empty&#34;)
+    
+    registry = self._load_registry()
+    if username not in registry[&#34;users&#34;]:
+        raise ValueError(f&#34;User &#39;{username}&#39; not found&#34;)
+    
+    user_data = registry[&#34;users&#34;][username]
+    if &#34;api_tokens&#34; not in user_data:
+        user_data[&#34;api_tokens&#34;] = {}
+    
+    # Generate cryptographically secure token with recognizable prefix
+    raw_secret = secrets.token_hex(32)
+    raw_token = f&#34;cnp_pat_{raw_secret}&#34;
+    token_hash = hashlib.sha256(raw_token.encode(&#34;utf-8&#34;)).hexdigest()
+    token_id = f&#34;tok_{secrets.token_hex(4)}&#34;
+    
+    now = datetime.datetime.now(datetime.timezone.utc)
+    expires_at = None
+    if expires_in_days and expires_in_days &gt; 0:
+        expires_at = (now + datetime.timedelta(days=expires_in_days)).isoformat()
+    
+    user_data[&#34;api_tokens&#34;][token_id] = {
+        &#34;name&#34;: name,
+        &#34;token_hash&#34;: token_hash,
+        &#34;token_prefix&#34;: raw_token[:16],
+        &#34;created_at&#34;: now.isoformat(),
+        &#34;last_used_at&#34;: None,
+        &#34;expires_at&#34;: expires_at,
+    }
+    
+    self._save_registry(registry)
+    self._token_index = self._build_token_index(registry)
+    
+    return {
+        &#34;token_id&#34;: token_id,
+        &#34;raw_token&#34;: raw_token,
+        &#34;name&#34;: name,
+    }</code></pre>
+</details>
+<div class="desc"><p>Creates a Personal Access Token for the user.</p>
+<p>Returns the raw token ONCE. Only the SHA-256 hash is persisted.</p></div>
 </dd>
 <dt id="connpy.services.user_service.UserService.create_user"><code class="name flex">
 <span>def <span class="ident">create_user</span></span>(<span>self, username, password, config_path=None) ‑> dict</span>
@@ -514,6 +705,35 @@ Mode B: config_path set -&gt; Reuses existing directory after validating its str
 </details>
 <div class="desc"><p>Retrieves raw metadata for a specific user.</p></div>
 </dd>
+<dt id="connpy.services.user_service.UserService.list_api_tokens"><code class="name flex">
+<span>def <span class="ident">list_api_tokens</span></span>(<span>self, username: str) ‑> list[dict]</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def list_api_tokens(self, username: str) -&gt; list[dict]:
+    &#34;&#34;&#34;Lists all active API tokens for a user (without sensitive data).&#34;&#34;&#34;
+    registry = self._load_registry()
+    if username not in registry[&#34;users&#34;]:
+        raise ValueError(f&#34;User &#39;{username}&#39; not found&#34;)
+    
+    tokens = registry[&#34;users&#34;][username].get(&#34;api_tokens&#34;, {})
+    return [
+        {
+            &#34;token_id&#34;: tid,
+            &#34;name&#34;: meta.get(&#34;name&#34;),
+            &#34;token_prefix&#34;: meta.get(&#34;token_prefix&#34;),
+            &#34;created_at&#34;: meta.get(&#34;created_at&#34;),
+            &#34;last_used_at&#34;: meta.get(&#34;last_used_at&#34;),
+            &#34;expires_at&#34;: meta.get(&#34;expires_at&#34;),
+        }
+        for tid, meta in tokens.items()
+    ]</code></pre>
+</details>
+<div class="desc"><p>Lists all active API tokens for a user (without sensitive data).</p></div>
+</dd>
 <dt id="connpy.services.user_service.UserService.list_users"><code class="name flex">
 <span>def <span class="ident">list_users</span></span>(<span>self) ‑> list[dict]</span>
 </code></dt>
@@ -535,6 +755,83 @@ Mode B: config_path set -&gt; Reuses existing directory after validating its str
     ]</code></pre>
 </details>
 <div class="desc"><p>Lists all registered users with metadata.</p></div>
+</dd>
+<dt id="connpy.services.user_service.UserService.revoke_api_token"><code class="name flex">
+<span>def <span class="ident">revoke_api_token</span></span>(<span>self, username: str, token_id: str) ‑> bool</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def revoke_api_token(self, username: str, token_id: str) -&gt; bool:
+    &#34;&#34;&#34;Revokes (deletes) a specific API token. Returns True if found and removed.&#34;&#34;&#34;
+    registry = self._load_registry()
+    if username not in registry[&#34;users&#34;]:
+        raise ValueError(f&#34;User &#39;{username}&#39; not found&#34;)
+    
+    tokens = registry[&#34;users&#34;][username].get(&#34;api_tokens&#34;, {})
+    if token_id not in tokens:
+        return False
+    
+    del tokens[token_id]
+    self._save_registry(registry)
+    self._token_index = self._build_token_index(registry)
+    return True</code></pre>
+</details>
+<div class="desc"><p>Revokes (deletes) a specific API token. Returns True if found and removed.</p></div>
+</dd>
+<dt id="connpy.services.user_service.UserService.verify_api_token"><code class="name flex">
+<span>def <span class="ident">verify_api_token</span></span>(<span>self, raw_token: str) ‑> str | None</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def verify_api_token(self, raw_token: str) -&gt; str | None:
+    &#34;&#34;&#34;Validates a PAT by hashing it and looking up the reverse index.
+    
+    Returns username if valid and not expired, None otherwise.
+    &#34;&#34;&#34;
+    token_hash = hashlib.sha256(raw_token.encode(&#34;utf-8&#34;)).hexdigest()
+    
+    # Rebuild index if empty (cold start or after process restart)
+    if not self._token_index:
+        registry = self._load_registry()
+        self._token_index = self._build_token_index(registry)
+    
+    match = self._token_index.get(token_hash)
+    if not match:
+        return None
+    
+    username, token_id = match
+    
+    # Validate token still exists and check expiration
+    registry = self._load_registry()
+    user_data = registry.get(&#34;users&#34;, {}).get(username, {})
+    token_meta = user_data.get(&#34;api_tokens&#34;, {}).get(token_id)
+    
+    if not token_meta:
+        # Token was revoked between index build and now
+        self._token_index = self._build_token_index(registry)
+        return None
+    
+    # Check expiration
+    expires_at = token_meta.get(&#34;expires_at&#34;)
+    if expires_at:
+        exp_dt = datetime.datetime.fromisoformat(expires_at)
+        if datetime.datetime.now(datetime.timezone.utc) &gt; exp_dt:
+            return None
+    
+    # Update last_used_at
+    token_meta[&#34;last_used_at&#34;] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    self._save_registry(registry)
+    
+    return username</code></pre>
+</details>
+<div class="desc"><p>Validates a PAT by hashing it and looking up the reverse index.</p>
+<p>Returns username if valid and not expired, None otherwise.</p></div>
 </dd>
 <dt id="connpy.services.user_service.UserService.verify_jwt"><code class="name flex">
 <span>def <span class="ident">verify_jwt</span></span>(<span>self, token) ‑> str | None</span>
@@ -579,11 +876,15 @@ Mode B: config_path set -&gt; Reuses existing directory after validating its str
 <li><code><a title="connpy.services.user_service.UserService.admin_change_password" href="#connpy.services.user_service.UserService.admin_change_password">admin_change_password</a></code></li>
 <li><code><a title="connpy.services.user_service.UserService.authenticate" href="#connpy.services.user_service.UserService.authenticate">authenticate</a></code></li>
 <li><code><a title="connpy.services.user_service.UserService.change_password" href="#connpy.services.user_service.UserService.change_password">change_password</a></code></li>
+<li><code><a title="connpy.services.user_service.UserService.create_api_token" href="#connpy.services.user_service.UserService.create_api_token">create_api_token</a></code></li>
 <li><code><a title="connpy.services.user_service.UserService.create_user" href="#connpy.services.user_service.UserService.create_user">create_user</a></code></li>
 <li><code><a title="connpy.services.user_service.UserService.delete_user" href="#connpy.services.user_service.UserService.delete_user">delete_user</a></code></li>
 <li><code><a title="connpy.services.user_service.UserService.generate_jwt" href="#connpy.services.user_service.UserService.generate_jwt">generate_jwt</a></code></li>
 <li><code><a title="connpy.services.user_service.UserService.get_user" href="#connpy.services.user_service.UserService.get_user">get_user</a></code></li>
+<li><code><a title="connpy.services.user_service.UserService.list_api_tokens" href="#connpy.services.user_service.UserService.list_api_tokens">list_api_tokens</a></code></li>
 <li><code><a title="connpy.services.user_service.UserService.list_users" href="#connpy.services.user_service.UserService.list_users">list_users</a></code></li>
+<li><code><a title="connpy.services.user_service.UserService.revoke_api_token" href="#connpy.services.user_service.UserService.revoke_api_token">revoke_api_token</a></code></li>
+<li><code><a title="connpy.services.user_service.UserService.verify_api_token" href="#connpy.services.user_service.UserService.verify_api_token">verify_api_token</a></code></li>
 <li><code><a title="connpy.services.user_service.UserService.verify_jwt" href="#connpy.services.user_service.UserService.verify_jwt">verify_jwt</a></code></li>
 </ul>
 </li>

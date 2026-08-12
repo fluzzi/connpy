@@ -68,6 +68,7 @@ el.replaceWith(d);
         else:
             return answer[0]
     else:
+        import inquirer
         questions = [inquirer.List(name, message=&#34;Pick {} to {}:&#34;.format(name,action), choices=list_, carousel=True)]
         answer = inquirer.prompt(questions, theme=theme)
         if answer == None:
@@ -125,6 +126,26 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def get_theme():
     &#34;&#34;&#34;Returns a fresh instance of the theme with current colors.&#34;&#34;&#34;
+    from inquirer.themes import Default, term
+
+    class ConnpyTheme(Default):
+        def __init__(self):
+            super().__init__()
+            try:
+                from ..printer import _global_active_styles
+                # Use user_prompt as primary accent, fallback to info/cyan
+                accent = _global_active_styles.get(&#34;user_prompt&#34;, _global_active_styles.get(&#34;info&#34;, &#34;cyan&#34;))
+                accent_color = hex_to_blessed(accent)
+                
+                self.Question.mark_color = accent_color
+                self.List.selection_color = accent_color
+                self.List.selection_cursor = &#34;&gt;&#34;
+            except:
+                # Absolute fallback to standard cyan
+                self.Question.mark_color = term.cyan
+                self.List.selection_color = term.bold_cyan
+                self.List.selection_cursor = &#34;&gt;&#34;
+
     return ConnpyTheme()</code></pre>
 </details>
 <div class="desc"><p>Returns a fresh instance of the theme with current colors.</p></div>
@@ -139,6 +160,7 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def hex_to_blessed(hex_str):
     &#34;&#34;&#34;Convert hex color string to blessed/ansi format.&#34;&#34;&#34;
+    from inquirer.themes import term
     if not hex_str or not isinstance(hex_str, str):
         return term.normal
     
@@ -242,39 +264,6 @@ el.replaceWith(d);
 <section>
 <h2 class="section-title" id="header-classes">Classes</h2>
 <dl>
-<dt id="connpy.cli.helpers.ConnpyTheme"><code class="flex name class">
-<span>class <span class="ident">ConnpyTheme</span></span>
-</code></dt>
-<dd>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">class ConnpyTheme(Default):
-    def __init__(self):
-        super().__init__()
-        try:
-            from ..printer import _global_active_styles
-            # Use user_prompt as primary accent, fallback to info/cyan
-            accent = _global_active_styles.get(&#34;user_prompt&#34;, _global_active_styles.get(&#34;info&#34;, &#34;cyan&#34;))
-            accent_color = hex_to_blessed(accent)
-            
-            self.Question.mark_color = accent_color
-            self.List.selection_color = accent_color
-            self.List.selection_cursor = &#34;&gt;&#34;
-        except:
-            # Absolute fallback to standard cyan
-            self.Question.mark_color = term.cyan
-            self.List.selection_color = term.bold_cyan
-            self.List.selection_cursor = &#34;&gt;&#34;</code></pre>
-</details>
-<div class="desc"></div>
-<h3>Ancestors</h3>
-<ul class="hlist">
-<li>inquirer.themes.Default</li>
-<li>inquirer.themes.Theme</li>
-</ul>
-</dd>
 <dt id="connpy.cli.helpers.ThemeProxy"><code class="flex name class">
 <span>class <span class="ident">ThemeProxy</span></span>
 </code></dt>
@@ -321,9 +310,6 @@ el.replaceWith(d);
 </li>
 <li><h3><a href="#header-classes">Classes</a></h3>
 <ul>
-<li>
-<h4><code><a title="connpy.cli.helpers.ConnpyTheme" href="#connpy.cli.helpers.ConnpyTheme">ConnpyTheme</a></code></h4>
-</li>
 <li>
 <h4><code><a title="connpy.cli.helpers.ThemeProxy" href="#connpy.cli.helpers.ThemeProxy">ThemeProxy</a></code></h4>
 </li>

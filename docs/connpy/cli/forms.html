@@ -61,6 +61,7 @@ el.replaceWith(d);
         self.validators = Validators(app)
 
     def questions_edit(self):
+        import inquirer
         questions = []
         questions.append(inquirer.Confirm(&#34;host&#34;, message=&#34;Edit Hostname/IP?&#34;))
         questions.append(inquirer.Confirm(&#34;protocol&#34;, message=&#34;Edit Protocol/app?&#34;))
@@ -74,6 +75,7 @@ el.replaceWith(d);
         return inquirer.prompt(questions)
 
     def questions_nodes(self, unique, uniques=None, edit=None):
+        import inquirer
         try:
             defaults = self.app.services.nodes.get_node_details(unique)
             if &#34;tags&#34; not in defaults:
@@ -151,6 +153,7 @@ el.replaceWith(d);
         return result
 
     def questions_profiles(self, unique, edit=None):
+        import inquirer
         try:
             defaults = self.app.services.profiles.get_profile(unique, resolve=False)
             if &#34;tags&#34; not in defaults:
@@ -216,6 +219,7 @@ el.replaceWith(d);
         return result
 
     def questions_bulk(self, nodes=&#34;&#34;, hosts=&#34;&#34;):
+        import inquirer
         questions = []
         questions.append(inquirer.Text(&#34;ids&#34;, message=&#34;add a comma separated list of nodes to add&#34;, default=nodes, validate=self.validators.bulk_node_validation))
         questions.append(inquirer.Text(&#34;location&#34;, message=&#34;Add a @folder, @subfolder@folder or leave empty&#34;, validate=self.validators.bulk_folder_validation))
@@ -253,6 +257,7 @@ el.replaceWith(d);
 
     def mcp_wizard(self, mcp_servers):
         &#34;&#34;&#34;Interactive wizard to manage MCP servers.&#34;&#34;&#34;
+        import inquirer
         from .helpers import theme
         
         while True:
@@ -345,6 +350,7 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def mcp_wizard(self, mcp_servers):
     &#34;&#34;&#34;Interactive wizard to manage MCP servers.&#34;&#34;&#34;
+    import inquirer
     from .helpers import theme
     
     while True:
@@ -435,6 +441,7 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def questions_bulk(self, nodes=&#34;&#34;, hosts=&#34;&#34;):
+    import inquirer
     questions = []
     questions.append(inquirer.Text(&#34;ids&#34;, message=&#34;add a comma separated list of nodes to add&#34;, default=nodes, validate=self.validators.bulk_node_validation))
     questions.append(inquirer.Text(&#34;location&#34;, message=&#34;Add a @folder, @subfolder@folder or leave empty&#34;, validate=self.validators.bulk_folder_validation))
@@ -481,6 +488,7 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def questions_edit(self):
+    import inquirer
     questions = []
     questions.append(inquirer.Confirm(&#34;host&#34;, message=&#34;Edit Hostname/IP?&#34;))
     questions.append(inquirer.Confirm(&#34;protocol&#34;, message=&#34;Edit Protocol/app?&#34;))
@@ -504,6 +512,7 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def questions_nodes(self, unique, uniques=None, edit=None):
+    import inquirer
     try:
         defaults = self.app.services.nodes.get_node_details(unique)
         if &#34;tags&#34; not in defaults:
@@ -591,6 +600,7 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def questions_profiles(self, unique, edit=None):
+    import inquirer
     try:
         defaults = self.app.services.profiles.get_profile(unique, resolve=False)
         if &#34;tags&#34; not in defaults:

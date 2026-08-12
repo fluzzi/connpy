@@ -5,7 +5,7 @@
 </p>
 
 
-# Connpy (v6.0.3)
+# Connpy (v6.1.0)
 [![](https://img.shields.io/pypi/v/connpy.svg?style=flat-square)](https://pypi.org/pypi/connpy/)
 [![](https://img.shields.io/pypi/pyversions/connpy.svg?style=flat-square)](https://pypi.org/pypi/connpy/)
 [![](https://img.shields.io/pypi/dm/connpy.svg?style=flat-square&cacheSeconds=86400)](https://pypi.org/pypi/connpy/)
@@ -44,6 +44,21 @@ conn ai "how do i check bgp summary on cisco?"
 Connect to external data sources and tools dynamically via the Model Context Protocol (MCP). Use the interactive wizard or command actions to configure MCP servers:
 ```bash
 conn ai --mcp
+```
+
+### 1d. Local Interactive Shell (conn shell)
+Launch a local interactive shell with AI Copilot support enabled directly on your host machine:
+```bash
+conn shell                     # Start local shell (default: $SHELL or /bin/bash)
+conn shell -c /bin/zsh         # Override shell executable
+conn shell --capture session.log # Log session output to file
+```
+* **Nested Sessions & Passthrough**: Supports running nested `conn` / `connpy` connections inside `conn shell`. Automatically detects foreground `conn` processes and forwards `Ctrl+Space` down to the active device connection instead of triggering the local Copilot.
+* **Shell Configuration**: Configure default shell command, prompt regex, or OS type via `conn config`:
+```bash
+conn config --shell-command /bin/zsh
+conn config --shell-prompt "\$\s*$"
+conn config --shell-os ubuntu
 ```
 
 
@@ -181,14 +196,19 @@ conn config --service-mode remote
 conn config --remote localhost:50051
 ```
 
-### 8c. User Management
-Manage server-side user credentials for distributed setups:
+### 8c. User Management & API Tokens
+Manage server-side user credentials and Personal Access Tokens (PAT) for automated setups:
 ```bash
 conn user --add username
 conn user --list
 conn user --regen-password username
+
+# Personal Access Tokens (PAT) for non-interactive API access
+conn user --create-token "CI/CD Token" --expires-in 30
+conn user --list-tokens
+conn user --revoke-token <token_id>
 ```
-Use `--path` to specify custom configuration folders in server Mode B.
+Use `--path` to specify custom configuration folders in server Mode B. Pass API tokens via `CONNPY_TOKEN` environment variable.
 
 ### 8d. SSO / OIDC
 Configure identity providers (e.g. Authelia, Keycloak) for SSO gRPC authentication using the interactive wizard:

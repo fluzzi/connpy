@@ -162,6 +162,7 @@ class connapp:
         from .cli.user_handler import UserHandler
         from .cli.login_handler import LoginHandler
         from .cli.sso_handler import SSOHandler
+        from .cli.shell_handler import ShellHandler
         
         # Instantiate Handlers
         self._node = NodeHandler(self)
@@ -173,6 +174,7 @@ class connapp:
         self._plugin = PluginHandler(self)
         self._context = ContextHandler(self)
         self._import_export = ImportExportHandler(self)
+        self._shell = ShellHandler(self)
         self._sync = SyncHandler(self)
         self._user = UserHandler(self)
         self._login = LoginHandler(self)
@@ -384,10 +386,19 @@ class connapp:
         configcrud.add_argument("--architect-api-key", dest="architect_api_key", nargs=1, action=self._store_type, help="Set architect api_key", metavar="API_KEY")
         configcrud.add_argument("--architect-auth", dest="architect_auth", nargs=1, action=self._store_type, help="Set architect auth (inline JSON/YAML or file path)", metavar="AUTH")
         configcrud.add_argument("--sync-remote", dest="sync_remote", nargs=1, action=self._store_type, help="Sync remote nodes to Google Drive", choices=["true","false"])
+        configcrud.add_argument("--shell-command", dest="shell_command", nargs=1, action=self._store_type, help="Set default shell command", metavar="COMMAND")
+        configcrud.add_argument("--shell-prompt", dest="shell_prompt", nargs=1, action=self._store_type, help="Set shell prompt regex for AI", metavar="REGEX")
+        configcrud.add_argument("--shell-os", dest="shell_os", nargs=1, action=self._store_type, help="Set shell OS hint for AI", metavar="OS")
         configparser.add_argument("--trusted-commands", dest="trusted_commands", nargs=1, action=self._store_type, help="Set custom trusted commands regexes (comma separated)", metavar="REGEX,REGEX")
         configparser.set_defaults(func=self._config.dispatch)
  
-        #USERPARSER
+        #SHELLPARSER
+        shellparser = subparsers.add_parser("shell", help="Start local interactive shell with copilot", formatter_class=RichHelpFormatter)
+        shellparser.error = self._custom_error
+        shellparser.add_argument("--command", "-c", dest="command_override", help="Override shell command")
+        shellparser.add_argument("--capture", dest="capture_file", help="Capture session to file")
+        shellparser.add_argument("-d", "--debug", action="store_true", help="Debug mode")
+        shellparser.set_defaults(func=self._shell.dispatch)
         userparser = subparsers.add_parser("user", help="Manage server users", description="Manage server users", formatter_class=RichHelpFormatter)
         userparser.error = self._custom_error
         usercrud = userparser.add_mutually_exclusive_group(required=True)

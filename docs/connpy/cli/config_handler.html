@@ -77,7 +77,10 @@ el.replaceWith(d);
             &#34;trusted_commands&#34;: self.set_ai_config,
             &#34;service_mode&#34;: self.set_service_mode,
             &#34;remote_host&#34;: self.set_remote_host,
-            &#34;sync_remote&#34;: self.set_sync_remote
+            &#34;sync_remote&#34;: self.set_sync_remote,
+            &#34;shell_command&#34;: self.set_shell_config,
+            &#34;shell_prompt&#34;: self.set_shell_config,
+            &#34;shell_os&#34;: self.set_shell_config
         }
         handler = actions.get(getattr(args, &#34;command&#34;, None))
         if handler:
@@ -232,7 +235,23 @@ el.replaceWith(d);
                     return parsed
                 raise ValueError()
             except Exception:
-                raise InvalidConfigurationError(&#34;Auth parameter must be a valid JSON/YAML string, or a path to a JSON/YAML file.&#34;)</code></pre>
+                raise InvalidConfigurationError(&#34;Auth parameter must be a valid JSON/YAML string, or a path to a JSON/YAML file.&#34;)
+
+    def set_shell_config(self, args):
+        key = args.command.replace(&#34;shell_&#34;, &#34;&#34;)
+        val = args.data[0] if isinstance(args.data, list) else args.data
+        try:
+            settings = self.app.services.config_svc.get_settings()
+            shell_cfg = settings.get(&#34;shell&#34;, {}) if isinstance(settings.get(&#34;shell&#34;), dict) else {}
+            if str(val).lower() in [&#34;none&#34;, &#34;clear&#34;, &#34;&#34;]:
+                if key in shell_cfg:
+                    del shell_cfg[key]
+            else:
+                shell_cfg[key] = val
+            self.app.services.config_svc.update_setting(&#34;shell&#34;, shell_cfg)
+            printer.success(&#34;Config saved&#34;)
+        except (ConnpyError, InvalidConfigurationError) as e:
+            printer.error(str(e))</code></pre>
 </details>
 <div class="desc"></div>
 <h3>Methods</h3>
@@ -263,7 +282,10 @@ el.replaceWith(d);
         &#34;trusted_commands&#34;: self.set_ai_config,
         &#34;service_mode&#34;: self.set_service_mode,
         &#34;remote_host&#34;: self.set_remote_host,
-        &#34;sync_remote&#34;: self.set_sync_remote
+        &#34;sync_remote&#34;: self.set_sync_remote,
+        &#34;shell_command&#34;: self.set_shell_config,
+        &#34;shell_prompt&#34;: self.set_shell_config,
+        &#34;shell_os&#34;: self.set_shell_config
     }
     handler = actions.get(getattr(args, &#34;command&#34;, None))
     if handler:
@@ -434,6 +456,32 @@ el.replaceWith(d);
 </details>
 <div class="desc"></div>
 </dd>
+<dt id="connpy.cli.config_handler.ConfigHandler.set_shell_config"><code class="name flex">
+<span>def <span class="ident">set_shell_config</span></span>(<span>self, args)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def set_shell_config(self, args):
+    key = args.command.replace(&#34;shell_&#34;, &#34;&#34;)
+    val = args.data[0] if isinstance(args.data, list) else args.data
+    try:
+        settings = self.app.services.config_svc.get_settings()
+        shell_cfg = settings.get(&#34;shell&#34;, {}) if isinstance(settings.get(&#34;shell&#34;), dict) else {}
+        if str(val).lower() in [&#34;none&#34;, &#34;clear&#34;, &#34;&#34;]:
+            if key in shell_cfg:
+                del shell_cfg[key]
+        else:
+            shell_cfg[key] = val
+        self.app.services.config_svc.update_setting(&#34;shell&#34;, shell_cfg)
+        printer.success(&#34;Config saved&#34;)
+    except (ConnpyError, InvalidConfigurationError) as e:
+        printer.error(str(e))</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
 <dt id="connpy.cli.config_handler.ConfigHandler.set_sync_remote"><code class="name flex">
 <span>def <span class="ident">set_sync_remote</span></span>(<span>self, args)</span>
 </code></dt>
@@ -538,6 +586,7 @@ el.replaceWith(d);
 <li><code><a title="connpy.cli.config_handler.ConfigHandler.set_idletime" href="#connpy.cli.config_handler.ConfigHandler.set_idletime">set_idletime</a></code></li>
 <li><code><a title="connpy.cli.config_handler.ConfigHandler.set_remote_host" href="#connpy.cli.config_handler.ConfigHandler.set_remote_host">set_remote_host</a></code></li>
 <li><code><a title="connpy.cli.config_handler.ConfigHandler.set_service_mode" href="#connpy.cli.config_handler.ConfigHandler.set_service_mode">set_service_mode</a></code></li>
+<li><code><a title="connpy.cli.config_handler.ConfigHandler.set_shell_config" href="#connpy.cli.config_handler.ConfigHandler.set_shell_config">set_shell_config</a></code></li>
 <li><code><a title="connpy.cli.config_handler.ConfigHandler.set_sync_remote" href="#connpy.cli.config_handler.ConfigHandler.set_sync_remote">set_sync_remote</a></code></li>
 <li><code><a title="connpy.cli.config_handler.ConfigHandler.set_theme" href="#connpy.cli.config_handler.ConfigHandler.set_theme">set_theme</a></code></li>
 <li><code><a title="connpy.cli.config_handler.ConfigHandler.show_completion" href="#connpy.cli.config_handler.ConfigHandler.show_completion">show_completion</a></code></li>

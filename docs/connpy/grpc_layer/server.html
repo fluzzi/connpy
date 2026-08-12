@@ -514,6 +514,8 @@ def service(self):
             return self._unauthenticated_handler(handler_call_details, &#34;Authorization token is missing&#34;)
 
         username = self.registry.user_service.verify_jwt(token)
+        if not username and token.startswith(&#34;cnp_pat_&#34;):
+            username = self.registry.user_service.verify_api_token(token)
         if not username:
             return self._unauthenticated_handler(handler_call_details, &#34;Invalid or expired token&#34;)
 
@@ -628,6 +630,8 @@ def service(self):
         return self._unauthenticated_handler(handler_call_details, &#34;Authorization token is missing&#34;)
 
     username = self.registry.user_service.verify_jwt(token)
+    if not username and token.startswith(&#34;cnp_pat_&#34;):
+        username = self.registry.user_service.verify_api_token(token)
     if not username:
         return self._unauthenticated_handler(handler_call_details, &#34;Invalid or expired token&#34;)
 
@@ -834,6 +838,58 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
         except ValueError as e:
             context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(e))
             
+        return Empty()
+
+    @handle_errors
+    def create_api_token(self, request, context):
+        username = _current_user.get()
+        if not username:
+            context.abort(grpc.StatusCode.UNAUTHENTICATED, &#34;Authentication required&#34;)
+        
+        try:
+            expires_in_days = request.expires_in_days if request.expires_in_days &gt; 0 else None
+            result = self.registry.user_service.create_api_token(
+                username, request.name, expires_in_days=expires_in_days
+            )
+        except ValueError as e:
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(e))
+        
+        return connpy_pb2.CreateApiTokenResponse(
+            token_id=result[&#34;token_id&#34;],
+            raw_token=result[&#34;raw_token&#34;],
+            name=result[&#34;name&#34;],
+        )
+
+    @handle_errors
+    def list_api_tokens(self, request, context):
+        username = _current_user.get()
+        if not username:
+            context.abort(grpc.StatusCode.UNAUTHENTICATED, &#34;Authentication required&#34;)
+        
+        tokens = self.registry.user_service.list_api_tokens(username)
+        token_infos = [
+            connpy_pb2.ApiTokenInfo(
+                token_id=t[&#34;token_id&#34;],
+                name=t.get(&#34;name&#34;) or &#34;&#34;,
+                token_prefix=t.get(&#34;token_prefix&#34;) or &#34;&#34;,
+                created_at=t.get(&#34;created_at&#34;) or &#34;&#34;,
+                last_used_at=t.get(&#34;last_used_at&#34;) or &#34;&#34;,
+                expires_at=t.get(&#34;expires_at&#34;) or &#34;&#34;,
+            )
+            for t in tokens
+        ]
+        return connpy_pb2.ListApiTokensResponse(tokens=token_infos)
+
+    @handle_errors
+    def revoke_api_token(self, request, context):
+        username = _current_user.get()
+        if not username:
+            context.abort(grpc.StatusCode.UNAUTHENTICATED, &#34;Authentication required&#34;)
+        
+        removed = self.registry.user_service.revoke_api_token(username, request.token_id)
+        if not removed:
+            context.abort(grpc.StatusCode.NOT_FOUND, f&#34;Token &#39;{request.token_id}&#39; not found&#34;)
+        
         return Empty()</code></pre>
 </details>
 <div class="desc"><p>Missing associated documentation comment in .proto file.</p></div>
@@ -846,9 +902,12 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
 <li><code><b><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer">AuthServiceServicer</a></b></code>:
 <ul class="hlist">
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.change_password" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.change_password">change_password</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.create_api_token" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.create_api_token">create_api_token</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.get_sso_providers" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.get_sso_providers">get_sso_providers</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.list_api_tokens" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.list_api_tokens">list_api_tokens</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.login" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.login">login</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.login_sso" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.login_sso">login_sso</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.revoke_api_token" href="connpy_pb2_grpc.html#connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.revoke_api_token">revoke_api_token</a></code></li>
 </ul>
 </li>
 </ul>
@@ -1496,10 +1555,59 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
                         raw_bytes = str(raw_bytes).encode()
                     
                     from connpy.utils import log_cleaner
-                    last_line = log_cleaner(raw_bytes.decode(errors=&#39;replace&#39;)).split(&#39;\n&#39;)[-1].strip()
+                    cleaned_buffer = log_cleaner(raw_bytes.decode(errors=&#39;replace&#39;))
+                    last_line = cleaned_buffer.split(&#39;\n&#39;)[-1].strip() if cleaned_buffer.strip() else &#34;(prompt)&#34;
                     blocks = service.build_context_blocks(raw_bytes, n.cmd_byte_positions, node_info, last_line=last_line)
                     node_info[&#34;context_blocks&#34;] = blocks
 
+                    total_cmds = len(blocks)
+                    total_lines = len(cleaned_buffer.split(&#39;\n&#39;))
+
+                    if not hasattr(remote_stream, &#39;copilot_state&#39;) or remote_stream.copilot_state is None:
+                        remote_stream.copilot_state = {}
+                    session_state = remote_stream.copilot_state
+
+                    if isinstance(node_info, dict):
+                        for k, v in node_info.items():
+                            if k in (&#39;context_mode&#39;, &#39;context_cmd&#39;, &#39;context_lines&#39;, &#39;persona&#39;, &#39;trust&#39;, &#39;os&#39;, &#39;prompt&#39;):
+                                session_state[k] = v
+
+                    saved_mode = session_state.get(&#39;context_mode&#39;, 0)
+                    saved_cmd = session_state.get(&#39;context_cmd&#39;, 1)
+                    saved_lines = session_state.get(&#39;context_lines&#39;, 50)
+                    last_total_cmds = session_state.get(&#39;last_total_cmds&#39;, None)
+                    last_total_lines = session_state.get(&#39;last_total_lines&#39;, None)
+
+                    is_range = saved_mode in (0, &#39;RANGE&#39;, &#39;range&#39;)
+                    is_lines = saved_mode in (2, &#39;LINES&#39;, &#39;lines&#39;)
+                    is_single = saved_mode in (1, &#39;SINGLE&#39;, &#39;single&#39;)
+
+                    if is_range or is_single:
+                        if last_total_cmds is not None and total_cmds &gt; last_total_cmds and saved_cmd &gt; 1:
+                            new_cmds = total_cmds - last_total_cmds
+                            initial_cmd = saved_cmd + new_cmds
+                        else:
+                            initial_cmd = saved_cmd
+                        initial_lines = saved_lines
+                    elif is_lines:
+                        if last_total_lines is not None and total_lines &gt; last_total_lines and saved_lines &gt; 50:
+                            new_lines = total_lines - last_total_lines
+                            initial_lines = saved_lines + new_lines
+                        else:
+                            initial_lines = saved_lines
+                        initial_cmd = saved_cmd
+                    else:
+                        initial_cmd = saved_cmd
+                        initial_lines = saved_lines
+
+                    session_state[&#39;context_cmd&#39;] = max(1, initial_cmd)
+                    session_state[&#39;context_lines&#39;] = max(1, initial_lines)
+                    session_state[&#39;last_total_cmds&#39;] = total_cmds
+                    session_state[&#39;last_total_lines&#39;] = total_lines
+
+                    node_info.update(session_state)
+                    node_info[&#39;context_cmd&#39;] = min(session_state[&#39;context_cmd&#39;], max(1, total_cmds))
+                    node_info[&#39;context_lines&#39;] = min(session_state[&#39;context_lines&#39;], max(1, total_lines))
                     node_info_json = json.dumps(node_info)
                     
                     # Convert buffer to string if it&#39;s bytes for the preview
@@ -1544,6 +1652,17 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
                             if req_session_id and req_session_id != copilot_session_id:
                                 continue # Ignore stale request from a previous session
 
+                            merged_node_info_str = req_data.get(&#34;node_info_json&#34;, &#34;&#34;)
+                            if merged_node_info_str:
+                                try:
+                                    merged_node_info = json.loads(merged_node_info_str)
+                                    node_info.update(merged_node_info)
+                                    # Sync context state from frontend into session_state for persistence
+                                    for k in (&#39;context_mode&#39;, &#39;context_cmd&#39;, &#39;context_lines&#39;):
+                                        if k in merged_node_info:
+                                            session_state[k] = merged_node_info[k]
+                                except: pass
+
                             if &#34;question&#34; not in req_data or not req_data[&#34;question&#34;] or req_data[&#34;question&#34;] == &#34;CANCEL&#34; or req_data.get(&#34;action&#34;) in (&#34;cancel&#34;, &#34;web_cancel&#34;):
                                 if req_data.get(&#34;action&#34;) == &#34;web_cancel&#34;:
                                     os.write(child_fd, b&#39;\x05&#39;)
@@ -1551,13 +1670,6 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
                                     os.write(child_fd, b&#39;\x15\r&#39;)
                                 return
                             question = req_data[&#34;question&#34;]
-                            
-                            merged_node_info_str = req_data.get(&#34;node_info_json&#34;, &#34;&#34;)
-                            if merged_node_info_str:
-                                try:
-                                    merged_node_info = json.loads(merged_node_info_str)
-                                    node_info.update(merged_node_info)
-                                except: pass
 
                             context_buffer = req_data.get(&#34;context_buffer&#34;, &#34;&#34;)
                             if context_buffer.startswith(&#39;{&#34;context_start_pos&#34;&#39;):
@@ -1620,6 +1732,15 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
                             if not action_data: return
                             action = action_data.get(&#34;action&#34;, &#34;cancel&#34;)
                             
+                            merged_node_info_str = action_data.get(&#34;node_info_json&#34;, &#34;&#34;)
+                            if merged_node_info_str:
+                                try:
+                                    merged_node_info = json.loads(merged_node_info_str)
+                                    for k in (&#39;context_mode&#39;, &#39;context_cmd&#39;, &#39;context_lines&#39;):
+                                        if k in merged_node_info:
+                                            session_state[k] = merged_node_info[k]
+                                except: pass
+
                             if action == &#34;continue&#34;:
                                 continue # Loop back for next question
                                 

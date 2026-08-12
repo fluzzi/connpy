@@ -374,7 +374,7 @@ class node:
             self.child.setwinsize(int(size.group(2)),int(size.group(1)))
         except OSError:
             pass
-        if logger:
+        if logger and self.protocol != "local":
             port_str = f":{self.port}" if self.port and self.protocol not in ["ssm", "kubectl", "docker"] else ""
             logger("success", f"Connected to {self.unique} at {self.host}{port_str} via: {self.protocol}")
 
@@ -407,6 +407,34 @@ class node:
         if 'logfile' in dir(self) and hasattr(self, 'mylog'):
             with open(self.logfile, "w") as f:
                 f.write(self._logclean(self.mylog.getvalue().decode(), True))
+
+    def _is_child_connpy_active(self, child_fd: int) -> bool:
+        if self.protocol != "local":
+            return False
+        try:
+            fg_pgid = os.tcgetpgrp(child_fd)
+            if fg_pgid <= 0:
+                return False
+            cmdline_path = f"/proc/{fg_pgid}/cmdline"
+            if os.path.exists(cmdline_path):
+                with open(cmdline_path, "rb") as f:
+                    raw_args = f.read().split(b"\x00")
+                    cmdline_str = " ".join([arg.decode(errors="ignore") for arg in raw_args if arg])
+                    
+                    is_active = False
+                    for raw_arg in raw_args:
+                        arg_str = raw_arg.decode(errors="ignore")
+                        if not arg_str:
+                            continue
+                        base_name = os.path.basename(arg_str)
+                        if base_name in ["conn", "connpy", "connapp"] or "connpy" in arg_str or "connapp" in arg_str:
+                            is_active = True
+                            break
+
+                    return is_active
+        except Exception:
+            pass
+        return False
 
     async def _async_interact_loop(self, local_stream, resize_callback, copilot_handler=None):
         local_stream.setup(resize_callback=resize_callback)
@@ -472,6 +500,14 @@ class node:
                     
                     # Copilot interception
                     if copilot_handler and b'\x00' in data:
+                        if self._is_child_connpy_active(child_fd):
+                            try:
+                                os.write(child_fd, data)
+                            except OSError:
+                                break
+                            self.lastinput = time()
+                            continue
+
                         # Build node info from available metadata and ensure values are strings (not bytes)
                         def to_str(val):
                             if isinstance(val, bytes):
@@ -579,12 +615,39 @@ class node:
                         except Exception:
                             pass
 
+            async def pwd_tracker_task():
+                import socket
+                hostname = socket.gethostname()
+                last_cwd = None
+                while True:
+                    await asyncio.sleep(0.3)
+                    try:
+                        child_pid = getattr(self.child, 'pid', None)
+                        if child_pid:
+                            new_cwd = os.readlink(f"/proc/{child_pid}/cwd")
+                            if new_cwd != last_cwd:
+                                last_cwd = new_cwd
+                                try:
+                                    os.chdir(new_cwd)
+                                except Exception:
+                                    pass
+                                try:
+                                    await local_stream.write(f"\033]7;file://{hostname}{new_cwd}\007".encode())
+                                except Exception:
+                                    pass
+                                if isinstance(self.tags, dict):
+                                    self.tags["cwd"] = new_cwd
+                    except Exception:
+                        pass
+
             try:
                 # We wait for either the user (ingress) or the child (egress) to finish
                 tasks = [
                     asyncio.create_task(ingress_task()),
                     asyncio.create_task(egress_task())
                 ]
+                if self.protocol == "local":
+                    tasks.append(asyncio.create_task(pwd_tracker_task()))
                 if self.idletime > 0:
                     tasks.append(asyncio.create_task(keepalive_task()))
                 if hasattr(self, 'logfile') and hasattr(self, 'mylog'):
@@ -1106,12 +1169,23 @@ class node:
             return self._generate_docker_cmd()
         elif self.protocol == "ssm":
             return self._generate_ssm_cmd()
+        elif self.protocol == "local":
+            return self.host
         else:
             printer.error(f"Invalid protocol: {self.protocol}")
             sys.exit(1)
 
     @MethodHook
     def _connect(self, debug=False, timeout=10, max_attempts=3, logger=None):
+        if self.protocol == "local":
+            cmd = self._get_cmd()
+            args = shlex.split(cmd)
+            self.child = pexpect.spawn(args[0], args[1:], env=os.environ.copy())
+            from pexpect import fdpexpect
+            self.raw_child = fdpexpect.fdspawn(self.child.child_fd)
+            if self.logs != '':
+                self.logfile = self._logfile()
+            return True
 
         cmd = self._get_cmd()
         passwords = self._passtx(self.password) if self.password and any(self.password) else []

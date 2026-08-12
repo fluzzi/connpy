@@ -61,61 +61,61 @@ el.replaceWith(d);
 
     def host_validation(self, answers, current, regex = &#34;^.+$&#34;):
         if not re.match(regex, current):
-            raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Host cannot be empty&#34;)
+            _raise_val_err(&#34;Host cannot be empty&#34;)
         if current.startswith(&#34;@&#34;):
             if current[1:] not in self.app.profiles:
-                raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Profile {} don&#39;t exist&#34;.format(current))
+                _raise_val_err(&#34;Profile {} don&#39;t exist&#34;.format(current))
         return True
 
     def profile_protocol_validation(self, answers, current, regex = &#34;(^ssh$|^telnet$|^kubectl$|^docker$|^ssm$|^$)&#34;):
         if not re.match(regex, current):
-            raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Pick between ssh, telnet, kubectl, docker, ssm or leave empty&#34;)
+            _raise_val_err(&#34;Pick between ssh, telnet, kubectl, docker, ssm or leave empty&#34;)
         return True
 
     def protocol_validation(self, answers, current, regex = &#34;(^ssh$|^telnet$|^kubectl$|^docker$|^ssm$|^$|^@.+$)&#34;):
         if not re.match(regex, current):
-            raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Pick between ssh, telnet, kubectl, docker, ssm, leave empty or @profile&#34;)
+            _raise_val_err(&#34;Pick between ssh, telnet, kubectl, docker, ssm, leave empty or @profile&#34;)
         if current.startswith(&#34;@&#34;):
             if current[1:] not in self.app.profiles:
-                raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Profile {} don&#39;t exist&#34;.format(current))
+                _raise_val_err(&#34;Profile {} don&#39;t exist&#34;.format(current))
         return True
 
     def profile_port_validation(self, answers, current, regex = &#34;(^[0-9]*$)&#34;):
         if not re.match(regex, current):
-            raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Pick a port between 1-65535, @profile o leave empty&#34;)
+            _raise_val_err(&#34;Pick a port between 1-65535, @profile o leave empty&#34;)
         try:
             port = int(current)
         except ValueError:
             port = 0
         if current != &#34;&#34; and not 1 &lt;= int(port) &lt;= 65535:
-            raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Pick a port between 1-65535 or leave empty&#34;)
+            _raise_val_err(&#34;Pick a port between 1-65535 or leave empty&#34;)
         return True
 
     def port_validation(self, answers, current, regex = &#34;(^[0-9]*$|^@.+$)&#34;):
         if not re.match(regex, current):
-            raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Pick a port between 1-65535, @profile or leave empty&#34;)
+            _raise_val_err(&#34;Pick a port between 1-65535, @profile or leave empty&#34;)
         try:
             port = int(current)
         except ValueError:
             port = 0
         if current.startswith(&#34;@&#34;):
             if current[1:] not in self.app.profiles:
-                raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Profile {} don&#39;t exist&#34;.format(current))
+                _raise_val_err(&#34;Profile {} don&#39;t exist&#34;.format(current))
         elif current != &#34;&#34; and not 1 &lt;= int(port) &lt;= 65535:
-            raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Pick a port between 1-65535, @profile o leave empty&#34;)
+            _raise_val_err(&#34;Pick a port between 1-65535, @profile o leave empty&#34;)
         return True
 
     def pass_validation(self, answers, current, regex = &#34;(^@.+$)&#34;):
         profiles = current.split(&#34;,&#34;)
         for i in profiles:
             if not re.match(regex, i) or i[1:] not in self.app.profiles:
-                raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Profile {} don&#39;t exist&#34;.format(i))
+                _raise_val_err(&#34;Profile {} don&#39;t exist&#34;.format(i))
         return True
 
     def tags_validation(self, answers, current):
         if current.startswith(&#34;@&#34;):
             if current[1:] not in self.app.profiles:
-                raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Profile {} don&#39;t exist&#34;.format(current))
+                _raise_val_err(&#34;Profile {} don&#39;t exist&#34;.format(current))
         elif current != &#34;&#34;:
             isdict = False
             try:
@@ -123,7 +123,7 @@ el.replaceWith(d);
             except Exception:
                 pass
             if not isinstance (isdict, dict):
-                raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Tags should be a python dictionary.&#34;.format(current))
+                _raise_val_err(&#34;Tags should be a python dictionary.&#34;.format(current))
         return True
 
     def profile_tags_validation(self, answers, current):
@@ -134,36 +134,36 @@ el.replaceWith(d);
             except Exception:
                 pass
             if not isinstance (isdict, dict):
-                raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Tags should be a python dictionary.&#34;.format(current))
+                _raise_val_err(&#34;Tags should be a python dictionary.&#34;.format(current))
         return True
 
     def jumphost_validation(self, answers, current):
         if current.startswith(&#34;@&#34;):
             if current[1:] not in self.app.profiles:
-                raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Profile {} don&#39;t exist&#34;.format(current))
+                _raise_val_err(&#34;Profile {} don&#39;t exist&#34;.format(current))
         elif current != &#34;&#34;:
             if current not in self.app.nodes_list:
-                raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Node {} don&#39;t exist.&#34;.format(current))
+                _raise_val_err(&#34;Node {} don&#39;t exist.&#34;.format(current))
         return True
 
     def profile_jumphost_validation(self, answers, current):
         if current != &#34;&#34;:
             if current not in self.app.nodes_list:
-                raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Node {} don&#39;t exist.&#34;.format(current))
+                _raise_val_err(&#34;Node {} don&#39;t exist.&#34;.format(current))
         return True
 
     def default_validation(self, answers, current):
         if current.startswith(&#34;@&#34;):
             if current[1:] not in self.app.profiles:
-                raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Profile {} don&#39;t exist&#34;.format(current))
+                _raise_val_err(&#34;Profile {} don&#39;t exist&#34;.format(current))
         return True
 
     def bulk_node_validation(self, answers, current, regex = &#34;^[0-9a-zA-Z_.,$#-]+$&#34;):
         if not re.match(regex, current):
-            raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Host cannot be empty&#34;)
+            _raise_val_err(&#34;Host cannot be empty&#34;)
         if current.startswith(&#34;@&#34;):
             if current[1:] not in self.app.profiles:
-                raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Profile {} don&#39;t exist&#34;.format(current))
+                _raise_val_err(&#34;Profile {} don&#39;t exist&#34;.format(current))
         return True
 
     def bulk_folder_validation(self, answers, current):
@@ -176,19 +176,19 @@ el.replaceWith(d);
             
         matches = list(filter(lambda k: k == candidate, self.app.folders))
         if current != &#34;&#34; and len(matches) == 0:
-            raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Location {} don&#39;t exist&#34;.format(current))
+            _raise_val_err(&#34;Location {} don&#39;t exist&#34;.format(current))
         return True
 
     def bulk_host_validation(self, answers, current, regex = &#34;^.+$&#34;):
         if not re.match(regex, current):
-            raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Host cannot be empty&#34;)
+            _raise_val_err(&#34;Host cannot be empty&#34;)
         if current.startswith(&#34;@&#34;):
             if current[1:] not in self.app.profiles:
-                raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Profile {} don&#39;t exist&#34;.format(current))
+                _raise_val_err(&#34;Profile {} don&#39;t exist&#34;.format(current))
         hosts = current.split(&#34;,&#34;)
         nodes = answers[&#34;ids&#34;].split(&#34;,&#34;)
         if len(hosts) &gt; 1 and len(hosts) != len(nodes):
-                raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Hosts list should be the same length of nodes list&#34;)
+                _raise_val_err(&#34;Hosts list should be the same length of nodes list&#34;)
         return True</code></pre>
 </details>
 <div class="desc"></div>
@@ -212,7 +212,7 @@ el.replaceWith(d);
         
     matches = list(filter(lambda k: k == candidate, self.app.folders))
     if current != &#34;&#34; and len(matches) == 0:
-        raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Location {} don&#39;t exist&#34;.format(current))
+        _raise_val_err(&#34;Location {} don&#39;t exist&#34;.format(current))
     return True</code></pre>
 </details>
 <div class="desc"></div>
@@ -227,14 +227,14 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def bulk_host_validation(self, answers, current, regex = &#34;^.+$&#34;):
     if not re.match(regex, current):
-        raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Host cannot be empty&#34;)
+        _raise_val_err(&#34;Host cannot be empty&#34;)
     if current.startswith(&#34;@&#34;):
         if current[1:] not in self.app.profiles:
-            raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Profile {} don&#39;t exist&#34;.format(current))
+            _raise_val_err(&#34;Profile {} don&#39;t exist&#34;.format(current))
     hosts = current.split(&#34;,&#34;)
     nodes = answers[&#34;ids&#34;].split(&#34;,&#34;)
     if len(hosts) &gt; 1 and len(hosts) != len(nodes):
-            raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Hosts list should be the same length of nodes list&#34;)
+            _raise_val_err(&#34;Hosts list should be the same length of nodes list&#34;)
     return True</code></pre>
 </details>
 <div class="desc"></div>
@@ -249,10 +249,10 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def bulk_node_validation(self, answers, current, regex = &#34;^[0-9a-zA-Z_.,$#-]+$&#34;):
     if not re.match(regex, current):
-        raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Host cannot be empty&#34;)
+        _raise_val_err(&#34;Host cannot be empty&#34;)
     if current.startswith(&#34;@&#34;):
         if current[1:] not in self.app.profiles:
-            raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Profile {} don&#39;t exist&#34;.format(current))
+            _raise_val_err(&#34;Profile {} don&#39;t exist&#34;.format(current))
     return True</code></pre>
 </details>
 <div class="desc"></div>
@@ -268,7 +268,7 @@ el.replaceWith(d);
 <pre><code class="python">def default_validation(self, answers, current):
     if current.startswith(&#34;@&#34;):
         if current[1:] not in self.app.profiles:
-            raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Profile {} don&#39;t exist&#34;.format(current))
+            _raise_val_err(&#34;Profile {} don&#39;t exist&#34;.format(current))
     return True</code></pre>
 </details>
 <div class="desc"></div>
@@ -283,10 +283,10 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def host_validation(self, answers, current, regex = &#34;^.+$&#34;):
     if not re.match(regex, current):
-        raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Host cannot be empty&#34;)
+        _raise_val_err(&#34;Host cannot be empty&#34;)
     if current.startswith(&#34;@&#34;):
         if current[1:] not in self.app.profiles:
-            raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Profile {} don&#39;t exist&#34;.format(current))
+            _raise_val_err(&#34;Profile {} don&#39;t exist&#34;.format(current))
     return True</code></pre>
 </details>
 <div class="desc"></div>
@@ -302,10 +302,10 @@ el.replaceWith(d);
 <pre><code class="python">def jumphost_validation(self, answers, current):
     if current.startswith(&#34;@&#34;):
         if current[1:] not in self.app.profiles:
-            raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Profile {} don&#39;t exist&#34;.format(current))
+            _raise_val_err(&#34;Profile {} don&#39;t exist&#34;.format(current))
     elif current != &#34;&#34;:
         if current not in self.app.nodes_list:
-            raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Node {} don&#39;t exist.&#34;.format(current))
+            _raise_val_err(&#34;Node {} don&#39;t exist.&#34;.format(current))
     return True</code></pre>
 </details>
 <div class="desc"></div>
@@ -322,7 +322,7 @@ el.replaceWith(d);
     profiles = current.split(&#34;,&#34;)
     for i in profiles:
         if not re.match(regex, i) or i[1:] not in self.app.profiles:
-            raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Profile {} don&#39;t exist&#34;.format(i))
+            _raise_val_err(&#34;Profile {} don&#39;t exist&#34;.format(i))
     return True</code></pre>
 </details>
 <div class="desc"></div>
@@ -337,16 +337,16 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def port_validation(self, answers, current, regex = &#34;(^[0-9]*$|^@.+$)&#34;):
     if not re.match(regex, current):
-        raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Pick a port between 1-65535, @profile or leave empty&#34;)
+        _raise_val_err(&#34;Pick a port between 1-65535, @profile or leave empty&#34;)
     try:
         port = int(current)
     except ValueError:
         port = 0
     if current.startswith(&#34;@&#34;):
         if current[1:] not in self.app.profiles:
-            raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Profile {} don&#39;t exist&#34;.format(current))
+            _raise_val_err(&#34;Profile {} don&#39;t exist&#34;.format(current))
     elif current != &#34;&#34; and not 1 &lt;= int(port) &lt;= 65535:
-        raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Pick a port between 1-65535, @profile o leave empty&#34;)
+        _raise_val_err(&#34;Pick a port between 1-65535, @profile o leave empty&#34;)
     return True</code></pre>
 </details>
 <div class="desc"></div>
@@ -362,7 +362,7 @@ el.replaceWith(d);
 <pre><code class="python">def profile_jumphost_validation(self, answers, current):
     if current != &#34;&#34;:
         if current not in self.app.nodes_list:
-            raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Node {} don&#39;t exist.&#34;.format(current))
+            _raise_val_err(&#34;Node {} don&#39;t exist.&#34;.format(current))
     return True</code></pre>
 </details>
 <div class="desc"></div>
@@ -377,13 +377,13 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def profile_port_validation(self, answers, current, regex = &#34;(^[0-9]*$)&#34;):
     if not re.match(regex, current):
-        raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Pick a port between 1-65535, @profile o leave empty&#34;)
+        _raise_val_err(&#34;Pick a port between 1-65535, @profile o leave empty&#34;)
     try:
         port = int(current)
     except ValueError:
         port = 0
     if current != &#34;&#34; and not 1 &lt;= int(port) &lt;= 65535:
-        raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Pick a port between 1-65535 or leave empty&#34;)
+        _raise_val_err(&#34;Pick a port between 1-65535 or leave empty&#34;)
     return True</code></pre>
 </details>
 <div class="desc"></div>
@@ -398,7 +398,7 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def profile_protocol_validation(self, answers, current, regex = &#34;(^ssh$|^telnet$|^kubectl$|^docker$|^ssm$|^$)&#34;):
     if not re.match(regex, current):
-        raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Pick between ssh, telnet, kubectl, docker, ssm or leave empty&#34;)
+        _raise_val_err(&#34;Pick between ssh, telnet, kubectl, docker, ssm or leave empty&#34;)
     return True</code></pre>
 </details>
 <div class="desc"></div>
@@ -419,7 +419,7 @@ el.replaceWith(d);
         except Exception:
             pass
         if not isinstance (isdict, dict):
-            raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Tags should be a python dictionary.&#34;.format(current))
+            _raise_val_err(&#34;Tags should be a python dictionary.&#34;.format(current))
     return True</code></pre>
 </details>
 <div class="desc"></div>
@@ -434,10 +434,10 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def protocol_validation(self, answers, current, regex = &#34;(^ssh$|^telnet$|^kubectl$|^docker$|^ssm$|^$|^@.+$)&#34;):
     if not re.match(regex, current):
-        raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Pick between ssh, telnet, kubectl, docker, ssm, leave empty or @profile&#34;)
+        _raise_val_err(&#34;Pick between ssh, telnet, kubectl, docker, ssm, leave empty or @profile&#34;)
     if current.startswith(&#34;@&#34;):
         if current[1:] not in self.app.profiles:
-            raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Profile {} don&#39;t exist&#34;.format(current))
+            _raise_val_err(&#34;Profile {} don&#39;t exist&#34;.format(current))
     return True</code></pre>
 </details>
 <div class="desc"></div>
@@ -453,7 +453,7 @@ el.replaceWith(d);
 <pre><code class="python">def tags_validation(self, answers, current):
     if current.startswith(&#34;@&#34;):
         if current[1:] not in self.app.profiles:
-            raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Profile {} don&#39;t exist&#34;.format(current))
+            _raise_val_err(&#34;Profile {} don&#39;t exist&#34;.format(current))
     elif current != &#34;&#34;:
         isdict = False
         try:
@@ -461,7 +461,7 @@ el.replaceWith(d);
         except Exception:
             pass
         if not isinstance (isdict, dict):
-            raise inquirer.errors.ValidationError(&#34;&#34;, reason=&#34;Tags should be a python dictionary.&#34;.format(current))
+            _raise_val_err(&#34;Tags should be a python dictionary.&#34;.format(current))
     return True</code></pre>
 </details>
 <div class="desc"></div>

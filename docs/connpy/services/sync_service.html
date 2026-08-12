@@ -82,6 +82,7 @@ el.replaceWith(d);
 
     def login(self):
         &#34;&#34;&#34;Authenticate with Google Drive.&#34;&#34;&#34;
+        Credentials, Request, _, RefreshError, InstalledAppFlow, _, _, _ = _get_google_libs()
         creds = None
         if os.path.exists(self.token_file):
             creds = Credentials.from_authorized_user_file(self.token_file, self.scopes)
@@ -119,6 +120,7 @@ el.replaceWith(d);
 
     def get_credentials(self):
         &#34;&#34;&#34;Get valid credentials, refreshing if necessary.&#34;&#34;&#34;
+        Credentials, Request, _, RefreshError, _, _, _, _ = _get_google_libs()
         if os.path.exists(self.token_file):
             creds = Credentials.from_authorized_user_file(self.token_file, self.scopes)
         else:
@@ -136,6 +138,7 @@ el.replaceWith(d);
 
     def check_login_status(self):
         &#34;&#34;&#34;Check if logged in to Google Drive.&#34;&#34;&#34;
+        Credentials, Request, _, RefreshError, _, _, _, _ = _get_google_libs()
         if os.path.exists(self.token_file):
             creds = Credentials.from_authorized_user_file(self.token_file)
             if creds and creds.expired and creds.refresh_token:
@@ -148,6 +151,7 @@ el.replaceWith(d);
 
     def list_backups(self):
         &#34;&#34;&#34;List files in Google Drive appDataFolder.&#34;&#34;&#34;
+        _, _, build, _, _, _, _, HttpError = _get_google_libs()
         creds = self.get_credentials()
         if not creds:
             printer.error(&#34;Not logged in to Google Drive.&#34;)
@@ -206,6 +210,7 @@ el.replaceWith(d);
 
     def upload_file(self, file_path, timestamp):
         &#34;&#34;&#34;Internal method to upload to Drive.&#34;&#34;&#34;
+        _, _, build, _, _, MediaFileUpload, _, _ = _get_google_libs()
         creds = self.get_credentials()
         if not creds: return False
         
@@ -231,6 +236,7 @@ el.replaceWith(d);
 
     def delete_backup(self, file_id):
         &#34;&#34;&#34;Delete a backup from Drive.&#34;&#34;&#34;
+        _, _, build, _, _, _, _, _ = _get_google_libs()
         creds = self.get_credentials()
         if not creds: return False
         try:
@@ -264,6 +270,7 @@ el.replaceWith(d);
 
     def download_file(self, file_id, dest):
         &#34;&#34;&#34;Internal method to download from Drive.&#34;&#34;&#34;
+        _, _, build, _, _, _, MediaIoBaseDownload, _ = _get_google_libs()
         creds = self.get_credentials()
         if not creds: return False
         try:
@@ -508,6 +515,7 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def check_login_status(self):
     &#34;&#34;&#34;Check if logged in to Google Drive.&#34;&#34;&#34;
+    Credentials, Request, _, RefreshError, _, _, _, _ = _get_google_libs()
     if os.path.exists(self.token_file):
         creds = Credentials.from_authorized_user_file(self.token_file)
         if creds and creds.expired and creds.refresh_token:
@@ -570,6 +578,7 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def delete_backup(self, file_id):
     &#34;&#34;&#34;Delete a backup from Drive.&#34;&#34;&#34;
+    _, _, build, _, _, _, _, _ = _get_google_libs()
     creds = self.get_credentials()
     if not creds: return False
     try:
@@ -592,6 +601,7 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def download_file(self, file_id, dest):
     &#34;&#34;&#34;Internal method to download from Drive.&#34;&#34;&#34;
+    _, _, build, _, _, _, MediaIoBaseDownload, _ = _get_google_libs()
     creds = self.get_credentials()
     if not creds: return False
     try:
@@ -619,6 +629,7 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def get_credentials(self):
     &#34;&#34;&#34;Get valid credentials, refreshing if necessary.&#34;&#34;&#34;
+    Credentials, Request, _, RefreshError, _, _, _, _ = _get_google_libs()
     if os.path.exists(self.token_file):
         creds = Credentials.from_authorized_user_file(self.token_file, self.scopes)
     else:
@@ -646,6 +657,7 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def list_backups(self):
     &#34;&#34;&#34;List files in Google Drive appDataFolder.&#34;&#34;&#34;
+    _, _, build, _, _, _, _, HttpError = _get_google_libs()
     creds = self.get_credentials()
     if not creds:
         printer.error(&#34;Not logged in to Google Drive.&#34;)
@@ -684,6 +696,7 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def login(self):
     &#34;&#34;&#34;Authenticate with Google Drive.&#34;&#34;&#34;
+    Credentials, Request, _, RefreshError, InstalledAppFlow, _, _, _ = _get_google_libs()
     creds = None
     if os.path.exists(self.token_file):
         creds = Credentials.from_authorized_user_file(self.token_file, self.scopes)
@@ -890,6 +903,7 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def upload_file(self, file_path, timestamp):
     &#34;&#34;&#34;Internal method to upload to Drive.&#34;&#34;&#34;
+    _, _, build, _, _, MediaFileUpload, _, _ = _get_google_libs()
     creds = self.get_credentials()
     if not creds: return False
     

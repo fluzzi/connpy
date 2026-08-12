@@ -92,6 +92,7 @@ el.replaceWith(d);
             sys.exit(1)
 
     def add_provider(self, args):
+        import inquirer
         provider = args.provider
         sso = self.app.config.config.get(&#34;sso&#34;, {})
         providers = sso.setdefault(&#34;providers&#34;, {})
@@ -165,6 +166,7 @@ el.replaceWith(d);
             sys.exit(1)
             
         # Confirm delete
+        import inquirer
         questions = [inquirer.Confirm(&#34;confirm&#34;, message=f&#34;Are you sure you want to delete SSO Provider &#39;{provider}&#39;?&#34;, default=False)]
         answers = inquirer.prompt(questions)
         if not answers or not answers[&#34;confirm&#34;]:
@@ -225,6 +227,7 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def add_provider(self, args):
+    import inquirer
     provider = args.provider
     sso = self.app.config.config.get(&#34;sso&#34;, {})
     providers = sso.setdefault(&#34;providers&#34;, {})
@@ -308,6 +311,7 @@ el.replaceWith(d);
         sys.exit(1)
         
     # Confirm delete
+    import inquirer
     questions = [inquirer.Confirm(&#34;confirm&#34;, message=f&#34;Are you sure you want to delete SSO Provider &#39;{provider}&#39;?&#34;, default=False)]
     answers = inquirer.prompt(questions)
     if not answers or not answers[&#34;confirm&#34;]:

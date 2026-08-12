@@ -153,6 +153,21 @@ el.replaceWith(d);
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                     response_serializer=connpy__pb2.SSOProvidersResponse.SerializeToString,
             ),
+            &#39;create_api_token&#39;: grpc.unary_unary_rpc_method_handler(
+                    servicer.create_api_token,
+                    request_deserializer=connpy__pb2.CreateApiTokenRequest.FromString,
+                    response_serializer=connpy__pb2.CreateApiTokenResponse.SerializeToString,
+            ),
+            &#39;list_api_tokens&#39;: grpc.unary_unary_rpc_method_handler(
+                    servicer.list_api_tokens,
+                    request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                    response_serializer=connpy__pb2.ListApiTokensResponse.SerializeToString,
+            ),
+            &#39;revoke_api_token&#39;: grpc.unary_unary_rpc_method_handler(
+                    servicer.revoke_api_token,
+                    request_deserializer=connpy__pb2.RevokeApiTokenRequest.FromString,
+                    response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
             &#39;connpy.AuthService&#39;, rpc_method_handlers)
@@ -1779,6 +1794,87 @@ def predict_execution_results(request,
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def create_api_token(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            &#39;/connpy.AuthService/create_api_token&#39;,
+            connpy__pb2.CreateApiTokenRequest.SerializeToString,
+            connpy__pb2.CreateApiTokenResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def list_api_tokens(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            &#39;/connpy.AuthService/list_api_tokens&#39;,
+            google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            connpy__pb2.ListApiTokensResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def revoke_api_token(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            &#39;/connpy.AuthService/revoke_api_token&#39;,
+            connpy__pb2.RevokeApiTokenRequest.SerializeToString,
+            google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
             _registered_method=True)</code></pre>
 </details>
 <div class="desc"><p>Missing associated documentation comment in .proto file.</p></div>
@@ -1821,6 +1917,43 @@ def change_password(request,
 </details>
 <div class="desc"></div>
 </dd>
+<dt id="connpy.grpc_layer.connpy_pb2_grpc.AuthService.create_api_token"><code class="name flex">
+<span>def <span class="ident">create_api_token</span></span>(<span>request,<br>target,<br>options=(),<br>channel_credentials=None,<br>call_credentials=None,<br>insecure=False,<br>compression=None,<br>wait_for_ready=None,<br>timeout=None,<br>metadata=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@staticmethod
+def create_api_token(request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None):
+    return grpc.experimental.unary_unary(
+        request,
+        target,
+        &#39;/connpy.AuthService/create_api_token&#39;,
+        connpy__pb2.CreateApiTokenRequest.SerializeToString,
+        connpy__pb2.CreateApiTokenResponse.FromString,
+        options,
+        channel_credentials,
+        insecure,
+        call_credentials,
+        compression,
+        wait_for_ready,
+        timeout,
+        metadata,
+        _registered_method=True)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
 <dt id="connpy.grpc_layer.connpy_pb2_grpc.AuthService.get_sso_providers"><code class="name flex">
 <span>def <span class="ident">get_sso_providers</span></span>(<span>request,<br>target,<br>options=(),<br>channel_credentials=None,<br>call_credentials=None,<br>insecure=False,<br>compression=None,<br>wait_for_ready=None,<br>timeout=None,<br>metadata=None)</span>
 </code></dt>
@@ -1846,6 +1979,43 @@ def get_sso_providers(request,
         &#39;/connpy.AuthService/get_sso_providers&#39;,
         google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
         connpy__pb2.SSOProvidersResponse.FromString,
+        options,
+        channel_credentials,
+        insecure,
+        call_credentials,
+        compression,
+        wait_for_ready,
+        timeout,
+        metadata,
+        _registered_method=True)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.connpy_pb2_grpc.AuthService.list_api_tokens"><code class="name flex">
+<span>def <span class="ident">list_api_tokens</span></span>(<span>request,<br>target,<br>options=(),<br>channel_credentials=None,<br>call_credentials=None,<br>insecure=False,<br>compression=None,<br>wait_for_ready=None,<br>timeout=None,<br>metadata=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@staticmethod
+def list_api_tokens(request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None):
+    return grpc.experimental.unary_unary(
+        request,
+        target,
+        &#39;/connpy.AuthService/list_api_tokens&#39;,
+        google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+        connpy__pb2.ListApiTokensResponse.FromString,
         options,
         channel_credentials,
         insecure,
@@ -1932,6 +2102,43 @@ def login_sso(request,
 </details>
 <div class="desc"></div>
 </dd>
+<dt id="connpy.grpc_layer.connpy_pb2_grpc.AuthService.revoke_api_token"><code class="name flex">
+<span>def <span class="ident">revoke_api_token</span></span>(<span>request,<br>target,<br>options=(),<br>channel_credentials=None,<br>call_credentials=None,<br>insecure=False,<br>compression=None,<br>wait_for_ready=None,<br>timeout=None,<br>metadata=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@staticmethod
+def revoke_api_token(request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None):
+    return grpc.experimental.unary_unary(
+        request,
+        target,
+        &#39;/connpy.AuthService/revoke_api_token&#39;,
+        connpy__pb2.RevokeApiTokenRequest.SerializeToString,
+        google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+        options,
+        channel_credentials,
+        insecure,
+        call_credentials,
+        compression,
+        wait_for_ready,
+        timeout,
+        metadata,
+        _registered_method=True)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
 </dl>
 </dd>
 <dt id="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer"><code class="flex name class">
@@ -1967,6 +2174,24 @@ def login_sso(request,
         &#34;&#34;&#34;Missing associated documentation comment in .proto file.&#34;&#34;&#34;
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details(&#39;Method not implemented!&#39;)
+        raise NotImplementedError(&#39;Method not implemented!&#39;)
+
+    def create_api_token(self, request, context):
+        &#34;&#34;&#34;Missing associated documentation comment in .proto file.&#34;&#34;&#34;
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details(&#39;Method not implemented!&#39;)
+        raise NotImplementedError(&#39;Method not implemented!&#39;)
+
+    def list_api_tokens(self, request, context):
+        &#34;&#34;&#34;Missing associated documentation comment in .proto file.&#34;&#34;&#34;
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details(&#39;Method not implemented!&#39;)
+        raise NotImplementedError(&#39;Method not implemented!&#39;)
+
+    def revoke_api_token(self, request, context):
+        &#34;&#34;&#34;Missing associated documentation comment in .proto file.&#34;&#34;&#34;
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details(&#39;Method not implemented!&#39;)
         raise NotImplementedError(&#39;Method not implemented!&#39;)</code></pre>
 </details>
 <div class="desc"><p>Missing associated documentation comment in .proto file.</p></div>
@@ -1992,6 +2217,22 @@ def login_sso(request,
 </details>
 <div class="desc"><p>Missing associated documentation comment in .proto file.</p></div>
 </dd>
+<dt id="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.create_api_token"><code class="name flex">
+<span>def <span class="ident">create_api_token</span></span>(<span>self, request, context)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def create_api_token(self, request, context):
+    &#34;&#34;&#34;Missing associated documentation comment in .proto file.&#34;&#34;&#34;
+    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+    context.set_details(&#39;Method not implemented!&#39;)
+    raise NotImplementedError(&#39;Method not implemented!&#39;)</code></pre>
+</details>
+<div class="desc"><p>Missing associated documentation comment in .proto file.</p></div>
+</dd>
 <dt id="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.get_sso_providers"><code class="name flex">
 <span>def <span class="ident">get_sso_providers</span></span>(<span>self, request, context)</span>
 </code></dt>
@@ -2001,6 +2242,22 @@ def login_sso(request,
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def get_sso_providers(self, request, context):
+    &#34;&#34;&#34;Missing associated documentation comment in .proto file.&#34;&#34;&#34;
+    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+    context.set_details(&#39;Method not implemented!&#39;)
+    raise NotImplementedError(&#39;Method not implemented!&#39;)</code></pre>
+</details>
+<div class="desc"><p>Missing associated documentation comment in .proto file.</p></div>
+</dd>
+<dt id="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.list_api_tokens"><code class="name flex">
+<span>def <span class="ident">list_api_tokens</span></span>(<span>self, request, context)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def list_api_tokens(self, request, context):
     &#34;&#34;&#34;Missing associated documentation comment in .proto file.&#34;&#34;&#34;
     context.set_code(grpc.StatusCode.UNIMPLEMENTED)
     context.set_details(&#39;Method not implemented!&#39;)
@@ -2033,6 +2290,22 @@ def login_sso(request,
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def login_sso(self, request, context):
+    &#34;&#34;&#34;Missing associated documentation comment in .proto file.&#34;&#34;&#34;
+    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+    context.set_details(&#39;Method not implemented!&#39;)
+    raise NotImplementedError(&#39;Method not implemented!&#39;)</code></pre>
+</details>
+<div class="desc"><p>Missing associated documentation comment in .proto file.</p></div>
+</dd>
+<dt id="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.revoke_api_token"><code class="name flex">
+<span>def <span class="ident">revoke_api_token</span></span>(<span>self, request, context)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def revoke_api_token(self, request, context):
     &#34;&#34;&#34;Missing associated documentation comment in .proto file.&#34;&#34;&#34;
     context.set_code(grpc.StatusCode.UNIMPLEMENTED)
     context.set_details(&#39;Method not implemented!&#39;)
@@ -2079,6 +2352,21 @@ def login_sso(request,
                 &#39;/connpy.AuthService/get_sso_providers&#39;,
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
                 response_deserializer=connpy__pb2.SSOProvidersResponse.FromString,
+                _registered_method=True)
+        self.create_api_token = channel.unary_unary(
+                &#39;/connpy.AuthService/create_api_token&#39;,
+                request_serializer=connpy__pb2.CreateApiTokenRequest.SerializeToString,
+                response_deserializer=connpy__pb2.CreateApiTokenResponse.FromString,
+                _registered_method=True)
+        self.list_api_tokens = channel.unary_unary(
+                &#39;/connpy.AuthService/list_api_tokens&#39;,
+                request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+                response_deserializer=connpy__pb2.ListApiTokensResponse.FromString,
+                _registered_method=True)
+        self.revoke_api_token = channel.unary_unary(
+                &#39;/connpy.AuthService/revoke_api_token&#39;,
+                request_serializer=connpy__pb2.RevokeApiTokenRequest.SerializeToString,
+                response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)</code></pre>
 </details>
 <div class="desc"><p>Missing associated documentation comment in .proto file.</p>
@@ -6510,20 +6798,26 @@ def stop_api(request,
 </li>
 <li>
 <h4><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthService" href="#connpy.grpc_layer.connpy_pb2_grpc.AuthService">AuthService</a></code></h4>
-<ul class="">
+<ul class="two-column">
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthService.change_password" href="#connpy.grpc_layer.connpy_pb2_grpc.AuthService.change_password">change_password</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthService.create_api_token" href="#connpy.grpc_layer.connpy_pb2_grpc.AuthService.create_api_token">create_api_token</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthService.get_sso_providers" href="#connpy.grpc_layer.connpy_pb2_grpc.AuthService.get_sso_providers">get_sso_providers</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthService.list_api_tokens" href="#connpy.grpc_layer.connpy_pb2_grpc.AuthService.list_api_tokens">list_api_tokens</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthService.login" href="#connpy.grpc_layer.connpy_pb2_grpc.AuthService.login">login</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthService.login_sso" href="#connpy.grpc_layer.connpy_pb2_grpc.AuthService.login_sso">login_sso</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthService.revoke_api_token" href="#connpy.grpc_layer.connpy_pb2_grpc.AuthService.revoke_api_token">revoke_api_token</a></code></li>
 </ul>
 </li>
 <li>
 <h4><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer" href="#connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer">AuthServiceServicer</a></code></h4>
-<ul class="">
+<ul class="two-column">
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.change_password" href="#connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.change_password">change_password</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.create_api_token" href="#connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.create_api_token">create_api_token</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.get_sso_providers" href="#connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.get_sso_providers">get_sso_providers</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.list_api_tokens" href="#connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.list_api_tokens">list_api_tokens</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.login" href="#connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.login">login</a></code></li>
 <li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.login_sso" href="#connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.login_sso">login_sso</a></code></li>
+<li><code><a title="connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.revoke_api_token" href="#connpy.grpc_layer.connpy_pb2_grpc.AuthServiceServicer.revoke_api_token">revoke_api_token</a></code></li>
 </ul>
 </li>
 <li>

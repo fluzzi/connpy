@@ -77,6 +77,9 @@ class TestTreeCompletions:
         config_completions = resolve_completion(["config", ""], tree)
         assert "--engineer-auth" in config_completions
         assert "--architect-auth" in config_completions
+        assert "--shell-command" in config_completions
+        assert "--shell-prompt" in config_completions
+        assert "--shell-os" in config_completions
 
         # Resolve when --engineer-auth is chosen in config
         auth_comp = resolve_completion(["config", "--engineer-auth", ""], tree)
@@ -88,6 +91,20 @@ class TestTreeCompletions:
         loop_back_comp = resolve_completion(["config", "--engineer-auth", "some_val", ""], tree)
         assert "--architect-auth" in loop_back_comp
         assert "--engineer-auth" in loop_back_comp
+        assert "--shell-command" in loop_back_comp
+
+    def test_shell_completions(self):
+        from connpy.completion import _build_tree, resolve_completion
+        tree = _build_tree([], [], [], {}, "/tmp")
+        shell_completions = resolve_completion(["shell", ""], tree)
+        assert "--command" in shell_completions
+        assert "--capture" in shell_completions
+        assert "--debug" in shell_completions
+        assert "--help" in shell_completions
+        # Short flags must NOT be recommended
+        assert "-c" not in shell_completions
+        assert "-d" not in shell_completions
+        assert "-h" not in shell_completions
 
     def test_ai_auth_completions(self):
         from connpy.completion import _build_tree, resolve_completion

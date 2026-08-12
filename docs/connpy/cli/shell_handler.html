@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
 <meta name="generator" content="pdoc3 0.11.5">
-<title>connpy.cli API documentation</title>
+<title>connpy.cli.shell_handler API documentation</title>
 <meta name="description" content="">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
@@ -33,96 +33,128 @@ el.replaceWith(d);
 <main>
 <article id="content">
 <header>
-<h1 class="title">Module <code>connpy.cli</code></h1>
+<h1 class="title">Module <code>connpy.cli.shell_handler</code></h1>
 </header>
 <section id="section-intro">
 </section>
 <section>
-<h2 class="section-title" id="header-submodules">Sub-modules</h2>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
 <dl>
-<dt><code class="name"><a title="connpy.cli.ai_handler" href="ai_handler.html">connpy.cli.ai_handler</a></code></dt>
+<dt id="connpy.cli.shell_handler.ShellHandler"><code class="flex name class">
+<span>class <span class="ident">ShellHandler</span></span>
+<span>(</span><span>app)</span>
+</code></dt>
 <dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class ShellHandler:
+    def __init__(self, app):
+        self.app = app
+
+    def dispatch(self, args):
+        shell_config = self.app.config.config.get(&#34;shell&#34;, {}) if hasattr(self.app.config, &#34;config&#34;) else {}
+        command = getattr(args, &#39;command_override&#39;, None) or shell_config.get(&#34;command&#34;) or os.environ.get(&#34;SHELL&#34;, &#34;/bin/bash&#34;)
+
+        try:
+            exe = shlex.split(command)[0]
+        except Exception:
+            exe = command
+
+        if not shutil.which(exe):
+            printer.error(f&#34;Shell command executable not found: {exe}&#34;)
+            sys.exit(1)
+
+        node_info = self._build_local_identity(shell_config)
+
+        tags = {
+            &#34;os&#34;: node_info[&#34;os&#34;],
+            &#34;prompt&#34;: node_info[&#34;prompt&#34;]
+        }
+
+        n = node(
+            unique=node_info[&#34;name&#34;],
+            host=command,
+            protocol=&#34;local&#34;,
+            config=self.app.config,
+            tags=tags
+        )
+
+        capture_file = getattr(args, &#39;capture_file&#39;, None)
+        if capture_file:
+            n.logs = capture_file
+        elif shell_config.get(&#34;logging&#34;):
+            n.logs = shell_config.get(&#34;log_path&#34;, os.path.expanduser(&#34;~/.config/conn/shell_logs/session.log&#34;))
+
+        n.interact(debug=getattr(args, &#39;debug&#39;, False))
+
+    def _build_local_identity(self, shell_config):
+        return {
+            &#34;name&#34;: &#34;local-shell&#34;,
+            &#34;host&#34;: socket.gethostname(),
+            &#34;os&#34;: shell_config.get(&#34;os&#34;, &#34;linux&#34;),
+            &#34;prompt&#34;: shell_config.get(&#34;prompt&#34;, r&#39;\$\s*$|#\s*$&#39;)
+        }</code></pre>
+</details>
 <div class="desc"></div>
-</dd>
-<dt><code class="name"><a title="connpy.cli.api_handler" href="api_handler.html">connpy.cli.api_handler</a></code></dt>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.cli.shell_handler.ShellHandler.dispatch"><code class="name flex">
+<span>def <span class="ident">dispatch</span></span>(<span>self, args)</span>
+</code></dt>
 <dd>
-<div class="desc"></div>
-</dd>
-<dt><code class="name"><a title="connpy.cli.config_handler" href="config_handler.html">connpy.cli.config_handler</a></code></dt>
-<dd>
-<div class="desc"></div>
-</dd>
-<dt><code class="name"><a title="connpy.cli.context_handler" href="context_handler.html">connpy.cli.context_handler</a></code></dt>
-<dd>
-<div class="desc"></div>
-</dd>
-<dt><code class="name"><a title="connpy.cli.forms" href="forms.html">connpy.cli.forms</a></code></dt>
-<dd>
-<div class="desc"></div>
-</dd>
-<dt><code class="name"><a title="connpy.cli.help_text" href="help_text.html">connpy.cli.help_text</a></code></dt>
-<dd>
-<div class="desc"></div>
-</dd>
-<dt><code class="name"><a title="connpy.cli.helpers" href="helpers.html">connpy.cli.helpers</a></code></dt>
-<dd>
-<div class="desc"></div>
-</dd>
-<dt><code class="name"><a title="connpy.cli.import_export_handler" href="import_export_handler.html">connpy.cli.import_export_handler</a></code></dt>
-<dd>
-<div class="desc"></div>
-</dd>
-<dt><code class="name"><a title="connpy.cli.login_handler" href="login_handler.html">connpy.cli.login_handler</a></code></dt>
-<dd>
-<div class="desc"></div>
-</dd>
-<dt><code class="name"><a title="connpy.cli.node_handler" href="node_handler.html">connpy.cli.node_handler</a></code></dt>
-<dd>
-<div class="desc"></div>
-</dd>
-<dt><code class="name"><a title="connpy.cli.plugin_handler" href="plugin_handler.html">connpy.cli.plugin_handler</a></code></dt>
-<dd>
-<div class="desc"></div>
-</dd>
-<dt><code class="name"><a title="connpy.cli.profile_handler" href="profile_handler.html">connpy.cli.profile_handler</a></code></dt>
-<dd>
-<div class="desc"></div>
-</dd>
-<dt><code class="name"><a title="connpy.cli.run_handler" href="run_handler.html">connpy.cli.run_handler</a></code></dt>
-<dd>
-<div class="desc"></div>
-</dd>
-<dt><code class="name"><a title="connpy.cli.shell_handler" href="shell_handler.html">connpy.cli.shell_handler</a></code></dt>
-<dd>
-<div class="desc"></div>
-</dd>
-<dt><code class="name"><a title="connpy.cli.sso_handler" href="sso_handler.html">connpy.cli.sso_handler</a></code></dt>
-<dd>
-<div class="desc"></div>
-</dd>
-<dt><code class="name"><a title="connpy.cli.sync_handler" href="sync_handler.html">connpy.cli.sync_handler</a></code></dt>
-<dd>
-<div class="desc"></div>
-</dd>
-<dt><code class="name"><a title="connpy.cli.terminal_ui" href="terminal_ui.html">connpy.cli.terminal_ui</a></code></dt>
-<dd>
-<div class="desc"></div>
-</dd>
-<dt><code class="name"><a title="connpy.cli.user_handler" href="user_handler.html">connpy.cli.user_handler</a></code></dt>
-<dd>
-<div class="desc"></div>
-</dd>
-<dt><code class="name"><a title="connpy.cli.validators" href="validators.html">connpy.cli.validators</a></code></dt>
-<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def dispatch(self, args):
+    shell_config = self.app.config.config.get(&#34;shell&#34;, {}) if hasattr(self.app.config, &#34;config&#34;) else {}
+    command = getattr(args, &#39;command_override&#39;, None) or shell_config.get(&#34;command&#34;) or os.environ.get(&#34;SHELL&#34;, &#34;/bin/bash&#34;)
+
+    try:
+        exe = shlex.split(command)[0]
+    except Exception:
+        exe = command
+
+    if not shutil.which(exe):
+        printer.error(f&#34;Shell command executable not found: {exe}&#34;)
+        sys.exit(1)
+
+    node_info = self._build_local_identity(shell_config)
+
+    tags = {
+        &#34;os&#34;: node_info[&#34;os&#34;],
+        &#34;prompt&#34;: node_info[&#34;prompt&#34;]
+    }
+
+    n = node(
+        unique=node_info[&#34;name&#34;],
+        host=command,
+        protocol=&#34;local&#34;,
+        config=self.app.config,
+        tags=tags
+    )
+
+    capture_file = getattr(args, &#39;capture_file&#39;, None)
+    if capture_file:
+        n.logs = capture_file
+    elif shell_config.get(&#34;logging&#34;):
+        n.logs = shell_config.get(&#34;log_path&#34;, os.path.expanduser(&#34;~/.config/conn/shell_logs/session.log&#34;))
+
+    n.interact(debug=getattr(args, &#39;debug&#39;, False))</code></pre>
+</details>
 <div class="desc"></div>
 </dd>
 </dl>
-</section>
-<section>
-</section>
-<section>
-</section>
-<section>
+</dd>
+</dl>
 </section>
 </article>
 <nav id="sidebar">
@@ -132,30 +164,17 @@ el.replaceWith(d);
 <ul id="index">
 <li><h3>Super-module</h3>
 <ul>
-<li><code><a title="connpy" href="../index.html">connpy</a></code></li>
+<li><code><a title="connpy.cli" href="index.html">connpy.cli</a></code></li>
 </ul>
 </li>
-<li><h3><a href="#header-submodules">Sub-modules</a></h3>
+<li><h3><a href="#header-classes">Classes</a></h3>
 <ul>
-<li><code><a title="connpy.cli.ai_handler" href="ai_handler.html">connpy.cli.ai_handler</a></code></li>
-<li><code><a title="connpy.cli.api_handler" href="api_handler.html">connpy.cli.api_handler</a></code></li>
-<li><code><a title="connpy.cli.config_handler" href="config_handler.html">connpy.cli.config_handler</a></code></li>
-<li><code><a title="connpy.cli.context_handler" href="context_handler.html">connpy.cli.context_handler</a></code></li>
-<li><code><a title="connpy.cli.forms" href="forms.html">connpy.cli.forms</a></code></li>
-<li><code><a title="connpy.cli.help_text" href="help_text.html">connpy.cli.help_text</a></code></li>
-<li><code><a title="connpy.cli.helpers" href="helpers.html">connpy.cli.helpers</a></code></li>
-<li><code><a title="connpy.cli.import_export_handler" href="import_export_handler.html">connpy.cli.import_export_handler</a></code></li>
-<li><code><a title="connpy.cli.login_handler" href="login_handler.html">connpy.cli.login_handler</a></code></li>
-<li><code><a title="connpy.cli.node_handler" href="node_handler.html">connpy.cli.node_handler</a></code></li>
-<li><code><a title="connpy.cli.plugin_handler" href="plugin_handler.html">connpy.cli.plugin_handler</a></code></li>
-<li><code><a title="connpy.cli.profile_handler" href="profile_handler.html">connpy.cli.profile_handler</a></code></li>
-<li><code><a title="connpy.cli.run_handler" href="run_handler.html">connpy.cli.run_handler</a></code></li>
-<li><code><a title="connpy.cli.shell_handler" href="shell_handler.html">connpy.cli.shell_handler</a></code></li>
-<li><code><a title="connpy.cli.sso_handler" href="sso_handler.html">connpy.cli.sso_handler</a></code></li>
-<li><code><a title="connpy.cli.sync_handler" href="sync_handler.html">connpy.cli.sync_handler</a></code></li>
-<li><code><a title="connpy.cli.terminal_ui" href="terminal_ui.html">connpy.cli.terminal_ui</a></code></li>
-<li><code><a title="connpy.cli.user_handler" href="user_handler.html">connpy.cli.user_handler</a></code></li>
-<li><code><a title="connpy.cli.validators" href="validators.html">connpy.cli.validators</a></code></li>
+<li>
+<h4><code><a title="connpy.cli.shell_handler.ShellHandler" href="#connpy.cli.shell_handler.ShellHandler">ShellHandler</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.cli.shell_handler.ShellHandler.dispatch" href="#connpy.cli.shell_handler.ShellHandler.dispatch">dispatch</a></code></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>

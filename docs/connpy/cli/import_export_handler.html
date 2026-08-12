@@ -58,12 +58,24 @@ el.replaceWith(d);
 <pre><code class="python">class ImportExportHandler:
     def __init__(self, app):
         self.app = app
-        self.forms = Forms(app)
+        self._forms = None
+
+    @property
+    def forms(self):
+        if self._forms is None:
+            from .forms import Forms
+            self._forms = Forms(self.app)
+        return self._forms
+
+    @forms.setter
+    def forms(self, value):
+        self._forms = value
 
     def dispatch_import(self, args):
         file_path = args.data[0]
         try:
             printer.warning(&#34;This could overwrite your current configuration!&#34;)
+            import inquirer
             question = [inquirer.Confirm(&#34;import&#34;, message=f&#34;Are you sure you want to import {file_path}?&#34;)]
             confirm = inquirer.prompt(question)
             if confirm == None or not confirm[&#34;import&#34;]:
@@ -135,6 +147,24 @@ el.replaceWith(d);
             sys.exit(1)</code></pre>
 </details>
 <div class="desc"></div>
+<h3>Instance variables</h3>
+<dl>
+<dt id="connpy.cli.import_export_handler.ImportExportHandler.forms"><code class="name">prop <span class="ident">forms</span></code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def forms(self):
+    if self._forms is None:
+        from .forms import Forms
+        self._forms = Forms(self.app)
+    return self._forms</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
 <h3>Methods</h3>
 <dl>
 <dt id="connpy.cli.import_export_handler.ImportExportHandler.bulk"><code class="name flex">
@@ -228,6 +258,7 @@ el.replaceWith(d);
     file_path = args.data[0]
     try:
         printer.warning(&#34;This could overwrite your current configuration!&#34;)
+        import inquirer
         question = [inquirer.Confirm(&#34;import&#34;, message=f&#34;Are you sure you want to import {file_path}?&#34;)]
         confirm = inquirer.prompt(question)
         if confirm == None or not confirm[&#34;import&#34;]:
@@ -264,6 +295,7 @@ el.replaceWith(d);
 <li><code><a title="connpy.cli.import_export_handler.ImportExportHandler.bulk" href="#connpy.cli.import_export_handler.ImportExportHandler.bulk">bulk</a></code></li>
 <li><code><a title="connpy.cli.import_export_handler.ImportExportHandler.dispatch_export" href="#connpy.cli.import_export_handler.ImportExportHandler.dispatch_export">dispatch_export</a></code></li>
 <li><code><a title="connpy.cli.import_export_handler.ImportExportHandler.dispatch_import" href="#connpy.cli.import_export_handler.ImportExportHandler.dispatch_import">dispatch_import</a></code></li>
+<li><code><a title="connpy.cli.import_export_handler.ImportExportHandler.forms" href="#connpy.cli.import_export_handler.ImportExportHandler.forms">forms</a></code></li>
 </ul>
 </li>
 </ul>

@@ -864,7 +864,37 @@ Call-Future's exception value will be an RpcError.</p></div>
     @handle_errors
     def change_password(self, old_password, new_password):
         req = connpy_pb2.ChangePasswordRequest(old_password=old_password, new_password=new_password)
-        self.stub.change_password(req)</code></pre>
+        self.stub.change_password(req)
+
+    @handle_errors
+    def create_api_token(self, name, expires_in_days=0):
+        req = connpy_pb2.CreateApiTokenRequest(name=name, expires_in_days=expires_in_days)
+        resp = self.stub.create_api_token(req)
+        return {
+            &#34;token_id&#34;: resp.token_id,
+            &#34;raw_token&#34;: resp.raw_token,
+            &#34;name&#34;: resp.name,
+        }
+
+    @handle_errors
+    def list_api_tokens(self):
+        resp = self.stub.list_api_tokens(Empty())
+        return [
+            {
+                &#34;token_id&#34;: t.token_id,
+                &#34;name&#34;: t.name,
+                &#34;token_prefix&#34;: t.token_prefix,
+                &#34;created_at&#34;: t.created_at,
+                &#34;last_used_at&#34;: t.last_used_at,
+                &#34;expires_at&#34;: t.expires_at,
+            }
+            for t in resp.tokens
+        ]
+
+    @handle_errors
+    def revoke_api_token(self, token_id):
+        req = connpy_pb2.RevokeApiTokenRequest(token_id=token_id)
+        self.stub.revoke_api_token(req)</code></pre>
 </details>
 <div class="desc"></div>
 <h3>Methods</h3>
@@ -881,6 +911,51 @@ Call-Future's exception value will be an RpcError.</p></div>
 def change_password(self, old_password, new_password):
     req = connpy_pb2.ChangePasswordRequest(old_password=old_password, new_password=new_password)
     self.stub.change_password(req)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.AuthStub.create_api_token"><code class="name flex">
+<span>def <span class="ident">create_api_token</span></span>(<span>self, name, expires_in_days=0)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def create_api_token(self, name, expires_in_days=0):
+    req = connpy_pb2.CreateApiTokenRequest(name=name, expires_in_days=expires_in_days)
+    resp = self.stub.create_api_token(req)
+    return {
+        &#34;token_id&#34;: resp.token_id,
+        &#34;raw_token&#34;: resp.raw_token,
+        &#34;name&#34;: resp.name,
+    }</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.AuthStub.list_api_tokens"><code class="name flex">
+<span>def <span class="ident">list_api_tokens</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def list_api_tokens(self):
+    resp = self.stub.list_api_tokens(Empty())
+    return [
+        {
+            &#34;token_id&#34;: t.token_id,
+            &#34;name&#34;: t.name,
+            &#34;token_prefix&#34;: t.token_prefix,
+            &#34;created_at&#34;: t.created_at,
+            &#34;last_used_at&#34;: t.last_used_at,
+            &#34;expires_at&#34;: t.expires_at,
+        }
+        for t in resp.tokens
+    ]</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -901,6 +976,21 @@ def login(self, username, password):
         &#34;username&#34;: resp.username,
         &#34;expires_at&#34;: resp.expires_at
     }</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.grpc_layer.stubs.AuthStub.revoke_api_token"><code class="name flex">
+<span>def <span class="ident">revoke_api_token</span></span>(<span>self, token_id)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@handle_errors
+def revoke_api_token(self, token_id):
+    req = connpy_pb2.RevokeApiTokenRequest(token_id=token_id)
+    self.stub.revoke_api_token(req)</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -2785,7 +2875,10 @@ def stop_api(self):
 <h4><code><a title="connpy.grpc_layer.stubs.AuthStub" href="#connpy.grpc_layer.stubs.AuthStub">AuthStub</a></code></h4>
 <ul class="">
 <li><code><a title="connpy.grpc_layer.stubs.AuthStub.change_password" href="#connpy.grpc_layer.stubs.AuthStub.change_password">change_password</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.AuthStub.create_api_token" href="#connpy.grpc_layer.stubs.AuthStub.create_api_token">create_api_token</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.AuthStub.list_api_tokens" href="#connpy.grpc_layer.stubs.AuthStub.list_api_tokens">list_api_tokens</a></code></li>
 <li><code><a title="connpy.grpc_layer.stubs.AuthStub.login" href="#connpy.grpc_layer.stubs.AuthStub.login">login</a></code></li>
+<li><code><a title="connpy.grpc_layer.stubs.AuthStub.revoke_api_token" href="#connpy.grpc_layer.stubs.AuthStub.revoke_api_token">revoke_api_token</a></code></li>
 </ul>
 </li>
 <li>

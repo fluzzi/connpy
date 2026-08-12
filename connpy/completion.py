@@ -238,11 +238,21 @@ def _build_tree(nodes, folders, profiles, plugins, configdir):
         "--sync-remote": ["true", "false"],
         "--help": None, "-h": None,
     }
-    for opt in ["--keepalive", "--engineer-model", "--engineer-api-key", "--architect-model", "--architect-api-key", "--theme", "--remote", "--trusted-commands"]:
+    for opt in ["--keepalive", "--engineer-model", "--engineer-api-key", "--architect-model", "--architect-api-key", "--theme", "--remote", "--trusted-commands", "--shell-command", "--shell-prompt", "--shell-os"]:
         config_dict[opt] = {"*": config_dict}
     config_dict["--configfolder"] = {"__extra__": lambda w: get_cwd(w, "--configfolder", True), "*": config_dict}
     config_dict["--engineer-auth"] = {"__extra__": lambda w: get_cwd(w, "--engineer-auth"), "*": config_dict}
     config_dict["--architect-auth"] = {"__extra__": lambda w: get_cwd(w, "--architect-auth"), "*": config_dict}
+
+    shell_dict = {
+        "--command": {"*": None},
+        "-c": {"*": None},
+        "--capture": {"__extra__": lambda w: get_cwd(w, "--capture")},
+        "--debug": None,
+        "-d": None,
+        "--help": None,
+        "-h": None
+    }
 
     _users = lambda w=None: _get_users(configdir)
 
@@ -376,6 +386,7 @@ def _build_tree(nodes, folders, profiles, plugins, configdir):
         },
         "logout": {"--help": None, "-h": None},
         "config": config_dict,
+        "shell": shell_dict,
         "sync": {
             "--login": None, "--logout": None,
             "--status": None, "--list": None,

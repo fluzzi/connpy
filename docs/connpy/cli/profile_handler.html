@@ -58,7 +58,18 @@ el.replaceWith(d);
 <pre><code class="python">class ProfileHandler:
     def __init__(self, app):
         self.app = app
-        self.forms = Forms(app)
+        self._forms = None
+
+    @property
+    def forms(self):
+        if self._forms is None:
+            from .forms import Forms
+            self._forms = Forms(self.app)
+        return self._forms
+
+    @forms.setter
+    def forms(self, value):
+        self._forms = value
 
     def dispatch(self, args):
         if not self.app.case:
@@ -78,6 +89,7 @@ el.replaceWith(d);
             printer.error(&#34;Can&#39;t delete default profile&#34;)
             sys.exit(6)
             
+        import inquirer
         question = [inquirer.Confirm(&#34;delete&#34;, message=f&#34;Are you sure you want to delete {name}?&#34;)]
         confirm = inquirer.prompt(question)
         if confirm == None or not confirm[&#34;delete&#34;]:
@@ -145,6 +157,24 @@ el.replaceWith(d);
             sys.exit(1)</code></pre>
 </details>
 <div class="desc"></div>
+<h3>Instance variables</h3>
+<dl>
+<dt id="connpy.cli.profile_handler.ProfileHandler.forms"><code class="name">prop <span class="ident">forms</span></code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def forms(self):
+    if self._forms is None:
+        from .forms import Forms
+        self._forms = Forms(self.app)
+    return self._forms</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
 <h3>Methods</h3>
 <dl>
 <dt id="connpy.cli.profile_handler.ProfileHandler.add"><code class="name flex">
@@ -194,6 +224,7 @@ el.replaceWith(d);
         printer.error(&#34;Can&#39;t delete default profile&#34;)
         sys.exit(6)
         
+    import inquirer
     question = [inquirer.Confirm(&#34;delete&#34;, message=f&#34;Are you sure you want to delete {name}?&#34;)]
     confirm = inquirer.prompt(question)
     if confirm == None or not confirm[&#34;delete&#34;]:
@@ -300,10 +331,11 @@ el.replaceWith(d);
 <ul>
 <li>
 <h4><code><a title="connpy.cli.profile_handler.ProfileHandler" href="#connpy.cli.profile_handler.ProfileHandler">ProfileHandler</a></code></h4>
-<ul class="">
+<ul class="two-column">
 <li><code><a title="connpy.cli.profile_handler.ProfileHandler.add" href="#connpy.cli.profile_handler.ProfileHandler.add">add</a></code></li>
 <li><code><a title="connpy.cli.profile_handler.ProfileHandler.delete" href="#connpy.cli.profile_handler.ProfileHandler.delete">delete</a></code></li>
 <li><code><a title="connpy.cli.profile_handler.ProfileHandler.dispatch" href="#connpy.cli.profile_handler.ProfileHandler.dispatch">dispatch</a></code></li>
+<li><code><a title="connpy.cli.profile_handler.ProfileHandler.forms" href="#connpy.cli.profile_handler.ProfileHandler.forms">forms</a></code></li>
 <li><code><a title="connpy.cli.profile_handler.ProfileHandler.modify" href="#connpy.cli.profile_handler.ProfileHandler.modify">modify</a></code></li>
 <li><code><a title="connpy.cli.profile_handler.ProfileHandler.show" href="#connpy.cli.profile_handler.ProfileHandler.show">show</a></code></li>
 </ul>

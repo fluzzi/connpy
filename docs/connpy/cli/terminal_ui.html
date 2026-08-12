@@ -57,25 +57,39 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">class CopilotInterface:
     def __init__(self, config, history=None, pt_input=None, pt_output=None, rich_file=None, session_state=None):
+        from ..services.ai_service import AIService
         self.config = config
         self.history = history or InMemoryHistory()
         self.pt_input = pt_input
         self.pt_output = pt_output
+        self.rich_file = rich_file
         self.ai_service = AIService(config)
-        self.session_state = session_state if session_state is not None else {
-            &#39;persona&#39;: &#39;engineer&#39;,
-            &#39;trust_mode&#39;: False,
-            &#39;memories&#39;: [],
-            &#39;os&#39;: None,
-            &#39;prompt&#39;: None
-        }
+        self.mode_range, self.mode_single, self.mode_lines = 0, 1, 2 
+
+        self.session_state = session_state if session_state is not None else {}
+        self.session_state.setdefault(&#39;persona&#39;, &#39;engineer&#39;)
+        self.session_state.setdefault(&#39;trust_mode&#39;, False)
+        self.session_state.setdefault(&#39;memories&#39;, [])
+        self.session_state.setdefault(&#39;os&#39;, None)
+        self.session_state.setdefault(&#39;prompt&#39;, None)
+        self.session_state.setdefault(&#39;context_mode&#39;, self.mode_range)
+        self.session_state.setdefault(&#39;context_cmd&#39;, 1)
+        self.session_state.setdefault(&#39;context_lines&#39;, 50)
+        self.session_state.setdefault(&#39;last_total_cmds&#39;, None)
+        self.session_state.setdefault(&#39;last_total_lines&#39;, None)
 
         if rich_file:
             self.console = Console(theme=connpy_theme, force_terminal=True, file=rich_file)
         else:
             self.console = Console(theme=connpy_theme)
 
-        self.mode_range, self.mode_single, self.mode_lines = 0, 1, 2 
+    def _sync_session_context(self, state: dict):
+        &#34;&#34;&#34;Persist current context mode, depth, total commands, and total lines into session_state.&#34;&#34;&#34;
+        self.session_state[&#39;context_mode&#39;] = state[&#39;context_mode&#39;]
+        self.session_state[&#39;context_cmd&#39;] = state[&#39;context_cmd&#39;]
+        self.session_state[&#39;context_lines&#39;] = state[&#39;context_lines&#39;]
+        self.session_state[&#39;last_total_cmds&#39;] = state[&#39;total_cmds&#39;]
+        self.session_state[&#39;last_total_lines&#39;] = state[&#39;total_lines&#39;]
 
     def _get_theme_color(self, style_name: str, fallback: str = &#34;white&#34;) -&gt; str:
         &#34;&#34;&#34;Extract Hex or ANSI color name from the active rich theme.&#34;&#34;&#34;
@@ -109,16 +123,52 @@ el.replaceWith(d);
                 last_line = buffer.split(&#39;\n&#39;)[-1].strip() if buffer.strip() else &#34;(prompt)&#34;
                 blocks = self.ai_service.build_context_blocks(raw_bytes, cmd_byte_positions, node_info, last_line=last_line)
             
+            total_cmds = len(blocks)
+            total_lines = len(buffer.split(&#39;\n&#39;))
+
+            saved_mode = self.session_state.get(&#39;context_mode&#39;, self.mode_range)
+            saved_cmd = self.session_state.get(&#39;context_cmd&#39;, 1)
+            saved_lines = self.session_state.get(&#39;context_lines&#39;, min(50, total_lines))
+            last_total_cmds = self.session_state.get(&#39;last_total_cmds&#39;, None)
+            last_total_lines = self.session_state.get(&#39;last_total_lines&#39;, None)
+
+            is_range = saved_mode in (self.mode_range, 0, &#39;RANGE&#39;, &#39;range&#39;)
+            is_lines = saved_mode in (self.mode_lines, 2, &#39;LINES&#39;, &#39;lines&#39;)
+            is_single = saved_mode in (self.mode_single, 1, &#39;SINGLE&#39;, &#39;single&#39;)
+
+            if is_range or is_single:
+                if last_total_cmds is not None and total_cmds &gt; last_total_cmds and saved_cmd &gt; 1:
+                    new_cmds = total_cmds - last_total_cmds
+                    initial_cmd = saved_cmd + new_cmds
+                else:
+                    initial_cmd = saved_cmd
+                initial_lines = saved_lines
+            elif is_lines:
+                if last_total_lines is not None and total_lines &gt; last_total_lines and saved_lines &gt; 50:
+                    new_lines = total_lines - last_total_lines
+                    initial_lines = saved_lines + new_lines
+                else:
+                    initial_lines = saved_lines
+                initial_cmd = saved_cmd
+            else:
+                initial_cmd = saved_cmd
+                initial_lines = saved_lines
+
             state = {
-                &#39;context_cmd&#39;: 1,
-                &#39;total_cmds&#39;: len(blocks),
-                &#39;total_lines&#39;: len(buffer.split(&#39;\n&#39;)),
-                &#39;context_lines&#39;: min(50, len(buffer.split(&#39;\n&#39;))),
-                &#39;context_mode&#39;: self.mode_range,
+                &#39;context_cmd&#39;: min(max(1, initial_cmd), max(1, total_cmds)),
+                &#39;total_cmds&#39;: total_cmds,
+                &#39;total_lines&#39;: total_lines,
+                &#39;context_lines&#39;: min(max(1, initial_lines), max(1, total_lines)),
+                &#39;context_mode&#39;: saved_mode,
                 &#39;cancelled&#39;: False,
                 &#39;toolbar_msg&#39;: &#39;&#39;,
                 &#39;msg_expiry&#39;: 0
             }
+            self.session_state[&#39;context_mode&#39;] = saved_mode
+            self.session_state[&#39;context_cmd&#39;] = max(1, initial_cmd)
+            self.session_state[&#39;context_lines&#39;] = max(1, initial_lines)
+            self.session_state[&#39;last_total_cmds&#39;] = total_cmds
+            self.session_state[&#39;last_total_lines&#39;] = total_lines
             
             # 1. Visual Separation
             self.console.print(&#34;&#34;) # Real line break
@@ -137,6 +187,7 @@ el.replaceWith(d);
                     state[&#39;context_lines&#39;] = min(state[&#39;context_lines&#39;] + 50, state[&#39;total_lines&#39;])
                 else:
                     state[&#39;context_cmd&#39;] = min(state[&#39;context_cmd&#39;] + 1, state[&#39;total_cmds&#39;])
+                self._sync_session_context(state)
                 event.app.invalidate()
             @bindings.add(&#39;c-down&#39;)
             def _(event):
@@ -144,6 +195,7 @@ el.replaceWith(d);
                     state[&#39;context_lines&#39;] = max(state[&#39;context_lines&#39;] - 50, min(50, state[&#39;total_lines&#39;]))
                 else:
                     state[&#39;context_cmd&#39;] = max(state[&#39;context_cmd&#39;] - 1, 1)
+                self._sync_session_context(state)
                 event.app.invalidate()
             @bindings.add(&#39;tab&#39;)
             def _(event):
@@ -153,6 +205,7 @@ el.replaceWith(d);
                     buf.complete_next()
                 else:
                     state[&#39;context_mode&#39;] = (state[&#39;context_mode&#39;] + 1) % 3
+                    self._sync_session_context(state)
                     event.app.invalidate()
             @bindings.add(&#39;escape&#39;, eager=True)
             @bindings.add(&#39;c-c&#39;)
@@ -575,16 +628,52 @@ el.replaceWith(d);
             last_line = buffer.split(&#39;\n&#39;)[-1].strip() if buffer.strip() else &#34;(prompt)&#34;
             blocks = self.ai_service.build_context_blocks(raw_bytes, cmd_byte_positions, node_info, last_line=last_line)
         
+        total_cmds = len(blocks)
+        total_lines = len(buffer.split(&#39;\n&#39;))
+
+        saved_mode = self.session_state.get(&#39;context_mode&#39;, self.mode_range)
+        saved_cmd = self.session_state.get(&#39;context_cmd&#39;, 1)
+        saved_lines = self.session_state.get(&#39;context_lines&#39;, min(50, total_lines))
+        last_total_cmds = self.session_state.get(&#39;last_total_cmds&#39;, None)
+        last_total_lines = self.session_state.get(&#39;last_total_lines&#39;, None)
+
+        is_range = saved_mode in (self.mode_range, 0, &#39;RANGE&#39;, &#39;range&#39;)
+        is_lines = saved_mode in (self.mode_lines, 2, &#39;LINES&#39;, &#39;lines&#39;)
+        is_single = saved_mode in (self.mode_single, 1, &#39;SINGLE&#39;, &#39;single&#39;)
+
+        if is_range or is_single:
+            if last_total_cmds is not None and total_cmds &gt; last_total_cmds and saved_cmd &gt; 1:
+                new_cmds = total_cmds - last_total_cmds
+                initial_cmd = saved_cmd + new_cmds
+            else:
+                initial_cmd = saved_cmd
+            initial_lines = saved_lines
+        elif is_lines:
+            if last_total_lines is not None and total_lines &gt; last_total_lines and saved_lines &gt; 50:
+                new_lines = total_lines - last_total_lines
+                initial_lines = saved_lines + new_lines
+            else:
+                initial_lines = saved_lines
+            initial_cmd = saved_cmd
+        else:
+            initial_cmd = saved_cmd
+            initial_lines = saved_lines
+
         state = {
-            &#39;context_cmd&#39;: 1,
-            &#39;total_cmds&#39;: len(blocks),
-            &#39;total_lines&#39;: len(buffer.split(&#39;\n&#39;)),
-            &#39;context_lines&#39;: min(50, len(buffer.split(&#39;\n&#39;))),
-            &#39;context_mode&#39;: self.mode_range,
+            &#39;context_cmd&#39;: min(max(1, initial_cmd), max(1, total_cmds)),
+            &#39;total_cmds&#39;: total_cmds,
+            &#39;total_lines&#39;: total_lines,
+            &#39;context_lines&#39;: min(max(1, initial_lines), max(1, total_lines)),
+            &#39;context_mode&#39;: saved_mode,
             &#39;cancelled&#39;: False,
             &#39;toolbar_msg&#39;: &#39;&#39;,
             &#39;msg_expiry&#39;: 0
         }
+        self.session_state[&#39;context_mode&#39;] = saved_mode
+        self.session_state[&#39;context_cmd&#39;] = max(1, initial_cmd)
+        self.session_state[&#39;context_lines&#39;] = max(1, initial_lines)
+        self.session_state[&#39;last_total_cmds&#39;] = total_cmds
+        self.session_state[&#39;last_total_lines&#39;] = total_lines
         
         # 1. Visual Separation
         self.console.print(&#34;&#34;) # Real line break
@@ -603,6 +692,7 @@ el.replaceWith(d);
                 state[&#39;context_lines&#39;] = min(state[&#39;context_lines&#39;] + 50, state[&#39;total_lines&#39;])
             else:
                 state[&#39;context_cmd&#39;] = min(state[&#39;context_cmd&#39;] + 1, state[&#39;total_cmds&#39;])
+            self._sync_session_context(state)
             event.app.invalidate()
         @bindings.add(&#39;c-down&#39;)
         def _(event):
@@ -610,6 +700,7 @@ el.replaceWith(d);
                 state[&#39;context_lines&#39;] = max(state[&#39;context_lines&#39;] - 50, min(50, state[&#39;total_lines&#39;]))
             else:
                 state[&#39;context_cmd&#39;] = max(state[&#39;context_cmd&#39;] - 1, 1)
+            self._sync_session_context(state)
             event.app.invalidate()
         @bindings.add(&#39;tab&#39;)
         def _(event):
@@ -619,6 +710,7 @@ el.replaceWith(d);
                 buf.complete_next()
             else:
                 state[&#39;context_mode&#39;] = (state[&#39;context_mode&#39;] + 1) % 3
+                self._sync_session_context(state)
                 event.app.invalidate()
         @bindings.add(&#39;escape&#39;, eager=True)
         @bindings.add(&#39;c-c&#39;)

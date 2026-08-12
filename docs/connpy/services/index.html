@@ -2836,13 +2836,13 @@ el.replaceWith(d);
             is_mock = True
             def __init__(self, config):
                 from ..core import node, nodes
-                from ..ai import ai
+                from ..connapp import DeferredAIProxy
                 from ..services.provider import ServiceProvider
                 
                 self.config = config
                 self.node = node
                 self.nodes = nodes
-                self.ai = ai
+                self.ai = DeferredAIProxy()
                 
                 self.services = ServiceProvider(config, mode=&#34;local&#34;)
                 
@@ -3159,13 +3159,13 @@ el.replaceWith(d);
         is_mock = True
         def __init__(self, config):
             from ..core import node, nodes
-            from ..ai import ai
+            from ..connapp import DeferredAIProxy
             from ..services.provider import ServiceProvider
             
             self.config = config
             self.node = node
             self.nodes = nodes
-            self.ai = ai
+            self.ai = DeferredAIProxy()
             
             self.services = ServiceProvider(config, mode=&#34;local&#34;)
             
@@ -3711,6 +3711,899 @@ el.replaceWith(d);
 </li>
 </ul>
 </dd>
+<dt id="connpy.services.SyncService"><code class="flex name class">
+<span>class <span class="ident">SyncService</span></span>
+<span>(</span><span>config)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class SyncService(BaseService):
+    &#34;&#34;&#34;Business logic for Google Drive synchronization.&#34;&#34;&#34;
+
+    def __init__(self, config):
+        super().__init__(config)
+        self.scopes = [&#39;https://www.googleapis.com/auth/drive.appdata&#39;]
+        self.token_file = os.path.join(self.config.defaultdir, &#34;gtoken.json&#34;)
+        
+        # Embedded OAuth config
+        self.client_config = {
+            &#34;installed&#34;: {
+                &#34;client_id&#34;: &#34;559598250648-cr189kfrga2il1a6d6nkaspq0a9pn5vv.&#34; + &#34;apps.googleusercontent.com&#34;,
+                &#34;project_id&#34;: &#34;celtic-surface-420323&#34;,
+                &#34;auth_uri&#34;: &#34;https://accounts.google.com/o/oauth2/auth&#34;,
+                &#34;token_uri&#34;: &#34;https://oauth2.googleapis.com/token&#34;,
+                &#34;auth_provider_x509_cert_url&#34;: &#34;https://www.googleapis.com/oauth2/v1/certs&#34;,
+                &#34;client_secret&#34;: &#34;GOCSPX-&#34; + &#34;VVfOSrJLPU90Pl0g7aAXM9GK2xPE&#34;,
+                &#34;redirect_uris&#34;: [&#34;http://localhost&#34;]
+            }
+        }
+        
+        # Sync status from config
+        self.sync_enabled = self.config.config.get(&#34;sync&#34;, False)
+        self.sync_remote = self.config.config.get(&#34;sync_remote&#34;, False)
+
+    def login(self):
+        &#34;&#34;&#34;Authenticate with Google Drive.&#34;&#34;&#34;
+        Credentials, Request, _, RefreshError, InstalledAppFlow, _, _, _ = _get_google_libs()
+        creds = None
+        if os.path.exists(self.token_file):
+            creds = Credentials.from_authorized_user_file(self.token_file, self.scopes)
+
+        try:
+            if not creds or not creds.valid:
+                if creds and creds.expired and creds.refresh_token:
+                    creds.refresh(Request())
+                else:
+                    flow = InstalledAppFlow.from_client_config(self.client_config, self.scopes)
+                    creds = flow.run_local_server(port=0, access_type=&#39;offline&#39;)
+
+                with open(self.token_file, &#39;w&#39;) as token:
+                    token.write(creds.to_json())
+
+            printer.success(&#34;Logged in successfully.&#34;)
+            return True
+
+        except RefreshError:
+            if os.path.exists(self.token_file):
+                os.remove(self.token_file)
+            printer.warning(&#34;Existing token was invalid and has been removed. Please log in again.&#34;)
+            return False
+        except Exception as e:
+            printer.error(f&#34;Login failed: {e}&#34;)
+            return False
+
+    def logout(self):
+        &#34;&#34;&#34;Remove Google Drive credentials.&#34;&#34;&#34;
+        if os.path.exists(self.token_file):
+            os.remove(self.token_file)
+            printer.success(&#34;Logged out successfully.&#34;)
+        else:
+            printer.info(&#34;No credentials file found. Already logged out.&#34;)
+
+    def get_credentials(self):
+        &#34;&#34;&#34;Get valid credentials, refreshing if necessary.&#34;&#34;&#34;
+        Credentials, Request, _, RefreshError, _, _, _, _ = _get_google_libs()
+        if os.path.exists(self.token_file):
+            creds = Credentials.from_authorized_user_file(self.token_file, self.scopes)
+        else:
+            return None
+        
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                try:
+                    creds.refresh(Request())
+                except RefreshError:
+                    return None
+            else:
+                return None
+        return creds
+
+    def check_login_status(self):
+        &#34;&#34;&#34;Check if logged in to Google Drive.&#34;&#34;&#34;
+        Credentials, Request, _, RefreshError, _, _, _, _ = _get_google_libs()
+        if os.path.exists(self.token_file):
+            creds = Credentials.from_authorized_user_file(self.token_file)
+            if creds and creds.expired and creds.refresh_token:
+                try:
+                    creds.refresh(Request())
+                except RefreshError:
+                    pass
+            return True if creds.valid else &#34;Invalid&#34;
+        return False
+
+    def list_backups(self):
+        &#34;&#34;&#34;List files in Google Drive appDataFolder.&#34;&#34;&#34;
+        _, _, build, _, _, _, _, HttpError = _get_google_libs()
+        creds = self.get_credentials()
+        if not creds:
+            printer.error(&#34;Not logged in to Google Drive.&#34;)
+            return []
+
+        try:
+            service = build(&#34;drive&#34;, &#34;v3&#34;, credentials=creds)
+            response = service.files().list(
+                spaces=&#34;appDataFolder&#34;,
+                fields=&#34;files(id, name, appProperties)&#34;,
+                pageSize=10,
+            ).execute()
+
+            files_info = []
+            for file in response.get(&#34;files&#34;, []):
+                files_info.append({
+                    &#34;name&#34;: file.get(&#34;name&#34;),
+                    &#34;id&#34;: file.get(&#34;id&#34;),
+                    &#34;date&#34;: file.get(&#34;appProperties&#34;, {}).get(&#34;date&#34;),
+                    &#34;timestamp&#34;: file.get(&#34;appProperties&#34;, {}).get(&#34;timestamp&#34;)
+                })
+            return files_info
+        except HttpError as error:
+            printer.error(f&#34;Google Drive API error: {error}&#34;)
+            return []
+
+    def compress_and_upload(self, remote_data=None):
+        &#34;&#34;&#34;Compress config and upload to Drive.&#34;&#34;&#34;
+        timestamp = int(time.time() * 1000)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            zip_path = os.path.join(tmp_dir, f&#34;connpy-backup-{timestamp}.zip&#34;)
+            
+            with zipfile.ZipFile(zip_path, &#39;w&#39;, zipfile.ZIP_DEFLATED) as zipf:
+                # If we have remote data, we create a virtual config file
+                if remote_data:
+                    config_tmp = os.path.join(tmp_dir, &#34;config.yaml&#34;)
+                    with open(config_tmp, &#39;w&#39;) as f:
+                        yaml.dump(remote_data, f, default_flow_style=False)
+                    zipf.write(config_tmp, &#34;config.yaml&#34;)
+                else:
+                    # Legacy behavior: use local file
+                    zipf.write(self.config.file, os.path.basename(self.config.file))
+                
+                # Always include the key if it exists
+                if os.path.exists(self.config.key):
+                    zipf.write(self.config.key, &#34;.osk&#34;)
+
+            # Manage retention (max 100 backups)
+            backups = self.list_backups()
+            if len(backups) &gt;= 100:
+                oldest = min(backups, key=lambda x: x[&#39;timestamp&#39;] or &#39;0&#39;)
+                self.delete_backup(oldest[&#39;id&#39;])
+
+            # Upload
+            return self.upload_file(zip_path, timestamp)
+
+    def upload_file(self, file_path, timestamp):
+        &#34;&#34;&#34;Internal method to upload to Drive.&#34;&#34;&#34;
+        _, _, build, _, _, MediaFileUpload, _, _ = _get_google_libs()
+        creds = self.get_credentials()
+        if not creds: return False
+        
+        service = build(&#39;drive&#39;, &#39;v3&#39;, credentials=creds)
+        date_str = datetime.fromtimestamp(timestamp/1000).strftime(&#39;%Y-%m-%d %H:%M:%S&#39;)
+        
+        file_metadata = {
+            &#39;name&#39;: os.path.basename(file_path),
+            &#39;parents&#39;: [&#34;appDataFolder&#34;],
+            &#39;appProperties&#39;: {
+                &#39;timestamp&#39;: str(timestamp),
+                &#39;date&#39;: date_str
+            }
+        }
+        media = MediaFileUpload(file_path)
+        try:
+            service.files().create(body=file_metadata, media_body=media, fields=&#39;id&#39;).execute()
+            printer.success(&#34;Backup uploaded to Google Drive.&#34;)
+            return True
+        except Exception as e:
+            printer.error(f&#34;Upload failed: {e}&#34;)
+            return False
+
+    def delete_backup(self, file_id):
+        &#34;&#34;&#34;Delete a backup from Drive.&#34;&#34;&#34;
+        _, _, build, _, _, _, _, _ = _get_google_libs()
+        creds = self.get_credentials()
+        if not creds: return False
+        try:
+            service = build(&#34;drive&#34;, &#34;v3&#34;, credentials=creds)
+            service.files().delete(fileId=file_id).execute()
+            return True
+        except Exception as e:
+            printer.error(f&#34;Delete failed: {e}&#34;)
+            return False
+
+    def restore_backup(self, file_id=None, restore_config=True, restore_nodes=True, app_instance=None):
+        &#34;&#34;&#34;Download and analyze a backup for restoration.&#34;&#34;&#34;
+        backups = self.list_backups()
+        if not backups:
+            printer.error(&#34;No backups found.&#34;)
+            return None
+
+        if file_id:
+            selected = next((f for f in backups if f[&#39;id&#39;] == file_id), None)
+            if not selected:
+                printer.error(f&#34;Backup {file_id} not found.&#34;)
+                return None
+        else:
+            selected = max(backups, key=lambda x: x[&#39;timestamp&#39;] or &#39;0&#39;)
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            zip_path = os.path.join(tmp_dir, &#39;restore.zip&#39;)
+            if self.download_file(selected[&#39;id&#39;], zip_path):
+                return self.perform_restore(zip_path, restore_config, restore_nodes, app_instance)
+        return False
+
+    def download_file(self, file_id, dest):
+        &#34;&#34;&#34;Internal method to download from Drive.&#34;&#34;&#34;
+        _, _, build, _, _, _, MediaIoBaseDownload, _ = _get_google_libs()
+        creds = self.get_credentials()
+        if not creds: return False
+        try:
+            service = build(&#39;drive&#39;, &#39;v3&#39;, credentials=creds)
+            request = service.files().get_media(fileId=file_id)
+            with io.FileIO(dest, mode=&#39;wb&#39;) as fh:
+                downloader = MediaIoBaseDownload(fh, request)
+                done = False
+                while not done:
+                    _, done = downloader.next_chunk()
+            return True
+        except Exception as e:
+            printer.error(f&#34;Download failed: {e}&#34;)
+            return False
+
+    def perform_restore(self, zip_path, restore_config=True, restore_nodes=True, app_instance=None):
+        &#34;&#34;&#34;Execute the actual restoration of files or remote nodes.&#34;&#34;&#34;
+        try:
+            with zipfile.ZipFile(zip_path, &#39;r&#39;) as zipf:
+                names = zipf.namelist()
+                dest_dir = os.path.dirname(self.config.file)
+                
+                # We need to read the config content from zip to decide what to do
+                backup_data = {}
+                config_filename = &#34;config.yaml&#34; if &#34;config.yaml&#34; in names else (&#34;config.json&#34; if &#34;config.json&#34; in names else None)
+                
+                if config_filename:
+                    with zipf.open(config_filename) as f:
+                        backup_data = yaml.safe_load(f)
+
+                # 1. Restore Key (.osk) - Part of config identity
+                if restore_config and &#34;.osk&#34; in names:
+                    zipf.extract(&#34;.osk&#34;, os.path.dirname(self.config.key))
+
+                # 2. Restore Config (Local Settings)
+                if restore_config and backup_data:
+                    local_config = self.config.config.copy()
+                    
+                    # Capture current connectivity settings to preserve them
+                    current_mode = local_config.get(&#34;service_mode&#34;, &#34;local&#34;)
+                    current_remote = local_config.get(&#34;remote_host&#34;)
+                    
+                    if &#34;config&#34; in backup_data:
+                        local_config.update(backup_data[&#34;config&#34;])
+                    
+                    # Restore connectivity settings - we don&#39;t want a restore to 
+                    # accidentally switch us between local and remote and break connectivity
+                    local_config[&#34;service_mode&#34;] = current_mode
+                    if current_remote:
+                        local_config[&#34;remote_host&#34;] = current_remote
+                        
+                    self.config.config = local_config
+                    self.config._saveconfig(self.config.file)
+
+                # 3. Restore Nodes and Profiles
+                if restore_nodes and backup_data:
+                    connections = backup_data.get(&#34;connections&#34;, {})
+                    profiles = backup_data.get(&#34;profiles&#34;, {})
+                    
+                    if app_instance and app_instance.services.mode == &#34;remote&#34;:
+                        # Push to Remote via gRPC
+                        app_instance.services.nodes.full_replace(connections, profiles)
+                    else:
+                        # Restore to Local config file
+                        self.config.connections = connections
+                        self.config.profiles = profiles
+                        self.config._saveconfig(self.config.file)
+
+            # Clear caches
+            for f in [self.config.cachefile, self.config.fzf_cachefile]:
+                if os.path.exists(f): os.remove(f)
+                
+            return True
+        except Exception as e:
+            printer.error(f&#34;Restoration failed: {e}&#34;)
+            return False
+
+    def analyze_backup_content(self, file_id=None):
+        &#34;&#34;&#34;Analyze a backup without restoring to provide info for confirmation.&#34;&#34;&#34;
+        backups = self.list_backups()
+        if not backups: return None
+        selected = next((f for f in backups if f[&#39;id&#39;] == file_id), None) if file_id else max(backups, key=lambda x: x[&#39;timestamp&#39;] or &#39;0&#39;)
+        
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            zip_path = os.path.join(tmp_dir, &#39;analyze.zip&#39;)
+            if self.download_file(selected[&#39;id&#39;], zip_path):
+                with zipfile.ZipFile(zip_path, &#39;r&#39;) as zipf:
+                    names = zipf.namelist()
+                    config_filename = &#34;config.yaml&#34; if &#34;config.yaml&#34; in names else (&#34;config.json&#34; if &#34;config.json&#34; in names else None)
+                    if config_filename:
+                        with zipf.open(config_filename) as f:
+                            data = yaml.safe_load(f)
+                            connections = data.get(&#34;connections&#34;, {})
+                            
+                            # Accurate recursive count
+                            nodes_count = 0
+                            folders_count = 0
+                            
+                            # Layer 1
+                            for k, v in connections.items():
+                                if isinstance(v, dict):
+                                    if v.get(&#34;type&#34;) == &#34;connection&#34;:
+                                        nodes_count += 1
+                                    elif v.get(&#34;type&#34;) == &#34;folder&#34;:
+                                        folders_count += 1
+                                        # Layer 2
+                                        for k2, v2 in v.items():
+                                            if isinstance(v2, dict):
+                                                if v2.get(&#34;type&#34;) == &#34;connection&#34;:
+                                                    nodes_count += 1
+                                                elif v2.get(&#34;type&#34;) == &#34;subfolder&#34;:
+                                                    folders_count += 1
+                                                    # Layer 3
+                                                    for k3, v3 in v2.items():
+                                                        if isinstance(v3, dict) and v3.get(&#34;type&#34;) == &#34;connection&#34;:
+                                                            nodes_count += 1
+
+                            return {
+                                &#34;nodes&#34;: nodes_count,
+                                &#34;folders&#34;: folders_count,
+                                &#34;profiles&#34;: len(data.get(&#34;profiles&#34;, {})),
+                                &#34;has_config&#34;: &#34;config&#34; in data,
+                                &#34;has_key&#34;: &#34;.osk&#34; in names
+                            }
+        return None
+
+    def perform_sync(self, app_instance):
+        &#34;&#34;&#34;Background sync logic.&#34;&#34;&#34;
+        # Always check current config state
+        sync_enabled = self.config.config.get(&#34;sync&#34;, False)
+        sync_remote = self.config.config.get(&#34;sync_remote&#34;, False)
+        
+        if not sync_enabled: return
+
+
+        if self.check_login_status() != True: 
+            printer.warning(&#34;Auto-sync: Not logged in to Google Drive.&#34;)
+            return
+
+        remote_data = None
+        if sync_remote and app_instance.services.mode == &#34;remote&#34;:
+            try:
+                inventory = app_instance.services.nodes.get_inventory()
+                # Merge with local settings
+                local_settings = app_instance.services.config_svc.get_settings()
+                local_settings.pop(&#34;configfolder&#34;, None)
+
+                # Maintain proper config structure: {config: {}, connections: {}, profiles: {}}
+                remote_data = {
+                    &#34;config&#34;: local_settings,
+                    &#34;connections&#34;: inventory.get(&#34;connections&#34;, {}),
+                    &#34;profiles&#34;: inventory.get(&#34;profiles&#34;, {})
+                }
+            except Exception as e:
+                printer.warning(f&#34;Could not fetch remote inventory for sync: {e}&#34;)
+
+        # Run in thread to not block CLI
+        threading.Thread(
+            target=self.compress_and_upload, 
+            args=(remote_data,)
+        ).start()</code></pre>
+</details>
+<div class="desc"><p>Business logic for Google Drive synchronization.</p>
+<p>Initialize the service.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>config</code></strong></dt>
+<dd>An instance of configfile (or None to instantiate a new one/use global context).</dd>
+</dl></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="connpy.services.base.BaseService" href="base.html#connpy.services.base.BaseService">BaseService</a></li>
+</ul>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.services.SyncService.analyze_backup_content"><code class="name flex">
+<span>def <span class="ident">analyze_backup_content</span></span>(<span>self, file_id=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def analyze_backup_content(self, file_id=None):
+    &#34;&#34;&#34;Analyze a backup without restoring to provide info for confirmation.&#34;&#34;&#34;
+    backups = self.list_backups()
+    if not backups: return None
+    selected = next((f for f in backups if f[&#39;id&#39;] == file_id), None) if file_id else max(backups, key=lambda x: x[&#39;timestamp&#39;] or &#39;0&#39;)
+    
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        zip_path = os.path.join(tmp_dir, &#39;analyze.zip&#39;)
+        if self.download_file(selected[&#39;id&#39;], zip_path):
+            with zipfile.ZipFile(zip_path, &#39;r&#39;) as zipf:
+                names = zipf.namelist()
+                config_filename = &#34;config.yaml&#34; if &#34;config.yaml&#34; in names else (&#34;config.json&#34; if &#34;config.json&#34; in names else None)
+                if config_filename:
+                    with zipf.open(config_filename) as f:
+                        data = yaml.safe_load(f)
+                        connections = data.get(&#34;connections&#34;, {})
+                        
+                        # Accurate recursive count
+                        nodes_count = 0
+                        folders_count = 0
+                        
+                        # Layer 1
+                        for k, v in connections.items():
+                            if isinstance(v, dict):
+                                if v.get(&#34;type&#34;) == &#34;connection&#34;:
+                                    nodes_count += 1
+                                elif v.get(&#34;type&#34;) == &#34;folder&#34;:
+                                    folders_count += 1
+                                    # Layer 2
+                                    for k2, v2 in v.items():
+                                        if isinstance(v2, dict):
+                                            if v2.get(&#34;type&#34;) == &#34;connection&#34;:
+                                                nodes_count += 1
+                                            elif v2.get(&#34;type&#34;) == &#34;subfolder&#34;:
+                                                folders_count += 1
+                                                # Layer 3
+                                                for k3, v3 in v2.items():
+                                                    if isinstance(v3, dict) and v3.get(&#34;type&#34;) == &#34;connection&#34;:
+                                                        nodes_count += 1
+
+                        return {
+                            &#34;nodes&#34;: nodes_count,
+                            &#34;folders&#34;: folders_count,
+                            &#34;profiles&#34;: len(data.get(&#34;profiles&#34;, {})),
+                            &#34;has_config&#34;: &#34;config&#34; in data,
+                            &#34;has_key&#34;: &#34;.osk&#34; in names
+                        }
+    return None</code></pre>
+</details>
+<div class="desc"><p>Analyze a backup without restoring to provide info for confirmation.</p></div>
+</dd>
+<dt id="connpy.services.SyncService.check_login_status"><code class="name flex">
+<span>def <span class="ident">check_login_status</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def check_login_status(self):
+    &#34;&#34;&#34;Check if logged in to Google Drive.&#34;&#34;&#34;
+    Credentials, Request, _, RefreshError, _, _, _, _ = _get_google_libs()
+    if os.path.exists(self.token_file):
+        creds = Credentials.from_authorized_user_file(self.token_file)
+        if creds and creds.expired and creds.refresh_token:
+            try:
+                creds.refresh(Request())
+            except RefreshError:
+                pass
+        return True if creds.valid else &#34;Invalid&#34;
+    return False</code></pre>
+</details>
+<div class="desc"><p>Check if logged in to Google Drive.</p></div>
+</dd>
+<dt id="connpy.services.SyncService.compress_and_upload"><code class="name flex">
+<span>def <span class="ident">compress_and_upload</span></span>(<span>self, remote_data=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def compress_and_upload(self, remote_data=None):
+    &#34;&#34;&#34;Compress config and upload to Drive.&#34;&#34;&#34;
+    timestamp = int(time.time() * 1000)
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        zip_path = os.path.join(tmp_dir, f&#34;connpy-backup-{timestamp}.zip&#34;)
+        
+        with zipfile.ZipFile(zip_path, &#39;w&#39;, zipfile.ZIP_DEFLATED) as zipf:
+            # If we have remote data, we create a virtual config file
+            if remote_data:
+                config_tmp = os.path.join(tmp_dir, &#34;config.yaml&#34;)
+                with open(config_tmp, &#39;w&#39;) as f:
+                    yaml.dump(remote_data, f, default_flow_style=False)
+                zipf.write(config_tmp, &#34;config.yaml&#34;)
+            else:
+                # Legacy behavior: use local file
+                zipf.write(self.config.file, os.path.basename(self.config.file))
+            
+            # Always include the key if it exists
+            if os.path.exists(self.config.key):
+                zipf.write(self.config.key, &#34;.osk&#34;)
+
+        # Manage retention (max 100 backups)
+        backups = self.list_backups()
+        if len(backups) &gt;= 100:
+            oldest = min(backups, key=lambda x: x[&#39;timestamp&#39;] or &#39;0&#39;)
+            self.delete_backup(oldest[&#39;id&#39;])
+
+        # Upload
+        return self.upload_file(zip_path, timestamp)</code></pre>
+</details>
+<div class="desc"><p>Compress config and upload to Drive.</p></div>
+</dd>
+<dt id="connpy.services.SyncService.delete_backup"><code class="name flex">
+<span>def <span class="ident">delete_backup</span></span>(<span>self, file_id)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def delete_backup(self, file_id):
+    &#34;&#34;&#34;Delete a backup from Drive.&#34;&#34;&#34;
+    _, _, build, _, _, _, _, _ = _get_google_libs()
+    creds = self.get_credentials()
+    if not creds: return False
+    try:
+        service = build(&#34;drive&#34;, &#34;v3&#34;, credentials=creds)
+        service.files().delete(fileId=file_id).execute()
+        return True
+    except Exception as e:
+        printer.error(f&#34;Delete failed: {e}&#34;)
+        return False</code></pre>
+</details>
+<div class="desc"><p>Delete a backup from Drive.</p></div>
+</dd>
+<dt id="connpy.services.SyncService.download_file"><code class="name flex">
+<span>def <span class="ident">download_file</span></span>(<span>self, file_id, dest)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def download_file(self, file_id, dest):
+    &#34;&#34;&#34;Internal method to download from Drive.&#34;&#34;&#34;
+    _, _, build, _, _, _, MediaIoBaseDownload, _ = _get_google_libs()
+    creds = self.get_credentials()
+    if not creds: return False
+    try:
+        service = build(&#39;drive&#39;, &#39;v3&#39;, credentials=creds)
+        request = service.files().get_media(fileId=file_id)
+        with io.FileIO(dest, mode=&#39;wb&#39;) as fh:
+            downloader = MediaIoBaseDownload(fh, request)
+            done = False
+            while not done:
+                _, done = downloader.next_chunk()
+        return True
+    except Exception as e:
+        printer.error(f&#34;Download failed: {e}&#34;)
+        return False</code></pre>
+</details>
+<div class="desc"><p>Internal method to download from Drive.</p></div>
+</dd>
+<dt id="connpy.services.SyncService.get_credentials"><code class="name flex">
+<span>def <span class="ident">get_credentials</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_credentials(self):
+    &#34;&#34;&#34;Get valid credentials, refreshing if necessary.&#34;&#34;&#34;
+    Credentials, Request, _, RefreshError, _, _, _, _ = _get_google_libs()
+    if os.path.exists(self.token_file):
+        creds = Credentials.from_authorized_user_file(self.token_file, self.scopes)
+    else:
+        return None
+    
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            try:
+                creds.refresh(Request())
+            except RefreshError:
+                return None
+        else:
+            return None
+    return creds</code></pre>
+</details>
+<div class="desc"><p>Get valid credentials, refreshing if necessary.</p></div>
+</dd>
+<dt id="connpy.services.SyncService.list_backups"><code class="name flex">
+<span>def <span class="ident">list_backups</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def list_backups(self):
+    &#34;&#34;&#34;List files in Google Drive appDataFolder.&#34;&#34;&#34;
+    _, _, build, _, _, _, _, HttpError = _get_google_libs()
+    creds = self.get_credentials()
+    if not creds:
+        printer.error(&#34;Not logged in to Google Drive.&#34;)
+        return []
+
+    try:
+        service = build(&#34;drive&#34;, &#34;v3&#34;, credentials=creds)
+        response = service.files().list(
+            spaces=&#34;appDataFolder&#34;,
+            fields=&#34;files(id, name, appProperties)&#34;,
+            pageSize=10,
+        ).execute()
+
+        files_info = []
+        for file in response.get(&#34;files&#34;, []):
+            files_info.append({
+                &#34;name&#34;: file.get(&#34;name&#34;),
+                &#34;id&#34;: file.get(&#34;id&#34;),
+                &#34;date&#34;: file.get(&#34;appProperties&#34;, {}).get(&#34;date&#34;),
+                &#34;timestamp&#34;: file.get(&#34;appProperties&#34;, {}).get(&#34;timestamp&#34;)
+            })
+        return files_info
+    except HttpError as error:
+        printer.error(f&#34;Google Drive API error: {error}&#34;)
+        return []</code></pre>
+</details>
+<div class="desc"><p>List files in Google Drive appDataFolder.</p></div>
+</dd>
+<dt id="connpy.services.SyncService.login"><code class="name flex">
+<span>def <span class="ident">login</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def login(self):
+    &#34;&#34;&#34;Authenticate with Google Drive.&#34;&#34;&#34;
+    Credentials, Request, _, RefreshError, InstalledAppFlow, _, _, _ = _get_google_libs()
+    creds = None
+    if os.path.exists(self.token_file):
+        creds = Credentials.from_authorized_user_file(self.token_file, self.scopes)
+
+    try:
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+            else:
+                flow = InstalledAppFlow.from_client_config(self.client_config, self.scopes)
+                creds = flow.run_local_server(port=0, access_type=&#39;offline&#39;)
+
+            with open(self.token_file, &#39;w&#39;) as token:
+                token.write(creds.to_json())
+
+        printer.success(&#34;Logged in successfully.&#34;)
+        return True
+
+    except RefreshError:
+        if os.path.exists(self.token_file):
+            os.remove(self.token_file)
+        printer.warning(&#34;Existing token was invalid and has been removed. Please log in again.&#34;)
+        return False
+    except Exception as e:
+        printer.error(f&#34;Login failed: {e}&#34;)
+        return False</code></pre>
+</details>
+<div class="desc"><p>Authenticate with Google Drive.</p></div>
+</dd>
+<dt id="connpy.services.SyncService.logout"><code class="name flex">
+<span>def <span class="ident">logout</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def logout(self):
+    &#34;&#34;&#34;Remove Google Drive credentials.&#34;&#34;&#34;
+    if os.path.exists(self.token_file):
+        os.remove(self.token_file)
+        printer.success(&#34;Logged out successfully.&#34;)
+    else:
+        printer.info(&#34;No credentials file found. Already logged out.&#34;)</code></pre>
+</details>
+<div class="desc"><p>Remove Google Drive credentials.</p></div>
+</dd>
+<dt id="connpy.services.SyncService.perform_restore"><code class="name flex">
+<span>def <span class="ident">perform_restore</span></span>(<span>self, zip_path, restore_config=True, restore_nodes=True, app_instance=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def perform_restore(self, zip_path, restore_config=True, restore_nodes=True, app_instance=None):
+    &#34;&#34;&#34;Execute the actual restoration of files or remote nodes.&#34;&#34;&#34;
+    try:
+        with zipfile.ZipFile(zip_path, &#39;r&#39;) as zipf:
+            names = zipf.namelist()
+            dest_dir = os.path.dirname(self.config.file)
+            
+            # We need to read the config content from zip to decide what to do
+            backup_data = {}
+            config_filename = &#34;config.yaml&#34; if &#34;config.yaml&#34; in names else (&#34;config.json&#34; if &#34;config.json&#34; in names else None)
+            
+            if config_filename:
+                with zipf.open(config_filename) as f:
+                    backup_data = yaml.safe_load(f)
+
+            # 1. Restore Key (.osk) - Part of config identity
+            if restore_config and &#34;.osk&#34; in names:
+                zipf.extract(&#34;.osk&#34;, os.path.dirname(self.config.key))
+
+            # 2. Restore Config (Local Settings)
+            if restore_config and backup_data:
+                local_config = self.config.config.copy()
+                
+                # Capture current connectivity settings to preserve them
+                current_mode = local_config.get(&#34;service_mode&#34;, &#34;local&#34;)
+                current_remote = local_config.get(&#34;remote_host&#34;)
+                
+                if &#34;config&#34; in backup_data:
+                    local_config.update(backup_data[&#34;config&#34;])
+                
+                # Restore connectivity settings - we don&#39;t want a restore to 
+                # accidentally switch us between local and remote and break connectivity
+                local_config[&#34;service_mode&#34;] = current_mode
+                if current_remote:
+                    local_config[&#34;remote_host&#34;] = current_remote
+                    
+                self.config.config = local_config
+                self.config._saveconfig(self.config.file)
+
+            # 3. Restore Nodes and Profiles
+            if restore_nodes and backup_data:
+                connections = backup_data.get(&#34;connections&#34;, {})
+                profiles = backup_data.get(&#34;profiles&#34;, {})
+                
+                if app_instance and app_instance.services.mode == &#34;remote&#34;:
+                    # Push to Remote via gRPC
+                    app_instance.services.nodes.full_replace(connections, profiles)
+                else:
+                    # Restore to Local config file
+                    self.config.connections = connections
+                    self.config.profiles = profiles
+                    self.config._saveconfig(self.config.file)
+
+        # Clear caches
+        for f in [self.config.cachefile, self.config.fzf_cachefile]:
+            if os.path.exists(f): os.remove(f)
+            
+        return True
+    except Exception as e:
+        printer.error(f&#34;Restoration failed: {e}&#34;)
+        return False</code></pre>
+</details>
+<div class="desc"><p>Execute the actual restoration of files or remote nodes.</p></div>
+</dd>
+<dt id="connpy.services.SyncService.perform_sync"><code class="name flex">
+<span>def <span class="ident">perform_sync</span></span>(<span>self, app_instance)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def perform_sync(self, app_instance):
+    &#34;&#34;&#34;Background sync logic.&#34;&#34;&#34;
+    # Always check current config state
+    sync_enabled = self.config.config.get(&#34;sync&#34;, False)
+    sync_remote = self.config.config.get(&#34;sync_remote&#34;, False)
+    
+    if not sync_enabled: return
+
+
+    if self.check_login_status() != True: 
+        printer.warning(&#34;Auto-sync: Not logged in to Google Drive.&#34;)
+        return
+
+    remote_data = None
+    if sync_remote and app_instance.services.mode == &#34;remote&#34;:
+        try:
+            inventory = app_instance.services.nodes.get_inventory()
+            # Merge with local settings
+            local_settings = app_instance.services.config_svc.get_settings()
+            local_settings.pop(&#34;configfolder&#34;, None)
+
+            # Maintain proper config structure: {config: {}, connections: {}, profiles: {}}
+            remote_data = {
+                &#34;config&#34;: local_settings,
+                &#34;connections&#34;: inventory.get(&#34;connections&#34;, {}),
+                &#34;profiles&#34;: inventory.get(&#34;profiles&#34;, {})
+            }
+        except Exception as e:
+            printer.warning(f&#34;Could not fetch remote inventory for sync: {e}&#34;)
+
+    # Run in thread to not block CLI
+    threading.Thread(
+        target=self.compress_and_upload, 
+        args=(remote_data,)
+    ).start()</code></pre>
+</details>
+<div class="desc"><p>Background sync logic.</p></div>
+</dd>
+<dt id="connpy.services.SyncService.restore_backup"><code class="name flex">
+<span>def <span class="ident">restore_backup</span></span>(<span>self, file_id=None, restore_config=True, restore_nodes=True, app_instance=None)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def restore_backup(self, file_id=None, restore_config=True, restore_nodes=True, app_instance=None):
+    &#34;&#34;&#34;Download and analyze a backup for restoration.&#34;&#34;&#34;
+    backups = self.list_backups()
+    if not backups:
+        printer.error(&#34;No backups found.&#34;)
+        return None
+
+    if file_id:
+        selected = next((f for f in backups if f[&#39;id&#39;] == file_id), None)
+        if not selected:
+            printer.error(f&#34;Backup {file_id} not found.&#34;)
+            return None
+    else:
+        selected = max(backups, key=lambda x: x[&#39;timestamp&#39;] or &#39;0&#39;)
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        zip_path = os.path.join(tmp_dir, &#39;restore.zip&#39;)
+        if self.download_file(selected[&#39;id&#39;], zip_path):
+            return self.perform_restore(zip_path, restore_config, restore_nodes, app_instance)
+    return False</code></pre>
+</details>
+<div class="desc"><p>Download and analyze a backup for restoration.</p></div>
+</dd>
+<dt id="connpy.services.SyncService.upload_file"><code class="name flex">
+<span>def <span class="ident">upload_file</span></span>(<span>self, file_path, timestamp)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def upload_file(self, file_path, timestamp):
+    &#34;&#34;&#34;Internal method to upload to Drive.&#34;&#34;&#34;
+    _, _, build, _, _, MediaFileUpload, _, _ = _get_google_libs()
+    creds = self.get_credentials()
+    if not creds: return False
+    
+    service = build(&#39;drive&#39;, &#39;v3&#39;, credentials=creds)
+    date_str = datetime.fromtimestamp(timestamp/1000).strftime(&#39;%Y-%m-%d %H:%M:%S&#39;)
+    
+    file_metadata = {
+        &#39;name&#39;: os.path.basename(file_path),
+        &#39;parents&#39;: [&#34;appDataFolder&#34;],
+        &#39;appProperties&#39;: {
+            &#39;timestamp&#39;: str(timestamp),
+            &#39;date&#39;: date_str
+        }
+    }
+    media = MediaFileUpload(file_path)
+    try:
+        service.files().create(body=file_metadata, media_body=media, fields=&#39;id&#39;).execute()
+        printer.success(&#34;Backup uploaded to Google Drive.&#34;)
+        return True
+    except Exception as e:
+        printer.error(f&#34;Upload failed: {e}&#34;)
+        return False</code></pre>
+</details>
+<div class="desc"><p>Internal method to upload to Drive.</p></div>
+</dd>
+</dl>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="connpy.services.base.BaseService" href="base.html#connpy.services.base.BaseService">BaseService</a></b></code>:
+<ul class="hlist">
+<li><code><a title="connpy.services.base.BaseService.set_reserved_names" href="base.html#connpy.services.base.BaseService.set_reserved_names">set_reserved_names</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
 <dt id="connpy.services.SystemService"><code class="flex name class">
 <span>class <span class="ident">SystemService</span></span>
 <span>(</span><span>config=None)</span>
@@ -3959,6 +4852,815 @@ el.replaceWith(d);
 </li>
 </ul>
 </dd>
+<dt id="connpy.services.UserService"><code class="flex name class">
+<span>class <span class="ident">UserService</span></span>
+<span>(</span><span>config_dir)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class UserService:
+    def __init__(self, config_dir):
+        self.config_dir = os.path.abspath(config_dir)
+        self.users_dir = os.path.join(self.config_dir, &#34;users&#34;)
+        self.registry_file = os.path.join(self.users_dir, &#34;registry.yaml&#34;)
+        
+        # Ensure users directory exists
+        os.makedirs(self.users_dir, exist_ok=True)
+        
+        # Reverse index cache: token_hash -&gt; (username, token_id)
+        self._token_index: dict[str, tuple[str, str]] = {}
+
+    def _load_registry(self) -&gt; dict:
+        &#34;&#34;&#34;Loads registry from file. If it doesn&#39;t exist, initializes it with a new JWT secret.&#34;&#34;&#34;
+        if not os.path.exists(self.registry_file):
+            registry = {
+                &#34;jwt_secret&#34;: secrets.token_hex(32),
+                &#34;users&#34;: {}
+            }
+            self._save_registry(registry)
+            return registry
+        
+        try:
+            with open(self.registry_file, &#34;r&#34;) as f:
+                registry = yaml.safe_load(f) or {}
+        except Exception:
+            registry = {}
+            
+        if not isinstance(registry, dict):
+            registry = {}
+            
+        if &#34;jwt_secret&#34; not in registry:
+            registry[&#34;jwt_secret&#34;] = secrets.token_hex(32)
+            
+        if &#34;users&#34; not in registry or not isinstance(registry[&#34;users&#34;], dict):
+            registry[&#34;users&#34;] = {}
+            
+        return registry
+
+    def _save_registry(self, data: dict):
+        &#34;&#34;&#34;Safely saves registry structure to registry.yaml.&#34;&#34;&#34;
+        tmp_file = self.registry_file + &#34;.tmp&#34;
+        try:
+            with open(tmp_file, &#34;w&#34;) as f:
+                yaml.dump(data, f, default_flow_style=False, sort_keys=False)
+            os.replace(tmp_file, self.registry_file)
+            os.chmod(self.registry_file, 0o600)
+        except Exception as e:
+            if os.path.exists(tmp_file):
+                try:
+                    os.remove(tmp_file)
+                except OSError:
+                    pass
+            raise e
+
+    def _build_token_index(self, registry: dict) -&gt; dict[str, tuple[str, str]]:
+        &#34;&#34;&#34;Builds a reverse index of token_hash -&gt; (username, token_id) for O(1) PAT lookup.&#34;&#34;&#34;
+        index = {}
+        for username, user_data in registry.get(&#34;users&#34;, {}).items():
+            for token_id, token_meta in user_data.get(&#34;api_tokens&#34;, {}).items():
+                token_hash = token_meta.get(&#34;token_hash&#34;)
+                if token_hash:
+                    index[token_hash] = (username, token_id)
+        return index
+
+    def create_user(self, username, password, config_path=None) -&gt; dict:
+        &#34;&#34;&#34;Creates a new user with bcrypt-hashed credentials.
+        
+        Mode A: config_path=None (fresh user) -&gt; Generates config.yaml and .osk key.
+        Mode B: config_path set -&gt; Reuses existing directory after validating its structure.
+        &#34;&#34;&#34;
+        if not username or not isinstance(username, str):
+            raise ValueError(&#34;Username cannot be empty&#34;)
+            
+        if not re.match(r&#34;^[a-zA-Z0-9_-]+$&#34;, username):
+            raise ValueError(&#34;Username must contain only alphanumeric characters, dashes, or underscores&#34;)
+            
+        if not password or not isinstance(password, str):
+            raise ValueError(&#34;Password cannot be empty&#34;)
+            
+        registry = self._load_registry()
+        if username in registry[&#34;users&#34;]:
+            raise ValueError(f&#34;User &#39;{username}&#39; already exists&#34;)
+            
+        # Resolve path and initialize configuration
+        if config_path is None:
+            user_dir = os.path.join(self.users_dir, username)
+            os.makedirs(user_dir, exist_ok=True)
+            
+            # Create subdirs for plugins and sessions
+            os.makedirs(os.path.join(user_dir, &#34;plugins&#34;), exist_ok=True)
+            os.makedirs(os.path.join(user_dir, &#34;ai_sessions&#34;), exist_ok=True)
+            
+            # Create default config.yaml &amp; .osk key via configfile
+            conf_file = os.path.join(user_dir, &#34;config.yaml&#34;)
+            configfile(conf=conf_file)
+            
+            stored_config_path = None
+        else:
+            abs_config_path = os.path.abspath(config_path)
+            os.makedirs(abs_config_path, exist_ok=True)
+            
+            # Create subdirs for plugins and sessions in the custom path
+            os.makedirs(os.path.join(abs_config_path, &#34;plugins&#34;), exist_ok=True)
+            os.makedirs(os.path.join(abs_config_path, &#34;ai_sessions&#34;), exist_ok=True)
+            
+            # Create default config.yaml &amp; .osk key via configfile if config.yaml is not present
+            conf_file = os.path.join(abs_config_path, &#34;config.yaml&#34;)
+            if not os.path.exists(conf_file):
+                configfile(conf=conf_file)
+                
+            stored_config_path = abs_config_path
+
+        # Hash password securely
+        password_hash = bcrypt.hashpw(password.encode(&#34;utf-8&#34;), bcrypt.gensalt()).decode(&#34;utf-8&#34;)
+        
+        user_entry = {
+            &#34;password_hash&#34;: password_hash,
+            &#34;config_path&#34;: stored_config_path,
+            &#34;created&#34;: datetime.datetime.now(datetime.timezone.utc).isoformat()
+        }
+        
+        registry[&#34;users&#34;][username] = user_entry
+        self._save_registry(registry)
+        
+        return {
+            &#34;username&#34;: username,
+            &#34;config_path&#34;: stored_config_path,
+            &#34;created&#34;: user_entry[&#34;created&#34;]
+        }
+
+    def delete_user(self, username):
+        &#34;&#34;&#34;Removes user from the registry and cleans up config directory if server-managed.&#34;&#34;&#34;
+        registry = self._load_registry()
+        if username not in registry[&#34;users&#34;]:
+            raise ValueError(f&#34;User &#39;{username}&#39; not found&#34;)
+            
+        user_data = registry[&#34;users&#34;][username]
+        config_path = user_data.get(&#34;config_path&#34;)
+        
+        if config_path is None:
+            user_dir = os.path.join(self.users_dir, username)
+            if os.path.exists(user_dir):
+                shutil.rmtree(user_dir, ignore_errors=True)
+                
+        del registry[&#34;users&#34;][username]
+        self._save_registry(registry)
+
+    def list_users(self) -&gt; list[dict]:
+        &#34;&#34;&#34;Lists all registered users with metadata.&#34;&#34;&#34;
+        registry = self._load_registry()
+        return [
+            {
+                &#34;username&#34;: name,
+                &#34;config_path&#34;: data.get(&#34;config_path&#34;),
+                &#34;created&#34;: data.get(&#34;created&#34;)
+            }
+            for name, data in registry.get(&#34;users&#34;, {}).items()
+        ]
+
+    def get_user(self, username) -&gt; dict:
+        &#34;&#34;&#34;Retrieves raw metadata for a specific user.&#34;&#34;&#34;
+        registry = self._load_registry()
+        if username not in registry[&#34;users&#34;]:
+            raise ValueError(f&#34;User &#39;{username}&#39; not found&#34;)
+            
+        data = registry[&#34;users&#34;][username]
+        return {
+            &#34;username&#34;: username,
+            &#34;config_path&#34;: data.get(&#34;config_path&#34;),
+            &#34;created&#34;: data.get(&#34;created&#34;),
+            &#34;password_hash&#34;: data.get(&#34;password_hash&#34;)
+        }
+
+    def change_password(self, username, old_password, new_password):
+        &#34;&#34;&#34;Verifies old password and updates registry with new hashed password.&#34;&#34;&#34;
+        if not new_password or not isinstance(new_password, str):
+            raise ValueError(&#34;New password cannot be empty&#34;)
+            
+        registry = self._load_registry()
+        if username not in registry[&#34;users&#34;]:
+            raise ValueError(f&#34;User &#39;{username}&#39; not found&#34;)
+            
+        user_data = registry[&#34;users&#34;][username]
+        if not bcrypt.checkpw(old_password.encode(&#34;utf-8&#34;), user_data[&#34;password_hash&#34;].encode(&#34;utf-8&#34;)):
+            raise ValueError(&#34;Invalid credentials&#34;)
+            
+        # Update hash
+        user_data[&#34;password_hash&#34;] = bcrypt.hashpw(new_password.encode(&#34;utf-8&#34;), bcrypt.gensalt()).decode(&#34;utf-8&#34;)
+        self._save_registry(registry)
+
+    def admin_change_password(self, username, new_password):
+        &#34;&#34;&#34;Administrative password override (does not require old password).&#34;&#34;&#34;
+        if not new_password or not isinstance(new_password, str):
+            raise ValueError(&#34;New password cannot be empty&#34;)
+            
+        registry = self._load_registry()
+        if username not in registry[&#34;users&#34;]:
+            raise ValueError(f&#34;User &#39;{username}&#39; not found&#34;)
+            
+        user_data = registry[&#34;users&#34;][username]
+        user_data[&#34;password_hash&#34;] = bcrypt.hashpw(new_password.encode(&#34;utf-8&#34;), bcrypt.gensalt()).decode(&#34;utf-8&#34;)
+        self._save_registry(registry)
+
+    def authenticate(self, username, password) -&gt; bool:
+        &#34;&#34;&#34;Verifies if the credentials are valid using bcrypt.&#34;&#34;&#34;
+        registry = self._load_registry()
+        if username not in registry[&#34;users&#34;]:
+            return False
+            
+        user_data = registry[&#34;users&#34;][username]
+        return bcrypt.checkpw(password.encode(&#34;utf-8&#34;), user_data[&#34;password_hash&#34;].encode(&#34;utf-8&#34;))
+
+    def generate_jwt(self, username) -&gt; str:
+        &#34;&#34;&#34;Generates a secure JSON Web Token for the user expiring in 12 hours.&#34;&#34;&#34;
+        registry = self._load_registry()
+        if username not in registry[&#34;users&#34;]:
+            raise ValueError(f&#34;User &#39;{username}&#39; not found&#34;)
+            
+        expiration = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=12)
+        payload = {
+            &#34;sub&#34;: username,
+            &#34;exp&#34;: expiration
+        }
+        
+        secret = os.environ.get(&#34;CONNPY_JWT_SECRET&#34;) or registry[&#34;jwt_secret&#34;]
+        token = jwt.encode(payload, secret, algorithm=&#34;HS256&#34;)
+        if isinstance(token, bytes):
+            token = token.decode(&#34;utf-8&#34;)
+            
+        return token
+
+    def verify_jwt(self, token) -&gt; str | None:
+        &#34;&#34;&#34;Decodes JWT and returns username if token is valid and unexpired.&#34;&#34;&#34;
+        registry = self._load_registry()
+        try:
+            secret = os.environ.get(&#34;CONNPY_JWT_SECRET&#34;) or registry[&#34;jwt_secret&#34;]
+            payload = jwt.decode(token, secret, algorithms=[&#34;HS256&#34;])
+            return payload.get(&#34;sub&#34;)
+        except (jwt.ExpiredSignatureError, jwt.InvalidTokenError, KeyError):
+            return None
+
+    # --- Personal Access Token (PAT) Management ---
+
+    def create_api_token(self, username: str, name: str, expires_in_days: int | None = None) -&gt; dict:
+        &#34;&#34;&#34;Creates a Personal Access Token for the user.
+        
+        Returns the raw token ONCE. Only the SHA-256 hash is persisted.
+        &#34;&#34;&#34;
+        if not name or not isinstance(name, str):
+            raise ValueError(&#34;Token name cannot be empty&#34;)
+        
+        registry = self._load_registry()
+        if username not in registry[&#34;users&#34;]:
+            raise ValueError(f&#34;User &#39;{username}&#39; not found&#34;)
+        
+        user_data = registry[&#34;users&#34;][username]
+        if &#34;api_tokens&#34; not in user_data:
+            user_data[&#34;api_tokens&#34;] = {}
+        
+        # Generate cryptographically secure token with recognizable prefix
+        raw_secret = secrets.token_hex(32)
+        raw_token = f&#34;cnp_pat_{raw_secret}&#34;
+        token_hash = hashlib.sha256(raw_token.encode(&#34;utf-8&#34;)).hexdigest()
+        token_id = f&#34;tok_{secrets.token_hex(4)}&#34;
+        
+        now = datetime.datetime.now(datetime.timezone.utc)
+        expires_at = None
+        if expires_in_days and expires_in_days &gt; 0:
+            expires_at = (now + datetime.timedelta(days=expires_in_days)).isoformat()
+        
+        user_data[&#34;api_tokens&#34;][token_id] = {
+            &#34;name&#34;: name,
+            &#34;token_hash&#34;: token_hash,
+            &#34;token_prefix&#34;: raw_token[:16],
+            &#34;created_at&#34;: now.isoformat(),
+            &#34;last_used_at&#34;: None,
+            &#34;expires_at&#34;: expires_at,
+        }
+        
+        self._save_registry(registry)
+        self._token_index = self._build_token_index(registry)
+        
+        return {
+            &#34;token_id&#34;: token_id,
+            &#34;raw_token&#34;: raw_token,
+            &#34;name&#34;: name,
+        }
+
+    def list_api_tokens(self, username: str) -&gt; list[dict]:
+        &#34;&#34;&#34;Lists all active API tokens for a user (without sensitive data).&#34;&#34;&#34;
+        registry = self._load_registry()
+        if username not in registry[&#34;users&#34;]:
+            raise ValueError(f&#34;User &#39;{username}&#39; not found&#34;)
+        
+        tokens = registry[&#34;users&#34;][username].get(&#34;api_tokens&#34;, {})
+        return [
+            {
+                &#34;token_id&#34;: tid,
+                &#34;name&#34;: meta.get(&#34;name&#34;),
+                &#34;token_prefix&#34;: meta.get(&#34;token_prefix&#34;),
+                &#34;created_at&#34;: meta.get(&#34;created_at&#34;),
+                &#34;last_used_at&#34;: meta.get(&#34;last_used_at&#34;),
+                &#34;expires_at&#34;: meta.get(&#34;expires_at&#34;),
+            }
+            for tid, meta in tokens.items()
+        ]
+
+    def revoke_api_token(self, username: str, token_id: str) -&gt; bool:
+        &#34;&#34;&#34;Revokes (deletes) a specific API token. Returns True if found and removed.&#34;&#34;&#34;
+        registry = self._load_registry()
+        if username not in registry[&#34;users&#34;]:
+            raise ValueError(f&#34;User &#39;{username}&#39; not found&#34;)
+        
+        tokens = registry[&#34;users&#34;][username].get(&#34;api_tokens&#34;, {})
+        if token_id not in tokens:
+            return False
+        
+        del tokens[token_id]
+        self._save_registry(registry)
+        self._token_index = self._build_token_index(registry)
+        return True
+
+    def verify_api_token(self, raw_token: str) -&gt; str | None:
+        &#34;&#34;&#34;Validates a PAT by hashing it and looking up the reverse index.
+        
+        Returns username if valid and not expired, None otherwise.
+        &#34;&#34;&#34;
+        token_hash = hashlib.sha256(raw_token.encode(&#34;utf-8&#34;)).hexdigest()
+        
+        # Rebuild index if empty (cold start or after process restart)
+        if not self._token_index:
+            registry = self._load_registry()
+            self._token_index = self._build_token_index(registry)
+        
+        match = self._token_index.get(token_hash)
+        if not match:
+            return None
+        
+        username, token_id = match
+        
+        # Validate token still exists and check expiration
+        registry = self._load_registry()
+        user_data = registry.get(&#34;users&#34;, {}).get(username, {})
+        token_meta = user_data.get(&#34;api_tokens&#34;, {}).get(token_id)
+        
+        if not token_meta:
+            # Token was revoked between index build and now
+            self._token_index = self._build_token_index(registry)
+            return None
+        
+        # Check expiration
+        expires_at = token_meta.get(&#34;expires_at&#34;)
+        if expires_at:
+            exp_dt = datetime.datetime.fromisoformat(expires_at)
+            if datetime.datetime.now(datetime.timezone.utc) &gt; exp_dt:
+                return None
+        
+        # Update last_used_at
+        token_meta[&#34;last_used_at&#34;] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        self._save_registry(registry)
+        
+        return username</code></pre>
+</details>
+<div class="desc"></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.services.UserService.admin_change_password"><code class="name flex">
+<span>def <span class="ident">admin_change_password</span></span>(<span>self, username, new_password)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def admin_change_password(self, username, new_password):
+    &#34;&#34;&#34;Administrative password override (does not require old password).&#34;&#34;&#34;
+    if not new_password or not isinstance(new_password, str):
+        raise ValueError(&#34;New password cannot be empty&#34;)
+        
+    registry = self._load_registry()
+    if username not in registry[&#34;users&#34;]:
+        raise ValueError(f&#34;User &#39;{username}&#39; not found&#34;)
+        
+    user_data = registry[&#34;users&#34;][username]
+    user_data[&#34;password_hash&#34;] = bcrypt.hashpw(new_password.encode(&#34;utf-8&#34;), bcrypt.gensalt()).decode(&#34;utf-8&#34;)
+    self._save_registry(registry)</code></pre>
+</details>
+<div class="desc"><p>Administrative password override (does not require old password).</p></div>
+</dd>
+<dt id="connpy.services.UserService.authenticate"><code class="name flex">
+<span>def <span class="ident">authenticate</span></span>(<span>self, username, password) ‑> bool</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def authenticate(self, username, password) -&gt; bool:
+    &#34;&#34;&#34;Verifies if the credentials are valid using bcrypt.&#34;&#34;&#34;
+    registry = self._load_registry()
+    if username not in registry[&#34;users&#34;]:
+        return False
+        
+    user_data = registry[&#34;users&#34;][username]
+    return bcrypt.checkpw(password.encode(&#34;utf-8&#34;), user_data[&#34;password_hash&#34;].encode(&#34;utf-8&#34;))</code></pre>
+</details>
+<div class="desc"><p>Verifies if the credentials are valid using bcrypt.</p></div>
+</dd>
+<dt id="connpy.services.UserService.change_password"><code class="name flex">
+<span>def <span class="ident">change_password</span></span>(<span>self, username, old_password, new_password)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def change_password(self, username, old_password, new_password):
+    &#34;&#34;&#34;Verifies old password and updates registry with new hashed password.&#34;&#34;&#34;
+    if not new_password or not isinstance(new_password, str):
+        raise ValueError(&#34;New password cannot be empty&#34;)
+        
+    registry = self._load_registry()
+    if username not in registry[&#34;users&#34;]:
+        raise ValueError(f&#34;User &#39;{username}&#39; not found&#34;)
+        
+    user_data = registry[&#34;users&#34;][username]
+    if not bcrypt.checkpw(old_password.encode(&#34;utf-8&#34;), user_data[&#34;password_hash&#34;].encode(&#34;utf-8&#34;)):
+        raise ValueError(&#34;Invalid credentials&#34;)
+        
+    # Update hash
+    user_data[&#34;password_hash&#34;] = bcrypt.hashpw(new_password.encode(&#34;utf-8&#34;), bcrypt.gensalt()).decode(&#34;utf-8&#34;)
+    self._save_registry(registry)</code></pre>
+</details>
+<div class="desc"><p>Verifies old password and updates registry with new hashed password.</p></div>
+</dd>
+<dt id="connpy.services.UserService.create_api_token"><code class="name flex">
+<span>def <span class="ident">create_api_token</span></span>(<span>self, username: str, name: str, expires_in_days: int | None = None) ‑> dict</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def create_api_token(self, username: str, name: str, expires_in_days: int | None = None) -&gt; dict:
+    &#34;&#34;&#34;Creates a Personal Access Token for the user.
+    
+    Returns the raw token ONCE. Only the SHA-256 hash is persisted.
+    &#34;&#34;&#34;
+    if not name or not isinstance(name, str):
+        raise ValueError(&#34;Token name cannot be empty&#34;)
+    
+    registry = self._load_registry()
+    if username not in registry[&#34;users&#34;]:
+        raise ValueError(f&#34;User &#39;{username}&#39; not found&#34;)
+    
+    user_data = registry[&#34;users&#34;][username]
+    if &#34;api_tokens&#34; not in user_data:
+        user_data[&#34;api_tokens&#34;] = {}
+    
+    # Generate cryptographically secure token with recognizable prefix
+    raw_secret = secrets.token_hex(32)
+    raw_token = f&#34;cnp_pat_{raw_secret}&#34;
+    token_hash = hashlib.sha256(raw_token.encode(&#34;utf-8&#34;)).hexdigest()
+    token_id = f&#34;tok_{secrets.token_hex(4)}&#34;
+    
+    now = datetime.datetime.now(datetime.timezone.utc)
+    expires_at = None
+    if expires_in_days and expires_in_days &gt; 0:
+        expires_at = (now + datetime.timedelta(days=expires_in_days)).isoformat()
+    
+    user_data[&#34;api_tokens&#34;][token_id] = {
+        &#34;name&#34;: name,
+        &#34;token_hash&#34;: token_hash,
+        &#34;token_prefix&#34;: raw_token[:16],
+        &#34;created_at&#34;: now.isoformat(),
+        &#34;last_used_at&#34;: None,
+        &#34;expires_at&#34;: expires_at,
+    }
+    
+    self._save_registry(registry)
+    self._token_index = self._build_token_index(registry)
+    
+    return {
+        &#34;token_id&#34;: token_id,
+        &#34;raw_token&#34;: raw_token,
+        &#34;name&#34;: name,
+    }</code></pre>
+</details>
+<div class="desc"><p>Creates a Personal Access Token for the user.</p>
+<p>Returns the raw token ONCE. Only the SHA-256 hash is persisted.</p></div>
+</dd>
+<dt id="connpy.services.UserService.create_user"><code class="name flex">
+<span>def <span class="ident">create_user</span></span>(<span>self, username, password, config_path=None) ‑> dict</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def create_user(self, username, password, config_path=None) -&gt; dict:
+    &#34;&#34;&#34;Creates a new user with bcrypt-hashed credentials.
+    
+    Mode A: config_path=None (fresh user) -&gt; Generates config.yaml and .osk key.
+    Mode B: config_path set -&gt; Reuses existing directory after validating its structure.
+    &#34;&#34;&#34;
+    if not username or not isinstance(username, str):
+        raise ValueError(&#34;Username cannot be empty&#34;)
+        
+    if not re.match(r&#34;^[a-zA-Z0-9_-]+$&#34;, username):
+        raise ValueError(&#34;Username must contain only alphanumeric characters, dashes, or underscores&#34;)
+        
+    if not password or not isinstance(password, str):
+        raise ValueError(&#34;Password cannot be empty&#34;)
+        
+    registry = self._load_registry()
+    if username in registry[&#34;users&#34;]:
+        raise ValueError(f&#34;User &#39;{username}&#39; already exists&#34;)
+        
+    # Resolve path and initialize configuration
+    if config_path is None:
+        user_dir = os.path.join(self.users_dir, username)
+        os.makedirs(user_dir, exist_ok=True)
+        
+        # Create subdirs for plugins and sessions
+        os.makedirs(os.path.join(user_dir, &#34;plugins&#34;), exist_ok=True)
+        os.makedirs(os.path.join(user_dir, &#34;ai_sessions&#34;), exist_ok=True)
+        
+        # Create default config.yaml &amp; .osk key via configfile
+        conf_file = os.path.join(user_dir, &#34;config.yaml&#34;)
+        configfile(conf=conf_file)
+        
+        stored_config_path = None
+    else:
+        abs_config_path = os.path.abspath(config_path)
+        os.makedirs(abs_config_path, exist_ok=True)
+        
+        # Create subdirs for plugins and sessions in the custom path
+        os.makedirs(os.path.join(abs_config_path, &#34;plugins&#34;), exist_ok=True)
+        os.makedirs(os.path.join(abs_config_path, &#34;ai_sessions&#34;), exist_ok=True)
+        
+        # Create default config.yaml &amp; .osk key via configfile if config.yaml is not present
+        conf_file = os.path.join(abs_config_path, &#34;config.yaml&#34;)
+        if not os.path.exists(conf_file):
+            configfile(conf=conf_file)
+            
+        stored_config_path = abs_config_path
+
+    # Hash password securely
+    password_hash = bcrypt.hashpw(password.encode(&#34;utf-8&#34;), bcrypt.gensalt()).decode(&#34;utf-8&#34;)
+    
+    user_entry = {
+        &#34;password_hash&#34;: password_hash,
+        &#34;config_path&#34;: stored_config_path,
+        &#34;created&#34;: datetime.datetime.now(datetime.timezone.utc).isoformat()
+    }
+    
+    registry[&#34;users&#34;][username] = user_entry
+    self._save_registry(registry)
+    
+    return {
+        &#34;username&#34;: username,
+        &#34;config_path&#34;: stored_config_path,
+        &#34;created&#34;: user_entry[&#34;created&#34;]
+    }</code></pre>
+</details>
+<div class="desc"><p>Creates a new user with bcrypt-hashed credentials.</p>
+<p>Mode A: config_path=None (fresh user) -&gt; Generates config.yaml and .osk key.
+Mode B: config_path set -&gt; Reuses existing directory after validating its structure.</p></div>
+</dd>
+<dt id="connpy.services.UserService.delete_user"><code class="name flex">
+<span>def <span class="ident">delete_user</span></span>(<span>self, username)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def delete_user(self, username):
+    &#34;&#34;&#34;Removes user from the registry and cleans up config directory if server-managed.&#34;&#34;&#34;
+    registry = self._load_registry()
+    if username not in registry[&#34;users&#34;]:
+        raise ValueError(f&#34;User &#39;{username}&#39; not found&#34;)
+        
+    user_data = registry[&#34;users&#34;][username]
+    config_path = user_data.get(&#34;config_path&#34;)
+    
+    if config_path is None:
+        user_dir = os.path.join(self.users_dir, username)
+        if os.path.exists(user_dir):
+            shutil.rmtree(user_dir, ignore_errors=True)
+            
+    del registry[&#34;users&#34;][username]
+    self._save_registry(registry)</code></pre>
+</details>
+<div class="desc"><p>Removes user from the registry and cleans up config directory if server-managed.</p></div>
+</dd>
+<dt id="connpy.services.UserService.generate_jwt"><code class="name flex">
+<span>def <span class="ident">generate_jwt</span></span>(<span>self, username) ‑> str</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def generate_jwt(self, username) -&gt; str:
+    &#34;&#34;&#34;Generates a secure JSON Web Token for the user expiring in 12 hours.&#34;&#34;&#34;
+    registry = self._load_registry()
+    if username not in registry[&#34;users&#34;]:
+        raise ValueError(f&#34;User &#39;{username}&#39; not found&#34;)
+        
+    expiration = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=12)
+    payload = {
+        &#34;sub&#34;: username,
+        &#34;exp&#34;: expiration
+    }
+    
+    secret = os.environ.get(&#34;CONNPY_JWT_SECRET&#34;) or registry[&#34;jwt_secret&#34;]
+    token = jwt.encode(payload, secret, algorithm=&#34;HS256&#34;)
+    if isinstance(token, bytes):
+        token = token.decode(&#34;utf-8&#34;)
+        
+    return token</code></pre>
+</details>
+<div class="desc"><p>Generates a secure JSON Web Token for the user expiring in 12 hours.</p></div>
+</dd>
+<dt id="connpy.services.UserService.get_user"><code class="name flex">
+<span>def <span class="ident">get_user</span></span>(<span>self, username) ‑> dict</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_user(self, username) -&gt; dict:
+    &#34;&#34;&#34;Retrieves raw metadata for a specific user.&#34;&#34;&#34;
+    registry = self._load_registry()
+    if username not in registry[&#34;users&#34;]:
+        raise ValueError(f&#34;User &#39;{username}&#39; not found&#34;)
+        
+    data = registry[&#34;users&#34;][username]
+    return {
+        &#34;username&#34;: username,
+        &#34;config_path&#34;: data.get(&#34;config_path&#34;),
+        &#34;created&#34;: data.get(&#34;created&#34;),
+        &#34;password_hash&#34;: data.get(&#34;password_hash&#34;)
+    }</code></pre>
+</details>
+<div class="desc"><p>Retrieves raw metadata for a specific user.</p></div>
+</dd>
+<dt id="connpy.services.UserService.list_api_tokens"><code class="name flex">
+<span>def <span class="ident">list_api_tokens</span></span>(<span>self, username: str) ‑> list[dict]</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def list_api_tokens(self, username: str) -&gt; list[dict]:
+    &#34;&#34;&#34;Lists all active API tokens for a user (without sensitive data).&#34;&#34;&#34;
+    registry = self._load_registry()
+    if username not in registry[&#34;users&#34;]:
+        raise ValueError(f&#34;User &#39;{username}&#39; not found&#34;)
+    
+    tokens = registry[&#34;users&#34;][username].get(&#34;api_tokens&#34;, {})
+    return [
+        {
+            &#34;token_id&#34;: tid,
+            &#34;name&#34;: meta.get(&#34;name&#34;),
+            &#34;token_prefix&#34;: meta.get(&#34;token_prefix&#34;),
+            &#34;created_at&#34;: meta.get(&#34;created_at&#34;),
+            &#34;last_used_at&#34;: meta.get(&#34;last_used_at&#34;),
+            &#34;expires_at&#34;: meta.get(&#34;expires_at&#34;),
+        }
+        for tid, meta in tokens.items()
+    ]</code></pre>
+</details>
+<div class="desc"><p>Lists all active API tokens for a user (without sensitive data).</p></div>
+</dd>
+<dt id="connpy.services.UserService.list_users"><code class="name flex">
+<span>def <span class="ident">list_users</span></span>(<span>self) ‑> list[dict]</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def list_users(self) -&gt; list[dict]:
+    &#34;&#34;&#34;Lists all registered users with metadata.&#34;&#34;&#34;
+    registry = self._load_registry()
+    return [
+        {
+            &#34;username&#34;: name,
+            &#34;config_path&#34;: data.get(&#34;config_path&#34;),
+            &#34;created&#34;: data.get(&#34;created&#34;)
+        }
+        for name, data in registry.get(&#34;users&#34;, {}).items()
+    ]</code></pre>
+</details>
+<div class="desc"><p>Lists all registered users with metadata.</p></div>
+</dd>
+<dt id="connpy.services.UserService.revoke_api_token"><code class="name flex">
+<span>def <span class="ident">revoke_api_token</span></span>(<span>self, username: str, token_id: str) ‑> bool</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def revoke_api_token(self, username: str, token_id: str) -&gt; bool:
+    &#34;&#34;&#34;Revokes (deletes) a specific API token. Returns True if found and removed.&#34;&#34;&#34;
+    registry = self._load_registry()
+    if username not in registry[&#34;users&#34;]:
+        raise ValueError(f&#34;User &#39;{username}&#39; not found&#34;)
+    
+    tokens = registry[&#34;users&#34;][username].get(&#34;api_tokens&#34;, {})
+    if token_id not in tokens:
+        return False
+    
+    del tokens[token_id]
+    self._save_registry(registry)
+    self._token_index = self._build_token_index(registry)
+    return True</code></pre>
+</details>
+<div class="desc"><p>Revokes (deletes) a specific API token. Returns True if found and removed.</p></div>
+</dd>
+<dt id="connpy.services.UserService.verify_api_token"><code class="name flex">
+<span>def <span class="ident">verify_api_token</span></span>(<span>self, raw_token: str) ‑> str | None</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def verify_api_token(self, raw_token: str) -&gt; str | None:
+    &#34;&#34;&#34;Validates a PAT by hashing it and looking up the reverse index.
+    
+    Returns username if valid and not expired, None otherwise.
+    &#34;&#34;&#34;
+    token_hash = hashlib.sha256(raw_token.encode(&#34;utf-8&#34;)).hexdigest()
+    
+    # Rebuild index if empty (cold start or after process restart)
+    if not self._token_index:
+        registry = self._load_registry()
+        self._token_index = self._build_token_index(registry)
+    
+    match = self._token_index.get(token_hash)
+    if not match:
+        return None
+    
+    username, token_id = match
+    
+    # Validate token still exists and check expiration
+    registry = self._load_registry()
+    user_data = registry.get(&#34;users&#34;, {}).get(username, {})
+    token_meta = user_data.get(&#34;api_tokens&#34;, {}).get(token_id)
+    
+    if not token_meta:
+        # Token was revoked between index build and now
+        self._token_index = self._build_token_index(registry)
+        return None
+    
+    # Check expiration
+    expires_at = token_meta.get(&#34;expires_at&#34;)
+    if expires_at:
+        exp_dt = datetime.datetime.fromisoformat(expires_at)
+        if datetime.datetime.now(datetime.timezone.utc) &gt; exp_dt:
+            return None
+    
+    # Update last_used_at
+    token_meta[&#34;last_used_at&#34;] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    self._save_registry(registry)
+    
+    return username</code></pre>
+</details>
+<div class="desc"><p>Validates a PAT by hashing it and looking up the reverse index.</p>
+<p>Returns username if valid and not expired, None otherwise.</p></div>
+</dd>
+<dt id="connpy.services.UserService.verify_jwt"><code class="name flex">
+<span>def <span class="ident">verify_jwt</span></span>(<span>self, token) ‑> str | None</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def verify_jwt(self, token) -&gt; str | None:
+    &#34;&#34;&#34;Decodes JWT and returns username if token is valid and unexpired.&#34;&#34;&#34;
+    registry = self._load_registry()
+    try:
+        secret = os.environ.get(&#34;CONNPY_JWT_SECRET&#34;) or registry[&#34;jwt_secret&#34;]
+        payload = jwt.decode(token, secret, algorithms=[&#34;HS256&#34;])
+        return payload.get(&#34;sub&#34;)
+    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError, KeyError):
+        return None</code></pre>
+</details>
+<div class="desc"><p>Decodes JWT and returns username if token is valid and unexpired.</p></div>
+</dd>
+</dl>
+</dd>
 </dl>
 </section>
 </article>
@@ -4105,6 +5807,24 @@ el.replaceWith(d);
 </ul>
 </li>
 <li>
+<h4><code><a title="connpy.services.SyncService" href="#connpy.services.SyncService">SyncService</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.services.SyncService.analyze_backup_content" href="#connpy.services.SyncService.analyze_backup_content">analyze_backup_content</a></code></li>
+<li><code><a title="connpy.services.SyncService.check_login_status" href="#connpy.services.SyncService.check_login_status">check_login_status</a></code></li>
+<li><code><a title="connpy.services.SyncService.compress_and_upload" href="#connpy.services.SyncService.compress_and_upload">compress_and_upload</a></code></li>
+<li><code><a title="connpy.services.SyncService.delete_backup" href="#connpy.services.SyncService.delete_backup">delete_backup</a></code></li>
+<li><code><a title="connpy.services.SyncService.download_file" href="#connpy.services.SyncService.download_file">download_file</a></code></li>
+<li><code><a title="connpy.services.SyncService.get_credentials" href="#connpy.services.SyncService.get_credentials">get_credentials</a></code></li>
+<li><code><a title="connpy.services.SyncService.list_backups" href="#connpy.services.SyncService.list_backups">list_backups</a></code></li>
+<li><code><a title="connpy.services.SyncService.login" href="#connpy.services.SyncService.login">login</a></code></li>
+<li><code><a title="connpy.services.SyncService.logout" href="#connpy.services.SyncService.logout">logout</a></code></li>
+<li><code><a title="connpy.services.SyncService.perform_restore" href="#connpy.services.SyncService.perform_restore">perform_restore</a></code></li>
+<li><code><a title="connpy.services.SyncService.perform_sync" href="#connpy.services.SyncService.perform_sync">perform_sync</a></code></li>
+<li><code><a title="connpy.services.SyncService.restore_backup" href="#connpy.services.SyncService.restore_backup">restore_backup</a></code></li>
+<li><code><a title="connpy.services.SyncService.upload_file" href="#connpy.services.SyncService.upload_file">upload_file</a></code></li>
+</ul>
+</li>
+<li>
 <h4><code><a title="connpy.services.SystemService" href="#connpy.services.SystemService">SystemService</a></code></h4>
 <ul class="">
 <li><code><a title="connpy.services.SystemService.debug_api" href="#connpy.services.SystemService.debug_api">debug_api</a></code></li>
@@ -4112,6 +5832,24 @@ el.replaceWith(d);
 <li><code><a title="connpy.services.SystemService.restart_api" href="#connpy.services.SystemService.restart_api">restart_api</a></code></li>
 <li><code><a title="connpy.services.SystemService.start_api" href="#connpy.services.SystemService.start_api">start_api</a></code></li>
 <li><code><a title="connpy.services.SystemService.stop_api" href="#connpy.services.SystemService.stop_api">stop_api</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.services.UserService" href="#connpy.services.UserService">UserService</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.services.UserService.admin_change_password" href="#connpy.services.UserService.admin_change_password">admin_change_password</a></code></li>
+<li><code><a title="connpy.services.UserService.authenticate" href="#connpy.services.UserService.authenticate">authenticate</a></code></li>
+<li><code><a title="connpy.services.UserService.change_password" href="#connpy.services.UserService.change_password">change_password</a></code></li>
+<li><code><a title="connpy.services.UserService.create_api_token" href="#connpy.services.UserService.create_api_token">create_api_token</a></code></li>
+<li><code><a title="connpy.services.UserService.create_user" href="#connpy.services.UserService.create_user">create_user</a></code></li>
+<li><code><a title="connpy.services.UserService.delete_user" href="#connpy.services.UserService.delete_user">delete_user</a></code></li>
+<li><code><a title="connpy.services.UserService.generate_jwt" href="#connpy.services.UserService.generate_jwt">generate_jwt</a></code></li>
+<li><code><a title="connpy.services.UserService.get_user" href="#connpy.services.UserService.get_user">get_user</a></code></li>
+<li><code><a title="connpy.services.UserService.list_api_tokens" href="#connpy.services.UserService.list_api_tokens">list_api_tokens</a></code></li>
+<li><code><a title="connpy.services.UserService.list_users" href="#connpy.services.UserService.list_users">list_users</a></code></li>
+<li><code><a title="connpy.services.UserService.revoke_api_token" href="#connpy.services.UserService.revoke_api_token">revoke_api_token</a></code></li>
+<li><code><a title="connpy.services.UserService.verify_api_token" href="#connpy.services.UserService.verify_api_token">verify_api_token</a></code></li>
+<li><code><a title="connpy.services.UserService.verify_jwt" href="#connpy.services.UserService.verify_jwt">verify_jwt</a></code></li>
 </ul>
 </li>
 </ul>

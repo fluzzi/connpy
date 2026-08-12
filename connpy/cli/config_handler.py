@@ -26,7 +26,10 @@ class ConfigHandler:
             "trusted_commands": self.set_ai_config,
             "service_mode": self.set_service_mode,
             "remote_host": self.set_remote_host,
-            "sync_remote": self.set_sync_remote
+            "sync_remote": self.set_sync_remote,
+            "shell_command": self.set_shell_config,
+            "shell_prompt": self.set_shell_config,
+            "shell_os": self.set_shell_config
         }
         handler = actions.get(getattr(args, "command", None))
         if handler:
@@ -182,4 +185,20 @@ class ConfigHandler:
                 raise ValueError()
             except Exception:
                 raise InvalidConfigurationError("Auth parameter must be a valid JSON/YAML string, or a path to a JSON/YAML file.")
+
+    def set_shell_config(self, args):
+        key = args.command.replace("shell_", "")
+        val = args.data[0] if isinstance(args.data, list) else args.data
+        try:
+            settings = self.app.services.config_svc.get_settings()
+            shell_cfg = settings.get("shell", {}) if isinstance(settings.get("shell"), dict) else {}
+            if str(val).lower() in ["none", "clear", ""]:
+                if key in shell_cfg:
+                    del shell_cfg[key]
+            else:
+                shell_cfg[key] = val
+            self.app.services.config_svc.update_setting("shell", shell_cfg)
+            printer.success("Config saved")
+        except (ConnpyError, InvalidConfigurationError) as e:
+            printer.error(str(e))
 

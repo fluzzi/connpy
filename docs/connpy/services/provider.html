@@ -79,6 +79,12 @@ el.replaceWith(d);
         self.mode = mode
         self.config = config
         self.remote_host = remote_host
+        self._system = None
+        self._execution = None
+        self._import_export = None
+        self._sync = None
+        self._users = None
+        self._ai = None
         
         if mode == &#34;local&#34;:
             self._init_local()
@@ -92,35 +98,20 @@ el.replaceWith(d);
         from .profile_service import ProfileService
         from .config_service import ConfigService
         from .plugin_service import PluginService
-        from .ai_service import AIService
-        from .system_service import SystemService
-        from .execution_service import ExecutionService
-        from .import_export_service import ImportExportService
         from .context_service import ContextService
-        from .sync_service import SyncService
-        from .user_service import UserService
         
         self.nodes = NodeService(self.config)
         self.profiles = ProfileService(self.config)
         self.config_svc = ConfigService(self.config)
         self.plugins = PluginService(self.config)
-        self.ai = AIService(self.config)
-        self.system = SystemService(self.config)
-        self.execution = ExecutionService(self.config)
-        self.import_export = ImportExportService(self.config)
         self.context = ContextService(self.config)
-        self.sync = SyncService(self.config)
-        self.users = UserService(self.config.defaultdir)
     
     def _init_remote(self):
         # Allow ConfigService to work locally so the user can revert the mode
         from .config_service import ConfigService
         from .context_service import ContextService
-        from .sync_service import SyncService
         self.config_svc = ConfigService(self.config)
         self.context = ContextService(self.config)
-        self.sync = SyncService(self.config)
-        self.users = None
         
         if not self.remote_host:
             raise InvalidConfigurationError(&#34;Remote host must be specified in remote mode&#34;)
@@ -134,6 +125,9 @@ el.replaceWith(d);
         )
         
         def get_token():
+            env_token = os.environ.get(&#34;CONNPY_TOKEN&#34;)
+            if env_token:
+                return env_token
             token_path = os.path.join(self.config.defaultdir, &#34;.token&#34;)
             if os.path.exists(token_path):
                 try:
@@ -159,9 +153,168 @@ el.replaceWith(d);
         self.system = SystemStub(channel, remote_host=self.remote_host)
         self.execution = ExecutionStub(channel, remote_host=self.remote_host)
         self.import_export = ImportExportStub(channel, remote_host=self.remote_host)
-        self.auth = AuthStub(channel, remote_host=self.remote_host)</code></pre>
+        self.auth = AuthStub(channel, remote_host=self.remote_host)
+
+    @property
+    def system(self):
+        if self._system is None and self.mode == &#34;local&#34;:
+            from .system_service import SystemService
+            self._system = SystemService(self.config)
+        return self._system
+
+    @system.setter
+    def system(self, value):
+        self._system = value
+
+    @property
+    def execution(self):
+        if self._execution is None and self.mode == &#34;local&#34;:
+            from .execution_service import ExecutionService
+            self._execution = ExecutionService(self.config)
+        return self._execution
+
+    @execution.setter
+    def execution(self, value):
+        self._execution = value
+
+    @property
+    def import_export(self):
+        if self._import_export is None and self.mode == &#34;local&#34;:
+            from .import_export_service import ImportExportService
+            self._import_export = ImportExportService(self.config)
+        return self._import_export
+
+    @import_export.setter
+    def import_export(self, value):
+        self._import_export = value
+
+    @property
+    def sync(self):
+        if self._sync is None:
+            from .sync_service import SyncService
+            self._sync = SyncService(self.config)
+        return self._sync
+
+    @sync.setter
+    def sync(self, value):
+        self._sync = value
+
+    @property
+    def users(self):
+        if self._users is None and self.mode == &#34;local&#34;:
+            from .user_service import UserService
+            self._users = UserService(self.config.defaultdir)
+        return self._users
+
+    @users.setter
+    def users(self, value):
+        self._users = value
+
+    @property
+    def ai(self):
+        if self._ai is None and self.mode == &#34;local&#34;:
+            from .ai_service import AIService
+            self._ai = AIService(self.config)
+        return self._ai
+
+    @ai.setter
+    def ai(self, value):
+        self._ai = value</code></pre>
 </details>
 <div class="desc"><p>Dynamic service backend. Transparently provides local or remote services.</p></div>
+<h3>Instance variables</h3>
+<dl>
+<dt id="connpy.services.provider.ServiceProvider.ai"><code class="name">prop <span class="ident">ai</span></code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def ai(self):
+    if self._ai is None and self.mode == &#34;local&#34;:
+        from .ai_service import AIService
+        self._ai = AIService(self.config)
+    return self._ai</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.services.provider.ServiceProvider.execution"><code class="name">prop <span class="ident">execution</span></code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def execution(self):
+    if self._execution is None and self.mode == &#34;local&#34;:
+        from .execution_service import ExecutionService
+        self._execution = ExecutionService(self.config)
+    return self._execution</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.services.provider.ServiceProvider.import_export"><code class="name">prop <span class="ident">import_export</span></code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def import_export(self):
+    if self._import_export is None and self.mode == &#34;local&#34;:
+        from .import_export_service import ImportExportService
+        self._import_export = ImportExportService(self.config)
+    return self._import_export</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.services.provider.ServiceProvider.sync"><code class="name">prop <span class="ident">sync</span></code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def sync(self):
+    if self._sync is None:
+        from .sync_service import SyncService
+        self._sync = SyncService(self.config)
+    return self._sync</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.services.provider.ServiceProvider.system"><code class="name">prop <span class="ident">system</span></code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def system(self):
+    if self._system is None and self.mode == &#34;local&#34;:
+        from .system_service import SystemService
+        self._system = SystemService(self.config)
+    return self._system</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.services.provider.ServiceProvider.users"><code class="name">prop <span class="ident">users</span></code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def users(self):
+    if self._users is None and self.mode == &#34;local&#34;:
+        from .user_service import UserService
+        self._users = UserService(self.config.defaultdir)
+    return self._users</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
 </dd>
 </dl>
 </section>
@@ -183,6 +336,14 @@ el.replaceWith(d);
 </li>
 <li>
 <h4><code><a title="connpy.services.provider.ServiceProvider" href="#connpy.services.provider.ServiceProvider">ServiceProvider</a></code></h4>
+<ul class="two-column">
+<li><code><a title="connpy.services.provider.ServiceProvider.ai" href="#connpy.services.provider.ServiceProvider.ai">ai</a></code></li>
+<li><code><a title="connpy.services.provider.ServiceProvider.execution" href="#connpy.services.provider.ServiceProvider.execution">execution</a></code></li>
+<li><code><a title="connpy.services.provider.ServiceProvider.import_export" href="#connpy.services.provider.ServiceProvider.import_export">import_export</a></code></li>
+<li><code><a title="connpy.services.provider.ServiceProvider.sync" href="#connpy.services.provider.ServiceProvider.sync">sync</a></code></li>
+<li><code><a title="connpy.services.provider.ServiceProvider.system" href="#connpy.services.provider.ServiceProvider.system">system</a></code></li>
+<li><code><a title="connpy.services.provider.ServiceProvider.users" href="#connpy.services.provider.ServiceProvider.users">users</a></code></li>
+</ul>
 </li>
 </ul>
 </li>
