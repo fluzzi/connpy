@@ -1394,6 +1394,9 @@ Rules:
 5. Do NOT provide commands to execute unless specifically requested. Instead, explain the consequences and best practices.
 6. Keep your guide concise and authoritative.
 7. You MUST output your response in the following strict format:
+<notes>
+Short internal notes for future context: tools used, key findings, IP addresses, or hypotheses.
+</notes>
 <guide>
 Your brief tactical guide in markdown.
 </guide>
@@ -1402,7 +1405,8 @@ Your brief tactical guide in markdown.
 <risk>
 low
 </risk>
-8. Risk level is usually "low" for read-only/no commands.
+8. CRITICAL CONVERSATION MEMORY: The chat history window retains ONLY the last 5 interactions. Messages older than 5 turns are automatically pruned. You MUST use your <notes> tag in EVERY response to record all critical facts, IP addresses, discoveries, and hypotheses. Because your <notes> are preserved in the assistant history, summarizing key facts in <notes> ensures you never lose vital context when older turns expire.
+9. Risk level is usually "low" for read-only/no commands.
 
 Terminal Context:
 {terminal_buffer}
@@ -1419,6 +1423,9 @@ Rules:
 5. If the user wants to execute an action, provide the required CLI commands inside a <commands> block, one command per line. If no commands are needed, leave it empty or omit the block.
 6. ULTRA-CONCISE. Keep your guide to the point.
 7. You MUST output your response in the following strict format:
+<notes>
+Short internal notes for future context: tools used, key findings, IP addresses, or hypotheses.
+</notes>
 <guide>
 Your brief tactical guide in markdown. 3-4 sentences max.
 </guide>
@@ -1429,7 +1436,8 @@ command 2
 <risk>
 low, high, or destructive
 </risk>
-8. Risk level: "low" for read-only/no commands, "high" for config changes, "destructive" for potentially dangerous ops.
+8. CRITICAL CONVERSATION MEMORY: The chat history window retains ONLY the last 5 interactions. Messages older than 5 turns are automatically pruned. You MUST use your <notes> tag in EVERY response to record all critical facts, IP addresses, discoveries, and hypotheses. Because your <notes> are preserved in the assistant history, summarizing key facts in <notes> ensures you never lose vital context when older turns expire.
+9. Risk level: "low" for read-only/no commands, "high" for config changes, "destructive" for potentially dangerous ops.
 
 Terminal Context:
 {terminal_buffer}
@@ -1457,9 +1465,17 @@ Node: {node_name}"""
             system_prompt += "\nUse these tools to validate syntax or find exact commands if needed before providing the final guide."
 
         messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_question}
+            {"role": "system", "content": system_prompt}
         ]
+
+        chat_history = node_info.get("chat_history", []) if node_info else []
+        if chat_history:
+            clean_history = chat_history[-10:]
+            for msg in clean_history:
+                if isinstance(msg, dict) and "role" in msg and "content" in msg:
+                    messages.append({"role": msg["role"], "content": msg["content"]})
+
+        messages.append({"role": "user", "content": user_question})
 
         iteration = 0
         max_iterations = 5 # Allow up to 5 iterations for tool usage
@@ -1582,6 +1598,11 @@ Node: {node_name}"""
                                     chunk_callback(new_text)
                                     streamed_guide += new_text
 
+            notes = ""
+            notes_match = re.search(r"<notes>(.*?)</notes>", full_content, re.DOTALL)
+            if notes_match:
+                notes = notes_match.group(1).strip()
+
             guide = ""
             commands = []
             risk_level = "low"
@@ -1606,6 +1627,7 @@ Node: {node_name}"""
             return {
                 "commands": commands,
                 "guide": guide,
+                "notes": notes,
                 "risk_level": risk_level,
                 "error": None
             }

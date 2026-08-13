@@ -70,6 +70,7 @@ el.replaceWith(d);
         self.session_state.setdefault(&#39;persona&#39;, &#39;engineer&#39;)
         self.session_state.setdefault(&#39;trust_mode&#39;, False)
         self.session_state.setdefault(&#39;memories&#39;, [])
+        self.session_state.setdefault(&#39;copilot_chat_history&#39;, [])
         self.session_state.setdefault(&#39;os&#39;, None)
         self.session_state.setdefault(&#39;prompt&#39;, None)
         self.session_state.setdefault(&#39;context_mode&#39;, self.mode_range)
@@ -416,17 +417,10 @@ el.replaceWith(d);
                 merged_node_info[&#39;persona&#39;] = self.session_state[&#39;persona&#39;]
                 merged_node_info[&#39;trust&#39;] = self.session_state[&#39;trust_mode&#39;]
                 merged_node_info[&#39;memories&#39;] = list(self.session_state[&#39;memories&#39;])
+                merged_node_info[&#39;chat_history&#39;] = list(self.session_state.get(&#39;copilot_chat_history&#39;, []))
                 
                 for k, v in overrides.items():
                     merged_node_info[k] = v
-
-                # Enrich question
-                past = self.history.get_strings()
-                if len(past) &gt; 1:
-                    clean_past = [q for q in past[-6:-1] if not q.startswith(&#39;/&#39;)]
-                    if clean_past:
-                        history_text = &#34;\n&#34;.join(f&#34;- {q}&#34; for q in clean_past)
-                        clean_question = f&#34;Previous questions:\n{history_text}\n\nCurrent Question:\n{clean_question}&#34;
 
                 # 3. AI Execution
                 # Use persona from overrides (one-shot) or from session state
@@ -494,6 +488,17 @@ el.replaceWith(d);
                 if first_chunk and result and result.get(&#34;guide&#34;):
                     from rich.markdown import Markdown
                     self.console.print(Panel(Markdown(result[&#34;guide&#34;]), title=f&#34;[bold {persona_color}]{persona_title}[/bold {persona_color}]&#34;, border_style=persona_color))
+
+                # Update copilot_chat_history with clean Q&amp;A turn
+                if result and not result.get(&#34;error&#34;):
+                    guide = result.get(&#34;guide&#34;, &#34;&#34;)
+                    notes = result.get(&#34;notes&#34;, &#34;&#34;)
+                    if guide:
+                        asst_msg = f&#34;Notes: {notes}\nGuide: {guide}&#34; if notes else guide
+                        hist = self.session_state.setdefault(&#34;copilot_chat_history&#34;, [])
+                        hist.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: clean_question})
+                        hist.append({&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: asst_msg})
+                        self.session_state[&#34;copilot_chat_history&#34;] = hist[-10:]
 
                 commands = result.get(&#34;commands&#34;, [])
                 if not commands:
@@ -922,17 +927,10 @@ el.replaceWith(d);
             merged_node_info[&#39;persona&#39;] = self.session_state[&#39;persona&#39;]
             merged_node_info[&#39;trust&#39;] = self.session_state[&#39;trust_mode&#39;]
             merged_node_info[&#39;memories&#39;] = list(self.session_state[&#39;memories&#39;])
+            merged_node_info[&#39;chat_history&#39;] = list(self.session_state.get(&#39;copilot_chat_history&#39;, []))
             
             for k, v in overrides.items():
                 merged_node_info[k] = v
-
-            # Enrich question
-            past = self.history.get_strings()
-            if len(past) &gt; 1:
-                clean_past = [q for q in past[-6:-1] if not q.startswith(&#39;/&#39;)]
-                if clean_past:
-                    history_text = &#34;\n&#34;.join(f&#34;- {q}&#34; for q in clean_past)
-                    clean_question = f&#34;Previous questions:\n{history_text}\n\nCurrent Question:\n{clean_question}&#34;
 
             # 3. AI Execution
             # Use persona from overrides (one-shot) or from session state
@@ -1000,6 +998,17 @@ el.replaceWith(d);
             if first_chunk and result and result.get(&#34;guide&#34;):
                 from rich.markdown import Markdown
                 self.console.print(Panel(Markdown(result[&#34;guide&#34;]), title=f&#34;[bold {persona_color}]{persona_title}[/bold {persona_color}]&#34;, border_style=persona_color))
+
+            # Update copilot_chat_history with clean Q&amp;A turn
+            if result and not result.get(&#34;error&#34;):
+                guide = result.get(&#34;guide&#34;, &#34;&#34;)
+                notes = result.get(&#34;notes&#34;, &#34;&#34;)
+                if guide:
+                    asst_msg = f&#34;Notes: {notes}\nGuide: {guide}&#34; if notes else guide
+                    hist = self.session_state.setdefault(&#34;copilot_chat_history&#34;, [])
+                    hist.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: clean_question})
+                    hist.append({&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: asst_msg})
+                    self.session_state[&#34;copilot_chat_history&#34;] = hist[-10:]
 
             commands = result.get(&#34;commands&#34;, [])
             if not commands:

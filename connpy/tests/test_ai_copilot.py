@@ -27,22 +27,21 @@ def mock_acompletion():
     with patch('litellm.acompletion') as mock:
         yield mock
 
+class MockDelta:
+    def __init__(self, content):
+        self.content = content
+
+class MockChoice:
+    def __init__(self, content):
+        self.delta = MockDelta(content)
+
+class MockChunk:
+    def __init__(self, content):
+        self.choices = [MockChoice(content)]
+
 def test_aask_copilot_tool_call(mock_acompletion):
     agent = ai(DummyConfig())
     
-    # Setup mock response for streaming
-    class MockDelta:
-        def __init__(self, content):
-            self.content = content
-            
-    class MockChoice:
-        def __init__(self, content):
-            self.delta = MockDelta(content)
-            
-    class MockChunk:
-        def __init__(self, content):
-            self.choices = [MockChoice(content)]
-            
     # acompletion is awaited and returns an async iterator
     async def mock_ac(*args, **kwargs):
         return MockAsyncIterator([
@@ -557,6 +556,34 @@ def test_copilot_single_mode_retains_command_block():
     assert interface_custom.session_state.get('context_cmd') == 4
 
 
+def test_aask_copilot_notes_parsing(mock_acompletion):
+    agent = ai(DummyConfig())
+    
+    async def mock_ac(*args, **kwargs):
+        return MockAsyncIterator([
+            MockChunk("<notes>Tool used: mcp_cisco__search. MTU mismatch suspected.</notes>"),
+            MockChunk("<guide>Check MTU on eth0.</guide>"),
+            MockChunk("<risk>low</risk>")
+        ])
+    
+    mock_acompletion.side_effect = mock_ac
+    
+    async def run_test():
+        return await agent.aask_copilot("Router#", "Why is ping failing?", node_info={"chat_history": [{"role": "user", "content": "hello"}, {"role": "assistant", "content": "hi"}]})
+    
+    result = asyncio.run(run_test())
+    
+    assert result["error"] is None
+    assert result["notes"] == "Tool used: mcp_cisco__search. MTU mismatch suspected."
+    assert result["guide"] == "Check MTU on eth0."
+    
+    # Check that messages passed to acompletion included chat_history
+    call_args = mock_acompletion.call_args[1]
+    msgs = call_args["messages"]
+    assert len(msgs) == 4 # system, user(hello), asst(hi), current_user
+    assert msgs[1]["content"] == "hello"
+    assert msgs[2]["content"] == "hi"
+    assert msgs[3]["content"] == "Why is ping failing?"
 
 
 

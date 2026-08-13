@@ -36,6 +36,7 @@ class CopilotInterface:
         self.session_state.setdefault('persona', 'engineer')
         self.session_state.setdefault('trust_mode', False)
         self.session_state.setdefault('memories', [])
+        self.session_state.setdefault('copilot_chat_history', [])
         self.session_state.setdefault('os', None)
         self.session_state.setdefault('prompt', None)
         self.session_state.setdefault('context_mode', self.mode_range)
@@ -382,17 +383,10 @@ class CopilotInterface:
                 merged_node_info['persona'] = self.session_state['persona']
                 merged_node_info['trust'] = self.session_state['trust_mode']
                 merged_node_info['memories'] = list(self.session_state['memories'])
+                merged_node_info['chat_history'] = list(self.session_state.get('copilot_chat_history', []))
                 
                 for k, v in overrides.items():
                     merged_node_info[k] = v
-
-                # Enrich question
-                past = self.history.get_strings()
-                if len(past) > 1:
-                    clean_past = [q for q in past[-6:-1] if not q.startswith('/')]
-                    if clean_past:
-                        history_text = "\n".join(f"- {q}" for q in clean_past)
-                        clean_question = f"Previous questions:\n{history_text}\n\nCurrent Question:\n{clean_question}"
 
                 # 3. AI Execution
                 # Use persona from overrides (one-shot) or from session state
@@ -460,6 +454,17 @@ class CopilotInterface:
                 if first_chunk and result and result.get("guide"):
                     from rich.markdown import Markdown
                     self.console.print(Panel(Markdown(result["guide"]), title=f"[bold {persona_color}]{persona_title}[/bold {persona_color}]", border_style=persona_color))
+
+                # Update copilot_chat_history with clean Q&A turn
+                if result and not result.get("error"):
+                    guide = result.get("guide", "")
+                    notes = result.get("notes", "")
+                    if guide:
+                        asst_msg = f"Notes: {notes}\nGuide: {guide}" if notes else guide
+                        hist = self.session_state.setdefault("copilot_chat_history", [])
+                        hist.append({"role": "user", "content": clean_question})
+                        hist.append({"role": "assistant", "content": asst_msg})
+                        self.session_state["copilot_chat_history"] = hist[-10:]
 
                 commands = result.get("commands", [])
                 if not commands:
