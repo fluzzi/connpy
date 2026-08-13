@@ -1,6 +1,5 @@
 import sys
 from rich.panel import Panel
-from rich.markdown import Markdown
 from rich.rule import Rule
 from rich.prompt import Prompt
 
@@ -102,6 +101,7 @@ class AIHandler:
         title = "[architect][bold]Network Architect[/bold][/architect]" if responder == "architect" else "[engineer][bold]Network Engineer[/bold][/engineer]"
         
         if not result.get("streamed"):
+            from rich.markdown import Markdown
             mdprint(Panel(Markdown(result["response"]), title=title, border_style=border, expand=False))
         
         if "usage" in result:
@@ -121,6 +121,7 @@ class AIHandler:
                 printer.info(f"Session '{session_id}' not found. Starting clean.")
         
         if not history:
+            from rich.markdown import Markdown
             mdprint(Rule(style="engineer"))
             mdprint(Markdown("**Networking Expert Agent**: Hi! I'm your assistant. I can help you diagnose issues, run commands, and manage your nodes.\nType 'exit' to quit.\n"))
             mdprint(Rule(style="engineer"))

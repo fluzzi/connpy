@@ -11,7 +11,6 @@ from textwrap import dedent
 
 from rich.console import Console
 from rich.panel import Panel
-from rich.markdown import Markdown
 from prompt_toolkit import PromptSession
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.filters import has_completions
@@ -459,6 +458,7 @@ class CopilotInterface:
 
                 # If no chunks were streamed but we have a guide, print it as a panel
                 if first_chunk and result and result.get("guide"):
+                    from rich.markdown import Markdown
                     self.console.print(Panel(Markdown(result["guide"]), title=f"[bold {persona_color}]{persona_title}[/bold {persona_color}]", border_style=persona_color))
 
                 commands = result.get("commands", [])

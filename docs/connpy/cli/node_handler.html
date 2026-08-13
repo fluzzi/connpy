@@ -204,6 +204,7 @@ el.replaceWith(d);
                 # Fast fail if parent folder does not exist
                 self.app.services.nodes.validate_parent_folder(args.data)
 
+                from rich.markdown import Markdown
                 printer.console.print(Markdown(get_instructions()))
 
                 new_node_data = self.forms.questions_nodes(args.data, uniques)
@@ -374,6 +375,7 @@ def forms(self):
             # Fast fail if parent folder does not exist
             self.app.services.nodes.validate_parent_folder(args.data)
 
+            from rich.markdown import Markdown
             printer.console.print(Markdown(get_instructions()))
 
             new_node_data = self.forms.questions_nodes(args.data, uniques)

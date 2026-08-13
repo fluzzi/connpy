@@ -148,6 +148,7 @@ el.replaceWith(d);
         title = &#34;[architect][bold]Network Architect[/bold][/architect]&#34; if responder == &#34;architect&#34; else &#34;[engineer][bold]Network Engineer[/bold][/engineer]&#34;
         
         if not result.get(&#34;streamed&#34;):
+            from rich.markdown import Markdown
             mdprint(Panel(Markdown(result[&#34;response&#34;]), title=title, border_style=border, expand=False))
         
         if &#34;usage&#34; in result:
@@ -167,6 +168,7 @@ el.replaceWith(d);
                 printer.info(f&#34;Session &#39;{session_id}&#39; not found. Starting clean.&#34;)
         
         if not history:
+            from rich.markdown import Markdown
             mdprint(Rule(style=&#34;engineer&#34;))
             mdprint(Markdown(&#34;**Networking Expert Agent**: Hi! I&#39;m your assistant. I can help you diagnose issues, run commands, and manage your nodes.\nType &#39;exit&#39; to quit.\n&#34;))
             mdprint(Rule(style=&#34;engineer&#34;))
@@ -573,6 +575,7 @@ el.replaceWith(d);
             printer.info(f&#34;Session &#39;{session_id}&#39; not found. Starting clean.&#34;)
     
     if not history:
+        from rich.markdown import Markdown
         mdprint(Rule(style=&#34;engineer&#34;))
         mdprint(Markdown(&#34;**Networking Expert Agent**: Hi! I&#39;m your assistant. I can help you diagnose issues, run commands, and manage your nodes.\nType &#39;exit&#39; to quit.\n&#34;))
         mdprint(Rule(style=&#34;engineer&#34;))
@@ -626,6 +629,7 @@ el.replaceWith(d);
     title = &#34;[architect][bold]Network Architect[/bold][/architect]&#34; if responder == &#34;architect&#34; else &#34;[engineer][bold]Network Engineer[/bold][/engineer]&#34;
     
     if not result.get(&#34;streamed&#34;):
+        from rich.markdown import Markdown
         mdprint(Panel(Markdown(result[&#34;response&#34;]), title=title, border_style=border, expand=False))
     
     if &#34;usage&#34; in result:

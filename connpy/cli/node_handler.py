@@ -1,6 +1,5 @@
 import sys
 import yaml
-from rich.markdown import Markdown
 
 from .. import printer
 from ..services.exceptions import ConnpyError, InvalidConfigurationError
@@ -156,6 +155,7 @@ class NodeHandler:
                 # Fast fail if parent folder does not exist
                 self.app.services.nodes.validate_parent_folder(args.data)
 
+                from rich.markdown import Markdown
                 printer.console.print(Markdown(get_instructions()))
 
                 new_node_data = self.forms.questions_nodes(args.data, uniques)

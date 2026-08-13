@@ -6,8 +6,6 @@ import re
 import sys
 import yaml
 import shutil
-from Crypto.PublicKey import RSA
-from Crypto.Cipher import PKCS1_OAEP
 from pathlib import Path
 from copy import deepcopy
 from .hooks import MethodHook, ClassHook
@@ -139,15 +137,38 @@ class configfile:
         self.connections = config["connections"]
         self.profiles = config["profiles"]
         
+        self._privatekey_obj = None
+        self._publickey_obj = None
         if not os.path.exists(self.key):
             self._createkey(self.key)
-        with open(self.key) as f:
-            self.privatekey = RSA.import_key(f.read())
-        self.publickey = self.privatekey.publickey()
 
         # Self-heal text caches if they are missing
         if not os.path.exists(self.fzf_cachefile) or not os.path.exists(self.folders_cachefile) or not os.path.exists(self.profiles_cachefile):
             self._generate_nodes_cache()
+
+    @property
+    def privatekey(self):
+        if getattr(self, '_privatekey_obj', None) is None:
+            from Crypto.PublicKey import RSA
+            if not os.path.exists(self.key):
+                self._createkey(self.key)
+            with open(self.key) as f:
+                self._privatekey_obj = RSA.import_key(f.read())
+        return self._privatekey_obj
+
+    @privatekey.setter
+    def privatekey(self, value):
+        self._privatekey_obj = value
+
+    @property
+    def publickey(self):
+        if getattr(self, '_publickey_obj', None) is None:
+            self._publickey_obj = self.privatekey.publickey()
+        return self._publickey_obj
+
+    @publickey.setter
+    def publickey(self, value):
+        self._publickey_obj = value
 
 
     def get_effective_setting(self, key, default=None):
@@ -297,6 +318,7 @@ class configfile:
 
     def _createkey(self, keyfile):
         #Create key file
+        from Crypto.PublicKey import RSA
         key = RSA.generate(2048)
         with open(keyfile,'wb') as f:
             f.write(key.export_key('PEM'))
@@ -623,6 +645,8 @@ class configfile:
         if keyfile is None:
             keyfile = self.key
         with open(keyfile) as f:
+            from Crypto.PublicKey import RSA
+            from Crypto.Cipher import PKCS1_OAEP
             key = RSA.import_key(f.read())
             f.close()
         publickey = key.publickey()

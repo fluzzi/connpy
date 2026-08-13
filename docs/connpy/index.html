@@ -41,7 +41,7 @@ el.replaceWith(d);
 <p align="center">
 <img src="https://nginx.gederico.dynu.net/images/CONNPY-resized.png" alt="App Logo">
 </p>
-<h1 id="connpy-v610">Connpy (v6.1.0)</h1>
+<h1 id="connpy-v611">Connpy (v6.1.1)</h1>
 <p><a href="https://pypi.org/pypi/connpy/"><img alt="" src="https://img.shields.io/pypi/v/connpy.svg?style=flat-square"></a>
 <a href="https://pypi.org/pypi/connpy/"><img alt="" src="https://img.shields.io/pypi/pyversions/connpy.svg?style=flat-square"></a>
 <a href="https://pypi.org/pypi/connpy/"><img alt="" src="https://img.shields.io/pypi/dm/connpy.svg?style=flat-square&amp;cacheSeconds=86400"></a>
@@ -819,15 +819,38 @@ class configfile:
         self.connections = config[&#34;connections&#34;]
         self.profiles = config[&#34;profiles&#34;]
         
+        self._privatekey_obj = None
+        self._publickey_obj = None
         if not os.path.exists(self.key):
             self._createkey(self.key)
-        with open(self.key) as f:
-            self.privatekey = RSA.import_key(f.read())
-        self.publickey = self.privatekey.publickey()
 
         # Self-heal text caches if they are missing
         if not os.path.exists(self.fzf_cachefile) or not os.path.exists(self.folders_cachefile) or not os.path.exists(self.profiles_cachefile):
             self._generate_nodes_cache()
+
+    @property
+    def privatekey(self):
+        if getattr(self, &#39;_privatekey_obj&#39;, None) is None:
+            from Crypto.PublicKey import RSA
+            if not os.path.exists(self.key):
+                self._createkey(self.key)
+            with open(self.key) as f:
+                self._privatekey_obj = RSA.import_key(f.read())
+        return self._privatekey_obj
+
+    @privatekey.setter
+    def privatekey(self, value):
+        self._privatekey_obj = value
+
+    @property
+    def publickey(self):
+        if getattr(self, &#39;_publickey_obj&#39;, None) is None:
+            self._publickey_obj = self.privatekey.publickey()
+        return self._publickey_obj
+
+    @publickey.setter
+    def publickey(self, value):
+        self._publickey_obj = value
 
 
     def get_effective_setting(self, key, default=None):
@@ -977,6 +1000,7 @@ class configfile:
 
     def _createkey(self, keyfile):
         #Create key file
+        from Crypto.PublicKey import RSA
         key = RSA.generate(2048)
         with open(keyfile,&#39;wb&#39;) as f:
             f.write(key.export_key(&#39;PEM&#39;))
@@ -1303,6 +1327,8 @@ class configfile:
         if keyfile is None:
             keyfile = self.key
         with open(keyfile) as f:
+            from Crypto.PublicKey import RSA
+            from Crypto.Cipher import PKCS1_OAEP
             key = RSA.import_key(f.read())
             f.close()
         publickey = key.publickey()
@@ -1331,6 +1357,41 @@ class configfile:
 - publickey    (obj): Object containing the public key to decrypt 
                       passwords.
 </code></pre></div>
+<h3>Instance variables</h3>
+<dl>
+<dt id="connpy.configfile.privatekey"><code class="name">prop <span class="ident">privatekey</span></code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def privatekey(self):
+    if getattr(self, &#39;_privatekey_obj&#39;, None) is None:
+        from Crypto.PublicKey import RSA
+        if not os.path.exists(self.key):
+            self._createkey(self.key)
+        with open(self.key) as f:
+            self._privatekey_obj = RSA.import_key(f.read())
+    return self._privatekey_obj</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.configfile.publickey"><code class="name">prop <span class="ident">publickey</span></code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def publickey(self):
+    if getattr(self, &#39;_publickey_obj&#39;, None) is None:
+        self._publickey_obj = self.privatekey.publickey()
+    return self._publickey_obj</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+</dl>
 <h3>Methods</h3>
 <dl>
 <dt id="connpy.configfile.encrypt"><code class="name flex">
@@ -1363,6 +1424,8 @@ def encrypt(self, password, keyfile=None):
     if keyfile is None:
         keyfile = self.key
     with open(keyfile) as f:
+        from Crypto.PublicKey import RSA
+        from Crypto.Cipher import PKCS1_OAEP
         key = RSA.import_key(f.read())
         f.close()
     publickey = key.publickey()
@@ -1839,6 +1902,8 @@ class node:
         if keyfile is None:
             keyfile = self.key
         if keyfile is not None:
+            from Crypto.PublicKey import RSA
+            from Crypto.Cipher import PKCS1_OAEP
             with open(keyfile) as f:
                 key = RSA.import_key(f.read())
             decryptor = PKCS1_OAEP.new(key)
@@ -4022,7 +4087,7 @@ def test(self, commands, expected, vars = None,*, folder = None, prompt = None, 
 <nav id="sidebar">
 <div class="toc">
 <ul>
-<li><a href="#connpy-v610">Connpy (v6.1.0)</a><ul>
+<li><a href="#connpy-v611">Connpy (v6.1.1)</a><ul>
 <li><a href="#1-ai-system">1. 🤖 AI System</a><ul>
 <li><a href="#1a-terminal-copilot-ctrlspace">1a. Terminal Copilot (Ctrl+Space)</a></li>
 <li><a href="#1b-ai-chat-conn-ai">1b. AI Chat (conn ai)</a></li>
@@ -4104,6 +4169,8 @@ def test(self, commands, expected, vars = None,*, folder = None, prompt = None, 
 <li><code><a title="connpy.configfile.get_effective_setting" href="#connpy.configfile.get_effective_setting">get_effective_setting</a></code></li>
 <li><code><a title="connpy.configfile.getitem" href="#connpy.configfile.getitem">getitem</a></code></li>
 <li><code><a title="connpy.configfile.getitems" href="#connpy.configfile.getitems">getitems</a></code></li>
+<li><code><a title="connpy.configfile.privatekey" href="#connpy.configfile.privatekey">privatekey</a></code></li>
+<li><code><a title="connpy.configfile.publickey" href="#connpy.configfile.publickey">publickey</a></code></li>
 </ul>
 </li>
 <li>

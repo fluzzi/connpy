@@ -4,8 +4,6 @@ import os
 import re
 import pexpect
 import shlex
-from Crypto.PublicKey import RSA
-from Crypto.Cipher import PKCS1_OAEP
 import ast
 from time import sleep,time
 import datetime
@@ -274,6 +272,8 @@ class node:
         if keyfile is None:
             keyfile = self.key
         if keyfile is not None:
+            from Crypto.PublicKey import RSA
+            from Crypto.Cipher import PKCS1_OAEP
             with open(keyfile) as f:
                 key = RSA.import_key(f.read())
             decryptor = PKCS1_OAEP.new(key)

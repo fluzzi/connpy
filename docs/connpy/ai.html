@@ -255,6 +255,7 @@ el.replaceWith(d);
                     chunk_callback(resp_msg.content)
                 elif not resp_msg.tool_calls:
                     # In direct non-streaming output, print markdown
+                    from rich.markdown import Markdown
                     self.console.print(Markdown(resp_msg.content))
 
             if not resp_msg.tool_calls:
@@ -388,6 +389,7 @@ el.replaceWith(d);
                 chunk_callback(resp_msg.content)
             elif not resp_msg.tool_calls:
                 # In direct non-streaming output, print markdown
+                from rich.markdown import Markdown
                 self.console.print(Markdown(resp_msg.content))
 
         if not resp_msg.tool_calls:
@@ -1621,6 +1623,7 @@ class ai:
                         if status:
                             try: status.stop()
                             except: pass
+                        from rich.markdown import Markdown
                         self.console.print(Panel(Markdown(resp_msg.content), title=f&#34;[{current_brain}][bold]{label} Reasoning[/bold][/{current_brain}]&#34;, border_style=&#34;architect&#34; if current_brain == &#34;architect&#34; else &#34;engineer&#34;))
                         if status:
                             try: status.start()
@@ -1668,6 +1671,7 @@ class ai:
                                 if status:
                                     try: status.stop()
                                     except: pass
+                                from rich.markdown import Markdown
                                 self.console.print(Panel(Markdown(obs), title=&#34;[architect]Architect Consultation[/architect]&#34;, border_style=&#34;architect&#34;))
                                 if status:
                                     try: status.start()
@@ -2579,6 +2583,7 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
                     if status:
                         try: status.stop()
                         except: pass
+                    from rich.markdown import Markdown
                     self.console.print(Panel(Markdown(resp_msg.content), title=f&#34;[{current_brain}][bold]{label} Reasoning[/bold][/{current_brain}]&#34;, border_style=&#34;architect&#34; if current_brain == &#34;architect&#34; else &#34;engineer&#34;))
                     if status:
                         try: status.start()
@@ -2626,6 +2631,7 @@ def ask(self, user_input, dryrun=False, chat_history=None, status=None, debug=Fa
                             if status:
                                 try: status.stop()
                                 except: pass
+                            from rich.markdown import Markdown
                             self.console.print(Panel(Markdown(obs), title=&#34;[architect]Architect Consultation[/architect]&#34;, border_style=&#34;architect&#34;))
                             if status:
                                 try: status.start()

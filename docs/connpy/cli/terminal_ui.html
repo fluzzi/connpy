@@ -492,6 +492,7 @@ el.replaceWith(d);
 
                 # If no chunks were streamed but we have a guide, print it as a panel
                 if first_chunk and result and result.get(&#34;guide&#34;):
+                    from rich.markdown import Markdown
                     self.console.print(Panel(Markdown(result[&#34;guide&#34;]), title=f&#34;[bold {persona_color}]{persona_title}[/bold {persona_color}]&#34;, border_style=persona_color))
 
                 commands = result.get(&#34;commands&#34;, [])
@@ -997,6 +998,7 @@ el.replaceWith(d);
 
             # If no chunks were streamed but we have a guide, print it as a panel
             if first_chunk and result and result.get(&#34;guide&#34;):
+                from rich.markdown import Markdown
                 self.console.print(Panel(Markdown(result[&#34;guide&#34;]), title=f&#34;[bold {persona_color}]{persona_title}[/bold {persona_color}]&#34;, border_style=persona_color))
 
             commands = result.get(&#34;commands&#34;, [])

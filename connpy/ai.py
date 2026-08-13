@@ -33,7 +33,6 @@ def stream_chunk_builder(*args, **kwargs):
     return _stream_chunk_builder(*args, **kwargs)
 from .hooks import ClassHook, MethodHook
 from . import printer
-from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.text import Text
 from rich.console import Group
@@ -1183,6 +1182,7 @@ class ai:
                         if status:
                             try: status.stop()
                             except: pass
+                        from rich.markdown import Markdown
                         self.console.print(Panel(Markdown(resp_msg.content), title=f"[{current_brain}][bold]{label} Reasoning[/bold][/{current_brain}]", border_style="architect" if current_brain == "architect" else "engineer"))
                         if status:
                             try: status.start()
@@ -1230,6 +1230,7 @@ class ai:
                                 if status:
                                     try: status.stop()
                                     except: pass
+                                from rich.markdown import Markdown
                                 self.console.print(Panel(Markdown(obs), title="[architect]Architect Consultation[/architect]", border_style="architect"))
                                 if status:
                                     try: status.start()
@@ -1872,6 +1873,7 @@ class PlaybookBuilderAgent:
                     chunk_callback(resp_msg.content)
                 elif not resp_msg.tool_calls:
                     # In direct non-streaming output, print markdown
+                    from rich.markdown import Markdown
                     self.console.print(Markdown(resp_msg.content))
 
             if not resp_msg.tool_calls:

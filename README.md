@@ -3,7 +3,7 @@
 </p>
 
 
-# Connpy (v6.1.0)
+# Connpy (v6.1.1)
 [![](https://img.shields.io/pypi/v/connpy.svg?style=flat-square)](https://pypi.org/pypi/connpy/)
 [![](https://img.shields.io/pypi/pyversions/connpy.svg?style=flat-square)](https://pypi.org/pypi/connpy/)
 [![](https://img.shields.io/pypi/dm/connpy.svg?style=flat-square&cacheSeconds=86400)](https://pypi.org/pypi/connpy/)
