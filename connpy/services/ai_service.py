@@ -207,6 +207,26 @@ class AIService(BaseService):
             else:
                 return {"action": "execute", "clean_prompt": args, "overrides": {"trust": False}}
 
+        elif cmd == "/mission":
+            if args:
+                session_state['mission'] = {
+                    'active': True,
+                    'goal': args,
+                    'step': 1,
+                    'max_steps': 10,
+                    'start_block_idx': None,
+                    'scratchpad_notes': []
+                }
+                return {"action": "mission_start", "clean_prompt": args, "overrides": {}}
+            else:
+                return {"action": "state_update", "message": "Usage: /mission <objective_description>"}
+
+        elif cmd in ("/cancel", "/abort"):
+            if session_state.get('mission', {}).get('active'):
+                session_state['mission']['active'] = False
+                return {"action": "mission_cancel", "message": "Mission cancelled"}
+            return {"action": "state_update", "message": "No active mission to cancel"}
+
         # Unknown command, execute normally
         return {"action": "execute", "clean_prompt": text, "overrides": {}}
 

@@ -586,5 +586,125 @@ def test_aask_copilot_notes_parsing(mock_acompletion):
     assert msgs[3]["content"] == "Why is ping failing?"
 
 
+def test_process_copilot_input_mission_command():
+    from connpy.services.ai_service import AIService
+
+    class MockConfig:
+        def __init__(self):
+            self.config = {"ai": {}}
+            self.defaultdir = "/tmp"
+
+    svc = AIService(MockConfig())
+    session_state = {}
+
+    # Test /mission command
+    res = svc.process_copilot_input("/mission check bgp neighbors", session_state)
+    assert res["action"] == "mission_start"
+    assert res["clean_prompt"] == "check bgp neighbors"
+    assert session_state["mission"]["active"] is True
+    assert session_state["mission"]["goal"] == "check bgp neighbors"
+    assert session_state["mission"]["step"] == 1
+
+    # Test /cancel command
+    res_cancel = svc.process_copilot_input("/cancel", session_state)
+    assert res_cancel["action"] == "mission_cancel"
+    assert session_state["mission"]["active"] is False
 
 
+def test_copilot_mission_mode_lifecycle():
+    from connpy.cli.terminal_ui import CopilotInterface
+
+    class MockConfig:
+        def __init__(self):
+            self.config = {"ai": {}}
+            self.defaultdir = "/tmp"
+
+    raw_bytes = b"router# show ip bgp\r\nrouter# "
+    blocks = [
+        (0, 20, "router# show ip bgp"),
+        (20, 30, "router#")
+    ]
+
+    async def mock_ai_call(active_buffer, question, on_chunk, node_info):
+        return {"guide": "BGP is UP", "notes": "Neighbor 10.0.0.1 established", "commands": [], "risk_level": "low"}
+
+    session_state = {
+        'persona': 'engineer',
+        'trust_mode': False,
+        'memories': [],
+        'copilot_chat_history': [],
+        'os': None,
+        'prompt': None,
+        'mission': {
+            'active': True,
+            'goal': 'verify bgp status',
+            'step': 1,
+            'max_steps': 10,
+            'start_block_idx': 0,
+            'scratchpad_notes': []
+        }
+    }
+
+    interface = CopilotInterface(MockConfig(), session_state=session_state)
+
+    asyncio.run(interface.run_session(raw_bytes=raw_bytes, node_info={"name": "test"}, on_ai_call=mock_ai_call, blocks=blocks))
+
+    # Mission completed (no commands), active flag should be set to False
+    assert interface.session_state['mission']['active'] is False
+    # Check that a single consolidated turn was added to copilot_chat_history
+    hist = interface.session_state.get('copilot_chat_history', [])
+    assert len(hist) == 2
+    assert hist[0]['role'] == 'user'
+    assert hist[0]['content'] == '/mission verify bgp status'
+    assert hist[1]['role'] == 'assistant'
+    assert 'Notes: Neighbor 10.0.0.1 established' in hist[1]['content']
+    assert 'Guide: BGP is UP' in hist[1]['content']
+
+
+def test_copilot_mission_pause_feedback_and_cancel():
+    from connpy.cli.terminal_ui import CopilotInterface
+    from unittest.mock import patch
+
+    class MockConfig:
+        def __init__(self):
+            self.config = {"ai": {}}
+            self.defaultdir = "/tmp"
+
+    raw_bytes = b"router# show ip bgp\r\nrouter# "
+    blocks = [
+        (0, 20, "router# show ip bgp"),
+        (20, 30, "router#")
+    ]
+
+    # AI returns commands to trigger rejection
+    async def mock_ai_call(active_buffer, question, on_chunk, node_info):
+        return {"guide": "Checking routes", "notes": "Need more info", "commands": ["clear ip bgp *"], "risk_level": "high"}
+
+    session_state = {
+        'persona': 'engineer',
+        'trust_mode': False,
+        'memories': [],
+        'copilot_chat_history': [],
+        'os': None,
+        'prompt': None,
+        'mission': {
+            'active': True,
+            'goal': 'troubleshoot routing',
+            'step': 2,
+            'max_steps': 10,
+            'start_block_idx': 0,
+            'scratchpad_notes': []
+        }
+    }
+
+    interface = CopilotInterface(MockConfig(), session_state=session_state)
+
+    # Simulate user rejecting the command ('n')
+    with patch('prompt_toolkit.PromptSession.prompt_async', return_value='n'):
+        action, commands, custom_cmd = asyncio.run(interface.run_session(
+            raw_bytes=raw_bytes, node_info={"name": "test"}, on_ai_call=mock_ai_call, blocks=blocks
+        ))
+
+    # Mission should now be paused (active=True, paused=True)
+    assert interface.session_state['mission']['active'] is True
+    assert interface.session_state['mission']['paused'] is True

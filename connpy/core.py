@@ -791,6 +791,7 @@ class node:
                 # Save history back to stream for persistence in current session
                 stream.copilot_history = interface.history
                 stream.copilot_state = interface.session_state
+                interface.session_state['banner_shown'] = False
                 
                 ai_service = AIService(config)
                 
@@ -821,6 +822,32 @@ class node:
                                 node_info=node_info,
                                 on_ai_call=on_ai_call
                             )
+                            if action in ("send_all", "custom"):
+                                cmds_to_send = commands if action == "send_all" else custom_cmd
+                                await self.inject_commands(cmds_to_send, child_fd)
+                                
+                                # Dynamic Wait for Device Prompt Settle
+                                prompt_pattern = node_info.get("prompt", r'>$|#$|\$$|>.$|#.$|\$.$')
+                                start_t = time()
+                                last_len = 0
+                                quiet_count = 0
+                                while time() - start_t < 60:
+                                    await asyncio.sleep(0.15)
+                                    cur_bytes = self.mylog.getvalue()
+                                    if len(cur_bytes) == last_len:
+                                        quiet_count += 1
+                                    else:
+                                        quiet_count = 0
+                                        last_len = len(cur_bytes)
+                                    
+                                    clean_txt = self._logclean(cur_bytes.decode(errors='replace'), True).strip()
+                                    lines = [l.strip() for l in clean_txt.split('\n') if l.strip()]
+                                    last_line = lines[-1] if lines else ""
+                                    if quiet_count >= 2 and re.search(prompt_pattern, last_line):
+                                        break
+
+                                raw_bytes = self.mylog.getvalue()
+                                continue
                             if action == "continue":
                                 continue
                             break
@@ -832,11 +859,7 @@ class node:
                     elif hasattr(stream, '_loop') and hasattr(stream, 'stdin_fd'):
                         stream._loop.add_reader(stream.stdin_fd, stream._read_ready)
                 
-                if action in ("send_all", "custom"):
-                    cmds_to_send = commands if action == "send_all" else custom_cmd
-                    await self.inject_commands(cmds_to_send, child_fd)
-                else:
-                    os.write(child_fd, b'\x15\r')
+                os.write(child_fd, b'\x15\r')
             except Exception as e:
                 import traceback
                 print(f"\n[ERROR in Copilot Handler] {e}", flush=True)

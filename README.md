@@ -25,7 +25,9 @@ The v6 release introduces a comprehensive **AI Copilot** and **AI Playbook Engin
 ### 1a. Terminal Copilot (Ctrl+Space)
 Invoke the context-aware AI Copilot directly inside any active terminal session by pressing **`Ctrl + Space`**. 
 * **Context Modes**: Cycles through `LINES` (sends raw scroll buffer), `SINGLE` (captures exactly one command + output block), and `RANGE` (logical group of recent commands) using **`Ctrl+Up/Down`**.
-* **Slash Commands (`/`)**: Control the AI persona and safety settings:
+* **Slash Commands (`/`)**: Control the AI persona, safety settings, and mission mode:
+  * `/mission [objective]`: Start an autonomous multi-step investigation mission with human approval.
+  * `/cancel`: Abort active mission.
   * `/architect` / `/engineer`: Swaps the agent between high-level strategist and technical executor.
   * `/trust` / `/untrust`: Configures auto-run behavior for suggested non-destructive commands.
   * `/os [system]`: Manually overrides target OS parsing rules (e.g. `/os cisco_ios`).
