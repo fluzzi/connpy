@@ -560,14 +560,13 @@ class CopilotInterface:
                             mission.setdefault('scratchpad_notes', []).append(notes)
                         if guide:
                             mission['last_guide'] = guide
-                    
-                    if guide or notes:
-                        asst_msg = f"Notes: {notes}\nGuide: {guide}" if notes else guide
-                        if not asst_msg and guide: asst_msg = guide
-                        hist = self.session_state.setdefault("copilot_chat_history", [])
-                        hist.append({"role": "user", "content": clean_question})
-                        hist.append({"role": "assistant", "content": asst_msg})
-                        self.session_state["copilot_chat_history"] = hist[-10:]
+                    else:
+                        if guide or notes:
+                            asst_msg = f"Notes: {notes}\nGuide: {guide}" if notes else guide
+                            hist = self.session_state.setdefault("copilot_chat_history", [])
+                            hist.append({"role": "user", "content": clean_question})
+                            hist.append({"role": "assistant", "content": asst_msg})
+                            self.session_state["copilot_chat_history"] = hist[-10:]
                 commands = result.get("commands", [])
                 mission = self.session_state.get('mission', {})
                 if not commands:

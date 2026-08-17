@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.5">
+<meta name="generator" content="pdoc3 0.11.6">
 <title>connpy.cli.terminal_ui API documentation</title>
 <meta name="description" content="">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
@@ -138,7 +138,8 @@ el.replaceWith(d);
             is_single = saved_mode in (self.mode_single, 1, &#39;SINGLE&#39;, &#39;single&#39;)
 
             if is_range or is_single:
-                if last_total_cmds is not None and total_cmds &gt; last_total_cmds and saved_cmd &gt; 1:
+                is_mission = self.session_state.get(&#39;mission&#39;, {}).get(&#39;active&#39;, False)
+                if last_total_cmds is not None and total_cmds &gt; last_total_cmds and (saved_cmd &gt; 1 or is_mission):
                     new_cmds = total_cmds - last_total_cmds
                     initial_cmd = saved_cmd + new_cmds
                 else:
@@ -171,15 +172,17 @@ el.replaceWith(d);
             self.session_state[&#39;last_total_cmds&#39;] = total_cmds
             self.session_state[&#39;last_total_lines&#39;] = total_lines
             
-            # 1. Visual Separation
+            # 1. Visual Separation (Only show help banner on initial entry)
             self.console.print(&#34;&#34;) # Real line break
             self.console.print(Rule(title=&#34;[bold cyan] AI TERMINAL COPILOT [/bold cyan]&#34;, style=&#34;cyan&#34;))
-            self.console.print(Panel(
-                &#34;[dim]Type your question. Enter to send, Escape/Ctrl+C to cancel. Type / for commands.\n&#34;
-                &#34;Tab to change context mode. Ctrl+\u2191/\u2193 to adjust context. \u2191\u2193 for question history.[/dim]&#34;,
-                border_style=&#34;cyan&#34;
-            ))
-            self.console.print(&#34;\n&#34;) # Small space before the copilot prompt
+            if not self.session_state.get(&#39;banner_shown&#39;, False):
+                self.console.print(Panel(
+                    &#34;[dim]Type your question. Enter to send, Escape/Ctrl+C to cancel. Type / for commands.\n&#34;
+                    &#34;Tab to change context mode. Ctrl+\u2191/\u2193 to adjust context. \u2191\u2193 for question history.[/dim]&#34;,
+                    border_style=&#34;cyan&#34;
+                ))
+                self.session_state[&#39;banner_shown&#39;] = True
+            self.console.print(&#34;&#34;) # Small space before the copilot prompt
 
             bindings = KeyBindings()
             @bindings.add(&#39;c-up&#39;)
@@ -261,7 +264,7 @@ el.replaceWith(d);
                     text = app.current_buffer.text
                     # Only show command help if typing the first command and there are no spaces
                     if text.startswith(&#39;/&#39;) and &#39; &#39; not in text:
-                        commands = [&#39;/os&#39;, &#39;/prompt&#39;, &#39;/architect&#39;, &#39;/engineer&#39;, &#39;/trust&#39;, &#39;/untrust&#39;, &#39;/memorize&#39;, &#39;/clear&#39;]
+                        commands = [&#39;/os&#39;, &#39;/prompt&#39;, &#39;/architect&#39;, &#39;/engineer&#39;, &#39;/trust&#39;, &#39;/untrust&#39;, &#39;/memorize&#39;, &#39;/clear&#39;, &#39;/mission&#39;, &#39;/cancel&#39;]
                         matches = [c for c in commands if c.startswith(text.lower())]
                         if matches:
                             m_text = html.escape(f&#34;Available: {&#39; &#39;.join(matches)}&#34;)
@@ -269,7 +272,7 @@ el.replaceWith(d);
 
                 m_label = {self.mode_range: &#34;RANGE&#34;, self.mode_single: &#34;SINGLE&#34;, self.mode_lines: &#34;LINES&#34;}[state[&#39;context_mode&#39;]]
                 if state[&#39;context_mode&#39;] == self.mode_lines:
-                    base_str = f&#39;\u25b6 Ctrl+\u2191/\u2193 adjusts by 50 lines  [Tab: {m_label}]&#39;
+                    base_str = f&#39;\u25b6 [Tab: {m_label}] {state[&#34;context_lines&#34;]}/{state[&#34;total_lines&#34;]}L (Ctrl+\u2191/\u2193 adjusts lines)&#39;
                 else:
                     idx = max(0, state[&#39;total_cmds&#39;] - state[&#39;context_cmd&#39;])
                     
@@ -292,7 +295,7 @@ el.replaceWith(d);
                             p = clean_preview(b[2])
                             if p:
                                 # Truncar comandos individuales largos
-                                if len(p) &gt; 25: p = p[:22] + &#34;...&#34;
+                                if len(p) &gt; 25: p = p[:22].rstrip(&#39; .,-_&#39;) + &#34;...&#34;
                                 previews.append(p)
                         
                         if not previews:
@@ -300,12 +303,12 @@ el.replaceWith(d);
                         elif len(previews) &lt;= 3:
                             desc = &#34; + &#34;.join(previews)
                         else:
-                            desc = f&#34;{previews[0]} + {previews[1]} + {previews[2]} ... (+{len(previews)-3})&#34;
+                            desc = f&#34;{previews[0]} + {previews[1]} + {previews[2]} (+{len(previews)-3})&#34;
                     else:
                         # Modo SINGLE original
                         desc = clean_preview(blocks[idx][2])
                         
-                    base_str = f&#39;\u25b6 {desc}  [Tab: {m_label}]&#39;
+                    base_str = f&#39;\u25b6 [Tab: {m_label}] {desc}&#39;
                 
                 # Wrap base_str in a style to maintain consistency and avoid glitches
                 # The fg color will be inherited from bottom-toolbar global style if not specified here
@@ -339,7 +342,9 @@ el.replaceWith(d);
                                 (&#39;/trust&#39;, &#39;Enable auto-execute&#39;),
                                 (&#39;/untrust&#39;, &#39;Disable auto-execute&#39;),
                                 (&#39;/memorize&#39;, &#39;Add fact to memory&#39;),
-                                (&#39;/clear&#39;, &#39;Clear memory&#39;)
+                                (&#39;/clear&#39;, &#39;Clear memory&#39;),
+                                (&#39;/mission&#39;, &#39;Start autonomous mission&#39;),
+                                (&#39;/cancel&#39;, &#39;Cancel active mission&#39;)
                             ]
                             for cmd, desc in commands:
                                 if cmd.startswith(cmd_part.lower()):
@@ -347,68 +352,162 @@ el.replaceWith(d);
 
             copilot_completer = SlashCommandCompleter()
 
+            def _finalize_mission(reason=&#34;completed&#34;, final_guide=&#34;&#34;):
+                mission = self.session_state.get(&#39;mission&#39;, {})
+                if not mission or not mission.get(&#39;active&#39;, False):
+                    return
+                mission[&#39;active&#39;] = False
+                if reason == &#34;completed&#34;:
+                    self.console.print(&#34;\n[bold green]🎉 Mission Completed[/bold green]&#34;)
+                elif reason == &#34;user_cancelled&#34;:
+                    self.console.print(&#34;\n[yellow]Mission cancelled by user.[/yellow]&#34;)
+                elif reason == &#34;limit_reached&#34;:
+                    self.console.print(&#34;\n[yellow]Mission step limit reached.[/yellow]&#34;)
+
+                final_notes = &#34;\n&#34;.join(mission.get(&#39;scratchpad_notes&#39;, []))
+                guide = final_guide or mission.get(&#39;last_guide&#39;, &#39;&#39;)
+                asst_msg = f&#34;Notes: {final_notes}\nGuide: {guide}&#34; if final_notes else guide
+                hist = self.session_state.setdefault(&#34;copilot_chat_history&#34;, [])
+                hist.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: f&#34;/mission {mission.get(&#39;goal&#39;, &#39;&#39;)}&#34;})
+                hist.append({&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: asst_msg})
+                self.session_state[&#34;copilot_chat_history&#34;] = hist[-10:]
+
             while True:
-                # 2. Ask question
-                from prompt_toolkit.styles import Style
-                c_contrast = self._get_theme_color(&#34;contrast&#34;, &#34;gray&#34;)
-                ui_style = Style.from_dict({
-                    &#39;bottom-toolbar&#39;: f&#39;fg:{c_contrast}&#39;,
-                })
-                
-                session = PromptSession(
-                    history=self.history, 
-                    input=self.pt_input, 
-                    output=self.pt_output,
-                    completer=copilot_completer,
-                    reserve_space_for_menu=0,
-                    style=ui_style
-                )
-                try:
-                    # We use an internal try/finally to ensure that if something fails in prompt_async,
-                    # we don&#39;t leave the terminal in a strange state.
-                    question = await session.prompt_async(
-                        get_prompt_text, 
-                        key_bindings=bindings, 
-                        bottom_toolbar=get_toolbar,
-                        multiline=True
-                    )
-                except (KeyboardInterrupt, EOFError):
-                    state[&#39;cancelled&#39;] = True
-                    question = &#34;&#34;
-                
-                if state[&#39;cancelled&#39;] or not question.strip() or question.strip().lower() in [&#39;cancel&#39;, &#39;exit&#39;, &#39;quit&#39;]:
-                    return &#34;cancel&#34;, None, None
+                overrides = {}
+                # Check for active mission auto-looping
+                mission = self.session_state.get(&#39;mission&#39;, {})
+                is_mission = mission.get(&#39;active&#39;, False) and not mission.get(&#39;paused&#39;, False)
 
-                # 3. Process Input via AIService
-                directive = self.ai_service.process_copilot_input(question, self.session_state)
-                
-                if directive[&#34;action&#34;] == &#34;state_update&#34;:
-                    msg = directive[&#39;message&#39;]
-                    state[&#39;toolbar_msg&#39;] = msg
-                    state[&#39;msg_expiry&#39;] = time.time() + 3 # 3 seconds timeout
+                if is_mission:
+                    # Force mode_range for mission mode
+                    state[&#39;context_mode&#39;] = self.mode_range
+                    self.session_state[&#39;context_mode&#39;] = self.mode_range
+
+                    if mission.get(&#39;start_block_idx&#39;) is None:
+                        mission[&#39;start_block_idx&#39;] = state[&#39;total_cmds&#39;]
+
+                    start_idx = mission.get(&#39;start_block_idx&#39;, state[&#39;total_cmds&#39;])
+                    cmds_since_start = max(1, (state[&#39;total_cmds&#39;] - start_idx) + 1)
+                    state[&#39;context_cmd&#39;] = max(state.get(&#39;context_cmd&#39;, 1), cmds_since_start)
+                    self.session_state[&#39;context_cmd&#39;] = state[&#39;context_cmd&#39;]
+
+                    step = mission.get(&#39;step&#39;, 1)
+                    max_steps = mission.get(&#39;max_steps&#39;, 10)
+
+                    if step &gt; max_steps:
+                        ext_session = PromptSession(input=self.pt_input, output=self.pt_output)
+                        c_warn = self._get_theme_color(&#34;warning&#34;, &#34;yellow&#34;)
+                        import html
+                        p_warn = html.escape(f&#34;[Mission Limit Reached ({max_steps} steps)] Extend mission for 10 more steps? (y/n) [y]: &#34;)
+                        try:
+                            ext_ans = await ext_session.prompt_async(HTML(f&#39;&lt;style fg=&#34;{c_warn}&#34; bold=&#34;true&#34;&gt;{p_warn}&lt;/style&gt;&#39;))
+                        except (KeyboardInterrupt, EOFError):
+                            ext_ans = &#39;n&#39;
+
+                        if (ext_ans or &#39;y&#39;).lower().strip() in (&#39;y&#39;, &#39;yes&#39;):
+                            mission[&#39;max_steps&#39;] += 10
+                        else:
+                            goal = mission.get(&#39;goal&#39;, &#39;&#39;)
+                            question = f&#34;[MISSION SUMMARY]: Step limit reached ({max_steps} steps). Provide a concise summary of all findings and current status for: {goal}&#34;
+                            clean_question = question
+                            mission[&#39;active&#39;] = False
+                            is_mission = False
+                            self.console.print(f&#34;\n[bold cyan]🤖 Generating Final Mission Summary ({max_steps} steps reached)...[/bold cyan]&#34;)
+
+                if is_mission:
+                    goal = mission.get(&#39;goal&#39;, &#39;&#39;)
+                    step = mission.get(&#39;step&#39;, 1)
+                    question = f&#34;[MISSION STEP {step}]: Continue analysis of: {goal}&#34;
                     
-                    async def delayed_refresh():
-                        await asyncio.sleep(3.1)
-                        # Only invalidate if the message hasn&#39;t been replaced by a newer one
-                        if state.get(&#39;toolbar_msg&#39;) == msg:
-                            state[&#39;toolbar_msg&#39;] = &#39;&#39; # Explicitly clear
-                            try:
-                                from prompt_toolkit.application.current import get_app
-                                app = get_app()
-                                if app: app.invalidate()
-                            except: pass
-                    asyncio.create_task(delayed_refresh())
-
-                    # Move the cursor up and clean the line so the new prompt replaces the previous one
-                    sys.stdout.write(&#39;\x1b[1A\x1b[2K&#39;)
-                    sys.stdout.flush()
-                    continue
+                    scratchpad = mission.get(&#39;scratchpad_notes&#39;, [])
+                    if scratchpad:
+                        notes_text = &#34;\n&#34;.join(f&#34;- {n}&#34; for n in scratchpad)
+                        question += f&#34;\n\nPast Mission Notes:\n{notes_text}&#34;
+                        
+                    clean_question = question
+                    self.console.print(f&#34;\n[bold cyan]🤖 Executing Mission Step {step}: {goal}[/bold cyan]&#34;)
+                elif not is_mission and &#39;clean_question&#39; in locals() and clean_question.startswith(&#34;[MISSION SUMMARY]&#34;):
+                    # Pass-through to AI execution for generating final summary
+                    pass
                 else:
-                    # Clean the toolbar message when a real question is asked
-                    state[&#39;toolbar_msg&#39;] = &#39;&#39;
-                
-                clean_question = directive.get(&#34;clean_prompt&#34;, question)
-                overrides = directive.get(&#34;overrides&#34;, {})
+                    # 2. Ask question
+                    from prompt_toolkit.styles import Style
+                    c_contrast = self._get_theme_color(&#34;contrast&#34;, &#34;gray&#34;)
+                    ui_style = Style.from_dict({
+                        &#39;bottom-toolbar&#39;: f&#39;fg:{c_contrast}&#39;,
+                    })
+                    
+                    session = PromptSession(
+                        history=self.history, 
+                        input=self.pt_input, 
+                        output=self.pt_output,
+                        completer=copilot_completer,
+                        reserve_space_for_menu=0,
+                        style=ui_style
+                    )
+                    try:
+                        question = await session.prompt_async(
+                            get_prompt_text, 
+                            key_bindings=bindings, 
+                            bottom_toolbar=get_toolbar,
+                            multiline=True
+                        )
+                    except (KeyboardInterrupt, EOFError):
+                        state[&#39;cancelled&#39;] = True
+                        question = &#34;&#34;
+                    
+                    if state[&#39;cancelled&#39;] or not question.strip() or question.strip().lower() in [&#39;cancel&#39;, &#39;exit&#39;, &#39;quit&#39;]:
+                        _finalize_mission(&#34;user_cancelled&#34;)
+                        return &#34;cancel&#34;, None, None
+
+                    # 3. Process Input via AIService
+                    directive = self.ai_service.process_copilot_input(question, self.session_state)
+                    
+                    if directive[&#34;action&#34;] == &#34;mission_start&#34;:
+                        mission = self.session_state.get(&#39;mission&#39;, {})
+                        mission[&#39;start_block_idx&#39;] = state[&#39;total_cmds&#39;]
+                        state[&#39;context_mode&#39;] = self.mode_range
+                        self.session_state[&#39;context_mode&#39;] = self.mode_range
+                        state[&#39;context_cmd&#39;] = 1
+                        self.session_state[&#39;context_cmd&#39;] = 1
+                        clean_question = f&#34;[MISSION STEP 1]: {directive[&#39;clean_prompt&#39;]}&#34;
+                        overrides = directive.get(&#34;overrides&#34;, {})
+                        self.console.print(f&#34;\n[bold cyan]🤖 Starting Mission: {directive[&#39;clean_prompt&#39;]}[/bold cyan]&#34;)
+                    elif directive[&#34;action&#34;] == &#34;mission_cancel&#34;:
+                        _finalize_mission(&#34;user_cancelled&#34;)
+                        state[&#39;toolbar_msg&#39;] = &#39;Mission cancelled&#39;
+                        continue
+                    elif directive[&#34;action&#34;] == &#34;state_update&#34;:
+                        msg = directive[&#39;message&#39;]
+                        state[&#39;toolbar_msg&#39;] = msg
+                        state[&#39;msg_expiry&#39;] = time.time() + 3 # 3 seconds timeout
+                        
+                        async def delayed_refresh():
+                            await asyncio.sleep(3.1)
+                            if state.get(&#39;toolbar_msg&#39;) == msg:
+                                state[&#39;toolbar_msg&#39;] = &#39;&#39;
+                                try:
+                                    from prompt_toolkit.application.current import get_app
+                                    app = get_app()
+                                    if app: app.invalidate()
+                                except: pass
+                        asyncio.create_task(delayed_refresh())
+
+                        sys.stdout.write(&#39;\x1b[1A\x1b[2K&#39;)
+                        sys.stdout.flush()
+                        continue
+                    else:
+                        state[&#39;toolbar_msg&#39;] = &#39;&#39;
+                        if mission.get(&#39;active&#39;, False):
+                            mission[&#39;paused&#39;] = False
+                            step = mission.get(&#39;step&#39;, 1)
+                            goal = mission.get(&#39;goal&#39;, &#39;&#39;)
+                            clean_question = f&#34;[MISSION FEEDBACK (Step {step})]: User provided guidance: {question}. Continue the mission for goal: {goal}&#34;
+                            self.console.print(f&#34;\n[bold cyan]🤖 Continuing Mission with User Feedback: {question}[/bold cyan]&#34;)
+                            overrides = directive.get(&#34;overrides&#34;, {})
+                        else:
+                            clean_question = directive.get(&#34;clean_prompt&#34;, question)
+                            overrides = directive.get(&#34;overrides&#34;, {})
                 
                 # Merge node_info with session_state and overrides
                 merged_node_info = node_info.copy()
@@ -423,7 +522,6 @@ el.replaceWith(d);
                     merged_node_info[k] = v
 
                 # 3. AI Execution
-                # Use persona from overrides (one-shot) or from session state
                 active_persona = merged_node_info.get(&#39;persona&#39;, self.session_state.get(&#39;persona&#39;, &#39;engineer&#39;))
                 persona_color = self._get_theme_color(active_persona, fallback=&#34;cyan&#34;)
                 persona_title = &#34;Network Architect&#34; if active_persona == &#34;architect&#34; else &#34;Network Engineer&#34;
@@ -450,7 +548,6 @@ el.replaceWith(d);
                     nonlocal live_text, first_chunk
                     if first_chunk:
                         status_spinner.stop()
-                        # Print header rule before first chunk arrives
                         self.console.print(Rule(
                             f&#34;[bold {persona_color}]{persona_title}[/bold {persona_color}]&#34;,
                             style=persona_color
@@ -459,7 +556,6 @@ el.replaceWith(d);
                     live_text += text
                     md_parser.feed(text)
                 
-                # Check for interruption during AI call
                 ai_task = asyncio.create_task(on_ai_call(active_buffer, clean_question, on_chunk, merged_node_info))
                 
                 try:
@@ -468,13 +564,12 @@ el.replaceWith(d);
                     result = await ai_task
                 except asyncio.CancelledError:
                     status_spinner.stop()
+                    _finalize_mission(&#34;user_cancelled&#34;)
                     return &#34;cancel&#34;, None, None
                 
-                # Ensure spinner is stopped if no chunks arrived
                 if first_chunk:
                     status_spinner.stop()
 
-                # Close the streamed output with a Rule
                 if not first_chunk:
                     md_parser.flush()
                     self.console.print(Rule(style=persona_color))
@@ -482,26 +577,35 @@ el.replaceWith(d);
                 if not result or result.get(&#34;error&#34;):
                     if first_chunk and result and result.get(&#34;error&#34;):
                         self.console.print(f&#34;[red]Error: {result[&#39;error&#39;]}[/red]&#34;)
+                    _finalize_mission(&#34;user_cancelled&#34;)
                     return &#34;cancel&#34;, None, None
 
-                # If no chunks were streamed but we have a guide, print it as a panel
                 if first_chunk and result and result.get(&#34;guide&#34;):
                     from rich.markdown import Markdown
                     self.console.print(Panel(Markdown(result[&#34;guide&#34;]), title=f&#34;[bold {persona_color}]{persona_title}[/bold {persona_color}]&#34;, border_style=persona_color))
 
-                # Update copilot_chat_history with clean Q&amp;A turn
+                # Update copilot_chat_history or mission scratchpad
                 if result and not result.get(&#34;error&#34;):
                     guide = result.get(&#34;guide&#34;, &#34;&#34;)
                     notes = result.get(&#34;notes&#34;, &#34;&#34;)
-                    if guide:
-                        asst_msg = f&#34;Notes: {notes}\nGuide: {guide}&#34; if notes else guide
-                        hist = self.session_state.setdefault(&#34;copilot_chat_history&#34;, [])
-                        hist.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: clean_question})
-                        hist.append({&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: asst_msg})
-                        self.session_state[&#34;copilot_chat_history&#34;] = hist[-10:]
-
+                    mission = self.session_state.get(&#39;mission&#39;, {})
+                    if mission.get(&#39;active&#39;, False):
+                        if notes:
+                            mission.setdefault(&#39;scratchpad_notes&#39;, []).append(notes)
+                        if guide:
+                            mission[&#39;last_guide&#39;] = guide
+                    else:
+                        if guide or notes:
+                            asst_msg = f&#34;Notes: {notes}\nGuide: {guide}&#34; if notes else guide
+                            hist = self.session_state.setdefault(&#34;copilot_chat_history&#34;, [])
+                            hist.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: clean_question})
+                            hist.append({&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: asst_msg})
+                            self.session_state[&#34;copilot_chat_history&#34;] = hist[-10:]
                 commands = result.get(&#34;commands&#34;, [])
+                mission = self.session_state.get(&#39;mission&#39;, {})
                 if not commands:
+                    if mission.get(&#39;active&#39;, False):
+                        _finalize_mission(&#34;completed&#34;, result.get(&#34;guide&#34;, &#34;&#34;))
                     self.console.print(&#34;&#34;)
                     return &#34;continue&#34;, None, None
 
@@ -510,11 +614,12 @@ el.replaceWith(d);
                 style_color = self._get_theme_color(risk_style, fallback=&#34;green&#34;)
                 
                 cmd_text = &#34;\n&#34;.join(f&#34;  {i+1}. {c}&#34; for i, c in enumerate(commands))
-                # Explicitly use &#39;bold style_color&#39; for both TITLE and BORDER to ensure maximum consistency
                 self.console.print(Panel(cmd_text, title=f&#34;[bold {style_color}]Suggested Commands [{risk.upper()}][/bold {style_color}]&#34;, border_style=f&#34;bold {style_color}&#34;))
 
                 if merged_node_info.get(&#39;trust&#39;, False) and risk != &#34;destructive&#34;:
                     self.console.print(f&#34;[dim]⚙️ Auto-executing (Trust Mode)[/dim]&#34;)
+                    if mission.get(&#39;active&#39;, False):
+                        mission[&#39;step&#39;] = mission.get(&#39;step&#39;, 1) + 1
                     return &#34;send_all&#34;, commands, None
 
                 confirm_session = PromptSession(input=self.pt_input, output=self.pt_output)
@@ -526,41 +631,39 @@ el.replaceWith(d);
                 import html
                 try:
                     p_text = html.escape(f&#34;Send? (y/n/e/range) [n]: &#34;)
-                    # Use the EXACT same style_color and force bold=&#34;true&#34; for Prompt-Toolkit
                     action = await confirm_session.prompt_async(HTML(f&#39;&lt;style fg=&#34;{style_color}&#34; bold=&#34;true&#34;&gt;{p_text}&lt;/style&gt;&#39;), key_bindings=c_bindings)
                 except (KeyboardInterrupt, EOFError):
+                    _finalize_mission(&#34;user_cancelled&#34;, result.get(&#34;guide&#34;, &#34;&#34;))
                     self.console.print(&#34;&#34;)
                     return &#34;continue&#34;, None, None
 
                 def parse_indices(text, max_len):
-                    &#34;&#34;&#34;Helper to parse &#39;1-3, 5, 7&#39; into [0, 1, 2, 4, 6].&#34;&#34;&#34;
                     indices = []
-                    # Replace commas with spaces and split
                     parts = text.replace(&#39;,&#39;, &#39; &#39;).split()
                     for part in parts:
                         if &#39;-&#39; in part:
                             try:
                                 start, end = map(int, part.split(&#39;-&#39;))
-                                # Ensure inclusive and 0-indexed
                                 indices.extend(range(start-1, end))
                             except: continue
                         elif part.isdigit():
                             indices.append(int(part)-1)
-                    # Filter valid indices and remove duplicates
                     return [i for i in sorted(set(indices)) if 0 &lt;= i &lt; max_len]
 
                 action_l = (action or &#34;n&#34;).lower().strip()
                 if action_l in (&#39;y&#39;, &#39;yes&#39;, &#39;all&#39;):
+                    if mission.get(&#39;active&#39;, False):
+                        mission[&#39;step&#39;] = mission.get(&#39;step&#39;, 1) + 1
                     return &#34;send_all&#34;, commands, None
                 
-                # Check for numeric selection (e.g., &#34;1, 2-4&#34;)
                 if re.match(r&#39;^[0-9,\-\s]+$&#39;, action_l):
                     selected_idxs = parse_indices(action_l, len(commands))
                     if selected_idxs:
+                        if mission.get(&#39;active&#39;, False):
+                            mission[&#39;step&#39;] = mission.get(&#39;step&#39;, 1) + 1
                         return &#34;send_all&#34;, [commands[i] for i in selected_idxs], None
 
                 elif action_l.startswith(&#39;e&#39;):
-                    # Check if it&#39;s a selective edit like &#39;e1-2&#39;
                     selection_str = action_l[1:].strip()
                     if selection_str:
                         idxs = parse_indices(selection_str, len(commands))
@@ -586,13 +689,22 @@ el.replaceWith(d);
                             default=target, multiline=True, key_bindings=e_bindings
                         )
                     except (KeyboardInterrupt, EOFError):
+                        if mission.get(&#39;active&#39;, False):
+                            mission[&#39;paused&#39;] = True
+                            self.console.print(&#34;\n[yellow]⏸️  Mission Paused — Provide feedback to redirect, or type /cancel to abort.[/yellow]&#34;)
                         self.console.print(&#34;&#34;)
                         return &#34;continue&#34;, None, None
 
                     if edited and edited.strip():
-                        # Split by lines to ensure core.py applies delay between each command
                         lines = [l.strip() for l in edited.split(&#39;\n&#39;) if l.strip()]
+                        if mission.get(&#39;active&#39;, False):
+                            mission[&#39;step&#39;] = mission.get(&#39;step&#39;, 1) + 1
                         return &#34;custom&#34;, None, lines
+
+                # User rejected/cancelled the commands
+                if mission.get(&#39;active&#39;, False):
+                    mission[&#39;paused&#39;] = True
+                    self.console.print(&#34;\n[yellow]⏸️  Mission Paused — Provide feedback to redirect, or type /cancel to abort.[/yellow]&#34;)
                     
                 self.console.print(&#34;&#34;)
                 return &#34;continue&#34;, None, None
@@ -648,7 +760,8 @@ el.replaceWith(d);
         is_single = saved_mode in (self.mode_single, 1, &#39;SINGLE&#39;, &#39;single&#39;)
 
         if is_range or is_single:
-            if last_total_cmds is not None and total_cmds &gt; last_total_cmds and saved_cmd &gt; 1:
+            is_mission = self.session_state.get(&#39;mission&#39;, {}).get(&#39;active&#39;, False)
+            if last_total_cmds is not None and total_cmds &gt; last_total_cmds and (saved_cmd &gt; 1 or is_mission):
                 new_cmds = total_cmds - last_total_cmds
                 initial_cmd = saved_cmd + new_cmds
             else:
@@ -681,15 +794,17 @@ el.replaceWith(d);
         self.session_state[&#39;last_total_cmds&#39;] = total_cmds
         self.session_state[&#39;last_total_lines&#39;] = total_lines
         
-        # 1. Visual Separation
+        # 1. Visual Separation (Only show help banner on initial entry)
         self.console.print(&#34;&#34;) # Real line break
         self.console.print(Rule(title=&#34;[bold cyan] AI TERMINAL COPILOT [/bold cyan]&#34;, style=&#34;cyan&#34;))
-        self.console.print(Panel(
-            &#34;[dim]Type your question. Enter to send, Escape/Ctrl+C to cancel. Type / for commands.\n&#34;
-            &#34;Tab to change context mode. Ctrl+\u2191/\u2193 to adjust context. \u2191\u2193 for question history.[/dim]&#34;,
-            border_style=&#34;cyan&#34;
-        ))
-        self.console.print(&#34;\n&#34;) # Small space before the copilot prompt
+        if not self.session_state.get(&#39;banner_shown&#39;, False):
+            self.console.print(Panel(
+                &#34;[dim]Type your question. Enter to send, Escape/Ctrl+C to cancel. Type / for commands.\n&#34;
+                &#34;Tab to change context mode. Ctrl+\u2191/\u2193 to adjust context. \u2191\u2193 for question history.[/dim]&#34;,
+                border_style=&#34;cyan&#34;
+            ))
+            self.session_state[&#39;banner_shown&#39;] = True
+        self.console.print(&#34;&#34;) # Small space before the copilot prompt
 
         bindings = KeyBindings()
         @bindings.add(&#39;c-up&#39;)
@@ -771,7 +886,7 @@ el.replaceWith(d);
                 text = app.current_buffer.text
                 # Only show command help if typing the first command and there are no spaces
                 if text.startswith(&#39;/&#39;) and &#39; &#39; not in text:
-                    commands = [&#39;/os&#39;, &#39;/prompt&#39;, &#39;/architect&#39;, &#39;/engineer&#39;, &#39;/trust&#39;, &#39;/untrust&#39;, &#39;/memorize&#39;, &#39;/clear&#39;]
+                    commands = [&#39;/os&#39;, &#39;/prompt&#39;, &#39;/architect&#39;, &#39;/engineer&#39;, &#39;/trust&#39;, &#39;/untrust&#39;, &#39;/memorize&#39;, &#39;/clear&#39;, &#39;/mission&#39;, &#39;/cancel&#39;]
                     matches = [c for c in commands if c.startswith(text.lower())]
                     if matches:
                         m_text = html.escape(f&#34;Available: {&#39; &#39;.join(matches)}&#34;)
@@ -779,7 +894,7 @@ el.replaceWith(d);
 
             m_label = {self.mode_range: &#34;RANGE&#34;, self.mode_single: &#34;SINGLE&#34;, self.mode_lines: &#34;LINES&#34;}[state[&#39;context_mode&#39;]]
             if state[&#39;context_mode&#39;] == self.mode_lines:
-                base_str = f&#39;\u25b6 Ctrl+\u2191/\u2193 adjusts by 50 lines  [Tab: {m_label}]&#39;
+                base_str = f&#39;\u25b6 [Tab: {m_label}] {state[&#34;context_lines&#34;]}/{state[&#34;total_lines&#34;]}L (Ctrl+\u2191/\u2193 adjusts lines)&#39;
             else:
                 idx = max(0, state[&#39;total_cmds&#39;] - state[&#39;context_cmd&#39;])
                 
@@ -802,7 +917,7 @@ el.replaceWith(d);
                         p = clean_preview(b[2])
                         if p:
                             # Truncar comandos individuales largos
-                            if len(p) &gt; 25: p = p[:22] + &#34;...&#34;
+                            if len(p) &gt; 25: p = p[:22].rstrip(&#39; .,-_&#39;) + &#34;...&#34;
                             previews.append(p)
                     
                     if not previews:
@@ -810,12 +925,12 @@ el.replaceWith(d);
                     elif len(previews) &lt;= 3:
                         desc = &#34; + &#34;.join(previews)
                     else:
-                        desc = f&#34;{previews[0]} + {previews[1]} + {previews[2]} ... (+{len(previews)-3})&#34;
+                        desc = f&#34;{previews[0]} + {previews[1]} + {previews[2]} (+{len(previews)-3})&#34;
                 else:
                     # Modo SINGLE original
                     desc = clean_preview(blocks[idx][2])
                     
-                base_str = f&#39;\u25b6 {desc}  [Tab: {m_label}]&#39;
+                base_str = f&#39;\u25b6 [Tab: {m_label}] {desc}&#39;
             
             # Wrap base_str in a style to maintain consistency and avoid glitches
             # The fg color will be inherited from bottom-toolbar global style if not specified here
@@ -849,7 +964,9 @@ el.replaceWith(d);
                             (&#39;/trust&#39;, &#39;Enable auto-execute&#39;),
                             (&#39;/untrust&#39;, &#39;Disable auto-execute&#39;),
                             (&#39;/memorize&#39;, &#39;Add fact to memory&#39;),
-                            (&#39;/clear&#39;, &#39;Clear memory&#39;)
+                            (&#39;/clear&#39;, &#39;Clear memory&#39;),
+                            (&#39;/mission&#39;, &#39;Start autonomous mission&#39;),
+                            (&#39;/cancel&#39;, &#39;Cancel active mission&#39;)
                         ]
                         for cmd, desc in commands:
                             if cmd.startswith(cmd_part.lower()):
@@ -857,68 +974,162 @@ el.replaceWith(d);
 
         copilot_completer = SlashCommandCompleter()
 
+        def _finalize_mission(reason=&#34;completed&#34;, final_guide=&#34;&#34;):
+            mission = self.session_state.get(&#39;mission&#39;, {})
+            if not mission or not mission.get(&#39;active&#39;, False):
+                return
+            mission[&#39;active&#39;] = False
+            if reason == &#34;completed&#34;:
+                self.console.print(&#34;\n[bold green]🎉 Mission Completed[/bold green]&#34;)
+            elif reason == &#34;user_cancelled&#34;:
+                self.console.print(&#34;\n[yellow]Mission cancelled by user.[/yellow]&#34;)
+            elif reason == &#34;limit_reached&#34;:
+                self.console.print(&#34;\n[yellow]Mission step limit reached.[/yellow]&#34;)
+
+            final_notes = &#34;\n&#34;.join(mission.get(&#39;scratchpad_notes&#39;, []))
+            guide = final_guide or mission.get(&#39;last_guide&#39;, &#39;&#39;)
+            asst_msg = f&#34;Notes: {final_notes}\nGuide: {guide}&#34; if final_notes else guide
+            hist = self.session_state.setdefault(&#34;copilot_chat_history&#34;, [])
+            hist.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: f&#34;/mission {mission.get(&#39;goal&#39;, &#39;&#39;)}&#34;})
+            hist.append({&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: asst_msg})
+            self.session_state[&#34;copilot_chat_history&#34;] = hist[-10:]
+
         while True:
-            # 2. Ask question
-            from prompt_toolkit.styles import Style
-            c_contrast = self._get_theme_color(&#34;contrast&#34;, &#34;gray&#34;)
-            ui_style = Style.from_dict({
-                &#39;bottom-toolbar&#39;: f&#39;fg:{c_contrast}&#39;,
-            })
-            
-            session = PromptSession(
-                history=self.history, 
-                input=self.pt_input, 
-                output=self.pt_output,
-                completer=copilot_completer,
-                reserve_space_for_menu=0,
-                style=ui_style
-            )
-            try:
-                # We use an internal try/finally to ensure that if something fails in prompt_async,
-                # we don&#39;t leave the terminal in a strange state.
-                question = await session.prompt_async(
-                    get_prompt_text, 
-                    key_bindings=bindings, 
-                    bottom_toolbar=get_toolbar,
-                    multiline=True
-                )
-            except (KeyboardInterrupt, EOFError):
-                state[&#39;cancelled&#39;] = True
-                question = &#34;&#34;
-            
-            if state[&#39;cancelled&#39;] or not question.strip() or question.strip().lower() in [&#39;cancel&#39;, &#39;exit&#39;, &#39;quit&#39;]:
-                return &#34;cancel&#34;, None, None
+            overrides = {}
+            # Check for active mission auto-looping
+            mission = self.session_state.get(&#39;mission&#39;, {})
+            is_mission = mission.get(&#39;active&#39;, False) and not mission.get(&#39;paused&#39;, False)
 
-            # 3. Process Input via AIService
-            directive = self.ai_service.process_copilot_input(question, self.session_state)
-            
-            if directive[&#34;action&#34;] == &#34;state_update&#34;:
-                msg = directive[&#39;message&#39;]
-                state[&#39;toolbar_msg&#39;] = msg
-                state[&#39;msg_expiry&#39;] = time.time() + 3 # 3 seconds timeout
+            if is_mission:
+                # Force mode_range for mission mode
+                state[&#39;context_mode&#39;] = self.mode_range
+                self.session_state[&#39;context_mode&#39;] = self.mode_range
+
+                if mission.get(&#39;start_block_idx&#39;) is None:
+                    mission[&#39;start_block_idx&#39;] = state[&#39;total_cmds&#39;]
+
+                start_idx = mission.get(&#39;start_block_idx&#39;, state[&#39;total_cmds&#39;])
+                cmds_since_start = max(1, (state[&#39;total_cmds&#39;] - start_idx) + 1)
+                state[&#39;context_cmd&#39;] = max(state.get(&#39;context_cmd&#39;, 1), cmds_since_start)
+                self.session_state[&#39;context_cmd&#39;] = state[&#39;context_cmd&#39;]
+
+                step = mission.get(&#39;step&#39;, 1)
+                max_steps = mission.get(&#39;max_steps&#39;, 10)
+
+                if step &gt; max_steps:
+                    ext_session = PromptSession(input=self.pt_input, output=self.pt_output)
+                    c_warn = self._get_theme_color(&#34;warning&#34;, &#34;yellow&#34;)
+                    import html
+                    p_warn = html.escape(f&#34;[Mission Limit Reached ({max_steps} steps)] Extend mission for 10 more steps? (y/n) [y]: &#34;)
+                    try:
+                        ext_ans = await ext_session.prompt_async(HTML(f&#39;&lt;style fg=&#34;{c_warn}&#34; bold=&#34;true&#34;&gt;{p_warn}&lt;/style&gt;&#39;))
+                    except (KeyboardInterrupt, EOFError):
+                        ext_ans = &#39;n&#39;
+
+                    if (ext_ans or &#39;y&#39;).lower().strip() in (&#39;y&#39;, &#39;yes&#39;):
+                        mission[&#39;max_steps&#39;] += 10
+                    else:
+                        goal = mission.get(&#39;goal&#39;, &#39;&#39;)
+                        question = f&#34;[MISSION SUMMARY]: Step limit reached ({max_steps} steps). Provide a concise summary of all findings and current status for: {goal}&#34;
+                        clean_question = question
+                        mission[&#39;active&#39;] = False
+                        is_mission = False
+                        self.console.print(f&#34;\n[bold cyan]🤖 Generating Final Mission Summary ({max_steps} steps reached)...[/bold cyan]&#34;)
+
+            if is_mission:
+                goal = mission.get(&#39;goal&#39;, &#39;&#39;)
+                step = mission.get(&#39;step&#39;, 1)
+                question = f&#34;[MISSION STEP {step}]: Continue analysis of: {goal}&#34;
                 
-                async def delayed_refresh():
-                    await asyncio.sleep(3.1)
-                    # Only invalidate if the message hasn&#39;t been replaced by a newer one
-                    if state.get(&#39;toolbar_msg&#39;) == msg:
-                        state[&#39;toolbar_msg&#39;] = &#39;&#39; # Explicitly clear
-                        try:
-                            from prompt_toolkit.application.current import get_app
-                            app = get_app()
-                            if app: app.invalidate()
-                        except: pass
-                asyncio.create_task(delayed_refresh())
-
-                # Move the cursor up and clean the line so the new prompt replaces the previous one
-                sys.stdout.write(&#39;\x1b[1A\x1b[2K&#39;)
-                sys.stdout.flush()
-                continue
+                scratchpad = mission.get(&#39;scratchpad_notes&#39;, [])
+                if scratchpad:
+                    notes_text = &#34;\n&#34;.join(f&#34;- {n}&#34; for n in scratchpad)
+                    question += f&#34;\n\nPast Mission Notes:\n{notes_text}&#34;
+                    
+                clean_question = question
+                self.console.print(f&#34;\n[bold cyan]🤖 Executing Mission Step {step}: {goal}[/bold cyan]&#34;)
+            elif not is_mission and &#39;clean_question&#39; in locals() and clean_question.startswith(&#34;[MISSION SUMMARY]&#34;):
+                # Pass-through to AI execution for generating final summary
+                pass
             else:
-                # Clean the toolbar message when a real question is asked
-                state[&#39;toolbar_msg&#39;] = &#39;&#39;
-            
-            clean_question = directive.get(&#34;clean_prompt&#34;, question)
-            overrides = directive.get(&#34;overrides&#34;, {})
+                # 2. Ask question
+                from prompt_toolkit.styles import Style
+                c_contrast = self._get_theme_color(&#34;contrast&#34;, &#34;gray&#34;)
+                ui_style = Style.from_dict({
+                    &#39;bottom-toolbar&#39;: f&#39;fg:{c_contrast}&#39;,
+                })
+                
+                session = PromptSession(
+                    history=self.history, 
+                    input=self.pt_input, 
+                    output=self.pt_output,
+                    completer=copilot_completer,
+                    reserve_space_for_menu=0,
+                    style=ui_style
+                )
+                try:
+                    question = await session.prompt_async(
+                        get_prompt_text, 
+                        key_bindings=bindings, 
+                        bottom_toolbar=get_toolbar,
+                        multiline=True
+                    )
+                except (KeyboardInterrupt, EOFError):
+                    state[&#39;cancelled&#39;] = True
+                    question = &#34;&#34;
+                
+                if state[&#39;cancelled&#39;] or not question.strip() or question.strip().lower() in [&#39;cancel&#39;, &#39;exit&#39;, &#39;quit&#39;]:
+                    _finalize_mission(&#34;user_cancelled&#34;)
+                    return &#34;cancel&#34;, None, None
+
+                # 3. Process Input via AIService
+                directive = self.ai_service.process_copilot_input(question, self.session_state)
+                
+                if directive[&#34;action&#34;] == &#34;mission_start&#34;:
+                    mission = self.session_state.get(&#39;mission&#39;, {})
+                    mission[&#39;start_block_idx&#39;] = state[&#39;total_cmds&#39;]
+                    state[&#39;context_mode&#39;] = self.mode_range
+                    self.session_state[&#39;context_mode&#39;] = self.mode_range
+                    state[&#39;context_cmd&#39;] = 1
+                    self.session_state[&#39;context_cmd&#39;] = 1
+                    clean_question = f&#34;[MISSION STEP 1]: {directive[&#39;clean_prompt&#39;]}&#34;
+                    overrides = directive.get(&#34;overrides&#34;, {})
+                    self.console.print(f&#34;\n[bold cyan]🤖 Starting Mission: {directive[&#39;clean_prompt&#39;]}[/bold cyan]&#34;)
+                elif directive[&#34;action&#34;] == &#34;mission_cancel&#34;:
+                    _finalize_mission(&#34;user_cancelled&#34;)
+                    state[&#39;toolbar_msg&#39;] = &#39;Mission cancelled&#39;
+                    continue
+                elif directive[&#34;action&#34;] == &#34;state_update&#34;:
+                    msg = directive[&#39;message&#39;]
+                    state[&#39;toolbar_msg&#39;] = msg
+                    state[&#39;msg_expiry&#39;] = time.time() + 3 # 3 seconds timeout
+                    
+                    async def delayed_refresh():
+                        await asyncio.sleep(3.1)
+                        if state.get(&#39;toolbar_msg&#39;) == msg:
+                            state[&#39;toolbar_msg&#39;] = &#39;&#39;
+                            try:
+                                from prompt_toolkit.application.current import get_app
+                                app = get_app()
+                                if app: app.invalidate()
+                            except: pass
+                    asyncio.create_task(delayed_refresh())
+
+                    sys.stdout.write(&#39;\x1b[1A\x1b[2K&#39;)
+                    sys.stdout.flush()
+                    continue
+                else:
+                    state[&#39;toolbar_msg&#39;] = &#39;&#39;
+                    if mission.get(&#39;active&#39;, False):
+                        mission[&#39;paused&#39;] = False
+                        step = mission.get(&#39;step&#39;, 1)
+                        goal = mission.get(&#39;goal&#39;, &#39;&#39;)
+                        clean_question = f&#34;[MISSION FEEDBACK (Step {step})]: User provided guidance: {question}. Continue the mission for goal: {goal}&#34;
+                        self.console.print(f&#34;\n[bold cyan]🤖 Continuing Mission with User Feedback: {question}[/bold cyan]&#34;)
+                        overrides = directive.get(&#34;overrides&#34;, {})
+                    else:
+                        clean_question = directive.get(&#34;clean_prompt&#34;, question)
+                        overrides = directive.get(&#34;overrides&#34;, {})
             
             # Merge node_info with session_state and overrides
             merged_node_info = node_info.copy()
@@ -933,7 +1144,6 @@ el.replaceWith(d);
                 merged_node_info[k] = v
 
             # 3. AI Execution
-            # Use persona from overrides (one-shot) or from session state
             active_persona = merged_node_info.get(&#39;persona&#39;, self.session_state.get(&#39;persona&#39;, &#39;engineer&#39;))
             persona_color = self._get_theme_color(active_persona, fallback=&#34;cyan&#34;)
             persona_title = &#34;Network Architect&#34; if active_persona == &#34;architect&#34; else &#34;Network Engineer&#34;
@@ -960,7 +1170,6 @@ el.replaceWith(d);
                 nonlocal live_text, first_chunk
                 if first_chunk:
                     status_spinner.stop()
-                    # Print header rule before first chunk arrives
                     self.console.print(Rule(
                         f&#34;[bold {persona_color}]{persona_title}[/bold {persona_color}]&#34;,
                         style=persona_color
@@ -969,7 +1178,6 @@ el.replaceWith(d);
                 live_text += text
                 md_parser.feed(text)
             
-            # Check for interruption during AI call
             ai_task = asyncio.create_task(on_ai_call(active_buffer, clean_question, on_chunk, merged_node_info))
             
             try:
@@ -978,13 +1186,12 @@ el.replaceWith(d);
                 result = await ai_task
             except asyncio.CancelledError:
                 status_spinner.stop()
+                _finalize_mission(&#34;user_cancelled&#34;)
                 return &#34;cancel&#34;, None, None
             
-            # Ensure spinner is stopped if no chunks arrived
             if first_chunk:
                 status_spinner.stop()
 
-            # Close the streamed output with a Rule
             if not first_chunk:
                 md_parser.flush()
                 self.console.print(Rule(style=persona_color))
@@ -992,26 +1199,35 @@ el.replaceWith(d);
             if not result or result.get(&#34;error&#34;):
                 if first_chunk and result and result.get(&#34;error&#34;):
                     self.console.print(f&#34;[red]Error: {result[&#39;error&#39;]}[/red]&#34;)
+                _finalize_mission(&#34;user_cancelled&#34;)
                 return &#34;cancel&#34;, None, None
 
-            # If no chunks were streamed but we have a guide, print it as a panel
             if first_chunk and result and result.get(&#34;guide&#34;):
                 from rich.markdown import Markdown
                 self.console.print(Panel(Markdown(result[&#34;guide&#34;]), title=f&#34;[bold {persona_color}]{persona_title}[/bold {persona_color}]&#34;, border_style=persona_color))
 
-            # Update copilot_chat_history with clean Q&amp;A turn
+            # Update copilot_chat_history or mission scratchpad
             if result and not result.get(&#34;error&#34;):
                 guide = result.get(&#34;guide&#34;, &#34;&#34;)
                 notes = result.get(&#34;notes&#34;, &#34;&#34;)
-                if guide:
-                    asst_msg = f&#34;Notes: {notes}\nGuide: {guide}&#34; if notes else guide
-                    hist = self.session_state.setdefault(&#34;copilot_chat_history&#34;, [])
-                    hist.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: clean_question})
-                    hist.append({&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: asst_msg})
-                    self.session_state[&#34;copilot_chat_history&#34;] = hist[-10:]
-
+                mission = self.session_state.get(&#39;mission&#39;, {})
+                if mission.get(&#39;active&#39;, False):
+                    if notes:
+                        mission.setdefault(&#39;scratchpad_notes&#39;, []).append(notes)
+                    if guide:
+                        mission[&#39;last_guide&#39;] = guide
+                else:
+                    if guide or notes:
+                        asst_msg = f&#34;Notes: {notes}\nGuide: {guide}&#34; if notes else guide
+                        hist = self.session_state.setdefault(&#34;copilot_chat_history&#34;, [])
+                        hist.append({&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: clean_question})
+                        hist.append({&#34;role&#34;: &#34;assistant&#34;, &#34;content&#34;: asst_msg})
+                        self.session_state[&#34;copilot_chat_history&#34;] = hist[-10:]
             commands = result.get(&#34;commands&#34;, [])
+            mission = self.session_state.get(&#39;mission&#39;, {})
             if not commands:
+                if mission.get(&#39;active&#39;, False):
+                    _finalize_mission(&#34;completed&#34;, result.get(&#34;guide&#34;, &#34;&#34;))
                 self.console.print(&#34;&#34;)
                 return &#34;continue&#34;, None, None
 
@@ -1020,11 +1236,12 @@ el.replaceWith(d);
             style_color = self._get_theme_color(risk_style, fallback=&#34;green&#34;)
             
             cmd_text = &#34;\n&#34;.join(f&#34;  {i+1}. {c}&#34; for i, c in enumerate(commands))
-            # Explicitly use &#39;bold style_color&#39; for both TITLE and BORDER to ensure maximum consistency
             self.console.print(Panel(cmd_text, title=f&#34;[bold {style_color}]Suggested Commands [{risk.upper()}][/bold {style_color}]&#34;, border_style=f&#34;bold {style_color}&#34;))
 
             if merged_node_info.get(&#39;trust&#39;, False) and risk != &#34;destructive&#34;:
                 self.console.print(f&#34;[dim]⚙️ Auto-executing (Trust Mode)[/dim]&#34;)
+                if mission.get(&#39;active&#39;, False):
+                    mission[&#39;step&#39;] = mission.get(&#39;step&#39;, 1) + 1
                 return &#34;send_all&#34;, commands, None
 
             confirm_session = PromptSession(input=self.pt_input, output=self.pt_output)
@@ -1036,41 +1253,39 @@ el.replaceWith(d);
             import html
             try:
                 p_text = html.escape(f&#34;Send? (y/n/e/range) [n]: &#34;)
-                # Use the EXACT same style_color and force bold=&#34;true&#34; for Prompt-Toolkit
                 action = await confirm_session.prompt_async(HTML(f&#39;&lt;style fg=&#34;{style_color}&#34; bold=&#34;true&#34;&gt;{p_text}&lt;/style&gt;&#39;), key_bindings=c_bindings)
             except (KeyboardInterrupt, EOFError):
+                _finalize_mission(&#34;user_cancelled&#34;, result.get(&#34;guide&#34;, &#34;&#34;))
                 self.console.print(&#34;&#34;)
                 return &#34;continue&#34;, None, None
 
             def parse_indices(text, max_len):
-                &#34;&#34;&#34;Helper to parse &#39;1-3, 5, 7&#39; into [0, 1, 2, 4, 6].&#34;&#34;&#34;
                 indices = []
-                # Replace commas with spaces and split
                 parts = text.replace(&#39;,&#39;, &#39; &#39;).split()
                 for part in parts:
                     if &#39;-&#39; in part:
                         try:
                             start, end = map(int, part.split(&#39;-&#39;))
-                            # Ensure inclusive and 0-indexed
                             indices.extend(range(start-1, end))
                         except: continue
                     elif part.isdigit():
                         indices.append(int(part)-1)
-                # Filter valid indices and remove duplicates
                 return [i for i in sorted(set(indices)) if 0 &lt;= i &lt; max_len]
 
             action_l = (action or &#34;n&#34;).lower().strip()
             if action_l in (&#39;y&#39;, &#39;yes&#39;, &#39;all&#39;):
+                if mission.get(&#39;active&#39;, False):
+                    mission[&#39;step&#39;] = mission.get(&#39;step&#39;, 1) + 1
                 return &#34;send_all&#34;, commands, None
             
-            # Check for numeric selection (e.g., &#34;1, 2-4&#34;)
             if re.match(r&#39;^[0-9,\-\s]+$&#39;, action_l):
                 selected_idxs = parse_indices(action_l, len(commands))
                 if selected_idxs:
+                    if mission.get(&#39;active&#39;, False):
+                        mission[&#39;step&#39;] = mission.get(&#39;step&#39;, 1) + 1
                     return &#34;send_all&#34;, [commands[i] for i in selected_idxs], None
 
             elif action_l.startswith(&#39;e&#39;):
-                # Check if it&#39;s a selective edit like &#39;e1-2&#39;
                 selection_str = action_l[1:].strip()
                 if selection_str:
                     idxs = parse_indices(selection_str, len(commands))
@@ -1096,13 +1311,22 @@ el.replaceWith(d);
                         default=target, multiline=True, key_bindings=e_bindings
                     )
                 except (KeyboardInterrupt, EOFError):
+                    if mission.get(&#39;active&#39;, False):
+                        mission[&#39;paused&#39;] = True
+                        self.console.print(&#34;\n[yellow]⏸️  Mission Paused — Provide feedback to redirect, or type /cancel to abort.[/yellow]&#34;)
                     self.console.print(&#34;&#34;)
                     return &#34;continue&#34;, None, None
 
                 if edited and edited.strip():
-                    # Split by lines to ensure core.py applies delay between each command
                     lines = [l.strip() for l in edited.split(&#39;\n&#39;) if l.strip()]
+                    if mission.get(&#39;active&#39;, False):
+                        mission[&#39;step&#39;] = mission.get(&#39;step&#39;, 1) + 1
                     return &#34;custom&#34;, None, lines
+
+            # User rejected/cancelled the commands
+            if mission.get(&#39;active&#39;, False):
+                mission[&#39;paused&#39;] = True
+                self.console.print(&#34;\n[yellow]⏸️  Mission Paused — Provide feedback to redirect, or type /cancel to abort.[/yellow]&#34;)
                 
             self.console.print(&#34;&#34;)
             return &#34;continue&#34;, None, None
@@ -1144,7 +1368,7 @@ on_ai_call: async function(active_buffer, question) -&gt; result_dict</p></div>
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
 </footer>
 </body>
 </html>

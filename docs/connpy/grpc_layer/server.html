@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.5">
+<meta name="generator" content="pdoc3 0.11.6">
 <title>connpy.grpc_layer.server API documentation</title>
 <meta name="description" content="">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
@@ -604,7 +604,7 @@ def service(self):
 <dl>
 <dt id="connpy.grpc_layer.server.AuthInterceptor.OPEN_METHODS"><code class="name">var <span class="ident">OPEN_METHODS</span></code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>The type of the None singleton.</p></div>
 </dd>
 </dl>
 <h3>Methods</h3>
@@ -1583,7 +1583,8 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
                     is_single = saved_mode in (1, &#39;SINGLE&#39;, &#39;single&#39;)
 
                     if is_range or is_single:
-                        if last_total_cmds is not None and total_cmds &gt; last_total_cmds and saved_cmd &gt; 1:
+                        is_mission = session_state.get(&#39;mission&#39;, {}).get(&#39;active&#39;, False) or (isinstance(node_info, dict) and node_info.get(&#39;mission&#39;, {}).get(&#39;active&#39;, False))
+                        if last_total_cmds is not None and total_cmds &gt; last_total_cmds and (saved_cmd &gt; 1 or is_mission):
                             new_cmds = total_cmds - last_total_cmds
                             initial_cmd = saved_cmd + new_cmds
                         else:
@@ -1627,6 +1628,14 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
                     ))
 
                     while True:
+                        # Refresh latest buffer from terminal log
+                        raw_bytes = n.mylog.getvalue() if hasattr(n, &#39;mylog&#39;) else buffer
+                        if not isinstance(raw_bytes, bytes):
+                            raw_bytes = str(raw_bytes).encode()
+                        from connpy.utils import log_cleaner
+                        cleaned_buffer = log_cleaner(raw_bytes.decode(errors=&#39;replace&#39;))
+                        buffer = cleaned_buffer
+
                         # 0. Drain the queue of any stale messages before starting a new interaction
                         while not remote_stream.copilot_queue.empty():
                             try:
@@ -1760,15 +1769,73 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
                         if action == &#34;send_all&#34;:
                             commands = result.get(&#34;commands&#34;, [])
                             await n.inject_commands(commands, child_fd, on_inject=on_inject)
-                            return
                         elif action.startswith(&#34;custom:&#34;):
                             custom_cmds_raw = action[7:]
                             custom_cmds = [cmd.strip() for cmd in custom_cmds_raw.split(&#39;\n&#39;) if cmd.strip()]
                             await n.inject_commands(custom_cmds, child_fd, on_inject=on_inject)
-                            return
                         else:
                             os.write(child_fd, b&#39;\x15\r&#39;)
                             return
+
+                        # Dynamic Wait for Device Prompt Settle
+                        prompt_pattern = node_info.get(&#34;prompt&#34;, r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;)
+                        import time
+                        import re
+                        start_t = time.time()
+                        last_len = 0
+                        quiet_count = 0
+                        while time.time() - start_t &lt; 60:
+                            await asyncio.sleep(0.15)
+                            cur_bytes = n.mylog.getvalue()
+                            if len(cur_bytes) == last_len:
+                                quiet_count += 1
+                            else:
+                                quiet_count = 0
+                                last_len = len(cur_bytes)
+                            
+                            clean_txt = n._logclean(cur_bytes.decode(errors=&#39;replace&#39;), True).strip()
+                            lines = [l.strip() for l in clean_txt.split(&#39;\n&#39;) if l.strip()]
+                            last_line = lines[-1] if lines else &#34;&#34;
+                            if quiet_count &gt;= 2 and re.search(prompt_pattern, last_line):
+                                break
+
+                        # Recalculate context blocks with updated buffer
+                        raw_bytes = n.mylog.getvalue()
+                        from connpy.utils import log_cleaner
+                        cleaned_buffer = log_cleaner(raw_bytes.decode(errors=&#39;replace&#39;))
+                        last_line = cleaned_buffer.split(&#39;\n&#39;)[-1].strip() if cleaned_buffer.strip() else &#34;(prompt)&#34;
+                        blocks = service.build_context_blocks(raw_bytes, n.cmd_byte_positions, node_info, last_line=last_line)
+                        node_info[&#34;context_blocks&#34;] = blocks
+
+                        total_cmds = len(blocks)
+                        total_lines = len(cleaned_buffer.split(&#39;\n&#39;))
+
+                        last_total_cmds = session_state.get(&#39;last_total_cmds&#39;, None)
+                        saved_cmd = session_state.get(&#39;context_cmd&#39;, 1)
+                        is_mission = session_state.get(&#39;mission&#39;, {}).get(&#39;active&#39;, False) or (isinstance(node_info, dict) and node_info.get(&#39;mission&#39;, {}).get(&#39;active&#39;, False))
+                        if last_total_cmds is not None and total_cmds &gt; last_total_cmds and (saved_cmd &gt; 1 or is_mission):
+                            new_cmds = total_cmds - last_total_cmds
+                            initial_cmd = saved_cmd + new_cmds
+                        else:
+                            initial_cmd = saved_cmd
+
+                        session_state[&#39;context_cmd&#39;] = max(1, initial_cmd)
+                        session_state[&#39;last_total_cmds&#39;] = total_cmds
+                        session_state[&#39;last_total_lines&#39;] = total_lines
+
+                        node_info[&#39;context_cmd&#39;] = min(session_state[&#39;context_cmd&#39;], max(1, total_cmds))
+                        node_info[&#39;context_lines&#39;] = min(session_state.get(&#39;context_lines&#39;, 50), max(1, total_lines))
+                        node_info_json = json.dumps(node_info)
+
+                        preview_str = raw_bytes[-200:].decode(errors=&#39;replace&#39;) if isinstance(raw_bytes, bytes) else str(raw_bytes)[-200:]
+
+                        # Signal prompt settle and send updated blocks to client
+                        response_queue.put(connpy_pb2.InteractResponse(
+                            copilot_prompt=True,
+                            copilot_buffer_preview=preview_str,
+                            copilot_node_info_json=node_info_json
+                        ))
+                        continue
 
                 asyncio.run(n._async_interact_loop(remote_stream, resize_callback, copilot_handler=remote_copilot_handler))
             except Exception as e:
@@ -2516,7 +2583,7 @@ def service(self):
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
 </footer>
 </body>
 </html>

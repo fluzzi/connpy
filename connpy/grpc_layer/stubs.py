@@ -44,7 +44,7 @@ class NodeStub:
         self.config = config
 
     def _handle_remote_copilot(self, res, request_queue, response_queue, client_buffer_bytes, pause_generator, resume_generator, old_tty):
-        import json, asyncio, termios, sys, tty, queue
+        import json, asyncio, termios, sys, tty, queue, os
         from ..core import copilot_terminal_mode
         from . import connpy_pb2
 
@@ -62,6 +62,7 @@ class NodeStub:
         )
         self.copilot_history = interface.history
         self.copilot_state = interface.session_state
+        interface.session_state['banner_shown'] = False
 
         async def on_ai_call_remote(active_buffer, question, chunk_callback, merged_node_info):
             # Send request to server
@@ -84,6 +85,7 @@ class NodeStub:
 
         # Wrap in async loop
         async def run_remote_copilot():
+            nonlocal blocks, node_info
             while True:
                 action, commands, custom_cmd = await interface.run_session(
                     raw_bytes=bytes(client_buffer_bytes),
@@ -97,6 +99,32 @@ class NodeStub:
                     request_queue.put(connpy_pb2.InteractRequest(copilot_action="continue"))
                     continue
                 
+                if action in ("send_all", "custom"):
+                    action_sent = "cancel"
+                    if action == "send_all" and commands:
+                        action_sent = f"custom:{chr(10).join(commands)}"
+                    elif action == "custom" and custom_cmd:
+                        action_sent = f"custom:{chr(10).join(custom_cmd)}"
+                    request_queue.put(connpy_pb2.InteractRequest(copilot_action=action_sent))
+
+                    print("\r\n\033[2m [Remote] Ejecutando comandos y esperando al prompt...\033[0m\r\n", flush=True)
+                    while True:
+                        try:
+                            prompt_res = response_queue.get(timeout=0.1)
+                            if prompt_res is None:
+                                return "cancel", None, None
+                            if prompt_res.stdout_data:
+                                os.write(sys.stdout.fileno(), prompt_res.stdout_data)
+                                client_buffer_bytes.extend(prompt_res.stdout_data)
+                            if prompt_res.copilot_prompt:
+                                if prompt_res.copilot_node_info_json:
+                                    node_info = json.loads(prompt_res.copilot_node_info_json)
+                                    blocks = node_info.get("context_blocks", [])
+                                break
+                        except queue.Empty:
+                            await asyncio.sleep(0.05)
+                    continue
+
                 return action, commands, custom_cmd
         
         with copilot_terminal_mode():
@@ -104,14 +132,7 @@ class NodeStub:
         
         print("\033[2m Returning to session...\033[0m", flush=True)
         # Prepare final action for server
-        action_sent = "cancel"
-        if action == "send_all" and commands:
-            # In remote mode, send the selected commands as a custom block
-            # so the server executes exactly what the user picked (e.g., selection '1')
-            action_sent = f"custom:{chr(10).join(commands)}"
-        elif action == "custom" and custom_cmd:
-            action_sent = f"custom:{chr(10).join(custom_cmd)}"
-        request_queue.put(connpy_pb2.InteractRequest(copilot_action=action_sent))
+        request_queue.put(connpy_pb2.InteractRequest(copilot_action="cancel"))
         resume_generator()
         tty.setraw(sys.stdin.fileno())
 

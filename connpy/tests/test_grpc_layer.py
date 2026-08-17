@@ -211,3 +211,80 @@ class TestGRPCIntegration:
         finally:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
+
+    @patch("sys.stdin.fileno", return_value=0)
+    @patch("termios.tcsetattr")
+    @patch("termios.tcgetattr")
+    @patch("tty.setraw")
+    @patch("os.write")
+    def test_handle_remote_copilot_command_execution_loop(self, mock_os_write, mock_setraw, mock_getattr, mock_setattr, mock_fileno):
+        import queue
+        from connpy.grpc_layer.stubs import NodeStub
+        from connpy.cli.terminal_ui import CopilotInterface
+
+        mock_getattr.return_value = [0, 0, 0, 0, 0, 0, [0] * 32]
+        mock_channel = MagicMock()
+        stub = NodeStub(mock_channel, "localhost:8048")
+
+        initial_node_info = {
+            "name": "r1",
+            "context_blocks": [[0, 10, "router#"]]
+        }
+        res = connpy_pb2.InteractResponse(
+            copilot_prompt=True,
+            copilot_node_info_json=json.dumps(initial_node_info)
+        )
+
+        request_queue = queue.Queue()
+        response_queue = queue.Queue()
+        client_buffer_bytes = bytearray(b"router# ")
+        pause_gen = MagicMock()
+        resume_gen = MagicMock()
+        old_tty = [0] * 7
+
+        call_count = 0
+        received_blocks_per_call = []
+
+        async def mock_run_session(raw_bytes, node_info, on_ai_call, blocks):
+            nonlocal call_count
+            call_count += 1
+            received_blocks_per_call.append(list(blocks))
+            if call_count == 1:
+                # Step 1: User approves commands
+                # Simulate server putting stdout data and next copilot prompt
+                updated_node_info = {
+                    "name": "r1",
+                    "context_blocks": [[0, 10, "router#"], [10, 30, "router# show ip route"]]
+                }
+                response_queue.put(connpy_pb2.InteractResponse(stdout_data=b"show ip route\r\n10.0.0.0/24\r\nrouter# "))
+                response_queue.put(connpy_pb2.InteractResponse(
+                    copilot_prompt=True,
+                    copilot_node_info_json=json.dumps(updated_node_info)
+                ))
+                return "send_all", ["show ip route"], None
+            else:
+                # Step 2: Second turn, mission completes or user cancels
+                return "cancel", None, None
+
+        with patch.object(CopilotInterface, "run_session", side_effect=mock_run_session):
+            stub._handle_remote_copilot(
+                res, request_queue, response_queue, client_buffer_bytes,
+                pause_gen, resume_gen, old_tty
+            )
+
+        # Assert that run_session was called twice
+        assert call_count == 2
+        # First call should have initial blocks
+        assert len(received_blocks_per_call[0]) == 1
+        # Second call should have updated blocks received from server
+        assert len(received_blocks_per_call[1]) == 2
+        assert received_blocks_per_call[1][1][2] == "router# show ip route"
+        # Assert client_buffer_bytes was updated with stdout_data
+        assert b"10.0.0.0/24" in bytes(client_buffer_bytes)
+        # Assert action sent to server
+        reqs = []
+        while not request_queue.empty():
+            reqs.append(request_queue.get_nowait())
+        assert reqs[0].copilot_action == "custom:show ip route"
+        assert reqs[1].copilot_action == "cancel"
+

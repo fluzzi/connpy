@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
-<meta name="generator" content="pdoc3 0.11.5">
+<meta name="generator" content="pdoc3 0.11.6">
 <title>connpy API documentation</title>
 <meta name="description" content="&lt;p align=&#34;center&#34;&gt;
 &lt;img src=&#34;https://nginx.gederico.dynu.net/images/CONNPY-resized.png&#34; alt=&#34;App Logo&#34;&gt;
@@ -41,7 +41,7 @@ el.replaceWith(d);
 <p align="center">
 <img src="https://nginx.gederico.dynu.net/images/CONNPY-resized.png" alt="App Logo">
 </p>
-<h1 id="connpy-v620">Connpy (v6.2.0)</h1>
+<h1 id="connpy-v630">Connpy (v6.3.0)</h1>
 <p><a href="https://pypi.org/pypi/connpy/"><img alt="" src="https://img.shields.io/pypi/v/connpy.svg?style=flat-square"></a>
 <a href="https://pypi.org/pypi/connpy/"><img alt="" src="https://img.shields.io/pypi/pyversions/connpy.svg?style=flat-square"></a>
 <a href="https://pypi.org/pypi/connpy/"><img alt="" src="https://img.shields.io/pypi/dm/connpy.svg?style=flat-square&amp;cacheSeconds=86400"></a>
@@ -57,7 +57,9 @@ el.replaceWith(d);
 <h3 id="1a-terminal-copilot-ctrlspace">1a. Terminal Copilot (Ctrl+Space)</h3>
 <p>Invoke the context-aware AI Copilot directly inside any active terminal session by pressing <strong><code>Ctrl + Space</code></strong>.
 * <strong>Context Modes</strong>: Cycles through <code>LINES</code> (sends raw scroll buffer), <code>SINGLE</code> (captures exactly one command + output block), and <code>RANGE</code> (logical group of recent commands) using <strong><code>Ctrl+Up/Down</code></strong>.
-* <strong>Slash Commands (<code>/</code>)</strong>: Control the AI persona and safety settings:
+* <strong>Slash Commands (<code>/</code>)</strong>: Control the AI persona, safety settings, and mission mode:
+* <code>/mission [objective]</code>: Start an autonomous multi-step investigation mission with human approval.
+* <code>/cancel</code>: Abort active mission.
 * <code>/architect</code> / <code>/engineer</code>: Swaps the agent between high-level strategist and technical executor.
 * <code>/trust</code> / <code>/untrust</code>: Configures auto-run behavior for suggested non-destructive commands.
 * <code>/os [system]</code>: Manually overrides target OS parsing rules (e.g. <code>/os cisco_ios</code>).
@@ -2421,6 +2423,7 @@ class node:
                 # Save history back to stream for persistence in current session
                 stream.copilot_history = interface.history
                 stream.copilot_state = interface.session_state
+                interface.session_state[&#39;banner_shown&#39;] = False
                 
                 ai_service = AIService(config)
                 
@@ -2451,6 +2454,32 @@ class node:
                                 node_info=node_info,
                                 on_ai_call=on_ai_call
                             )
+                            if action in (&#34;send_all&#34;, &#34;custom&#34;):
+                                cmds_to_send = commands if action == &#34;send_all&#34; else custom_cmd
+                                await self.inject_commands(cmds_to_send, child_fd)
+                                
+                                # Dynamic Wait for Device Prompt Settle
+                                prompt_pattern = node_info.get(&#34;prompt&#34;, r&#39;&gt;$|#$|\$$|&gt;.$|#.$|\$.$&#39;)
+                                start_t = time()
+                                last_len = 0
+                                quiet_count = 0
+                                while time() - start_t &lt; 60:
+                                    await asyncio.sleep(0.15)
+                                    cur_bytes = self.mylog.getvalue()
+                                    if len(cur_bytes) == last_len:
+                                        quiet_count += 1
+                                    else:
+                                        quiet_count = 0
+                                        last_len = len(cur_bytes)
+                                    
+                                    clean_txt = self._logclean(cur_bytes.decode(errors=&#39;replace&#39;), True).strip()
+                                    lines = [l.strip() for l in clean_txt.split(&#39;\n&#39;) if l.strip()]
+                                    last_line = lines[-1] if lines else &#34;&#34;
+                                    if quiet_count &gt;= 2 and re.search(prompt_pattern, last_line):
+                                        break
+
+                                raw_bytes = self.mylog.getvalue()
+                                continue
                             if action == &#34;continue&#34;:
                                 continue
                             break
@@ -2462,11 +2491,7 @@ class node:
                     elif hasattr(stream, &#39;_loop&#39;) and hasattr(stream, &#39;stdin_fd&#39;):
                         stream._loop.add_reader(stream.stdin_fd, stream._read_ready)
                 
-                if action in (&#34;send_all&#34;, &#34;custom&#34;):
-                    cmds_to_send = commands if action == &#34;send_all&#34; else custom_cmd
-                    await self.inject_commands(cmds_to_send, child_fd)
-                else:
-                    os.write(child_fd, b&#39;\x15\r&#39;)
+                os.write(child_fd, b&#39;\x15\r&#39;)
             except Exception as e:
                 import traceback
                 print(f&#34;\n[ERROR in Copilot Handler] {e}&#34;, flush=True)
@@ -4087,7 +4112,7 @@ def test(self, commands, expected, vars = None,*, folder = None, prompt = None, 
 <nav id="sidebar">
 <div class="toc">
 <ul>
-<li><a href="#connpy-v620">Connpy (v6.2.0)</a><ul>
+<li><a href="#connpy-v630">Connpy (v6.3.0)</a><ul>
 <li><a href="#1-ai-system">1. 🤖 AI System</a><ul>
 <li><a href="#1a-terminal-copilot-ctrlspace">1a. Terminal Copilot (Ctrl+Space)</a></li>
 <li><a href="#1b-ai-chat-conn-ai">1b. AI Chat (conn ai)</a></li>
@@ -4195,7 +4220,7 @@ def test(self, commands, expected, vars = None,*, folder = None, prompt = None, 
 </nav>
 </main>
 <footer id="footer">
-<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.5</a>.</p>
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
 </footer>
 </body>
 </html>

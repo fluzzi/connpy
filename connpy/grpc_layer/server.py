@@ -277,7 +277,8 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
                     is_single = saved_mode in (1, 'SINGLE', 'single')
 
                     if is_range or is_single:
-                        if last_total_cmds is not None and total_cmds > last_total_cmds and saved_cmd > 1:
+                        is_mission = session_state.get('mission', {}).get('active', False) or (isinstance(node_info, dict) and node_info.get('mission', {}).get('active', False))
+                        if last_total_cmds is not None and total_cmds > last_total_cmds and (saved_cmd > 1 or is_mission):
                             new_cmds = total_cmds - last_total_cmds
                             initial_cmd = saved_cmd + new_cmds
                         else:
@@ -321,6 +322,14 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
                     ))
 
                     while True:
+                        # Refresh latest buffer from terminal log
+                        raw_bytes = n.mylog.getvalue() if hasattr(n, 'mylog') else buffer
+                        if not isinstance(raw_bytes, bytes):
+                            raw_bytes = str(raw_bytes).encode()
+                        from connpy.utils import log_cleaner
+                        cleaned_buffer = log_cleaner(raw_bytes.decode(errors='replace'))
+                        buffer = cleaned_buffer
+
                         # 0. Drain the queue of any stale messages before starting a new interaction
                         while not remote_stream.copilot_queue.empty():
                             try:
@@ -454,15 +463,73 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
                         if action == "send_all":
                             commands = result.get("commands", [])
                             await n.inject_commands(commands, child_fd, on_inject=on_inject)
-                            return
                         elif action.startswith("custom:"):
                             custom_cmds_raw = action[7:]
                             custom_cmds = [cmd.strip() for cmd in custom_cmds_raw.split('\n') if cmd.strip()]
                             await n.inject_commands(custom_cmds, child_fd, on_inject=on_inject)
-                            return
                         else:
                             os.write(child_fd, b'\x15\r')
                             return
+
+                        # Dynamic Wait for Device Prompt Settle
+                        prompt_pattern = node_info.get("prompt", r'>$|#$|\$$|>.$|#.$|\$.$')
+                        import time
+                        import re
+                        start_t = time.time()
+                        last_len = 0
+                        quiet_count = 0
+                        while time.time() - start_t < 60:
+                            await asyncio.sleep(0.15)
+                            cur_bytes = n.mylog.getvalue()
+                            if len(cur_bytes) == last_len:
+                                quiet_count += 1
+                            else:
+                                quiet_count = 0
+                                last_len = len(cur_bytes)
+                            
+                            clean_txt = n._logclean(cur_bytes.decode(errors='replace'), True).strip()
+                            lines = [l.strip() for l in clean_txt.split('\n') if l.strip()]
+                            last_line = lines[-1] if lines else ""
+                            if quiet_count >= 2 and re.search(prompt_pattern, last_line):
+                                break
+
+                        # Recalculate context blocks with updated buffer
+                        raw_bytes = n.mylog.getvalue()
+                        from connpy.utils import log_cleaner
+                        cleaned_buffer = log_cleaner(raw_bytes.decode(errors='replace'))
+                        last_line = cleaned_buffer.split('\n')[-1].strip() if cleaned_buffer.strip() else "(prompt)"
+                        blocks = service.build_context_blocks(raw_bytes, n.cmd_byte_positions, node_info, last_line=last_line)
+                        node_info["context_blocks"] = blocks
+
+                        total_cmds = len(blocks)
+                        total_lines = len(cleaned_buffer.split('\n'))
+
+                        last_total_cmds = session_state.get('last_total_cmds', None)
+                        saved_cmd = session_state.get('context_cmd', 1)
+                        is_mission = session_state.get('mission', {}).get('active', False) or (isinstance(node_info, dict) and node_info.get('mission', {}).get('active', False))
+                        if last_total_cmds is not None and total_cmds > last_total_cmds and (saved_cmd > 1 or is_mission):
+                            new_cmds = total_cmds - last_total_cmds
+                            initial_cmd = saved_cmd + new_cmds
+                        else:
+                            initial_cmd = saved_cmd
+
+                        session_state['context_cmd'] = max(1, initial_cmd)
+                        session_state['last_total_cmds'] = total_cmds
+                        session_state['last_total_lines'] = total_lines
+
+                        node_info['context_cmd'] = min(session_state['context_cmd'], max(1, total_cmds))
+                        node_info['context_lines'] = min(session_state.get('context_lines', 50), max(1, total_lines))
+                        node_info_json = json.dumps(node_info)
+
+                        preview_str = raw_bytes[-200:].decode(errors='replace') if isinstance(raw_bytes, bytes) else str(raw_bytes)[-200:]
+
+                        # Signal prompt settle and send updated blocks to client
+                        response_queue.put(connpy_pb2.InteractResponse(
+                            copilot_prompt=True,
+                            copilot_buffer_preview=preview_str,
+                            copilot_node_info_json=node_info_json
+                        ))
+                        continue
 
                 asyncio.run(n._async_interact_loop(remote_stream, resize_callback, copilot_handler=remote_copilot_handler))
             except Exception as e:
