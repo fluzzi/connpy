@@ -916,12 +916,14 @@ class node:
             str: Output of the commands you ran on the node.
 
         '''
-        connect = self._connect(timeout=timeout, logger=logger, force_ssh=(self.protocol == "mosh"))
+        force_ssh = (self.protocol == "mosh")
+        connect = self._connect(timeout=timeout, logger=logger, force_ssh=force_ssh)
         now = datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S')
         if connect == True:
             if logger:
-                port_str = f":{self.port}" if self.port and self.protocol not in ["ssm", "kubectl", "docker"] else ""
-                logger("success", f"Connected to {self.unique} at {self.host}{port_str} via: {self.protocol}")
+                effective_protocol = "ssh" if force_ssh else self.protocol
+                port_str = f":{self.port}" if self.port and effective_protocol not in ["ssm", "kubectl", "docker"] else ""
+                logger("success", f"Connected to {self.unique} at {self.host}{port_str} via: {effective_protocol}")
 
             if "prompt" in self.tags:
                 prompt = self.tags["prompt"]
@@ -1033,11 +1035,13 @@ class node:
 
         '''
         now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        connect = self._connect(timeout=timeout, logger=logger, force_ssh=(self.protocol == "mosh"))
+        force_ssh = (self.protocol == "mosh")
+        connect = self._connect(timeout=timeout, logger=logger, force_ssh=force_ssh)
         if connect == True:
             if logger:
-                port_str = f":{self.port}" if self.port and self.protocol not in ["ssm", "kubectl", "docker"] else ""
-                logger("success", f"Connected to {self.unique} at {self.host}{port_str} via: {self.protocol}")
+                effective_protocol = "ssh" if force_ssh else self.protocol
+                port_str = f":{self.port}" if self.port and effective_protocol not in ["ssm", "kubectl", "docker"] else ""
+                logger("success", f"Connected to {self.unique} at {self.host}{port_str} via: {effective_protocol}")
 
             if "prompt" in self.tags:
                 prompt = self.tags["prompt"]
@@ -1231,7 +1235,7 @@ class node:
         if self.options:
             opts = str(self.options).strip()
             if opts:
-                if re.search(r'--(?:ssh|server|client)', opts):
+                if re.search(r'--(?:ssh|server|client)(?:=|\s|$)', opts):
                     raise ValueError("Options cannot override --ssh, --server or --client for mosh")
                 if re.search(r'(?:LocalCommand|ProxyCommand)', opts, re.IGNORECASE):
                     raise ValueError("Options cannot contain LocalCommand or ProxyCommand")
@@ -1302,16 +1306,22 @@ class node:
             printer.error(f"Invalid protocol: {self.protocol}")
             sys.exit(1)
 
-    def _spawn_child(self, args):
-        env = os.environ.copy()
-        if not any(
-            "utf-8" in env.get(k, "").lower() or "utf8" in env.get(k, "").lower()
-            for k in ("LC_ALL", "LC_CTYPE", "LANG")
-        ):
-            env["LC_ALL"] = "C.UTF-8"
-        env.setdefault("TERM", "xterm-256color")
+    def _spawn_child(self, args, protocol=None):
+        if protocol is None:
+            protocol = getattr(self, "protocol", "")
+        env = None
+        if protocol == "mosh":
+            env = os.environ.copy()
+            if not any(
+                "utf-8" in env.get(k, "").lower() or "utf8" in env.get(k, "").lower()
+                for k in ("LC_ALL", "LC_CTYPE", "LANG")
+            ):
+                env["LC_ALL"] = "C.UTF-8"
+            env.setdefault("TERM", "xterm-256color")
         try:
-            return pexpect.spawn(args[0], args[1:], env=env), None
+            if env is not None:
+                return pexpect.spawn(args[0], args[1:], env=env), None
+            return pexpect.spawn(args[0], args[1:]), None
         except pexpect.exceptions.ExceptionPexpect as e:
             return None, f"Connection failed: {e}"
 
@@ -1327,7 +1337,7 @@ class node:
         if effective_protocol == "local":
             cmd = self._get_cmd()
             args = shlex.split(cmd)
-            child, err = self._spawn_child(args)
+            child, err = self._spawn_child(args, protocol=effective_protocol)
             if err:
                 return err
             self.child = child
@@ -1344,7 +1354,7 @@ class node:
         default_prompt = r'>$|#$|\$$|>.$|#.$|\$.$'
         prompt = self.tags.get("prompt", default_prompt) if isinstance(self.tags, dict) else default_prompt
         password_prompt = '[p|P]assword:|[u|U]sername:' if effective_protocol != 'telnet' else '[p|P]assword:'
-        mosh_prompt = r"(?:(?:" + prompt + r")(?:\x1b\[[0-9;?]*[a-zA-Z])*|\x1b\[\?1049h.*)$"
+        mosh_prompt = r"(?:(?:" + prompt + r")\x1b\[[0-9;?]*[a-zA-Z]|\x1b\[\?1049h.*)$"
 
         expects = {
             "ssh": ['yes/no', 'refused', 'supported', 'Invalid|[u|U]sage: ssh', 'ssh-keygen.*\"', 'timeout|timed.out', 'unavailable', 'closed', password_prompt, prompt, 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching", "[b|B]ad (owner|permissions)"],
@@ -1411,7 +1421,7 @@ class node:
         handshake_progressed = False
         while attempts <= max_attempts:
             args = shlex.split(cmd)
-            child, err = self._spawn_child(args)
+            child, err = self._spawn_child(args, protocol=effective_protocol)
             if err:
                 return err
             if isinstance(self.tags, dict) and self.tags.get("console"):

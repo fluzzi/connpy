@@ -748,3 +748,391 @@ class TestJumphostChain:
         assert 'aws ssm start-session' in n.jumphost
         assert 'admin@10.0.0.2' in n.jumphost
         assert '--region us-east-1' in n.jumphost
+
+
+# =========================================================================
+# Mosh protocol tests
+# =========================================================================
+
+class TestMoshProtocol:
+    """Comprehensive tests for Mosh (Mobile Shell) protocol support."""
+
+    def _make_config_with_nodes(self, tmp_config_dir, nodes, profiles=None):
+        import yaml
+        from connpy.configfile import configfile
+        if profiles is None:
+            profiles = {
+                "default": {
+                    "host": "", "protocol": "ssh", "port": "", "user": "",
+                    "password": "", "options": "", "logs": "", "tags": "", "jumphost": ""
+                }
+            }
+        data = {
+            "config": {"case": False, "idletime": 30, "fzf": False},
+            "connections": nodes,
+            "profiles": profiles
+        }
+        config_file = tmp_config_dir / "config.yaml"
+        config_file.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False))
+        os.chmod(str(config_file), 0o600)
+        return configfile(conf=str(config_file), key=str(tmp_config_dir / ".osk"))
+
+    def test_mosh_cmd_basic_and_double_dash(self):
+        """Basic mosh command generation with double dash separator."""
+        from connpy.core import node
+        n = node("m1", "10.0.0.1", user="admin", protocol="mosh")
+        assert n._get_cmd() == "mosh -- admin@10.0.0.1"
+
+    def test_mosh_cmd_ssh_port(self):
+        """Mosh command embeds SSH TCP port into --ssh option."""
+        import shlex
+        from connpy.core import node
+        n1 = node("m1", "10.0.0.1", user="admin", protocol="mosh", port="2222")
+        tokens1 = shlex.split(n1._get_cmd())
+        assert "--ssh=ssh -p 2222" in tokens1
+
+        n2 = node("m2", "10.0.0.1", user="admin", protocol="mosh", port=2222)
+        tokens2 = shlex.split(n2._get_cmd())
+        assert "--ssh=ssh -p 2222" in tokens2
+
+    def test_mosh_cmd_tags_and_quoting(self):
+        """Mosh tags for udp port, server binary, and ssh options are properly quoted."""
+        import shlex
+        from connpy.core import node
+        tags = {
+            "mosh_udp_port": "60001:60005",
+            "mosh_server": "/opt/mosh bin/mosh-server",
+            "mosh_ssh_options": "-i /tmp/key.pem",
+        }
+        n = node(
+            "m1", "10.0.0.1", user="admin", protocol="mosh", port="2222",
+            options="--predict=always", tags=tags
+        )
+        tokens = shlex.split(n._get_cmd())
+        assert "--server=/opt/mosh bin/mosh-server" in tokens
+        assert "-p" in tokens
+        idx_p = tokens.index("-p")
+        assert tokens[idx_p + 1] == "60001:60005"
+        assert "--ssh=ssh -p 2222 -i /tmp/key.pem" in tokens
+        assert "--predict=always" in tokens
+        assert "--" in tokens
+        assert tokens[-1] == "admin@10.0.0.1"
+
+    def test_mosh_port_validation_and_ssh_backward_compat(self):
+        """Invalid port values raise ValueError for mosh while preserving legacy ssh/sftp."""
+        from connpy.core import node
+        for bad_port in ["22; id", "0", "70000", "-1"]:
+            n = node("m1", "10.0.0.1", user="admin", protocol="mosh", port=bad_port)
+            with pytest.raises(ValueError, match="Invalid TCP SSH port"):
+                n._get_cmd()
+
+            n_sftp = node("m2", "10.0.0.1", user="admin", protocol="mosh", port=bad_port)
+            n_sftp.protocol = "sftp"
+            with pytest.raises(ValueError, match="Invalid TCP SSH port"):
+                n_sftp._get_cmd()
+
+        # Legacy backward compatibility: ssh and sftp preserve original behavior
+        ssh_node = node("s1", "10.0.0.1", user="admin", protocol="ssh", port="2222")
+        assert "-p 2222" in ssh_node._get_cmd()
+        sftp_node = node("sf1", "10.0.0.1", user="admin", protocol="sftp", port="2222")
+        assert "-P 2222" in sftp_node._get_cmd()
+
+    def test_mosh_rejects_leading_dash_in_host_or_user(self):
+        """Reject leading dash, whitespace, or shell metacharacters in host and user."""
+        from connpy.core import node
+        with pytest.raises(ValueError, match="Host cannot start with '-'"):
+            node("m1", "-oProxyCommand=evil", protocol="mosh")._get_cmd()
+
+        with pytest.raises(ValueError, match="User cannot start with '-'"):
+            node("m1", "10.0.0.1", user="-oProxyCommand=evil", protocol="mosh")._get_cmd()
+
+        for bad_host in ["10.0.0.1; id", "admin user", "host`id`", "host$id", "host|id", "host&id"]:
+            with pytest.raises(ValueError, match="Invalid characters in host"):
+                node("m1", bad_host, protocol="mosh")._get_cmd()
+
+        for bad_user in ["admin user", "user;id", "user`id`", "user$id", "user|id", "user&id"]:
+            with pytest.raises(ValueError, match="Invalid characters in user"):
+                node("m1", "10.0.0.1", user=bad_user, protocol="mosh")._get_cmd()
+
+    def test_mosh_rejects_forbidden_options_and_local_command(self):
+        """Reject dangerous options, command injection attempts, and unbalanced quotes."""
+        from connpy.core import node
+        for forbidden in [
+            "--ssh='ssh -o ProxyCommand=evil'",
+            "--server=/tmp/x",
+            "--client=/tmp/y",
+            "--ssh",
+            "--server",
+            "--client"
+        ]:
+            with pytest.raises(ValueError, match="Options cannot override --ssh, --server or --client for mosh"):
+                node("m1", "10.0.0.1", protocol="mosh", options=forbidden)._get_cmd()
+
+        # Legitimate options such as --ssh-agent are not falsely rejected
+        n_agent = node("m1", "10.0.0.1", protocol="mosh", options="--ssh-agent")
+        assert "--ssh-agent" in n_agent._get_cmd()
+
+        # LocalCommand / ProxyCommand in mosh_ssh_options
+        with pytest.raises(ValueError, match="mosh_ssh_options cannot contain LocalCommand or ProxyCommand"):
+            node("m1", "10.0.0.1", protocol="mosh", tags={"mosh_ssh_options": "-o LocalCommand='id'"})._get_cmd()
+        with pytest.raises(ValueError, match="mosh_ssh_options cannot contain LocalCommand or ProxyCommand"):
+            node("m1", "10.0.0.1", protocol="mosh", tags={"mosh_ssh_options": "-o ProxyCommand='nc'"})._get_cmd()
+
+        # LocalCommand / ProxyCommand in options
+        with pytest.raises(ValueError, match="Options cannot contain LocalCommand or ProxyCommand"):
+            node("m1", "10.0.0.1", protocol="mosh", options="-o LocalCommand='id'")._get_cmd()
+        with pytest.raises(ValueError, match="Options cannot contain LocalCommand or ProxyCommand"):
+            node("m1", "10.0.0.1", protocol="mosh", options="-o ProxyCommand='nc'")._get_cmd()
+
+        # Unbalanced quotes
+        with pytest.raises(ValueError, match="Invalid options: unbalanced quotes"):
+            node("m1", "10.0.0.1", protocol="mosh", options='--predict="always')._get_cmd()
+        with pytest.raises(ValueError, match="Invalid mosh_ssh_options: unbalanced quotes"):
+            node("m1", "10.0.0.1", protocol="mosh", tags={"mosh_ssh_options": '-i "/tmp/unclosed'})._get_cmd()
+
+        # Invalid mosh_udp_port
+        with pytest.raises(ValueError, match="Invalid mosh_udp_port"):
+            node("m1", "10.0.0.1", protocol="mosh", tags={"mosh_udp_port": "60001 --ssh=evil"})._get_cmd()
+
+    def test_mosh_cmd_with_two_hop_chained_jumphost(self, tmp_config_dir):
+        """Two-hop chained SSH jumphost maintains nested ProxyCommand correctly inside --ssh."""
+        import shlex
+        from connpy.core import node
+        nodes = {
+            "bastionB": {
+                "host": "10.0.0.1", "protocol": "ssh", "port": "22",
+                "user": "userB", "password": "", "options": "",
+                "logs": "", "tags": "", "jumphost": "", "type": "connection"
+            },
+            "bastionA": {
+                "host": "10.0.0.2", "protocol": "ssh", "port": "22",
+                "user": "userA", "password": "", "options": "",
+                "logs": "", "tags": "", "jumphost": "bastionB", "type": "connection"
+            },
+            "dest": {
+                "host": "10.0.1.1", "protocol": "mosh", "port": "2222",
+                "user": "root", "password": "", "options": "",
+                "logs": "", "tags": "", "jumphost": "bastionA", "type": "connection"
+            }
+        }
+        config = self._make_config_with_nodes(tmp_config_dir, nodes)
+        n = node(
+            "dest", "10.0.1.1", user="root", protocol="mosh", port="2222",
+            jumphost="bastionA", config=config
+        )
+        cmd = n._get_cmd()
+        tokens = shlex.split(cmd)
+        ssh_token = [t for t in tokens if t.startswith("--ssh=")]
+        assert len(ssh_token) == 1
+        assert "ProxyCommand=" in ssh_token[0]
+        assert "userA@10.0.0.2" in ssh_token[0]
+        assert "userB@10.0.0.1" in ssh_token[0]
+        assert "-p 2222" in ssh_token[0]
+        assert tokens[-1] == "root@10.0.1.1"
+
+    def test_mosh_as_single_or_chained_jumphost_raises(self, tmp_config_dir):
+        """A mosh node cannot be used as a direct or chained jumphost."""
+        from connpy.core import node
+        nodes1 = {
+            "mosh_bastion": {
+                "host": "10.0.0.1", "protocol": "mosh", "port": "",
+                "user": "admin", "password": "", "options": "",
+                "logs": "", "tags": "", "jumphost": "", "type": "connection"
+            },
+            "dest": {
+                "host": "10.0.1.1", "protocol": "ssh", "port": "",
+                "user": "root", "password": "", "options": "",
+                "logs": "", "tags": "", "jumphost": "mosh_bastion", "type": "connection"
+            }
+        }
+        config1 = self._make_config_with_nodes(tmp_config_dir, nodes1)
+        with pytest.raises(ValueError, match="cannot be used as a jumphost"):
+            node("dest", "10.0.1.1", jumphost="mosh_bastion", config=config1)
+
+        nodes2 = {
+            "mosh_bastion": {
+                "host": "10.0.0.1", "protocol": "mosh", "port": "",
+                "user": "admin", "password": "", "options": "",
+                "logs": "", "tags": "", "jumphost": "", "type": "connection"
+            },
+            "bastionA": {
+                "host": "10.0.0.2", "protocol": "ssh", "port": "",
+                "user": "userA", "password": "", "options": "",
+                "logs": "", "tags": "", "jumphost": "mosh_bastion", "type": "connection"
+            },
+            "dest": {
+                "host": "10.0.1.1", "protocol": "ssh", "port": "",
+                "user": "root", "password": "", "options": "",
+                "logs": "", "tags": "", "jumphost": "bastionA", "type": "connection"
+            }
+        }
+        config2 = self._make_config_with_nodes(tmp_config_dir, nodes2)
+        with pytest.raises(ValueError, match="cannot be used as a jumphost"):
+            node("dest", "10.0.1.1", jumphost="bastionA", config=config2)
+
+    def test_mosh_sftp_override_and_ssh_options_isolation(self, tmp_config_dir):
+        """Switching a mosh node to sftp preserves _orig_protocol and uses mosh_ssh_options."""
+        from connpy.core import node
+        nodes = {
+            "bastion": {
+                "host": "10.0.0.1", "protocol": "ssh", "port": "",
+                "user": "admin", "password": "", "options": "",
+                "logs": "", "tags": "", "jumphost": "", "type": "connection"
+            },
+            "dest": {
+                "host": "10.0.1.1", "protocol": "@mosh_prof", "port": "2222",
+                "user": "root", "password": "", "options": "--predict=always",
+                "logs": "", "tags": {"mosh_ssh_options": "-i /tmp/key.pem -t"},
+                "jumphost": "bastion", "type": "connection"
+            }
+        }
+        profiles = {
+            "default": {"protocol": "ssh"},
+            "mosh_prof": {
+                "protocol": "mosh", "host": "", "user": "", "port": "",
+                "password": "", "options": "", "logs": "", "tags": "", "jumphost": ""
+            }
+        }
+        config = self._make_config_with_nodes(tmp_config_dir, nodes, profiles=profiles)
+        n = node(
+            "dest", "10.0.1.1", protocol="@mosh_prof", port="2222", user="root",
+            options="--predict=always", tags={"mosh_ssh_options": "-i /tmp/key.pem -t"},
+            jumphost="bastion", config=config
+        )
+        assert n._orig_protocol == "mosh"
+        assert n.protocol == "mosh"
+
+        # Switch to sftp
+        n.protocol = "sftp"
+        cmd = n._get_cmd()
+        assert cmd.startswith("sftp -P 2222")
+        assert "-i /tmp/key.pem" in cmd
+        assert " -t" not in cmd  # -t stripped for sftp
+        assert "--predict=always" not in cmd  # options discarded for is_from_mosh
+        assert "-o ProxyCommand=" in cmd
+        assert cmd.endswith("root@10.0.1.1")
+
+    def test_mosh_run_and_test_use_force_ssh_without_mutating_protocol(self):
+        """Batch commands on mosh nodes connect via SSH without mutating self.protocol."""
+        from connpy.core import node
+        n = node(
+            "m1", "10.0.0.1", user="admin", protocol="mosh", port="2222",
+            options="--predict=always", tags={"mosh_ssh_options": "-i /tmp/key.pem"}
+        )
+
+        ssh_cmd = n._get_cmd(force_ssh=True)
+        assert ssh_cmd.startswith("ssh -p 2222")
+        assert "-i /tmp/key.pem" in ssh_cmd
+        assert "--predict=always" not in ssh_cmd
+        assert n.protocol == "mosh"
+
+        mock_child = MagicMock()
+        mock_child.expect.return_value = 0
+        with patch.object(n, "_connect", return_value=True) as mock_conn:
+            n.child = mock_child
+            n.run(["show version"])
+            mock_conn.assert_called_once()
+            _, kwargs = mock_conn.call_args
+            assert kwargs.get("force_ssh") is True
+            assert n.protocol == "mosh"
+
+        with patch.object(n, "_connect", return_value=True) as mock_conn_test:
+            n.child = mock_child
+            with patch.object(n, "_logclean", return_value="1.1.1.1 is alive"):
+                n.test(["ping 1.1.1.1"], "1.1.1.1")
+                mock_conn_test.assert_called_once()
+                _, kwargs = mock_conn_test.call_args
+                assert kwargs.get("force_ssh") is True
+                assert n.protocol == "mosh"
+
+    def test_mosh_connect_timeout_min_15_and_strict_esc_mosh_prompt(self):
+        """Mosh connect enforces min 15s timeout and strict escape requirement in prompt."""
+        from connpy.core import node
+
+        n = node("m1", "10.0.0.1", user="admin", protocol="mosh")
+
+        mock_child = MagicMock()
+        mock_child.expect.side_effect = [0, 9]  # 0: yes/no, 9: mosh_prompt
+
+        with patch("shutil.which", return_value="/usr/bin/mosh"), \
+             patch("pexpect.spawn", return_value=mock_child), \
+             patch("pexpect.fdpexpect.fdspawn"):
+            res = n._connect(timeout=10)
+            assert res is True
+            for call in mock_child.expect.call_args_list:
+                assert call[1]["timeout"] == 15
+            mock_child.sendline.assert_any_call("yes")
+
+        default_prompt = r'>$|#$|\$$|>.$|#.$|\$.$'
+        mosh_prompt_pattern = r"(?:(?:" + default_prompt + r")\x1b\[[0-9;?]*[a-zA-Z]|\x1b\[\?1049h.*)$"
+
+        assert re.search(mosh_prompt_pattern, "\x1b[?1049h\x1b[1;1H") is not None
+        assert re.search(mosh_prompt_pattern, "admin@host:~$ \x1b[1;15H") is not None
+        # Strict: must NOT match without \x1b
+        assert re.search(mosh_prompt_pattern, "admin@host:~$ ") is None
+        assert re.search(mosh_prompt_pattern, "admin@host:~$") is None
+        # Must not match MOTD words
+        for word in ["supported", "unavailable", "refused", "closed", "timeout"]:
+            assert re.search(mosh_prompt_pattern, f"MOTD: System is {word}") is None
+
+    def test_mosh_connect_errors_missing_binary_and_no_post_handshake_retry(self):
+        """Mosh connection handles missing binary, locale errors, and suppresses post-handshake retry."""
+        from connpy.core import node
+
+        n = node("m1", "10.0.0.1", user="admin", protocol="mosh")
+
+        # 1. Missing mosh binary
+        with patch("shutil.which", return_value=None), \
+             patch("pexpect.spawn") as mock_spawn:
+            err = n._connect()
+            assert err == "Connection failed: mosh binary not found in PATH"
+            mock_spawn.assert_not_called()
+
+        # 2. Locale and server not found errors
+        for idx, err_msg in [(19, "needs a UTF-8 native locale to run"), (17, "mosh-server: command not found")]:
+            mock_child = MagicMock()
+            mock_child.expect.return_value = idx
+            mock_child.after = err_msg.encode()
+            mock_child.before = b""
+            mock_child.readline.return_value = b""
+            with patch("shutil.which", return_value="/usr/bin/mosh"), \
+                 patch("pexpect.spawn", return_value=mock_child):
+                res = n._connect()
+                assert f"Connection failed code: {idx}" in res
+                assert err_msg in res
+
+        # 3. No retry on timeout after handshake progressed
+        mock_child = MagicMock()
+        mock_child.expect.side_effect = [0, 12]  # 0: yes/no, then 12: TIMEOUT
+        mock_child.before = b"Mosh connecting..."
+        mock_child.readline.return_value = b""
+        with patch("shutil.which", return_value="/usr/bin/mosh"), \
+             patch("pexpect.spawn", return_value=mock_child) as mock_spawn:
+            res = n._connect(max_attempts=3)
+            assert mock_spawn.call_count == 1
+            assert "Connection failed code: 12" in res
+            assert "Connection timeout" in res
+
+    def test_mosh_spawn_child_env_isolation(self):
+        """_spawn_child applies LC_ALL=C.UTF-8 only for mosh and leaves env untouched for other protocols."""
+        from connpy.core import node
+
+        n_mosh = node("m1", "10.0.0.1", protocol="mosh")
+        n_ssh = node("s1", "10.0.0.1", protocol="ssh")
+
+        # When running mosh with a non-utf8 environment, LC_ALL=C.UTF-8 is injected
+        with patch.dict(os.environ, {"LC_ALL": "C", "LANG": "C", "LC_CTYPE": "C"}, clear=True), \
+             patch("pexpect.spawn") as mock_spawn:
+            mock_spawn.return_value = MagicMock()
+            n_mosh._spawn_child(["mosh", "10.0.0.1"], protocol="mosh")
+            _, kwargs = mock_spawn.call_args
+            assert kwargs.get("env") is not None
+            assert kwargs["env"]["LC_ALL"] == "C.UTF-8"
+            assert kwargs["env"]["TERM"] == "xterm-256color"
+
+        # When running ssh, env is not passed (pexpect inherits default untouched)
+        with patch("pexpect.spawn") as mock_spawn:
+            mock_spawn.return_value = MagicMock()
+            n_ssh._spawn_child(["ssh", "10.0.0.1"], protocol="ssh")
+            _, kwargs = mock_spawn.call_args
+            assert kwargs.get("env") is None
