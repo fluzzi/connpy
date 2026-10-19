@@ -1354,7 +1354,8 @@ class node:
         default_prompt = r'>$|#$|\$$|>.$|#.$|\$.$'
         prompt = self.tags.get("prompt", default_prompt) if isinstance(self.tags, dict) else default_prompt
         password_prompt = '[p|P]assword:|[u|U]sername:' if effective_protocol != 'telnet' else '[p|P]assword:'
-        mosh_prompt = r"(?:(?:" + prompt + r")\x1b\[[0-9;?]*[a-zA-Z]|\x1b\[\?1049h.*)$"
+        prompt_unanchored = "|".join([t[:-1] if t.endswith("$") else t for t in prompt.split("|")])
+        mosh_prompt = r"(?:(?:" + prompt_unanchored + r")\s*\[[0-9;?]*[a-zA-Z]|\[\?1049h.*)$"
 
         expects = {
             "ssh": ['yes/no', 'refused', 'supported', 'Invalid|[u|U]sage: ssh', 'ssh-keygen.*\"', 'timeout|timed.out', 'unavailable', 'closed', password_prompt, prompt, 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching", "[b|B]ad (owner|permissions)"],

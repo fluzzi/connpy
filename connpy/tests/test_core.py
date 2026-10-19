@@ -1064,7 +1064,8 @@ class TestMoshProtocol:
             mock_child.sendline.assert_any_call("yes")
 
         default_prompt = r'>$|#$|\$$|>.$|#.$|\$.$'
-        mosh_prompt_pattern = r"(?:(?:" + default_prompt + r")\x1b\[[0-9;?]*[a-zA-Z]|\x1b\[\?1049h.*)$"
+        prompt_unanchored = "|".join([t[:-1] if t.endswith("$") else t for t in default_prompt.split("|")])
+        mosh_prompt_pattern = r"(?:(?:" + prompt_unanchored + r")\s*\[[0-9;?]*[a-zA-Z]|\[\?1049h.*)$"
 
         assert re.search(mosh_prompt_pattern, "\x1b[?1049h\x1b[1;1H") is not None
         assert re.search(mosh_prompt_pattern, "admin@host:~$ \x1b[1;15H") is not None
