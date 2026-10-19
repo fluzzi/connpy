@@ -161,6 +161,9 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
                         setattr(n, attr, params[attr])
                 if "tags" in params:
                     n.tags = params["tags"]
+            n._orig_protocol = n.protocol
+            if sftp:
+                n.protocol = "sftp"
         else:
             try:
                 node_data = user_config.getitem(unique_id, extract=False)

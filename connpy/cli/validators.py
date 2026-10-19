@@ -17,14 +17,14 @@ class Validators:
                 _raise_val_err("Profile {} don't exist".format(current))
         return True
 
-    def profile_protocol_validation(self, answers, current, regex = "(^ssh$|^telnet$|^kubectl$|^docker$|^ssm$|^$)"):
+    def profile_protocol_validation(self, answers, current, regex = "(^ssh$|^mosh$|^telnet$|^kubectl$|^docker$|^ssm$|^$)"):
         if not re.match(regex, current):
-            _raise_val_err("Pick between ssh, telnet, kubectl, docker, ssm or leave empty")
+            _raise_val_err("Pick between ssh, mosh, telnet, kubectl, docker, ssm or leave empty")
         return True
 
-    def protocol_validation(self, answers, current, regex = "(^ssh$|^telnet$|^kubectl$|^docker$|^ssm$|^$|^@.+$)"):
+    def protocol_validation(self, answers, current, regex = "(^ssh$|^mosh$|^telnet$|^kubectl$|^docker$|^ssm$|^$|^@.+$)"):
         if not re.match(regex, current):
-            _raise_val_err("Pick between ssh, telnet, kubectl, docker, ssm, leave empty or @profile")
+            _raise_val_err("Pick between ssh, mosh, telnet, kubectl, docker, ssm, leave empty or @profile")
         if current.startswith("@"):
             if current[1:] not in self.app.profiles:
                 _raise_val_err("Profile {} don't exist".format(current))

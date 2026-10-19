@@ -323,4 +323,17 @@ def test_node_connect_exact_match_priority(mock_connect_node, mock_list_nodes, a
     mock_connect_node.assert_called_once_with("pe1@ctx", sftp=False, debug=False, logger=app._service_logger)
 
 
+def test_validators_accept_mosh(app):
+    """Validators accept mosh protocol and reject invalid protocols."""
+    import inquirer
+    from connpy.cli.validators import Validators
+    val = Validators(app)
 
+    assert val.protocol_validation({}, "mosh") is True
+    assert val.profile_protocol_validation({}, "mosh") is True
+
+    with pytest.raises(inquirer.errors.ValidationError):
+        val.protocol_validation({}, "invalid_proto")
+
+    with pytest.raises(inquirer.errors.ValidationError):
+        val.profile_protocol_validation({}, "invalid_proto")

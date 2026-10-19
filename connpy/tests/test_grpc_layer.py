@@ -288,3 +288,45 @@ class TestGRPCIntegration:
         assert reqs[0].copilot_action == "custom:show ip route"
         assert reqs[1].copilot_action == "cancel"
 
+
+def test_grpc_interact_node_mosh_sftp_preserves_orig_protocol(populated_config):
+    """Test NodeServiceServicer.interact_node with sftp=True preserves _orig_protocol='mosh'."""
+    servicer = server.NodeServicer(populated_config)
+    params = {
+        "host": "10.0.0.15",
+        "user": "admin",
+        "protocol": "mosh",
+        "port": "2222",
+        "options": "--predict=always",
+        "tags": {"mosh_ssh_options": "-i /tmp/key.pem"}
+    }
+    request = connpy_pb2.InteractRequest(
+        id="dynamic",
+        connection_params_json=json.dumps(params),
+        sftp=True
+    )
+    with patch("connpy.grpc_layer.server.node") as mock_node_cls:
+        from connpy.core import node as real_node
+        created_nodes = []
+
+        def fake_node_constructor(*args, **kwargs):
+            real_instance = real_node(*args, **kwargs)
+            real_instance._connect = MagicMock(return_value=True)
+            created_nodes.append(real_instance)
+            return real_instance
+
+        mock_node_cls.side_effect = fake_node_constructor
+
+        gen = servicer.interact_node(iter([request]), MockContext())
+        res = next(gen)
+        assert res.success is True
+
+        assert len(created_nodes) > 0
+        inst = created_nodes[0]
+        assert inst.protocol == "sftp"
+        assert getattr(inst, "_orig_protocol", "") == "mosh"
+        cmd = inst._get_cmd()
+        assert "sftp" in cmd
+        assert "-i /tmp/key.pem" in cmd
+        assert "--predict=always" not in cmd
+

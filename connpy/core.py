@@ -83,7 +83,7 @@ class node:
             - port     (str): Port to connect to node, default 22 for ssh and 23 
                               for telnet.  
 
-            - protocol (str): Select ssh, telnet, kubectl or docker. Default is ssh.  
+            - protocol (str): Select ssh, mosh, telnet, kubectl, docker or ssm. Default is ssh.  
 
             - user     (str): Username to of the node.  
 
@@ -119,6 +119,7 @@ class node:
                     setattr(self,key,"ssh")
             else: 
                 setattr(self,key,attr[key])
+        self._orig_protocol = self.protocol
         if isinstance(password,list):
             self.password = []
             for i, s in enumerate(password):
@@ -194,6 +195,11 @@ class node:
 
         jh = config.getitem(jumphost_name)
         jh = self._resolve_jumphost_data(jh, config)
+
+        if jh["protocol"] == "mosh":
+            raise ValueError(
+                f"Jumphost '{jumphost_name}' uses protocol 'mosh' which cannot be used as a jumphost."
+            )
 
         passwords = []
         inner_proxy_opt = ""
@@ -910,7 +916,7 @@ class node:
             str: Output of the commands you ran on the node.
 
         '''
-        connect = self._connect(timeout = timeout, logger = logger)
+        connect = self._connect(timeout=timeout, logger=logger, force_ssh=(self.protocol == "mosh"))
         now = datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S')
         if connect == True:
             if logger:
@@ -1027,7 +1033,7 @@ class node:
 
         '''
         now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        connect = self._connect(timeout = timeout, logger = logger)
+        connect = self._connect(timeout=timeout, logger=logger, force_ssh=(self.protocol == "mosh"))
         if connect == True:
             if logger:
                 port_str = f":{self.port}" if self.port and self.protocol not in ["ssm", "kubectl", "docker"] else ""
@@ -1123,16 +1129,45 @@ class node:
             return connect
 
     @MethodHook
-    def _generate_ssh_sftp_cmd(self):
-        cmd = self.protocol
-        if self.port:
-            if self.protocol == "ssh":
-                cmd += " -p " + self.port
-            elif self.protocol == "sftp":
-                cmd += " -P " + self.port
-        if self.options:
-            opts = self.options
-            if self.protocol == "sftp":
+    def _generate_ssh_sftp_cmd(self, force_ssh=False):
+        is_from_mosh = getattr(self, "_orig_protocol", "") == "mosh"
+        if is_from_mosh:
+            if str(self.host).startswith("-"):
+                raise ValueError("Host cannot start with '-'")
+            if self.user and str(self.user).startswith("-"):
+                raise ValueError("User cannot start with '-'")
+
+        proto = "ssh" if force_ssh else self.protocol
+        cmd = proto
+        if self.port != "" and self.port is not None:
+            if is_from_mosh:
+                port_s = str(self.port).strip()
+                if port_s:
+                    if not re.fullmatch(r"^\d+$", port_s) or not (1 <= int(port_s) <= 65535):
+                        raise ValueError(f"Invalid TCP SSH port '{self.port}'")
+                    cmd += (" -p " if proto == "ssh" else " -P ") + port_s
+            else:
+                if proto == "ssh":
+                    cmd += " -p " + str(self.port)
+                elif proto == "sftp":
+                    cmd += " -P " + str(self.port)
+
+        if is_from_mosh:
+            raw_opts = self.tags.get("mosh_ssh_options", "") if isinstance(self.tags, dict) else ""
+            if raw_opts:
+                ssh_opts = str(raw_opts).strip()
+                if re.search(r'(?:LocalCommand|ProxyCommand)', ssh_opts, re.IGNORECASE):
+                    raise ValueError("mosh_ssh_options cannot contain LocalCommand or ProxyCommand")
+                try:
+                    shlex.split(ssh_opts)
+                except ValueError as exc:
+                    raise ValueError("Invalid mosh_ssh_options: unbalanced quotes") from exc
+        else:
+            raw_opts = self.options
+
+        if raw_opts:
+            opts = str(raw_opts).strip()
+            if proto == "sftp":
                 # Strip SSH-only flags that sftp doesn't support
                 opts = re.sub(r'(?<!\S)-[XxtTAaNf]\b', '', opts).strip()
             if opts:
@@ -1142,6 +1177,73 @@ class node:
         user_host = f"{self.user}@{self.host}" if self.user else self.host
         cmd += f" {user_host}"
         return cmd
+
+    @MethodHook
+    def _generate_mosh_cmd(self):
+        if str(self.host).startswith("-"):
+            raise ValueError("Host cannot start with '-'")
+        if self.user and str(self.user).startswith("-"):
+            raise ValueError("User cannot start with '-'")
+        if not self.host or re.search(r'[\s;|&$`><"\'\\]', str(self.host)):
+            raise ValueError(f"Invalid characters in host: '{self.host}'")
+        if self.user and re.search(r'[\s;|&$`><"\'\\]', str(self.user)):
+            raise ValueError(f"Invalid characters in user: '{self.user}'")
+
+        cmd_parts = ["mosh"]
+        if isinstance(self.tags, dict):
+            if self.tags.get("mosh_server"):
+                server_bin = str(self.tags["mosh_server"]).strip()
+                if server_bin:
+                    cmd_parts.append(f"--server={shlex.quote(server_bin)}")
+            if self.tags.get("mosh_udp_port"):
+                udp_port = str(self.tags["mosh_udp_port"]).strip()
+                if udp_port:
+                    if not re.match(r"^\d+(:\d+)?$", udp_port):
+                        raise ValueError(
+                            f"Invalid mosh_udp_port '{udp_port}': must be PORT or PORT1:PORT2"
+                        )
+                    cmd_parts.append(f"-p {shlex.quote(udp_port)}")
+
+        ssh_parts = ["ssh"]
+        if self.port != "" and self.port is not None:
+            port_s = str(self.port).strip()
+            if port_s:
+                if not re.fullmatch(r"^\d+$", port_s) or not (1 <= int(port_s) <= 65535):
+                    raise ValueError(f"Invalid TCP SSH port '{self.port}'")
+                ssh_parts.append(f"-p {port_s}")
+        if isinstance(self.tags, dict) and self.tags.get("mosh_ssh_options"):
+            ssh_opts = str(self.tags["mosh_ssh_options"]).strip()
+            if ssh_opts:
+                if re.search(r'(?:LocalCommand|ProxyCommand)', ssh_opts, re.IGNORECASE):
+                    raise ValueError("mosh_ssh_options cannot contain LocalCommand or ProxyCommand")
+                try:
+                    shlex.split(ssh_opts)
+                except ValueError as exc:
+                    raise ValueError("Invalid mosh_ssh_options: unbalanced quotes") from exc
+                ssh_parts.append(ssh_opts)
+        if self.jumphost:
+            ssh_parts.append(self.jumphost)
+
+        if len(ssh_parts) > 1:
+            raw_ssh = " ".join(ssh_parts)
+            cmd_parts.append(f"--ssh={shlex.quote(raw_ssh)}")
+
+        if self.options:
+            opts = str(self.options).strip()
+            if opts:
+                if re.search(r'--(?:ssh|server|client)', opts):
+                    raise ValueError("Options cannot override --ssh, --server or --client for mosh")
+                if re.search(r'(?:LocalCommand|ProxyCommand)', opts, re.IGNORECASE):
+                    raise ValueError("Options cannot contain LocalCommand or ProxyCommand")
+                try:
+                    shlex.split(opts)
+                except ValueError as exc:
+                    raise ValueError("Invalid options: unbalanced quotes") from exc
+                cmd_parts.append(opts)
+
+        user_host = f"{self.user}@{self.host}" if self.user else self.host
+        cmd_parts.extend(["--", user_host])
+        return " ".join(cmd_parts)
 
     @MethodHook
     def _generate_telnet_cmd(self):
@@ -1181,9 +1283,11 @@ class node:
 
 
     @MethodHook
-    def _get_cmd(self):
-        if self.protocol in ["ssh", "sftp"]:
-            return self._generate_ssh_sftp_cmd()
+    def _get_cmd(self, force_ssh=False):
+        if force_ssh or self.protocol in ["ssh", "sftp"]:
+            return self._generate_ssh_sftp_cmd(force_ssh=force_ssh)
+        elif self.protocol == "mosh":
+            return self._generate_mosh_cmd()
         elif self.protocol == "telnet":
             return self._generate_telnet_cmd()
         elif self.protocol == "kubectl":
@@ -1198,25 +1302,49 @@ class node:
             printer.error(f"Invalid protocol: {self.protocol}")
             sys.exit(1)
 
+    def _spawn_child(self, args):
+        env = os.environ.copy()
+        if not any(
+            "utf-8" in env.get(k, "").lower() or "utf8" in env.get(k, "").lower()
+            for k in ("LC_ALL", "LC_CTYPE", "LANG")
+        ):
+            env["LC_ALL"] = "C.UTF-8"
+        env.setdefault("TERM", "xterm-256color")
+        try:
+            return pexpect.spawn(args[0], args[1:], env=env), None
+        except pexpect.exceptions.ExceptionPexpect as e:
+            return None, f"Connection failed: {e}"
+
     @MethodHook
-    def _connect(self, debug=False, timeout=10, max_attempts=3, logger=None):
-        if self.protocol == "local":
+    def _connect(self, debug=False, timeout=10, max_attempts=3, logger=None, force_ssh=False):
+        effective_protocol = "ssh" if force_ssh else self.protocol
+        if effective_protocol == "mosh":
+            import shutil
+            if shutil.which("mosh") is None:
+                return "Connection failed: mosh binary not found in PATH"
+            timeout = max(timeout, 15)
+
+        if effective_protocol == "local":
             cmd = self._get_cmd()
             args = shlex.split(cmd)
-            self.child = pexpect.spawn(args[0], args[1:], env=os.environ.copy())
+            child, err = self._spawn_child(args)
+            if err:
+                return err
+            self.child = child
             from pexpect import fdpexpect
             self.raw_child = fdpexpect.fdspawn(self.child.child_fd)
             if self.logs != '':
                 self.logfile = self._logfile()
             return True
 
-        cmd = self._get_cmd()
+        cmd = self._get_cmd(force_ssh=force_ssh)
         passwords = self._passtx(self.password) if self.password and any(self.password) else []
         if self.logs != '':
             self.logfile = self._logfile()
         default_prompt = r'>$|#$|\$$|>.$|#.$|\$.$'
         prompt = self.tags.get("prompt", default_prompt) if isinstance(self.tags, dict) else default_prompt
-        password_prompt = '[p|P]assword:|[u|U]sername:' if self.protocol != 'telnet' else '[p|P]assword:'
+        password_prompt = '[p|P]assword:|[u|U]sername:' if effective_protocol != 'telnet' else '[p|P]assword:'
+        mosh_prompt = r"(?:(?:" + prompt + r")(?:\x1b\[[0-9;?]*[a-zA-Z])*|\x1b\[\?1049h.*)$"
 
         expects = {
             "ssh": ['yes/no', 'refused', 'supported', 'Invalid|[u|U]sage: ssh', 'ssh-keygen.*\"', 'timeout|timed.out', 'unavailable', 'closed', password_prompt, prompt, 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching", "[b|B]ad (owner|permissions)"],
@@ -1226,6 +1354,28 @@ class node:
             "docker": ['[u|U]sername:', 'Cannot', '[E|e]rror', 'failed', 'not a docker command', 'unknown', 'unable to resolve', pexpect.TIMEOUT, password_prompt, prompt, pexpect.EOF],
             "ssm": ['[u|U]sername:', 'Cannot', '[E|e]rror', 'failed', 'SessionManagerPlugin', '[u|U]nknown', 'unable to resolve', pexpect.TIMEOUT, password_prompt, prompt, pexpect.EOF]
         }
+        expects["mosh"] = [
+            'yes/no',                                                                              # 0  (initial)
+            r'(?:ssh: connect to host .* port .*: Connection refused|Connection refused)',         # 1  (error)
+            r'(?:ssh|mosh): .*supported',                                                          # 2  (error)
+            r'(?:(?:ssh|mosh): (?:Invalid|usage)|Unknown option:)',                                # 3  (error)
+            'ssh-keygen.*\"',                                                                      # 4  (error)
+            r'(?:ssh: connect to host .* port .*: Connection timed out|mosh: .* timed out)',       # 5  (error)
+            r'(?:ssh|mosh): .*unavailable',                                                        # 6  (error)
+            r'(?:Connection to .* closed|Connection closed by remote host)',                       # 7  (error)
+            password_prompt,                                                                       # 8  (eof)
+            mosh_prompt,                                                                           # 9  (eof)
+            'suspend',                                                                             # 10 (eof)
+            pexpect.EOF,                                                                           # 11 (eof)
+            pexpect.TIMEOUT,                                                                       # 12 (error)
+            "No route to host",                                                                    # 13 (error)
+            "resolve hostname",                                                                    # 14 (error)
+            r'(?:ssh|mosh): .*no matching',                                                        # 15 (error)
+            "[b|B]ad (owner|permissions)",                                                         # 16 (error)
+            "mosh-server:.*not found|command not found",                                           # 17 (error)
+            "Did not find mosh server startup message|Nothing received from server",               # 18 (error)
+            "needs a UTF-8 native locale to run|requires a UTF-8 locale|locale.*not available",    # 19 (error)
+        ]
 
         error_indices = {
             "ssh": [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15, 16],
@@ -1233,7 +1383,8 @@ class node:
             "telnet": [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15, 16],
             "kubectl": [1, 2, 3, 4, 8],  # Define error indices for kube
             "docker": [1, 2, 3, 4, 5, 6, 7],  # Define error indices for docker
-            "ssm": [1, 2, 3, 4, 5, 6, 7]
+            "ssm": [1, 2, 3, 4, 5, 6, 7],
+            "mosh": [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15, 16, 17, 18, 19]
         }
 
         eof_indices = {
@@ -1242,7 +1393,8 @@ class node:
             "telnet": [8, 9, 10, 11],
             "kubectl": [5, 6, 7],  # Define eof indices for kube
             "docker": [8, 9, 10],  # Define eof indices for docker
-            "ssm": [8, 9, 10]
+            "ssm": [8, 9, 10],
+            "mosh": [8, 9, 10, 11]
         }
 
         initial_indices = {
@@ -1251,13 +1403,17 @@ class node:
             "telnet": [0],
             "kubectl": [0],  # Define special indices for kube
             "docker": [0],  # Define special indices for docker
-            "ssm": [0]
+            "ssm": [0],
+            "mosh": [0]
         }
 
         attempts = 1
+        handshake_progressed = False
         while attempts <= max_attempts:
             args = shlex.split(cmd)
-            child = pexpect.spawn(args[0], args[1:])
+            child, err = self._spawn_child(args)
+            if err:
+                return err
             if isinstance(self.tags, dict) and self.tags.get("console"):
                 child.sendline()
             if debug:
@@ -1271,33 +1427,46 @@ class node:
             endloop = False
             for i in range(len(passwords) if passwords else 1):
                 while True:
-                    results = child.expect(expects[self.protocol], timeout=timeout)
-                    results_value = expects[self.protocol][results]
+                    results = child.expect(expects[effective_protocol], timeout=timeout)
+                    results_value = expects[effective_protocol][results]
                     
-                    if results in initial_indices[self.protocol]:
-                        if self.protocol in ["ssh", "sftp"]:
+                    if results in initial_indices[effective_protocol]:
+                        if effective_protocol in ["ssh", "sftp", "mosh"]:
                             child.sendline('yes')
-                        elif self.protocol in ["telnet", "kubectl", "docker", "ssm"]:
+                            handshake_progressed = True
+                        elif effective_protocol in ["telnet", "kubectl", "docker", "ssm"]:
                             if self.user:
                                 child.sendline(self.user)
                             else:
                                 self.missingtext = True
                                 break
                     
-                    elif results in error_indices[self.protocol]:
+                    elif results in error_indices[effective_protocol]:
                         child.terminate()
-                        if results_value == pexpect.TIMEOUT and attempts != max_attempts:
+                        can_retry = (
+                            results_value == pexpect.TIMEOUT
+                            and attempts != max_attempts
+                            and not (effective_protocol == "mosh" and handshake_progressed)
+                        )
+                        if can_retry:
                             attempts += 1
                             endloop = True
                             break
                         else:
-                            after = "Connection timeout" if results_value == pexpect.TIMEOUT else child.after.decode()
-                            return f"Connection failed code: {results}\n{child.before.decode().lstrip()}{after}{child.readline().decode()}".rstrip()
+                            def _to_str(val):
+                                if val is None:
+                                    return ""
+                                if hasattr(val, "decode"):
+                                    return val.decode()
+                                return str(val)
+                            after = "Connection timeout" if results_value == pexpect.TIMEOUT else _to_str(child.after)
+                            return f"Connection failed code: {results}\n{_to_str(child.before).lstrip()}{after}{_to_str(child.readline())}".rstrip()
                     
-                    elif results in eof_indices[self.protocol]:
+                    elif results in eof_indices[effective_protocol]:
                         if results_value == password_prompt:
                             if passwords:
                                 child.sendline(passwords[i])
+                                handshake_progressed = True
                             else:
                                 self.missingtext = True
                             break
