@@ -1355,7 +1355,7 @@ class node:
         prompt = self.tags.get("prompt", default_prompt) if isinstance(self.tags, dict) else default_prompt
         password_prompt = '[p|P]assword:|[u|U]sername:' if effective_protocol != 'telnet' else '[p|P]assword:'
         prompt_unanchored = "|".join([t[:-1] if t.endswith("$") else t for t in prompt.split("|")])
-        mosh_prompt = r"(?:(?:" + prompt_unanchored + r")\s*\[[0-9;?]*[a-zA-Z]|\[\?1049h.*)$"
+        mosh_prompt = r"(?:" + prompt_unanchored + r")\s*(?:\[[0-9;?]*[a-zA-Z])*$"
 
         expects = {
             "ssh": ['yes/no', 'refused', 'supported', 'Invalid|[u|U]sage: ssh', 'ssh-keygen.*\"', 'timeout|timed.out', 'unavailable', 'closed', password_prompt, prompt, 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching", "[b|B]ad (owner|permissions)"],
@@ -1384,7 +1384,7 @@ class node:
             r'(?:ssh|mosh): .*no matching',                                                        # 15 (error)
             "[b|B]ad (owner|permissions)",                                                         # 16 (error)
             "mosh-server:.*not found|command not found",                                           # 17 (error)
-            "Did not find mosh server startup message|Nothing received from server",               # 18 (error)
+            r"(?:Did not find mosh server startup message|(?:mosh: )?Nothing received from server on UDP port \d+\.?|Nothing received from server)", # 18 (error)
             "needs a UTF-8 native locale to run|requires a UTF-8 locale|locale.*not available",    # 19 (error)
         ]
 
@@ -1453,7 +1453,10 @@ class node:
                                 break
                     
                     elif results in error_indices[effective_protocol]:
-                        child.terminate()
+                        try:
+                            child.terminate()
+                        except Exception:
+                            pass
                         can_retry = (
                             results_value == pexpect.TIMEOUT
                             and attempts != max_attempts
@@ -1471,7 +1474,16 @@ class node:
                                     return val.decode()
                                 return str(val)
                             after = "Connection timeout" if results_value == pexpect.TIMEOUT else _to_str(child.after)
-                            return f"Connection failed code: {results}\n{_to_str(child.before).lstrip()}{after}{_to_str(child.readline())}".rstrip()
+                            before = _to_str(child.before)
+                            readline_val = _to_str(child.readline())
+                            if effective_protocol == "mosh":
+                                after = self._logclean(after, True)
+                                before = self._logclean(before, True)
+                                readline_val = self._logclean(readline_val, True)
+                            if effective_protocol == "mosh" and results == 18 and ("Nothing received from server" in after or "Nothing received from server" in before):
+                                err_msg = after.strip() if "Nothing received from server" in after else before.strip()
+                                return f"Connection failed code: {results}\n{err_msg} — UDP traffic is blocked or unreachable. Verify firewall rules for UDP ports (60000-61000 or mosh_udp_port)."
+                            return f"Connection failed code: {results}\n{before.lstrip()}{after}{readline_val}".rstrip()
                     
                     elif results in eof_indices[effective_protocol]:
                         if results_value == password_prompt:

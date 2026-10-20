@@ -68,19 +68,24 @@ def test_list_nodes_case_sensitivity(populated_config):
 
 def test_connect_node_mosh_and_sftp_override(populated_config):
     """Test connect_node preserves mosh by default and switches to sftp while keeping _orig_protocol."""
-    from unittest.mock import patch
+    from unittest.mock import patch, MagicMock
     from connpy.core import node
 
     service = NodeService(populated_config)
-    populated_config.connections.append({
-        "id": "mosh1",
+    service.add_node("mosh1", {
         "host": "10.0.0.99",
         "user": "admin",
         "protocol": "mosh",
+        "port": "22",
+        "options": "",
+        "logs": "",
+        "tags": {},
+        "jumphost": "",
         "type": "connection"
     })
 
-    with patch.object(node, "interact", autospec=True) as mock_interact:
+    mock_interact = MagicMock()
+    with patch.object(getattr(node, "cls", node), "interact", lambda *a, **kw: mock_interact(*a, **kw)):
         service.connect_node("mosh1", sftp=False)
         node_obj = mock_interact.call_args[0][0]
         assert node_obj.protocol == "mosh"

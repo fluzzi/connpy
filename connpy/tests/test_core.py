@@ -1065,13 +1065,13 @@ class TestMoshProtocol:
 
         default_prompt = r'>$|#$|\$$|>.$|#.$|\$.$'
         prompt_unanchored = "|".join([t[:-1] if t.endswith("$") else t for t in default_prompt.split("|")])
-        mosh_prompt_pattern = r"(?:(?:" + prompt_unanchored + r")\s*\[[0-9;?]*[a-zA-Z]|\[\?1049h.*)$"
+        mosh_prompt_pattern = r"(?:" + prompt_unanchored + r")\s*(?:\x1b\[[0-9;?]*[a-zA-Z])*$"
 
-        assert re.search(mosh_prompt_pattern, "\x1b[?1049h\x1b[1;1H") is not None
+        # Must NOT match empty alternate screen without real prompt
+        assert re.search(mosh_prompt_pattern, "\x1b[?1049h\x1b[1;1H") is None
         assert re.search(mosh_prompt_pattern, "admin@host:~$ \x1b[1;15H") is not None
-        # Strict: must NOT match without \x1b
-        assert re.search(mosh_prompt_pattern, "admin@host:~$ ") is None
-        assert re.search(mosh_prompt_pattern, "admin@host:~$") is None
+        assert re.search(mosh_prompt_pattern, "admin@host:~$ ") is not None
+        assert re.search(mosh_prompt_pattern, "admin@host:~$") is not None
         # Must not match MOTD words
         for word in ["supported", "unavailable", "refused", "closed", "timeout"]:
             assert re.search(mosh_prompt_pattern, f"MOTD: System is {word}") is None
@@ -1137,3 +1137,65 @@ class TestMoshProtocol:
             n_ssh._spawn_child(["ssh", "10.0.0.1"], protocol="ssh")
             _, kwargs = mock_spawn.call_args
             assert kwargs.get("env") is None
+
+    def test_mosh_prompt_rejects_bare_alternate_screen_without_prompt(self):
+        """mosh_prompt does not match empty alternate screen without a real remote shell prompt."""
+        default_prompt = r'>$|#$|\$$|>.$|#.$|\$.$'
+        prompt_unanchored = "|".join([t[:-1] if t.endswith("$") else t for t in default_prompt.split("|")])
+        mosh_prompt_pattern = r"(?:" + prompt_unanchored + r")\s*(?:\x1b\[[0-9;?]*[a-zA-Z])*$"
+
+        # Bare alternate screen escape sequences without remote prompt must NOT match
+        assert re.search(mosh_prompt_pattern, "\x1b[?1049h\x1b[1;1H") is None
+        assert re.search(mosh_prompt_pattern, "\x1b[?1049h\x1b[1;24r\x1b[4l") is None
+        assert re.search(mosh_prompt_pattern, "\x1b[?1049h") is None
+        assert re.search(mosh_prompt_pattern, "\x1b[?1049h\r\n") is None
+
+        # Real prompts with cursor sequences must match
+        assert re.search(mosh_prompt_pattern, "admin@host:~$ \x1b[1;15H") is not None
+        assert re.search(mosh_prompt_pattern, "router# ") is not None
+        assert re.search(mosh_prompt_pattern, "admin@host:~$ ") is not None
+        assert re.search(mosh_prompt_pattern, "user@host:~$ \x1b[?2004h") is not None
+
+    def test_mosh_connect_early_udp_block_detection_terminates_child_and_explicit_error(self):
+        """Early UDP block detection terminates child, does not return True, and returns explicit firewall error."""
+        from connpy.core import node
+        n = node("m1", "10.0.0.1", user="admin", protocol="mosh")
+
+        mock_child = MagicMock()
+        mock_child.expect.return_value = 18  # index 18: UDP error pattern
+        mock_child.after = b"mosh: Nothing received from server on UDP port 60001\r\n"
+        mock_child.before = b"\x1b[?1049h"
+        mock_child.readline.return_value = b""
+
+        with patch("shutil.which", return_value="/usr/bin/mosh"), \
+             patch("pexpect.spawn", return_value=mock_child):
+            res = n._connect()
+
+            # Ensure does NOT return True
+            assert res is not True
+            assert isinstance(res, str)
+
+            # Ensure child.terminate was called
+            mock_child.terminate.assert_called()
+
+            # Verify explicit firewall error message
+            assert "Connection failed code: 18" in res
+            assert "Nothing received from server on UDP port 60001" in res
+            assert "UDP traffic is blocked or unreachable" in res
+            assert "Verify firewall rules for UDP ports" in res
+            assert "\x1b[?1049h" not in res  # Cleaned of alternate screen escapes
+
+        # Test with bare 'Nothing received from server on UDP port 60001'
+        mock_child2 = MagicMock()
+        mock_child2.expect.return_value = 18
+        mock_child2.after = b"Nothing received from server on UDP port 60001"
+        mock_child2.before = b""
+        mock_child2.readline.return_value = b""
+
+        with patch("shutil.which", return_value="/usr/bin/mosh"), \
+             patch("pexpect.spawn", return_value=mock_child2):
+            res2 = n._connect()
+            assert res2 is not True
+            mock_child2.terminate.assert_called()
+            assert "Connection failed code: 18" in res2
+            assert "UDP traffic is blocked or unreachable" in res2

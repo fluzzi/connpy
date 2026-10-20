@@ -14,6 +14,10 @@ class MockContext:
 
 # --- UNIT TESTS (with mocks) ---
 
+@pytest.fixture
+def grpc_servicer(populated_config):
+    return server.NodeServicer(populated_config)
+
 class TestNodeServicerNaming:
     @pytest.fixture
     def servicer(self, populated_config):
@@ -289,9 +293,9 @@ class TestGRPCIntegration:
         assert reqs[1].copilot_action == "cancel"
 
 
-def test_grpc_interact_node_mosh_sftp_preserves_orig_protocol(populated_config):
+def test_grpc_interact_node_mosh_sftp_preserves_orig_protocol(grpc_servicer):
     """Test NodeServiceServicer.interact_node with sftp=True preserves _orig_protocol='mosh'."""
-    servicer = server.NodeServicer(populated_config)
+    servicer = grpc_servicer
     params = {
         "host": "10.0.0.15",
         "user": "admin",
@@ -305,8 +309,8 @@ def test_grpc_interact_node_mosh_sftp_preserves_orig_protocol(populated_config):
         connection_params_json=json.dumps(params),
         sftp=True
     )
-    with patch("connpy.grpc_layer.server.node") as mock_node_cls:
-        from connpy.core import node as real_node
+    from connpy.core import node as real_node
+    with patch("connpy.core.node") as mock_node_cls:
         created_nodes = []
 
         def fake_node_constructor(*args, **kwargs):
