@@ -3,7 +3,7 @@
 </p>
 
 
-# Connpy (v6.3.0)
+# Connpy (v6.4.0b1)
 [![](https://img.shields.io/pypi/v/connpy.svg?style=flat-square)](https://pypi.org/pypi/connpy/)
 [![](https://img.shields.io/pypi/pyversions/connpy.svg?style=flat-square)](https://pypi.org/pypi/connpy/)
 [![](https://img.shields.io/pypi/dm/connpy.svg?style=flat-square&cacheSeconds=86400)](https://pypi.org/pypi/connpy/)
@@ -13,7 +13,7 @@
 [![](https://img.shields.io/badge/MCP-compatible-orange?style=flat-square)](https://modelcontextprotocol.io)
 [![](https://img.shields.io/pypi/l/connpy.svg?style=flat-square)](https://github.com/fluzzi/connpy/blob/main/LICENSE)
 
-**Connpy** is a powerful Connection Manager and Network Automation Platform for Linux, Mac, and Docker. It provides a unified interface for **SSH, SFTP, Telnet, kubectl, Docker pods, and AWS SSM**.
+**Connpy** is a powerful Connection Manager and Network Automation Platform for Linux, Mac, and Docker. It provides a unified interface for **SSH, SFTP, Mosh, Telnet, kubectl, Docker pods, and AWS SSM**.
 
 The v6 release introduces a comprehensive **AI Copilot** and **AI Playbook Engine**, transforming your terminal into an interactive network assistant that understands your device outputs, configures parameters safely, and runs simulations.
 
@@ -134,9 +134,10 @@ tags: { "os": "cisco_ios", "prompt": ".*#", "screen_length_command": "terminal l
 
 ## 4. 🔌 Protocols & Connection Features
 
-### 4a. SSH / SFTP / Telnet / kubectl / Docker / AWS SSM
+### 4a. SSH / SFTP / Mosh / Telnet / kubectl / Docker / AWS SSM
 Connect to various architectures using native protocols:
 * **SSH / Telnet**: Standard CLI protocols.
+* **Mosh**: Mobile Shell with roaming and local echo support.
 * **SFTP**: Transfer files securely (`conn --sftp node`).
 * **Docker**: Connect directly to local container names (host set to container name/ID).
 * **Kubernetes (kubectl)**: Connect to pods (namespace customizable via options).

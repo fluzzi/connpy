@@ -1467,6 +1467,9 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
                         setattr(n, attr, params[attr])
                 if &#34;tags&#34; in params:
                     n.tags = params[&#34;tags&#34;]
+            n._orig_protocol = n.protocol
+            if sftp:
+                n.protocol = &#34;sftp&#34;
         else:
             try:
                 node_data = user_config.getitem(unique_id, extract=False)
