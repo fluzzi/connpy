@@ -5,7 +5,7 @@
 </p>
 
 
-# Connpy (v6.4.0b1)
+# Connpy (v6.4.0b2)
 [![](https://img.shields.io/pypi/v/connpy.svg?style=flat-square)](https://pypi.org/pypi/connpy/)
 [![](https://img.shields.io/pypi/pyversions/connpy.svg?style=flat-square)](https://pypi.org/pypi/connpy/)
 [![](https://img.shields.io/pypi/dm/connpy.svg?style=flat-square&cacheSeconds=86400)](https://pypi.org/pypi/connpy/)
@@ -146,7 +146,7 @@ Connect to various architectures using native protocols:
 * **AWS SSM**: Connect to EC2 instances using Instance IDs as hosts.
 
 ### 4b. Jumphosts
-Support for single or chained intermediate gateway nodes (SSH, SSM, kubectl, or docker jumphosts) to tunnel traffic safely into target environments.
+Support for single or chained intermediate gateway nodes (SSH, Mosh, SSM, kubectl, or docker jumphosts) to tunnel traffic safely into target environments.
 
 ### 4c. Debug Mode, Keepalive, Logging
 Track connection steps (`conn --debug node`), set idle keepalive intervals (`conn config --keepalive <seconds>`), or define dynamic output log files using variables like `${unique}`, `${host}`, `${port}`, `${user}`, `${protocol}`, or `${date 'format'}`.
@@ -155,7 +155,7 @@ Track connection steps (`conn --debug node`), set idle keepalive intervals (`con
 ---
 
 ## 5. 🖥️ Remote Capture (conn capture - Core Plugin)
-Perform remote packet capture (`tcpdump`) on hosts over secure SSH reverse tunnels and stream packets live into your local Wireshark GUI:
+Perform remote packet capture (`tcpdump`) on hosts over secure SSH or Mosh reverse tunnels and stream packets live into your local Wireshark GUI:
 ```bash
 conn capture router1 eth0 -w -f "port 80"
 ```

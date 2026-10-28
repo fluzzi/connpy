@@ -3,6 +3,7 @@ import json
 import os
 import io
 import re
+import shlex
 import pytest
 from unittest.mock import patch, MagicMock, PropertyMock
 from copy import deepcopy
@@ -930,45 +931,273 @@ class TestMoshProtocol:
         assert "-p 2222" in ssh_token[0]
         assert tokens[-1] == "root@10.0.1.1"
 
-    def test_mosh_as_single_or_chained_jumphost_raises(self, tmp_config_dir):
-        """A mosh node cannot be used as a direct or chained jumphost."""
+    def test_mosh_as_single_and_chained_jumphost_uses_ssh_backend(self, tmp_config_dir):
+        """Mosh nodes can be used as single and multi-hop jumphosts via SSH backend."""
         from connpy.core import node
+
+        def extract_proxy_cmd(tokens):
+            for i, tok in enumerate(tokens):
+                if tok.startswith("ProxyCommand="):
+                    return tok.split("ProxyCommand=", 1)[1]
+                if tok == "-o" and i + 1 < len(tokens) and tokens[i + 1].startswith("ProxyCommand="):
+                    return tokens[i + 1].split("ProxyCommand=", 1)[1]
+            raise ValueError("ProxyCommand not found in tokens")
+
+        # 1. Golden String in single hop (1-hop)
         nodes1 = {
             "mosh_bastion": {
-                "host": "10.0.0.1", "protocol": "mosh", "port": "",
+                "host": "10.0.0.1", "protocol": "mosh", "port": "2222",
                 "user": "admin", "password": "", "options": "",
-                "logs": "", "tags": "", "jumphost": "", "type": "connection"
+                "logs": "", "tags": {"mosh_ssh_options": "-i '/path A/key.pem' -4 -v -o StrictHostKeyChecking=no"},
+                "jumphost": "", "type": "connection"
             },
-            "dest": {
-                "host": "10.0.1.1", "protocol": "ssh", "port": "",
+            "dest1": {
+                "host": "10.0.1.1", "protocol": "ssh", "port": "22",
                 "user": "root", "password": "", "options": "",
                 "logs": "", "tags": "", "jumphost": "mosh_bastion", "type": "connection"
             }
         }
         config1 = self._make_config_with_nodes(tmp_config_dir, nodes1)
-        with pytest.raises(ValueError, match="cannot be used as a jumphost"):
-            node("dest", "10.0.1.1", jumphost="mosh_bastion", config=config1)
+        dest1 = node("dest1", **{k: v for k, v in nodes1["dest1"].items() if k != "type"}, config=config1)
+        expected_golden_1hop = (
+            'ssh -p 22 -o ProxyCommand="ssh -W %h:%p -p 2222 -i \'/path A/key.pem\' '
+            '-4 -o StrictHostKeyChecking=no admin@10.0.0.1" root@10.0.1.1'
+        )
+        assert dest1._get_cmd() == expected_golden_1hop
 
+        # 2. Golden String and 2-level unescaping in chained jumphost (2-hop) with spaces in paths
         nodes2 = {
-            "mosh_bastion": {
-                "host": "10.0.0.1", "protocol": "mosh", "port": "",
-                "user": "admin", "password": "", "options": "",
-                "logs": "", "tags": "", "jumphost": "", "type": "connection"
+            "hop2_mosh": {
+                "host": "10.0.0.2", "protocol": "mosh", "port": "2202",
+                "user": "user2", "password": "", "options": "",
+                "logs": "", "tags": {"mosh_ssh_options": "-i '/path B/key.pem' -6"},
+                "jumphost": "", "type": "connection"
             },
-            "bastionA": {
-                "host": "10.0.0.2", "protocol": "ssh", "port": "",
-                "user": "userA", "password": "", "options": "",
-                "logs": "", "tags": "", "jumphost": "mosh_bastion", "type": "connection"
+            "hop1_mosh": {
+                "host": "10.0.0.1", "protocol": "mosh", "port": "2201",
+                "user": "user1", "password": "", "options": "",
+                "logs": "", "tags": {"mosh_ssh_options": "-i '/path A/key.pem' -4"},
+                "jumphost": "hop2_mosh", "type": "connection"
             },
-            "dest": {
+            "dest2": {
                 "host": "10.0.1.1", "protocol": "ssh", "port": "",
                 "user": "root", "password": "", "options": "",
-                "logs": "", "tags": "", "jumphost": "bastionA", "type": "connection"
+                "logs": "", "tags": "", "jumphost": "hop1_mosh", "type": "connection"
             }
         }
         config2 = self._make_config_with_nodes(tmp_config_dir, nodes2)
-        with pytest.raises(ValueError, match="cannot be used as a jumphost"):
-            node("dest", "10.0.1.1", jumphost="bastionA", config=config2)
+        dest2 = node("dest2", **{k: v for k, v in nodes2["dest2"].items() if k != "type"}, config=config2)
+        expected_hop2_raw = "ssh -W 10.0.0.1:2201 -p 2202 -i '/path B/key.pem' -6 user2@10.0.0.2"
+        expected_hop1_raw = (
+            f'ssh -W %h:%p -o ProxyCommand="{expected_hop2_raw.replace(chr(34), chr(92)+chr(34))}" '
+            f"-p 2201 -i '/path A/key.pem' -4 user1@10.0.0.1"
+        )
+        expected_dest2_cmd = (
+            f'ssh -o ProxyCommand="{expected_hop1_raw.replace(chr(92), chr(92)*2).replace(chr(34), chr(92)+chr(34))}" root@10.0.1.1'
+        )
+        assert dest2._get_cmd() == expected_dest2_cmd
+
+        outer_tokens = shlex.split(dest2._get_cmd())
+        hop1_proxy_cmd = extract_proxy_cmd(outer_tokens)
+        hop1_tokens = shlex.split(hop1_proxy_cmd)
+        assert hop1_tokens[hop1_tokens.index("-i") + 1] == "/path A/key.pem"
+        hop2_proxy_cmd = extract_proxy_cmd(hop1_tokens)
+        hop2_tokens = shlex.split(hop2_proxy_cmd)
+        assert hop2_tokens[hop2_tokens.index("-i") + 1] == "/path B/key.pem"
+
+        # 2b. Chained mosh -> ssh hop where ssh hop has options with double quotes unescapes cleanly across 2 levels
+        nodes_mosh_ssh = {
+            "hop2_ssh": {
+                "host": "10.0.0.2", "protocol": "ssh", "port": "2202",
+                "user": "user2", "password": "", "options": '-i "/path C/key.pem"',
+                "logs": "", "tags": "", "jumphost": "", "type": "connection"
+            },
+            "hop1_mosh": {
+                "host": "10.0.0.1", "protocol": "mosh", "port": "2201",
+                "user": "user1", "password": "", "options": "",
+                "logs": "", "tags": {"mosh_ssh_options": "-i '/path A/key.pem' -4"},
+                "jumphost": "hop2_ssh", "type": "connection"
+            },
+            "dest_mosh_ssh": {
+                "host": "10.0.1.1", "protocol": "ssh", "port": "",
+                "user": "root", "password": "", "options": "",
+                "logs": "", "tags": "", "jumphost": "hop1_mosh", "type": "connection"
+            }
+        }
+        config_mosh_ssh = self._make_config_with_nodes(tmp_config_dir, nodes_mosh_ssh)
+        dest_mosh_ssh = node("dest_mosh_ssh", **{k: v for k, v in nodes_mosh_ssh["dest_mosh_ssh"].items() if k != "type"}, config=config_mosh_ssh)
+        outer_tokens_ms = shlex.split(dest_mosh_ssh._get_cmd())
+        hop1_proxy_cmd_ms = extract_proxy_cmd(outer_tokens_ms)
+        hop1_tokens_ms = shlex.split(hop1_proxy_cmd_ms)
+        assert hop1_tokens_ms[hop1_tokens_ms.index("-i") + 1] == "/path A/key.pem"
+        hop2_proxy_cmd_ms = extract_proxy_cmd(hop1_tokens_ms)
+        hop2_tokens_ms = shlex.split(hop2_proxy_cmd_ms)
+        assert hop2_tokens_ms[hop2_tokens_ms.index("-i") + 1] == "/path C/key.pem"
+
+        # 3. IPv6 formats (::1, [::1], ::ffff:1.2.3.4) and dest -> mosh(IPv6) -> ssh
+        assert node._validate_mosh_ssh_fields("::1", "u", "22", {})[0] == "::1"
+        assert node._validate_mosh_ssh_fields("[::1]", "u", "22", {})[0] == "::1"
+        assert node._validate_mosh_ssh_fields("::ffff:1.2.3.4", "u", "22", {})[0] == "::ffff:1.2.3.4"
+
+        nodes_ipv6 = {
+            "bastion_ssh": {
+                "host": "192.168.1.1", "protocol": "ssh", "port": "",
+                "user": "buser", "password": "", "options": "",
+                "logs": "", "tags": "", "jumphost": "", "type": "connection"
+            },
+            "mosh_ipv6": {
+                "host": "2001:db8::1", "protocol": "mosh", "port": "2222",
+                "user": "muser", "password": "", "options": "",
+                "logs": "", "tags": "", "jumphost": "bastion_ssh", "type": "connection"
+            },
+            "dest_ipv6": {
+                "host": "10.0.0.5", "protocol": "ssh", "port": "",
+                "user": "root", "password": "", "options": "",
+                "logs": "", "tags": "", "jumphost": "mosh_ipv6", "type": "connection"
+            }
+        }
+        config_ipv6 = self._make_config_with_nodes(tmp_config_dir, nodes_ipv6)
+        dest_ipv6 = node("dest_ipv6", **{k: v for k, v in nodes_ipv6["dest_ipv6"].items() if k != "type"}, config=config_ipv6)
+        assert "-W [2001:db8::1]:2222" in dest_ipv6._get_cmd()
+
+        # 4. sftp over IPv6 filtering -Y and -m
+        nodes_sftp = {
+            "mosh_sftp": {
+                "host": "2001:db8::1", "protocol": "mosh", "port": "2222",
+                "user": "muser", "password": "", "options": "",
+                "logs": "", "tags": {"mosh_ssh_options": "-Y -m hmac-sha2-256 -i /tmp/key"},
+                "jumphost": "", "type": "connection"
+            }
+        }
+        config_sftp = self._make_config_with_nodes(tmp_config_dir, nodes_sftp)
+        n_sftp = node("mosh_sftp", **{k: v for k, v in nodes_sftp["mosh_sftp"].items() if k != "type"}, config=config_sftp)
+        n_sftp.protocol = "sftp"
+        cmd_sftp = n_sftp._get_cmd()
+        assert "-Y" not in cmd_sftp
+        assert "-m" not in cmd_sftp
+        assert "hmac-sha2-256" not in cmd_sftp
+        assert "-i /tmp/key" in cmd_sftp
+        assert "muser@[2001:db8::1]" in cmd_sftp
+        assert "-P 2222" in cmd_sftp
+
+        # 5. @profile isolation with deepcopy
+        profiles = {
+            "default": {"protocol": "ssh"},
+            "prof1": {
+                "protocol": "mosh", "host": "10.0.0.1", "port": "22", "user": "u",
+                "password": "", "options": "", "logs": "",
+                "tags": {"mosh_ssh_options": "-i /tmp/key"}, "jumphost": ""
+            }
+        }
+        config_prof = self._make_config_with_nodes(tmp_config_dir, {}, profiles=profiles)
+        n_prof = node("node_prof", "@prof1", tags="@prof1", config=config_prof)
+        n_prof.tags["mosh_ssh_options"] = "-i /tmp/mutated"
+        assert config_prof.profiles["prof1"]["tags"]["mosh_ssh_options"] == "-i /tmp/key"
+
+        jh_dict = {"tags": "@prof1", "password": ""}
+        resolved_jh = node._resolve_jumphost_data(jh_dict, config_prof)
+        resolved_jh["tags"]["mosh_ssh_options"] = "-i /tmp/mutated_jh"
+        assert config_prof.profiles["prof1"]["tags"]["mosh_ssh_options"] == "-i /tmp/key"
+
+        # 6. Retrocompatibility of legacy ssh hops
+        nodes_legacy = {
+            "legacy_hop": {
+                "host": "fe80::1%eth0", "protocol": "ssh", "port": "22",
+                "user": "DOMAIN\\user", "password": "", "options": "-o StrictHostKeyChecking=no",
+                "logs": "", "tags": "", "jumphost": "", "type": "connection"
+            },
+            "dest_legacy": {
+                "host": "10.0.0.10", "protocol": "ssh", "port": "22",
+                "user": "root", "password": "", "options": "",
+                "logs": "", "tags": "", "jumphost": "legacy_hop", "type": "connection"
+            }
+        }
+        config_legacy = self._make_config_with_nodes(tmp_config_dir, nodes_legacy)
+        dest_legacy = node("dest_legacy", **{k: v for k, v in nodes_legacy["dest_legacy"].items() if k != "type"}, config=config_legacy)
+        cmd_legacy = dest_legacy._get_cmd()
+        assert (
+            "DOMAIN\\\\user@fe80::1%eth0" in cmd_legacy
+            or "DOMAIN\\user@fe80::1%eth0" in cmd_legacy
+        )
+        assert "-o StrictHostKeyChecking=no" in cmd_legacy
+
+        # _validate_legacy_ssh_hop_fields rejects unsafe host/user containing spaces or semicolons
+        for bad_h in ["10.0.0.1 22", "10.0.0.1;id"]:
+            with pytest.raises(ValueError, match="Invalid characters in host"):
+                node._validate_legacy_ssh_hop_fields(bad_h, "user", "22")
+        for bad_u in ["user name", "user;id"]:
+            with pytest.raises(ValueError, match="Invalid characters in user"):
+                node._validate_legacy_ssh_hop_fields("10.0.0.1", bad_u, "22")
+
+        # 7. Chains mosh <-> ssh with cycle detection and max depth 5
+        nodes_cycle = {
+            "mosh_a": {"host": "10.0.0.1", "protocol": "mosh", "jumphost": "ssh_b", "password": "", "options": "", "logs": "", "tags": "", "user": "", "port": "", "type": "connection"},
+            "ssh_b": {"host": "10.0.0.2", "protocol": "ssh", "jumphost": "mosh_a", "password": "", "options": "", "logs": "", "tags": "", "user": "", "port": "", "type": "connection"},
+            "dest_cycle": {"host": "10.0.0.3", "protocol": "ssh", "jumphost": "mosh_a", "password": "", "options": "", "logs": "", "tags": "", "user": "", "port": "", "type": "connection"}
+        }
+        config_cycle = self._make_config_with_nodes(tmp_config_dir, nodes_cycle)
+        with pytest.raises(ValueError, match="Circular jumphost reference detected"):
+            node("dest_cycle", **{k: v for k, v in nodes_cycle["dest_cycle"].items() if k != "type"}, config=config_cycle)
+
+        nodes_depth = {}
+        for i in range(1, 7):
+            proto = "mosh" if i % 2 == 1 else "ssh"
+            jh = f"hop_{i+1}" if i < 6 else ""
+            nodes_depth[f"hop_{i}"] = {"host": f"10.0.0.{i}", "protocol": proto, "jumphost": jh, "password": "", "options": "", "logs": "", "tags": "", "user": "", "port": "", "type": "connection"}
+        nodes_depth["dest_depth"] = {"host": "10.0.0.100", "protocol": "ssh", "jumphost": "hop_1", "password": "", "options": "", "logs": "", "tags": "", "user": "", "port": "", "type": "connection"}
+        config_depth = self._make_config_with_nodes(tmp_config_dir, nodes_depth)
+        with pytest.raises(ValueError, match="Jumphost chain exceeds maximum depth of 5 hops"):
+            node("dest_depth", **{k: v for k, v in nodes_depth["dest_depth"].items() if k != "type"}, config=config_depth)
+
+    @pytest.mark.parametrize("host,user,port,tags,expected_err", [
+        ("-oProxyCommand=x", "admin", "22", {}, "Host cannot start with '-'"),
+        ("10.0.0.1", "-x", "22", {}, "User cannot start with '-'"),
+        ("10.0.0.1 22", "admin", "22", {}, "Invalid characters in host"),
+        ("\n10.0.0.1", "admin", "22", {}, "Invalid characters in host"),
+        ("10.0.0.1;id", "admin", "22", {}, "Invalid characters in host"),
+        ("1:2:3", "admin", "22", {}, "Invalid characters in host"),
+        ("[::1%eth0]", "admin", "22", {}, "Invalid characters in host"),
+        ("[::1%;id]", "admin", "22", {}, "Invalid characters in host"),
+        ("10.0.0.1", "user;id", "22", {}, "Invalid characters in user"),
+        ("10.0.0.1", "user name", "22", {}, "Invalid characters in user"),
+        ("10.0.0.1", "user\x00", "22", {}, "Invalid characters in user"),
+        ("10.0.0.1", "admin", 0, {}, "Invalid TCP SSH port"),
+        ("10.0.0.1", "admin", "0", {}, "Invalid TCP SSH port"),
+        ("10.0.0.1", "admin", " 0 ", {}, "Invalid TCP SSH port"),
+        ("10.0.0.1", "admin", -1, {}, "Invalid TCP SSH port"),
+        ("10.0.0.1", "admin", 65536, {}, "Invalid TCP SSH port"),
+        ("10.0.0.1", "admin", 70000, {}, "Invalid TCP SSH port"),
+        ("10.0.0.1", "admin", 22.0, {}, "Invalid TCP SSH port"),
+        ("10.0.0.1", "admin", True, {}, "Invalid TCP SSH port"),
+        ("10.0.0.1", "admin", False, {}, "Invalid TCP SSH port"),
+        ("10.0.0.1", "admin", "٢٢", {}, "Invalid TCP SSH port"),
+        ("10.0.0.1", "admin", "22", {"mosh_ssh_options": "-o LocalCommand=id"}, "LocalCommand or ProxyCommand"),
+        ("10.0.0.1", "admin", "22", {"mosh_ssh_options": "-o ProxyCommand=id"}, "LocalCommand or ProxyCommand"),
+        ("10.0.0.1", "admin", "22", {"mosh_ssh_options": "-o StrictHostKeyChecking=yes;id"}, "Disallowed -o directive"),
+        ("10.0.0.1", "admin", "22", {"mosh_ssh_options": "-o ProxyJump=host"}, "Disallowed -o directive"),
+        ("10.0.0.1", "admin", "22", {"mosh_ssh_options": "-D 1080"}, "Disallowed ssh option"),
+        ("10.0.0.1", "admin", "22", {"mosh_ssh_options": "-L 8080:localhost:80"}, "Disallowed ssh option"),
+        ("10.0.0.1", "admin", "22", {"mosh_ssh_options": "-R 2222:localhost:2222 -R 2222:localhost:2222"}, "Disallowed ssh option"),
+        ("10.0.0.1", "admin", "22", {"mosh_ssh_options": "-o ExitOnForwardFailure=no"}, "Disallowed -o directive"),
+        ("10.0.0.1", "admin", "22", {"mosh_ssh_options": "opt\x00ion"}, "Disallowed control characters"),
+        ("10.0.0.1", "admin", "22", {"mosh_ssh_options": "opt\nion"}, "Disallowed control characters"),
+        ("10.0.0.1", "admin", "22", {"mosh_ssh_options": "opt\rion"}, "Disallowed control characters"),
+        ("10.0.0.1", "admin", "22", {"mosh_ssh_options": '-i "unclosed'}, "unbalanced quotes"),
+    ])
+    def test_mosh_jumphost_security_validations(self, host, user, port, tags, expected_err):
+        from connpy.core import node
+        with pytest.raises(ValueError, match=expected_err):
+            node._validate_mosh_ssh_fields(host, user, port, tags)
+
+    def test_force_ssh_without_allow_reverse_tunnel_port_rejects_tunnel_options(self):
+        from connpy.core import node
+        n = node("mosh1", "10.0.0.1", user="admin", protocol="mosh", tags={"mosh_ssh_options": "-o ExitOnForwardFailure=yes -R 2222:localhost:2222"})
+        with pytest.raises(ValueError, match="Disallowed -o directive in mosh_ssh_options"):
+            n._get_cmd(force_ssh=True)
+
+        n2 = node("mosh2", "10.0.0.1", user="admin", protocol="mosh", tags={"mosh_ssh_options": "-R 2222:localhost:2222"})
+        with pytest.raises(ValueError, match="Disallowed ssh option in mosh_ssh_options: '-R'"):
+            n2._get_cmd(force_ssh=True)
 
     def test_mosh_sftp_override_and_ssh_options_isolation(self, tmp_config_dir):
         """Switching a mosh node to sftp preserves _orig_protocol and uses mosh_ssh_options."""

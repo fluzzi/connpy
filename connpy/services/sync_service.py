@@ -1,39 +1,64 @@
-import sys
-import os
-import time
-import zipfile
-import tempfile
+import importlib
 import io
-import yaml
+import os
+import sys
+import tempfile
 import threading
+import time
+import warnings
+import zipfile
 from datetime import datetime
 
+import yaml
+
+_GOOGLE_PY_VERSION_WARNING_MESSAGE = (
+    r"(?s)^You are using a Python version .* Google will .*"
+)
+_GOOGLE_PY_VERSION_WARNING_MODULE = (
+    r"^google\.api_core\._python_version_support$"
+)
+_GOOGLE_LAZY_IMPORTS: dict[str, tuple[str, str]] = {
+    "Credentials": ("google.oauth2.credentials", "Credentials"),
+    "Request": ("google.auth.transport.requests", "Request"),
+    "build": ("googleapiclient.discovery", "build"),
+    "RefreshError": ("google.auth.exceptions", "RefreshError"),
+    "InstalledAppFlow": ("google_auth_oauthlib.flow", "InstalledAppFlow"),
+    "MediaFileUpload": ("googleapiclient.http", "MediaFileUpload"),
+    "MediaIoBaseDownload": ("googleapiclient.http", "MediaIoBaseDownload"),
+    "HttpError": ("googleapiclient.errors", "HttpError"),
+}
+
+
+def _silence_google_python_version_warning() -> None:
+    """Suppress Google API Core Python version EOL FutureWarning.
+
+    Intentionally inserts an 'ignore' filter at the front of warnings.filters
+    (overriding prior general filters such as -W error or PYTHONWARNINGS only
+    for this exact message, category, and module). CPython deduplicates
+    identical filter tuples in warnings.filters, making repeated calls
+    idempotent without growing the filter list.
+    """
+    warnings.filterwarnings(
+        "ignore",
+        message=_GOOGLE_PY_VERSION_WARNING_MESSAGE,
+        category=FutureWarning,
+        module=_GOOGLE_PY_VERSION_WARNING_MODULE,
+    )
+
+
+_silence_google_python_version_warning()
+
+
 def __getattr__(name: str):
-    if name == "Credentials":
-        from google.oauth2.credentials import Credentials
-        return Credentials
-    elif name == "Request":
-        from google.auth.transport.requests import Request
-        return Request
-    elif name == "build":
-        from googleapiclient.discovery import build
-        return build
-    elif name == "RefreshError":
-        from google.auth.exceptions import RefreshError
-        return RefreshError
-    elif name == "InstalledAppFlow":
-        from google_auth_oauthlib.flow import InstalledAppFlow
-        return InstalledAppFlow
-    elif name == "MediaFileUpload":
-        from googleapiclient.http import MediaFileUpload
-        return MediaFileUpload
-    elif name == "MediaIoBaseDownload":
-        from googleapiclient.http import MediaIoBaseDownload
-        return MediaIoBaseDownload
-    elif name == "HttpError":
-        from googleapiclient.errors import HttpError
-        return HttpError
-    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+    target = _GOOGLE_LAZY_IMPORTS.get(name)
+    if target is None:
+        raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+    _silence_google_python_version_warning()
+    module_name, attr_name = target
+    module = importlib.import_module(module_name)
+    value = getattr(module, attr_name)
+    globals()[name] = value
+    return value
 
 def _get_google_libs():
     mod = sys.modules[__name__]

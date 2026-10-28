@@ -41,7 +41,7 @@ el.replaceWith(d);
 <p align="center">
 <img src="https://nginx.gederico.dynu.net/images/CONNPY-resized.png" alt="App Logo">
 </p>
-<h1 id="connpy-v640b1">Connpy (v6.4.0b1)</h1>
+<h1 id="connpy-v640b2">Connpy (v6.4.0b2)</h1>
 <p><a href="https://pypi.org/pypi/connpy/"><img alt="" src="https://img.shields.io/pypi/v/connpy.svg?style=flat-square"></a>
 <a href="https://pypi.org/pypi/connpy/"><img alt="" src="https://img.shields.io/pypi/pyversions/connpy.svg?style=flat-square"></a>
 <a href="https://pypi.org/pypi/connpy/"><img alt="" src="https://img.shields.io/pypi/dm/connpy.svg?style=flat-square&amp;cacheSeconds=86400"></a>
@@ -145,12 +145,12 @@ tags: { &quot;os&quot;: &quot;cisco_ios&quot;, &quot;prompt&quot;: &quot;.*#&quo
 * <strong>Kubernetes (kubectl)</strong>: Connect to pods (namespace customizable via options).
 * <strong>AWS SSM</strong>: Connect to EC2 instances using Instance IDs as hosts.</p>
 <h3 id="4b-jumphosts">4b. Jumphosts</h3>
-<p>Support for single or chained intermediate gateway nodes (SSH, SSM, kubectl, or docker jumphosts) to tunnel traffic safely into target environments.</p>
+<p>Support for single or chained intermediate gateway nodes (SSH, Mosh, SSM, kubectl, or docker jumphosts) to tunnel traffic safely into target environments.</p>
 <h3 id="4c-debug-mode-keepalive-logging">4c. Debug Mode, Keepalive, Logging</h3>
 <p>Track connection steps (<code>conn --debug node</code>), set idle keepalive intervals (<code>conn config --keepalive &lt;seconds&gt;</code>), or define dynamic output log files using variables like <code>${unique}</code>, <code>${host}</code>, <code>${port}</code>, <code>${user}</code>, <code>${protocol}</code>, or <code>${date 'format'}</code>.</p>
 <hr>
 <h2 id="5-remote-capture-conn-capture-core-plugin">5. 🖥️ Remote Capture (conn capture - Core Plugin)</h2>
-<p>Perform remote packet capture (<code>tcpdump</code>) on hosts over secure SSH reverse tunnels and stream packets live into your local Wireshark GUI:</p>
+<p>Perform remote packet capture (<code>tcpdump</code>) on hosts over secure SSH or Mosh reverse tunnels and stream packets live into your local Wireshark GUI:</p>
 <pre><code class="language-bash">conn capture router1 eth0 -w -f &quot;port 80&quot;
 </code></pre>
 <ul>
@@ -1742,7 +1742,7 @@ class node:
             profile = re.search(&#34;^@(.*)&#34;, str(attr[key]))
             if profile and config != &#39;&#39;:
                 try:
-                    setattr(self,key,config.profiles[profile.group(1)][key])
+                    setattr(self,key,deepcopy(config.profiles[profile.group(1)][key]))
                 except KeyError:
                     setattr(self,key,&#34;&#34;)
             elif attr[key] == &#39;&#39; and key == &#34;protocol&#34;:
@@ -1785,7 +1785,7 @@ class node:
             profile = re.search(&#34;^@(.*)&#34;, str(jh_dict[key]))
             if profile:
                 try:
-                    jh_dict[key] = config.profiles[profile.group(1)][key]
+                    jh_dict[key] = deepcopy(config.profiles[profile.group(1)][key])
                 except KeyError:
                     jh_dict[key] = &#34;&#34;
             elif jh_dict[key] == &#39;&#39; and key == &#34;protocol&#34;:
@@ -1805,6 +1805,242 @@ class node:
         else:
             jh_dict[&#34;password&#34;] = [jh_dict[&#34;password&#34;]]
         return jh_dict
+
+    @staticmethod
+    def _validate_legacy_ssh_hop_fields(host, user, port):
+        &#34;&#34;&#34;Minimal injection guard for legacy SSH jumphost fields (preserves DOMAIN\\user, %scope, etc.).&#34;&#34;&#34;
+        host_s = str(host) if host is not None else &#34;&#34;
+        if host_s.startswith(&#34;-&#34;):
+            raise ValueError(&#34;Host cannot start with &#39;-&#39;&#34;)
+        if not host_s or _LEGACY_SSH_UNSAFE_RE.search(host_s):
+            raise ValueError(f&#34;Invalid characters in host: &#39;{host}&#39;&#34;)
+        host_bare = (
+            host_s[1:-1]
+            if (host_s.startswith(&#34;[&#34;) and host_s.endswith(&#34;]&#34;))
+            else host_s
+        )
+        if not host_bare or host_bare.startswith(&#34;-&#34;):
+            raise ValueError(f&#34;Invalid characters in host: &#39;{host}&#39;&#34;)
+
+        user_s = str(user) if user is not None else &#34;&#34;
+        if user_s.startswith(&#34;-&#34;):
+            raise ValueError(&#34;User cannot start with &#39;-&#39;&#34;)
+        if user_s and _LEGACY_SSH_UNSAFE_RE.search(user_s):
+            raise ValueError(f&#34;Invalid characters in user: &#39;{user}&#39;&#34;)
+
+        port_out = &#34;&#34;
+        if port != &#34;&#34; and port is not None:
+            if isinstance(port, (bool, float)):
+                raise ValueError(f&#34;Invalid TCP SSH port &#39;{port}&#39;&#34;)
+            port_s = str(port).strip()
+            if port_s:
+                if (
+                    not port_s.isascii()
+                    or not re.fullmatch(r&#34;[0-9]+&#34;, port_s, re.ASCII)
+                    or not (1 &lt;= int(port_s) &lt;= 65535)
+                ):
+                    raise ValueError(f&#34;Invalid TCP SSH port &#39;{port}&#39;&#34;)
+                port_out = port_s
+
+        return host_bare, port_out
+
+    @staticmethod
+    def _validate_mosh_ssh_fields(
+        host,
+        user,
+        port,
+        tags,
+        *,
+        strip_non_tunnel_flags=False,
+        allow_reverse_tunnel_port=None,
+    ):
+        &#34;&#34;&#34;Validate host, user, TCP SSH port, and mosh_ssh_options for Mosh SSH backend.
+
+        Accepts IPv4, hostnames, and bare or bracketed IPv6 literals (including
+        IPv4-mapped IPv6 like ::ffff:1.2.3.4, without scope-id &#39;%&#39;).
+        Returns:
+            tuple[str, str, str]: (host_bare_str, validated_port_str, validated_ssh_opts_str)
+        &#34;&#34;&#34;
+        host_s = str(host) if host is not None else &#34;&#34;
+        if host_s.startswith(&#34;-&#34;):
+            raise ValueError(&#34;Host cannot start with &#39;-&#39;&#34;)
+        if not host_s:
+            raise ValueError(f&#34;Invalid characters in host: &#39;{host}&#39;&#34;)
+
+        if (host_s.startswith(&#34;[&#34;) and host_s.endswith(&#34;]&#34;)) or &#34;:&#34; in host_s:
+            inner = host_s[1:-1] if (host_s.startswith(&#34;[&#34;) and host_s.endswith(&#34;]&#34;)) else host_s
+            if &#34;%&#34; in inner or not re.fullmatch(r&#34;[0-9A-Fa-f:.]+&#34;, inner, re.ASCII):
+                raise ValueError(f&#34;Invalid characters in host: &#39;{host}&#39;&#34;)
+            try:
+                ipaddress.IPv6Address(inner)
+            except ValueError as exc:
+                raise ValueError(f&#34;Invalid characters in host: &#39;{host}&#39;&#34;) from exc
+            host_bare = inner
+        else:
+            if not re.fullmatch(r&#34;[A-Za-z0-9._-]+&#34;, host_s, re.ASCII):
+                raise ValueError(f&#34;Invalid characters in host: &#39;{host}&#39;&#34;)
+            host_bare = host_s
+
+        user_s = str(user) if user is not None else &#34;&#34;
+        if user_s.startswith(&#34;-&#34;):
+            raise ValueError(&#34;User cannot start with &#39;-&#39;&#34;)
+        if user_s and not re.fullmatch(
+            r&#34;[A-Za-z0-9._-]+(?:@[A-Za-z0-9._-]+)?&#34;, user_s, re.ASCII
+        ):
+            raise ValueError(f&#34;Invalid characters in user: &#39;{user}&#39;&#34;)
+
+        port_out = &#34;&#34;
+        if port != &#34;&#34; and port is not None:
+            if isinstance(port, (bool, float)):
+                raise ValueError(f&#34;Invalid TCP SSH port &#39;{port}&#39;&#34;)
+            port_s = str(port).strip()
+            if port_s:
+                if (
+                    not port_s.isascii()
+                    or not re.fullmatch(r&#34;[0-9]+&#34;, port_s, re.ASCII)
+                    or not (1 &lt;= int(port_s) &lt;= 65535)
+                ):
+                    raise ValueError(f&#34;Invalid TCP SSH port &#39;{port}&#39;&#34;)
+                port_out = port_s
+
+        allowed_r_port = None
+        if allow_reverse_tunnel_port is not None:
+            r_port_s = str(allow_reverse_tunnel_port).strip()
+            if (
+                isinstance(allow_reverse_tunnel_port, (bool, float))
+                or not r_port_s.isascii()
+                or not re.fullmatch(r&#34;[0-9]+&#34;, r_port_s, re.ASCII)
+                or not (1 &lt;= int(r_port_s) &lt;= 65535)
+            ):
+                raise ValueError(
+                    f&#34;Invalid allow_reverse_tunnel_port &#39;{allow_reverse_tunnel_port}&#39;&#34;
+                )
+            allowed_r_port = r_port_s
+
+        opts_out = &#34;&#34;
+        raw_opts = tags.get(&#34;mosh_ssh_options&#34;, &#34;&#34;) if isinstance(tags, dict) else &#34;&#34;
+        if raw_opts:
+            ssh_opts = str(raw_opts).strip()
+            if &#34;\x00&#34; in ssh_opts or &#34;\n&#34; in ssh_opts or &#34;\r&#34; in ssh_opts:
+                raise ValueError(&#34;Disallowed control characters in mosh_ssh_options&#34;)
+            if ssh_opts:
+                try:
+                    tokens = shlex.split(ssh_opts)
+                except ValueError as exc:
+                    raise ValueError(
+                        &#34;Invalid mosh_ssh_options: unbalanced quotes&#34;
+                    ) from exc
+                r_count = 0
+                exit_fwd_count = 0
+                out_tokens = []
+                idx = 0
+                # Normative branch evaluation order:
+                # 1. NOARG -&gt; 2. ARG separate -&gt; 3. ARG attached -&gt; 4. -R -&gt; 5. -o/-oXXX -&gt; 6. other
+                while idx &lt; len(tokens):
+                    tok = tokens[idx]
+                    if tok in _ALLOWED_SSH_NOARG_FLAGS:
+                        if not (strip_non_tunnel_flags and tok in _NON_TUNNEL_SSH_FLAGS):
+                            out_tokens.append(tok)
+                        idx += 1
+                    elif tok in _ALLOWED_SSH_ARG_FLAGS:
+                        if idx + 1 &gt;= len(tokens) or not tokens[idx + 1].strip():
+                            raise ValueError(
+                                f&#34;Missing argument for ssh option &#39;{tok}&#39; in mosh_ssh_options&#34;
+                            )
+                        arg_val = tokens[idx + 1]
+                        val_re = _SAFE_SSH_PATH_RE if tok == &#34;-i&#34; else _SAFE_SSH_O_VALUE_RE
+                        if arg_val.startswith(&#34;-&#34;) or not val_re.fullmatch(arg_val):
+                            raise ValueError(
+                                f&#34;Invalid argument for ssh option &#39;{tok}&#39; in mosh_ssh_options&#34;
+                            )
+                        out_tokens.extend([tok, arg_val])
+                        idx += 2
+                    elif tok[:2] in _ALLOWED_SSH_ARG_FLAGS and len(tok) &gt; 2:
+                        flag_prefix = tok[:2]
+                        arg_val = tok[2:]
+                        val_re = _SAFE_SSH_PATH_RE if flag_prefix == &#34;-i&#34; else _SAFE_SSH_O_VALUE_RE
+                        if (
+                            not arg_val.strip()
+                            or arg_val.startswith(&#34;-&#34;)
+                            or not val_re.fullmatch(arg_val)
+                        ):
+                            raise ValueError(
+                                f&#34;Invalid argument for ssh option &#39;{flag_prefix}&#39; in mosh_ssh_options&#34;
+                            )
+                        out_tokens.append(tok)
+                        idx += 1
+                    elif tok == &#34;-R&#34;:
+                        if (
+                            allowed_r_port is None
+                            or r_count &gt;= 1
+                            or idx + 1 &gt;= len(tokens)
+                            or tokens[idx + 1]
+                            != f&#34;{allowed_r_port}:localhost:{allowed_r_port}&#34;
+                        ):
+                            raise ValueError(
+                                f&#34;Disallowed ssh option in mosh_ssh_options: &#39;{tok}&#39;&#34;
+                            )
+                        r_count += 1
+                        out_tokens.extend([tok, tokens[idx + 1]])
+                        idx += 2
+                    elif tok == &#34;-o&#34; or tok.startswith(&#34;-o&#34;):
+                        if tok == &#34;-o&#34;:
+                            if idx + 1 &gt;= len(tokens) or not tokens[idx + 1].strip():
+                                raise ValueError(
+                                    &#34;Missing argument for ssh option &#39;-o&#39; in mosh_ssh_options&#34;
+                                )
+                            opt_spec = tokens[idx + 1]
+                            step = 2
+                        else:
+                            opt_spec = tok[2:]
+                            step = 1
+                        if re.search(r&#34;(?:localcommand|proxycommand)&#34;, opt_spec, re.IGNORECASE):
+                            raise ValueError(
+                                &#34;mosh_ssh_options cannot contain LocalCommand or ProxyCommand&#34;
+                            )
+                        m = re.fullmatch(r&#34;([A-Za-z0-9]+)=(.+)&#34;, opt_spec, re.ASCII)
+                        if (
+                            not m
+                            or not m.group(2).strip()
+                            or not _SAFE_SSH_O_VALUE_RE.fullmatch(m.group(2).strip())
+                        ):
+                            raise ValueError(
+                                f&#34;Disallowed -o directive in mosh_ssh_options: &#39;{opt_spec}&#39;&#34;
+                            )
+                        key_raw = m.group(1)
+                        key_lower = key_raw.lower()
+                        val_str = m.group(2).strip()
+                        if key_lower == &#34;exitonforwardfailure&#34;:
+                            if (
+                                allowed_r_port is None
+                                or exit_fwd_count &gt;= 1
+                                or val_str.lower() != &#34;yes&#34;
+                            ):
+                                raise ValueError(
+                                    f&#34;Disallowed -o directive in mosh_ssh_options: &#39;{opt_spec}&#39;&#34;
+                                )
+                            exit_fwd_count += 1
+                        elif key_lower not in _ALLOWED_SSH_O_KEYS:
+                            raise ValueError(
+                                f&#34;Disallowed -o directive in mosh_ssh_options: &#39;{opt_spec}&#39;&#34;
+                            )
+                        if not (strip_non_tunnel_flags and key_lower == &#34;forwardagent&#34;):
+                            if tok == &#34;-o&#34;:
+                                out_tokens.extend([&#34;-o&#34;, f&#34;{key_raw}={val_str}&#34;])
+                            else:
+                                out_tokens.append(f&#34;-o{key_raw}={val_str}&#34;)
+                        idx += step
+                    else:
+                        if re.search(r&#34;(?:localcommand|proxycommand)&#34;, tok, re.IGNORECASE):
+                            raise ValueError(
+                                &#34;mosh_ssh_options cannot contain LocalCommand or ProxyCommand&#34;
+                            )
+                        raise ValueError(
+                            f&#34;Disallowed ssh option in mosh_ssh_options: &#39;{tok}&#39;&#34;
+                        )
+                opts_out = shlex.join(out_tokens)
+
+        return host_bare, port_out, opts_out
 
     def _build_jumphost_chain(self, jumphost_name, config, visited=None, depth=0, target_host=&#34;%h&#34;, target_port=&#34;%p&#34;):
         &#39;&#39;&#39;Recursively build ProxyCommand for chained jumphosts.
@@ -1830,24 +2066,39 @@ class node:
         jh = self._resolve_jumphost_data(jh, config)
 
         if jh[&#34;protocol&#34;] == &#34;mosh&#34;:
-            raise ValueError(
-                f&#34;Jumphost &#39;{jumphost_name}&#39; uses protocol &#39;mosh&#39; which cannot be used as a jumphost.&#34;
+            jh_host, jh_port, jh_opts = self._validate_mosh_ssh_fields(
+                jh.get(&#34;host&#34;, &#34;&#34;),
+                jh.get(&#34;user&#34;, &#34;&#34;),
+                jh.get(&#34;port&#34;, &#34;&#34;),
+                jh.get(&#34;tags&#34;, &#34;&#34;),
+                strip_non_tunnel_flags=True,
             )
+        elif jh[&#34;protocol&#34;] == &#34;ssh&#34;:
+            jh_host, jh_port = self._validate_legacy_ssh_hop_fields(
+                jh.get(&#34;host&#34;, &#34;&#34;),
+                jh.get(&#34;user&#34;, &#34;&#34;),
+                jh.get(&#34;port&#34;, &#34;&#34;),
+            )
+            jh_opts = jh.get(&#34;options&#34;, &#34;&#34;)
+        else:
+            jh_host = jh.get(&#34;host&#34;, &#34;&#34;)
+            jh_port = str(jh[&#34;port&#34;]).strip() if jh.get(&#34;port&#34;) not in (&#34;&#34;, None) else &#34;&#34;
+            jh_opts = jh.get(&#34;options&#34;, &#34;&#34;)
 
         passwords = []
         inner_proxy_opt = &#34;&#34;
 
         # Recursively resolve inner jumphost
         if jh.get(&#34;jumphost&#34;, &#34;&#34;) != &#34;&#34;:
-            if jh[&#34;protocol&#34;] not in [&#34;ssh&#34;]:
+            if jh[&#34;protocol&#34;] not in [&#34;ssh&#34;, &#34;mosh&#34;]:
                 raise ValueError(
                     f&#34;Jumphost &#39;{jumphost_name}&#39; uses protocol &#39;{jh[&#39;protocol&#39;]}&#39; &#34;
                     f&#34;which does not support chained jumphosts. &#34;
-                    f&#34;Only SSH jumphosts can have their own jumphosts.&#34;
+                    f&#34;Only SSH or Mosh jumphosts can have their own jumphosts.&#34;
                 )
-            parent_port = jh[&#34;port&#34;] if jh[&#34;port&#34;] != &#34;&#34; else &#34;22&#34;
+            parent_port = jh_port if jh_port != &#34;&#34; else &#34;22&#34;
             inner_raw_cmd, inner_passwords = self._build_jumphost_chain(
-                jh[&#34;jumphost&#34;], config, visited, depth + 1, target_host=jh[&#34;host&#34;], target_port=parent_port
+                jh[&#34;jumphost&#34;], config, visited, depth + 1, target_host=jh_host, target_port=parent_port
             )
             passwords = inner_passwords
             escaped = inner_raw_cmd.replace(&#39;\\&#39;, &#39;\\\\&#39;).replace(&#39;&#34;&#39;, &#39;\\&#34;&#39;)
@@ -1858,17 +2109,31 @@ class node:
             passwords = passwords + jh[&#34;password&#34;]
 
         t_port = target_port if target_port != &#34;&#34; else &#34;22&#34;
+        if jh[&#34;protocol&#34;] in [&#34;ssh&#34;, &#34;mosh&#34;]:
+            if target_host == &#34;%h&#34; and t_port == &#34;%p&#34;:
+                w_target = &#34;%h&#34;
+                w_port = &#34;%p&#34;
+            else:
+                t_host_bare, t_port_norm = self._validate_legacy_ssh_hop_fields(
+                    target_host, &#34;&#34;, t_port
+                )
+                w_target = f&#34;[{t_host_bare}]&#34; if &#34;:&#34; in t_host_bare else t_host_bare
+                w_port = t_port_norm if t_port_norm != &#34;&#34; else &#34;22&#34;
+        else:
+            w_target = target_host
+            w_port = t_port
 
         # Build raw command based on protocol
-        if jh[&#34;protocol&#34;] == &#34;ssh&#34;:
-            cmd = f&#34;ssh -W {target_host}:{t_port}&#34;
+        if jh[&#34;protocol&#34;] in [&#34;ssh&#34;, &#34;mosh&#34;]:
+            cmd = f&#34;ssh -W {w_target}:{w_port}&#34;
             if inner_proxy_opt:
                 cmd += f&#34; {inner_proxy_opt}&#34;
-            if jh[&#34;port&#34;] != &#39;&#39;:
-                cmd += f&#34; -p {jh[&#39;port&#39;]}&#34;
-            if jh[&#34;options&#34;] != &#39;&#39;:
-                cmd += f&#34; {jh[&#39;options&#39;]}&#34;
-            user_host = f&#34;{jh[&#39;user&#39;]}@{jh[&#39;host&#39;]}&#34; if jh[&#39;user&#39;] != &#39;&#39; else jh[&#39;host&#39;]
+            if jh_port != &#34;&#34;:
+                cmd += f&#34; -p {jh_port}&#34;
+            if jh_opts != &#34;&#34;:
+                cmd += f&#34; {jh_opts}&#34;
+            jh_user = str(jh.get(&#34;user&#34;, &#34;&#34;) or &#34;&#34;)
+            user_host = f&#34;{jh_user}@{jh_host}&#34; if jh_user else jh_host
             cmd += f&#34; {user_host}&#34;
         elif jh[&#34;protocol&#34;] == &#34;ssm&#34;:
             ssm_target = jh[&#34;host&#34;]
@@ -2766,52 +3031,62 @@ class node:
             return connect
 
     @MethodHook
-    def _generate_ssh_sftp_cmd(self, force_ssh=False):
-        is_from_mosh = getattr(self, &#34;_orig_protocol&#34;, &#34;&#34;) == &#34;mosh&#34;
-        if is_from_mosh:
-            if str(self.host).startswith(&#34;-&#34;):
-                raise ValueError(&#34;Host cannot start with &#39;-&#39;&#34;)
-            if self.user and str(self.user).startswith(&#34;-&#34;):
-                raise ValueError(&#34;User cannot start with &#39;-&#39;&#34;)
-
+    def _generate_ssh_sftp_cmd(self, force_ssh=False, allow_reverse_tunnel_port=None):
+        is_from_mosh = (
+            self.protocol == &#34;mosh&#34;
+            or getattr(self, &#34;_orig_protocol&#34;, &#34;&#34;) == &#34;mosh&#34;
+        )
         proto = &#34;ssh&#34; if force_ssh else self.protocol
         cmd = proto
-        if self.port != &#34;&#34; and self.port is not None:
-            if is_from_mosh:
-                port_s = str(self.port).strip()
-                if port_s:
-                    if not re.fullmatch(r&#34;^\d+$&#34;, port_s) or not (1 &lt;= int(port_s) &lt;= 65535):
-                        raise ValueError(f&#34;Invalid TCP SSH port &#39;{self.port}&#39;&#34;)
-                    cmd += (&#34; -p &#34; if proto == &#34;ssh&#34; else &#34; -P &#34;) + port_s
+        if is_from_mosh:
+            host_bare, port_s, raw_opts = self._validate_mosh_ssh_fields(
+                self.host,
+                self.user,
+                self.port,
+                self.tags,
+                allow_reverse_tunnel_port=allow_reverse_tunnel_port,
+            )
+            if port_s:
+                cmd += (&#34; -p &#34; if proto == &#34;ssh&#34; else &#34; -P &#34;) + port_s
+            if raw_opts and proto == &#34;sftp&#34;:
+                sftp_tokens = []
+                toks = shlex.split(raw_opts)
+                i = 0
+                while i &lt; len(toks):
+                    t = toks[i]
+                    if t in (&#34;-X&#34;, &#34;-x&#34;, &#34;-Y&#34;, &#34;-t&#34;, &#34;-A&#34;, &#34;-a&#34;):
+                        i += 1
+                    elif t == &#34;-m&#34;:
+                        i += 2
+                    elif t.startswith(&#34;-m&#34;) and len(t) &gt; 2:
+                        i += 1
+                    else:
+                        sftp_tokens.append(t)
+                        i += 1
+                opts = shlex.join(sftp_tokens)
             else:
+                opts = str(raw_opts).strip() if raw_opts else &#34;&#34;
+            if opts:
+                cmd += &#34; &#34; + opts
+            target_h = f&#34;[{host_bare}]&#34; if (proto == &#34;sftp&#34; and &#34;:&#34; in host_bare) else host_bare
+        else:
+            if self.port != &#34;&#34; and self.port is not None:
                 if proto == &#34;ssh&#34;:
                     cmd += &#34; -p &#34; + str(self.port)
                 elif proto == &#34;sftp&#34;:
                     cmd += &#34; -P &#34; + str(self.port)
-
-        if is_from_mosh:
-            raw_opts = self.tags.get(&#34;mosh_ssh_options&#34;, &#34;&#34;) if isinstance(self.tags, dict) else &#34;&#34;
-            if raw_opts:
-                ssh_opts = str(raw_opts).strip()
-                if re.search(r&#39;(?:LocalCommand|ProxyCommand)&#39;, ssh_opts, re.IGNORECASE):
-                    raise ValueError(&#34;mosh_ssh_options cannot contain LocalCommand or ProxyCommand&#34;)
-                try:
-                    shlex.split(ssh_opts)
-                except ValueError as exc:
-                    raise ValueError(&#34;Invalid mosh_ssh_options: unbalanced quotes&#34;) from exc
-        else:
             raw_opts = self.options
+            if raw_opts:
+                opts = str(raw_opts).strip()
+                if proto == &#34;sftp&#34;:
+                    opts = re.sub(r&#39;(?&lt;!\S)-[XxtTAaNf]\b&#39;, &#39;&#39;, opts).strip()
+                if opts:
+                    cmd += &#34; &#34; + opts
+            target_h = self.host
 
-        if raw_opts:
-            opts = str(raw_opts).strip()
-            if proto == &#34;sftp&#34;:
-                # Strip SSH-only flags that sftp doesn&#39;t support
-                opts = re.sub(r&#39;(?&lt;!\S)-[XxtTAaNf]\b&#39;, &#39;&#39;, opts).strip()
-            if opts:
-                cmd += &#34; &#34; + opts
         if self.jumphost:
             cmd += &#34; &#34; + self.jumphost
-        user_host = f&#34;{self.user}@{self.host}&#34; if self.user else self.host
+        user_host = f&#34;{self.user}@{target_h}&#34; if self.user else target_h
         cmd += f&#34; {user_host}&#34;
         return cmd
 
@@ -2920,9 +3195,12 @@ class node:
 
 
     @MethodHook
-    def _get_cmd(self, force_ssh=False):
+    def _get_cmd(self, force_ssh=False, allow_reverse_tunnel_port=None):
         if force_ssh or self.protocol in [&#34;ssh&#34;, &#34;sftp&#34;]:
-            return self._generate_ssh_sftp_cmd(force_ssh=force_ssh)
+            return self._generate_ssh_sftp_cmd(
+                force_ssh=force_ssh,
+                allow_reverse_tunnel_port=allow_reverse_tunnel_port,
+            )
         elif self.protocol == &#34;mosh&#34;:
             return self._generate_mosh_cmd()
         elif self.protocol == &#34;telnet&#34;:
@@ -2959,7 +3237,15 @@ class node:
             return None, f&#34;Connection failed: {e}&#34;
 
     @MethodHook
-    def _connect(self, debug=False, timeout=10, max_attempts=3, logger=None, force_ssh=False):
+    def _connect(
+        self,
+        debug=False,
+        timeout=10,
+        max_attempts=3,
+        logger=None,
+        force_ssh=False,
+        allow_reverse_tunnel_port=None,
+    ):
         effective_protocol = &#34;ssh&#34; if force_ssh else self.protocol
         if effective_protocol == &#34;mosh&#34;:
             import shutil
@@ -2980,7 +3266,10 @@ class node:
                 self.logfile = self._logfile()
             return True
 
-        cmd = self._get_cmd(force_ssh=force_ssh)
+        cmd = self._get_cmd(
+            force_ssh=force_ssh,
+            allow_reverse_tunnel_port=allow_reverse_tunnel_port,
+        )
         passwords = self._passtx(self.password) if self.password and any(self.password) else []
         if self.logs != &#39;&#39;:
             self.logfile = self._logfile()
@@ -4309,7 +4598,7 @@ def test(self, commands, expected, vars = None,*, folder = None, prompt = None, 
 <nav id="sidebar">
 <div class="toc">
 <ul>
-<li><a href="#connpy-v640b1">Connpy (v6.4.0b1)</a><ul>
+<li><a href="#connpy-v640b2">Connpy (v6.4.0b2)</a><ul>
 <li><a href="#1-ai-system">1. 🤖 AI System</a><ul>
 <li><a href="#1a-terminal-copilot-ctrlspace">1a. Terminal Copilot (Ctrl+Space)</a></li>
 <li><a href="#1b-ai-chat-conn-ai">1b. AI Chat (conn ai)</a></li>

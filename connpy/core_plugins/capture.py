@@ -5,7 +5,7 @@ class Parser:
     def __init__(self):
         self.parser = argparse.ArgumentParser(description="Capture packets remotely using a saved SSH node", epilog="All unknown arguments will be passed to tcpdump.")
 
-        self.parser.add_argument("node", nargs='?', help="Name of the saved node (must use SSH)")
+        self.parser.add_argument("node", nargs='?', help="Name of the saved node (must use SSH or Mosh)")
         self.parser.add_argument("interface", nargs='?', help="Network interface to capture on")
         self.parser.add_argument("--ns", "--namespace", dest="namespace", help="Optional network namespace")
         self.parser.add_argument("-w","--wireshark", action="store_true", help="Open live capture in Wireshark")
@@ -28,6 +28,7 @@ class Parser:
 class Entrypoint:
     @staticmethod
     def get_remote_capture_class():
+        from copy import deepcopy
         import subprocess
         import random
         import socket
@@ -35,6 +36,7 @@ class Entrypoint:
         import threading
         from pexpect import TIMEOUT
         from connpy import printer
+        from connpy.core import node as CoreNode
 
         class RemoteCapture:
             def __init__(self, connapp, node_name, interface, namespace=None, use_wireshark=False, tcpdump_filter=None, tcpdump_args=None):
@@ -64,8 +66,8 @@ class Entrypoint:
                 node_data = self.connapp.services.nodes.get_node_details(matches[0])
                 self.node = self.connapp.node(matches[0], **node_data, config=self.connapp.config)
 
-                if self.node.protocol != "ssh":
-                    printer.error(f"Node '{self.node.unique}' must be an SSH connection.")
+                if self.node.protocol not in ("ssh", "mosh"):
+                    printer.error(f"Node '{self.node.unique}' must be an SSH or Mosh connection.")
                     sys.exit(2)
 
                 settings = self.connapp.services.config_svc.get_settings()
@@ -285,63 +287,108 @@ class Entrypoint:
                         printer.error("Wireshark path not set in config.\nUse '--set-wireshark-path /full/path/to/wireshark' to configure it.")
                         sys.exit(1)
 
-                self.local_port = self._find_free_port()
-                self.node.options += f" -o ExitOnForwardFailure=yes -R {self.local_port}:localhost:{self.local_port}"
-
-                connection = self.node._connect()
-                if connection is not True:
-                    printer.error(f"Could not connect to {self.node.unique}\n{connection}")
-                    sys.exit(1)
-
-                self.requires_sudo = self._detect_sudo_requirement()
-                tcpdump_cmd = self._build_tcpdump_command()
-
-                ws_proc = None
-                monitor_thread = None
-
-                if self.use_wireshark:
-                    printer.info(f"Live capture from {self.node.unique}:{self.interface}, launching Wireshark...")
-                    try:
-                        ws_proc = subprocess.Popen([self.wireshark_path, "-k", "-i", "-"], stdin=subprocess.PIPE, stderr=subprocess.PIPE)
-                    except Exception as e:
-                        printer.error(f"Failed to launch Wireshark: {e}\nMake sure the path is correct and Wireshark is installed.")
-                        exit(1)
-
-                    monitor_thread = threading.Thread(target=self._monitor_wireshark, args=(ws_proc,))
-                    monitor_thread.daemon = True
-                    monitor_thread.start()
-                else:
-                    printer.info(f"Live text capture from {self.node.unique}:{self.interface}")
-                    printer.info("Press Ctrl+C to stop.\n")
-
+                orig_options = self.node.options
+                orig_tags = self.node.tags
                 try:
-                    self._start_local_listener(self.local_port, ws_proc=ws_proc)
-                    time.sleep(1)
-
-                    result = self._sendline_until_connected(tcpdump_cmd, retries=5, interval=2)
-                    if result is not True:
-                        if isinstance(result, str):
-                            printer.error(f"{result}")
-                        else:
-                            printer.error("Listener connection failed after all retries.")
-                        self.listener_active = False
-                        return
-
-                    while self.listener_active:
-                        time.sleep(0.5)
-
-                except KeyboardInterrupt:
-                    print("")
-                    printer.warning("Capture interrupted by user.")
-                    self.listener_active = False
-                finally:
-                    if self.listener_conn:
+                    self.local_port = self._find_free_port()
+                    tunnel_opts = f"-o ExitOnForwardFailure=yes -R {self.local_port}:localhost:{self.local_port}"
+                    force_ssh = self.node.protocol == "mosh"
+                    if force_ssh:
                         try:
-                            self.listener_conn.shutdown(socket.SHUT_RDWR)
-                            self.listener_conn.close()
-                        except OSError: pass
-                    if hasattr(self.node, "child"):
-                        self.node.child.close(force=True)
+                            CoreNode._validate_mosh_ssh_fields(
+                                self.node.host,
+                                self.node.user,
+                                self.node.port,
+                                self.node.tags,
+                                allow_reverse_tunnel_port=None,
+                            )
+                            tags_copy = (
+                                deepcopy(self.node.tags)
+                                if isinstance(self.node.tags, dict)
+                                else {}
+                            )
+                            existing_opts = str(tags_copy.get("mosh_ssh_options", "")).strip()
+                            tags_copy["mosh_ssh_options"] = (
+                                f"{tunnel_opts} {existing_opts}".strip()
+                                if existing_opts
+                                else tunnel_opts
+                            )
+                            CoreNode._validate_mosh_ssh_fields(
+                                self.node.host,
+                                self.node.user,
+                                self.node.port,
+                                tags_copy,
+                                allow_reverse_tunnel_port=self.local_port,
+                            )
+                        except ValueError as exc:
+                            printer.error(
+                                f"Invalid Mosh SSH configuration for node '{self.node.unique}': {exc}"
+                            )
+                            sys.exit(2)
+                        self.node.tags = tags_copy
+                        connection = self.node._connect(
+                            force_ssh=True, allow_reverse_tunnel_port=self.local_port
+                        )
+                    else:
+                        self.node.options = f"{self.node.options} {tunnel_opts}"
+                        connection = self.node._connect()
+
+                    if connection is not True:
+                        printer.error(f"Could not connect to {self.node.unique}\n{connection}")
+                        sys.exit(1)
+
+                    self.requires_sudo = self._detect_sudo_requirement()
+                    tcpdump_cmd = self._build_tcpdump_command()
+
+                    ws_proc = None
+                    monitor_thread = None
+
+                    if self.use_wireshark:
+                        printer.info(f"Live capture from {self.node.unique}:{self.interface}, launching Wireshark...")
+                        try:
+                            ws_proc = subprocess.Popen([self.wireshark_path, "-k", "-i", "-"], stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+                        except Exception as e:
+                            printer.error(f"Failed to launch Wireshark: {e}\nMake sure the path is correct and Wireshark is installed.")
+                            exit(1)
+
+                        monitor_thread = threading.Thread(target=self._monitor_wireshark, args=(ws_proc,))
+                        monitor_thread.daemon = True
+                        monitor_thread.start()
+                    else:
+                        printer.info(f"Live text capture from {self.node.unique}:{self.interface}")
+                        printer.info("Press Ctrl+C to stop.\n")
+
+                    try:
+                        self._start_local_listener(self.local_port, ws_proc=ws_proc)
+                        time.sleep(1)
+
+                        result = self._sendline_until_connected(tcpdump_cmd, retries=5, interval=2)
+                        if result is not True:
+                            if isinstance(result, str):
+                                printer.error(f"{result}")
+                            else:
+                                printer.error("Listener connection failed after all retries.")
+                            self.listener_active = False
+                            return
+
+                        while self.listener_active:
+                            time.sleep(0.5)
+
+                    except KeyboardInterrupt:
+                        print("")
+                        printer.warning("Capture interrupted by user.")
+                        self.listener_active = False
+                    finally:
+                        if self.listener_conn:
+                            try:
+                                self.listener_conn.shutdown(socket.SHUT_RDWR)
+                                self.listener_conn.close()
+                            except OSError: pass
+                        if hasattr(self.node, "child"):
+                            self.node.child.close(force=True)
+                finally:
+                    self.node.options = orig_options
+                    self.node.tags = orig_tags
 
         return RemoteCapture
 
