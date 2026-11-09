@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+# ruff: noqa
 import os
 import secrets
 
@@ -197,6 +199,9 @@ class ai:
         self.session_path = os.path.join(self.sessions_dir, f"{self.session_id}.json") if self.session_id else None
 
         # Agnostic base prompts
+        self._update_base_prompts()
+
+    def _update_base_prompts(self):
         architect_instructions = ""
         if self.has_architect:
             architect_instructions = """
@@ -237,7 +242,7 @@ class ai:
             - NO WANDERING: Do not speculate. If stuck, report attempts.
             - SAFETY: When you use 'run_commands' with configuration commands, the system automatically prompts the user for confirmation. Just execute - don't ask permission first.
 {architect_instructions}
-            Network Context: {{self.long_term_memory if self.long_term_memory else "Empty."}}
+            Network Context: {self.long_term_memory if self.long_term_memory else "Empty."}
         """).strip()
 
         self._architect_base_prompt = dedent(f"""
@@ -277,6 +282,7 @@ class ai:
     @property
     def engineer_system_prompt(self):
         """Build engineer system prompt with plugin extensions."""
+        self._update_base_prompts()
         if self.engineer_prompt_extensions:
             extensions = "\n".join(self.engineer_prompt_extensions)
             return self._engineer_base_prompt + f"\n\nPlugin Capabilities:\n{extensions}"
@@ -285,6 +291,7 @@ class ai:
     @property
     def architect_system_prompt(self):
         """Build architect system prompt with plugin extensions."""
+        self._update_base_prompts()
         prompt = self._architect_base_prompt
         if getattr(self, "one_shot", False):
             prompt += "\n\nCRITICAL 1-SHOT DIAGNOSTICS DIRECTIVE:\nYou are running in a 1-shot offline diagnostics mode. There is no active conversation loop, and you are NOT conversing with a Network Engineer. You MUST deliver your complete strategic analysis immediately and directly to the user. Do not suggest or attempt to delegate/return control to the engineer."
@@ -624,6 +631,7 @@ class ai:
             # Reload memory after update
             with open(self.memory_path, "r") as f:
                 self.long_term_memory = f.read()
+            self._update_base_prompts()
             
             return "Memory updated successfully."
         except PermissionError as e:
@@ -859,7 +867,7 @@ class ai:
             # Silently fail for LLM tools
             pass
 
-        if self.architect_key:
+        if self.has_architect:
             base_tools.extend([
                 {"type": "function", "function": {"name": "consult_architect", "description": "Ask the Strategic Reasoning Engine for advice on complex design, architecture, or troubleshooting decisions. You remain in control and will present the response to the user. Use this for: configuration planning, design validation, complex troubleshooting.", "parameters": {"type": "object", "properties": {"question": {"type": "string", "description": "Strategic question or decision needed."}, "technical_summary": {"type": "string", "description": "Technical findings and context gathered so far."}}, "required": ["question", "technical_summary"]}}},
                 {"type": "function", "function": {"name": "escalate_to_architect", "description": "Transfer full control to the Strategic Reasoning Engine. Use ONLY when the user explicitly requests the Architect or when the problem requires strategic oversight beyond consultation. After escalation, the Architect takes over the conversation.", "parameters": {"type": "object", "properties": {"reason": {"type": "string", "description": "Why you're escalating (e.g. 'User requested Architect', 'Complex multi-site design needed')."}, "context": {"type": "string", "description": "Full context and findings to hand over."}}, "required": ["reason", "context"]}}}
@@ -1216,14 +1224,17 @@ class ai:
                         if status: update_status("[architect]Engineer consulting Architect...")
                         try:
                             # Consultation only - Engineer stays in control
+                            auth_kwargs = dict(self.architect_auth or {})
+                            if self.architect_key and "api_key" not in auth_kwargs:
+                                auth_kwargs["api_key"] = self.architect_key
                             claude_resp = completion(
                                 model=self.architect_model, 
                                 messages=[
                                     {"role": "system", "content": self.architect_system_prompt},
                                     {"role": "user", "content": f"The Engineer needs your strategic advice.\n\nTECHNICAL SUMMARY: {args['technical_summary']}\n\nQUESTION: {args['question']}\n\nProvide strategic guidance. The Engineer will continue handling the user."}
                                 ], 
-                                api_key=self.architect_key, 
-                                num_retries=3
+                                num_retries=3,
+                                **auth_kwargs
                             )
                             obs = claude_resp.choices[0].message.content
                             if debug:
@@ -1790,7 +1801,7 @@ class PlaybookBuilderAgent:
         import yaml
         try:
             # 1. Parse YAML
-            data = yaml.load(playbook_yaml, Loader=yaml.FullLoader)
+            data = yaml.safe_load(playbook_yaml)
         except Exception as e:
             return {"valid": False, "error": f"YAML Syntax Error: {e}"}
 
