@@ -3,7 +3,7 @@
 </p>
 
 
-# Connpy (v6.4.0b2)
+# Connpy (v6.4.0b3)
 [![](https://img.shields.io/pypi/v/connpy.svg?style=flat-square)](https://pypi.org/pypi/connpy/)
 [![](https://img.shields.io/pypi/pyversions/connpy.svg?style=flat-square)](https://pypi.org/pypi/connpy/)
 [![](https://img.shields.io/pypi/dm/connpy.svg?style=flat-square&cacheSeconds=86400)](https://pypi.org/pypi/connpy/)
@@ -40,10 +40,18 @@ Start a standalone persistent session with the AI Copilot. Manage sessions using
 conn ai "how do i check bgp summary on cisco?"
 ```
 
-### 1c. MCP Integration
-Connect to external data sources and tools dynamically via the Model Context Protocol (MCP). Use the interactive wizard or command actions to configure MCP servers:
+### 1c. MCP Integration (Client & Server)
+Connect to external data sources and tools dynamically, or expose `connpy` as a native MCP server for external agents (Claude Desktop, Cursor, IDEs):
 ```bash
-conn ai --mcp
+# MCP Client: Manage connected MCP servers
+conn ai --mcp                        # Interactive configuration wizard
+conn ai --mcp list                   # List configured MCP servers
+conn ai --mcp add <name> <url> [os]  # Add a remote SSE MCP server
+
+# MCP Server: Serve connpy inventory, diagnostic tools, and playbooks
+conn ai --mcp serve                  # Standard I/O mode (default, for local clients)
+conn ai --mcp serve --sse --port 8080 # Remote SSE mode
+conn ai --mcp serve --trust          # Enable inventory mutations (CRUD) & configuration commands
 ```
 
 ### 1d. Local Interactive Shell (conn shell)

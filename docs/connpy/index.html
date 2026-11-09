@@ -41,7 +41,7 @@ el.replaceWith(d);
 <p align="center">
 <img src="https://nginx.gederico.dynu.net/images/CONNPY-resized.png" alt="App Logo">
 </p>
-<h1 id="connpy-v640b2">Connpy (v6.4.0b2)</h1>
+<h1 id="connpy-v640b3">Connpy (v6.4.0b3)</h1>
 <p><a href="https://pypi.org/pypi/connpy/"><img alt="" src="https://img.shields.io/pypi/v/connpy.svg?style=flat-square"></a>
 <a href="https://pypi.org/pypi/connpy/"><img alt="" src="https://img.shields.io/pypi/pyversions/connpy.svg?style=flat-square"></a>
 <a href="https://pypi.org/pypi/connpy/"><img alt="" src="https://img.shields.io/pypi/dm/connpy.svg?style=flat-square&amp;cacheSeconds=86400"></a>
@@ -69,9 +69,17 @@ el.replaceWith(d);
 <p>Start a standalone persistent session with the AI Copilot. Manage sessions using <code>--list</code>, <code>--resume</code>, <code>--session &lt;id&gt;</code> (to restore a specific history), <code>--delete &lt;id&gt;</code>, or send a quick single-shot question directly from the terminal prompt:</p>
 <pre><code class="language-bash">conn ai &quot;how do i check bgp summary on cisco?&quot;
 </code></pre>
-<h3 id="1c-mcp-integration">1c. MCP Integration</h3>
-<p>Connect to external data sources and tools dynamically via the Model Context Protocol (MCP). Use the interactive wizard or command actions to configure MCP servers:</p>
-<pre><code class="language-bash">conn ai --mcp
+<h3 id="1c-mcp-integration-client-server">1c. MCP Integration (Client &amp; Server)</h3>
+<p>Connect to external data sources and tools dynamically, or expose <code><a title="connpy" href="#connpy">connpy</a></code> as a native MCP server for external agents (Claude Desktop, Cursor, IDEs):</p>
+<pre><code class="language-bash"># MCP Client: Manage connected MCP servers
+conn ai --mcp                        # Interactive configuration wizard
+conn ai --mcp list                   # List configured MCP servers
+conn ai --mcp add &lt;name&gt; &lt;url&gt; [os]  # Add a remote SSE MCP server
+
+# MCP Server: Serve connpy inventory, diagnostic tools, and playbooks
+conn ai --mcp serve                  # Standard I/O mode (default, for local clients)
+conn ai --mcp serve --sse --port 8080 # Remote SSE mode
+conn ai --mcp serve --trust          # Enable inventory mutations (CRUD) &amp; configuration commands
 </code></pre>
 <h3 id="1d-local-interactive-shell-conn-shell">1d. Local Interactive Shell (conn shell)</h3>
 <p>Launch a local interactive shell with AI Copilot support enabled directly on your host machine:</p>
@@ -4598,7 +4606,7 @@ def test(self, commands, expected, vars = None,*, folder = None, prompt = None, 
 <nav id="sidebar">
 <div class="toc">
 <ul>
-<li><a href="#connpy-v640b2">Connpy (v6.4.0b2)</a><ul>
+<li><a href="#connpy-v640b3">Connpy (v6.4.0b3)</a><ul>
 <li><a href="#1-ai-system">1. 🤖 AI System</a><ul>
 <li><a href="#1a-terminal-copilot-ctrlspace">1a. Terminal Copilot (Ctrl+Space)</a></li>
 <li><a href="#1b-ai-chat-conn-ai">1b. AI Chat (conn ai)</a></li>
