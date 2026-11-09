@@ -1,7 +1,8 @@
 import sys
+
 from rich.panel import Panel
-from rich.rule import Rule
 from rich.prompt import Prompt
+from rich.rule import Rule
 
 from .. import printer
 
@@ -36,7 +37,7 @@ class AIHandler:
             try:
                 self.app.services.ai.delete_session(args.delete_session[0])
                 printer.success(f"Session {args.delete_session[0]} deleted.")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 printer.error(str(e))
             return
 
@@ -189,7 +190,7 @@ class AIHandler:
                 try:
                     self.app.services.ai.configure_mcp(name, url=url, auto_load_on_os=os_filter)
                     printer.success(f"MCP server '{name}' added/updated.")
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     printer.error(str(e))
                 return
 
@@ -201,7 +202,7 @@ class AIHandler:
                 try:
                     self.app.services.ai.configure_mcp(name, remove=True)
                     printer.success(f"MCP server '{name}' removed.")
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     printer.error(str(e))
                 return
 
@@ -214,13 +215,54 @@ class AIHandler:
                 try:
                     self.app.services.ai.configure_mcp(name, enabled=enabled)
                     printer.success(f"MCP server '{name}' {'enabled' if enabled else 'disabled'}.")
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     printer.error(str(e))
                 return
+
+            elif action == "serve":
+                transport = "stdio"
+                host = "127.0.0.1"
+                port = 8000
+                trust = getattr(args, "trust", False)
+
+                idx = 1
+                while idx < len(mcp_args):
+                    tok = mcp_args[idx]
+                    if tok in ["--sse", "sse"]:
+                        transport = "sse"
+                    elif tok in ["--stdio", "stdio"]:
+                        transport = "stdio"
+                    elif tok in ["--trust", "trust"]:
+                        trust = True
+                    elif tok in ["--port", "-p"]:
+                        idx += 1
+                        if idx < len(mcp_args):
+                            try:
+                                port = int(mcp_args[idx])
+                            except ValueError:
+                                printer.error(f"Invalid port: {mcp_args[idx]}")
+                                return
+                    elif tok.startswith("--port="):
+                        try:
+                            port = int(tok.split("=", 1)[1])
+                        except ValueError:
+                            printer.error(f"Invalid port: {tok}")
+                            return
+                    elif tok in ["--host", "-h"]:
+                        idx += 1
+                        if idx < len(mcp_args):
+                            host = mcp_args[idx]
+                    elif tok.startswith("--host="):
+                        host = tok.split("=", 1)[1]
+                    idx += 1
+
+                from ..mcp_server import ConnpyMCPServer
+                server = ConnpyMCPServer(config=self.app.config, services=self.app.services, trust=trust)
+                return server.run(transport=transport, host=host, port=port)
             
             else:
                 printer.error(f"Unknown MCP action: {action}")
-                printer.info("Available actions: list, add, remove, enable, disable")
+                printer.info("Available actions: list, add, remove, enable, disable, serve")
                 return
 
         # 2. Interactive Wizard Mode (if no arguments provided)
@@ -262,15 +304,16 @@ class AIHandler:
                 self.app.services.ai.configure_mcp(result["name"], remove=True)
                 printer.success(f"MCP server '{result['name']}' removed.")
                 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             printer.error(str(e))
 
     def _parse_auth_value(self, value):
         if not value or value.lower() in ["none", "clear"]:
             return None
-        import os
-        import yaml
         import json
+        import os
+
+        import yaml
         if os.path.exists(value):
             try:
                 with open(value, "r") as f:
@@ -279,7 +322,7 @@ class AIHandler:
                     return json.loads(content)
                 except ValueError:
                     return yaml.safe_load(content)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 printer.error(f"Failed to read/parse auth file '{value}': {e}")
                 sys.exit(1)
         
@@ -291,6 +334,6 @@ class AIHandler:
                 if isinstance(parsed, dict):
                     return parsed
                 raise ValueError()
-            except Exception:
+            except Exception:  # noqa: BLE001
                 printer.error("Auth parameter must be a valid JSON/YAML string, or a path to a JSON/YAML file.")
                 sys.exit(1)
