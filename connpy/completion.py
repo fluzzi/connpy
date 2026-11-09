@@ -1,5 +1,7 @@
-import sys
+#!/usr/bin/env python3
 import os
+import sys
+
 
 def load_txt_cache(filepath):
     try:
@@ -27,7 +29,7 @@ def get_cwd(words, option=None, folderonly=False):
     for i in range(len(pathstrings)):
         if os.path.isdir(pathstrings[i]):
             pathstrings[i] += '/'
-    pathstrings = [s[2:] if s.startswith('./') else s for s in pathstrings]
+    pathstrings = [s.removeprefix('./') for s in pathstrings]
     if folderonly:
         pathstrings = [s for s in pathstrings if os.path.isdir(s)]
     return pathstrings
@@ -43,7 +45,7 @@ def _get_plugins(which, defaultdir):
     try:
         with open(pref_path) as f:
             preferences = json.load(f)
-    except Exception:
+    except Exception:  # noqa: BLE001
         preferences = {}
 
     # Load service mode
@@ -71,8 +73,8 @@ def _get_plugins(which, defaultdir):
 
     # Get plugins from all directories
     user_enabled, user_disabled, user_all_plugins = get_plugins_from_directory(defaultdir + "/plugins")
-    core_enabled, core_disabled, core_all_plugins = get_plugins_from_directory(core_path)
-    remote_enabled, remote_disabled, remote_all_plugins = get_plugins_from_directory(remote_path)
+    _core_enabled, _core_disabled, core_all_plugins = get_plugins_from_directory(core_path)
+    _remote_enabled, _remote_disabled, remote_all_plugins = get_plugins_from_directory(remote_path)
 
     # Calculate final paths respecting priorities and preferences
     # Priority: User Local > Core Local > Remote (unless preferred)
@@ -115,7 +117,7 @@ def _get_users(configdir):
             data = yaml.safe_load(f) or {}
             if isinstance(data, dict) and "users" in data:
                 return list(data["users"].keys())
-    except Exception:
+    except Exception:  # noqa: BLE001, S110
         pass
     return []
 
@@ -135,7 +137,7 @@ def _get_sso_providers(configdir):
                     providers = sso.get("providers", {})
                     if isinstance(providers, dict):
                         return list(providers.keys())
-    except Exception:
+    except Exception:  # noqa: BLE001, S110
         pass
     return []
 
@@ -210,12 +212,22 @@ def _build_tree(nodes, folders, profiles, plugins, configdir):
     }
 
     # State Machine Definitions
+    serve_dict = {"__exclude_used__": True}
+    serve_dict.update({
+        "--sse": serve_dict,
+        "--port": {"*": serve_dict},
+        "--trust": serve_dict,
+        "--help": None,
+        "-h": None
+    })
+
     mcp_dict = {
         "list": None,
         "add": {"*": {"*": {"*": None}}}, # name url [os]
         "remove": {"*": None},
         "enable": {"*": None},
         "disable": {"*": None},
+        "serve": serve_dict,
         "--help": None, "-h": None
     }
 
@@ -291,7 +303,7 @@ def _build_tree(nodes, folders, profiles, plugins, configdir):
     # Long flags are offered; short forms (-d/-t) only used for navigation.
     # Two states: before node (offer nodes + remaining long flags)
     #             after node  (offer only remaining long flags, no more nodes)
-    connect_flags_long = ["--debug", "--sftp"]
+    _connect_flags_long = ["--debug", "--sftp"]
     connect_flags_all  = ["--debug", "-d", "--sftp", "-t"]
 
     # Post-node: only offer remaining long flags
@@ -443,7 +455,7 @@ def main():
     try:
         with open(pathfile, "r") as f:
             configdir = f.read().strip()
-    except (FileNotFoundError, IOError):
+    except (OSError, FileNotFoundError):
         configdir = defaultdir
     cachefile = configdir + '/.config.cache.json'
     
@@ -477,8 +489,8 @@ def main():
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
             module.get_cwd = get_cwd
-        except Exception:
-            exit()
+        except Exception:  # noqa: BLE001
+            sys.exit()
 
         # New API: _connpy_tree → integrate into main tree and use resolver
         if hasattr(module, "_connpy_tree"):
@@ -493,20 +505,20 @@ def main():
             try:
                 with open(cachefile, "r") as jsonconf:
                     info["config"] = json.load(jsonconf)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 try:
                     import yaml
                     with open(configdir + '/config.yaml', "r") as yamlconf:
                         info["config"] = yaml.safe_load(yamlconf)
-                except Exception:
+                except Exception:  # noqa: BLE001
                     info["config"] = {}
             try:
-                plugin_completion = getattr(module, "_connpy_completion")
+                plugin_completion = module._connpy_completion
                 strings = plugin_completion(wordsnumber, words, info)
-            except Exception:
-                exit()
+            except Exception:  # noqa: BLE001
+                sys.exit()
         else:
-            exit()
+            sys.exit()
 
     # --- Tree-based completion ---
     else:
