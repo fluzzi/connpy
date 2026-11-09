@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 #Imports
-from functools import wraps, partial, update_wrapper
+from functools import update_wrapper, wraps
+
 from . import printer
 
 #functions and classes
@@ -10,54 +11,118 @@ class MethodHook:
 
     def __init__(self, func):
         self.func = func
-        self.pre_hooks = []   # List to store registered pre-hooks
-        self.post_hooks = []  # List to store registered post-hooks
+        self.pre_hooks = []   # List to store registered class-level pre-hooks
+        self.post_hooks = []  # List to store registered class-level post-hooks
         wraps(func)(self)
 
+    def register_pre_hook(self, hook):
+        """Register a function to be called before the original function"""
+        if hook not in self.pre_hooks:
+            self.pre_hooks.append(hook)
+
+    def register_post_hook(self, hook):
+        """Register a function to be called after the original function"""
+        if hook not in self.post_hooks:
+            self.post_hooks.append(hook)
+
     def __call__(self, *args, **kwargs):
-        # Execute pre-hooks before the original function
-        for hook in self.pre_hooks:
+        # Fallback when called directly on descriptor or standalone function
+        inst_pre = []
+        inst_post = []
+        if args and hasattr(args[0], "__dict__"):
+            inst_dict = args[0].__dict__
+            inst_pre = inst_dict.get("_method_pre_hooks", {}).get(self.func.__name__, []) if isinstance(inst_dict.get("_method_pre_hooks"), dict) else []
+            inst_post = inst_dict.get("_method_post_hooks", {}).get(self.func.__name__, []) if isinstance(inst_dict.get("_method_post_hooks"), dict) else []
+
+        all_pre = list(self.pre_hooks) + [h for h in inst_pre if h not in self.pre_hooks]
+        for hook in all_pre:
             try:
                 args, kwargs = hook(*args, **kwargs)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 hook_name = getattr(hook, "__name__", str(hook))
                 printer.error(f"{self.func.__name__} Pre-hook {hook_name} raised an exception: {e}")
 
         result = self.func(*args, **kwargs)
 
-        # Execute post-hooks after the original function
-        if self.post_hooks:
-            #printer.info(f"Executing {len(self.post_hooks)} post-hooks for {self.func.__name__}...")
-            pass
-        for hook in self.post_hooks:
+        all_post = list(self.post_hooks) + [h for h in inst_post if h not in self.post_hooks]
+        for hook in all_post:
             try:
-                result = hook(*args, **kwargs, result=result)  # Pass result to hooks
-            except Exception as e:
+                result = hook(*args, **kwargs, result=result)
+            except Exception as e:  # noqa: BLE001
                 hook_name = getattr(hook, "__name__", str(hook))
                 printer.error(f"{self.func.__name__} Post-hook {hook_name} raised an exception: {e}")
 
         return result
 
     def __get__(self, instance, owner):
-        if not instance:
+        if instance is None:
             return self
-        else:
-            return self.make_callable(instance)
+        return self.make_callable(instance)
 
     def make_callable(self, instance):
-        # Returns a callable that also allows access to hook registration methods
-        callable_instance = partial(self.__call__, instance)
-        callable_instance.register_pre_hook = self.register_pre_hook
-        callable_instance.register_post_hook = self.register_post_hook
-        return callable_instance
+        # Returns a callable bound to instance with per-instance hook registration
+        func_name = self.func.__name__
 
-    def register_pre_hook(self, hook):
-        """Register a function to be called before the original function"""
-        self.pre_hooks.append(hook)
+        def bound_method(*args, **kwargs):
+            # Pre-hooks: class-level followed by instance-level
+            if hasattr(instance, "__dict__"):
+                inst_pre = instance.__dict__.get("_method_pre_hooks", {}).get(func_name, [])
+                inst_post = instance.__dict__.get("_method_post_hooks", {}).get(func_name, [])
+            else:
+                inst_pre = instance._method_pre_hooks.get(func_name, []) if hasattr(instance, "_method_pre_hooks") else []
+                inst_post = instance._method_post_hooks.get(func_name, []) if hasattr(instance, "_method_post_hooks") else []
 
-    def register_post_hook(self, hook):
-        """Register a function to be called after the original function"""
-        self.post_hooks.append(hook)
+            all_pre = list(self.pre_hooks) + [h for h in inst_pre if h not in self.pre_hooks]
+            call_args = (instance,) + args
+
+            for hook in all_pre:
+                try:
+                    call_args, kwargs = hook(*call_args, **kwargs)
+                except Exception as e:  # noqa: BLE001
+                    hook_name = getattr(hook, "__name__", str(hook))
+                    printer.error(f"{func_name} Pre-hook {hook_name} raised an exception: {e}")
+
+            result = self.func(*call_args, **kwargs)
+
+            all_post = list(self.post_hooks) + [h for h in inst_post if h not in self.post_hooks]
+            for hook in all_post:
+                try:
+                    result = hook(*call_args, **kwargs, result=result)
+                except Exception as e:  # noqa: BLE001
+                    hook_name = getattr(hook, "__name__", str(hook))
+                    printer.error(f"{func_name} Post-hook {hook_name} raised an exception: {e}")
+
+            return result
+
+        wraps(self.func)(bound_method)
+
+        def register_pre_hook(hook):
+            if hasattr(instance, "__dict__"):
+                hooks = instance.__dict__.setdefault("_method_pre_hooks", {}).setdefault(func_name, [])
+            else:
+                if not hasattr(instance, "_method_pre_hooks"):
+                    instance._method_pre_hooks = {}
+                hooks = instance._method_pre_hooks.setdefault(func_name, [])
+            if hook not in hooks:
+                hooks.append(hook)
+
+        def register_post_hook(hook):
+            if hasattr(instance, "__dict__"):
+                hooks = instance.__dict__.setdefault("_method_post_hooks", {}).setdefault(func_name, [])
+            else:
+                if not hasattr(instance, "_method_post_hooks"):
+                    instance._method_post_hooks = {}
+                hooks = instance._method_post_hooks.setdefault(func_name, [])
+            if hook not in hooks:
+                hooks.append(hook)
+
+        bound_method.register_pre_hook = register_pre_hook
+        bound_method.register_post_hook = register_post_hook
+        bound_method.__self__ = instance
+        bound_method.__func__ = self.func
+
+        return bound_method
+
 
 class ClassHook:
     """Decorator class to enable Class Modifying"""
@@ -91,4 +156,3 @@ class ClassHook:
             """Modify this specific instance."""
             modification_func(instance)
         return modify_instance
-
