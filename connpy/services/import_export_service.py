@@ -71,7 +71,7 @@ class ImportExportService(BaseService):
             
         try:
             with open(file_path, "r") as f:
-                data = yaml.load(f, Loader=yaml.FullLoader)
+                data = yaml.safe_load(f)
             self.import_from_dict(data)
         except Exception as e:
             raise InvalidConfigurationError(f"Failed to read/parse import file: {e}")

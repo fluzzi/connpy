@@ -960,7 +960,7 @@ class ImportExportServicer(connpy_pb2_grpc.ImportExportServiceServicer):
         if request.value.startswith("---YAML---\n"):
             import yaml
             content = request.value[len("---YAML---\n"):]
-            data = yaml.load(content, Loader=yaml.FullLoader)
+            data = yaml.safe_load(content)
             self.service.import_from_dict(data)
         else:
             self.service.import_from_file(request.value)
