@@ -522,7 +522,15 @@ class ConnpyMCPServer:
             return self.server.run(transport="stdio", **kwargs)
 
         if transport == "sse":
-            return self.server.run(transport="sse", host=host, port=port, **kwargs)
+            if hasattr(self.server, "settings"):
+                if hasattr(self.server.settings, "host"):
+                    self.server.settings.host = host
+                if hasattr(self.server.settings, "port"):
+                    self.server.settings.port = port
+            try:
+                return self.server.run(transport="sse", host=host, port=port, **kwargs)
+            except TypeError:
+                return self.server.run(transport="sse", **kwargs)
 
         msg = f"Unknown transport: {transport}. Supported transports: 'stdio', 'sse'"
         raise ValueError(msg)

@@ -604,7 +604,7 @@ def service(self):
 <dl>
 <dt id="connpy.grpc_layer.server.AuthInterceptor.OPEN_METHODS"><code class="name">var <span class="ident">OPEN_METHODS</span></code></dt>
 <dd>
-<div class="desc"><p>The type of the None singleton.</p></div>
+<div class="desc"></div>
 </dd>
 </dl>
 <h3>Methods</h3>
@@ -648,8 +648,9 @@ contextvars.Context, and the same Context is used for downstream
 interceptors and for the final handler call. Note that there are no
 guarantees that interceptors and handlers will be called from the
 same thread.</p>
-<h2 id="args">Args</h2>
 <dl>
+<dt>Args</dt>
+<dt>-----=</dt>
 <dt><strong><code>continuation</code></strong></dt>
 <dd>A function that takes a HandlerCallDetails and
 proceeds to invoke the next interceptor in the chain, if any,
@@ -659,8 +660,9 @@ the RPC is considered serviced, or None otherwise.</dd>
 <dt><strong><code>handler_call_details</code></strong></dt>
 <dd>A HandlerCallDetails describing the RPC.</dd>
 </dl>
-<h2 id="returns">Returns</h2>
-<p>An RpcMethodHandler with which the RPC may be serviced if the
+<p>Returns
+-----=
+An RpcMethodHandler with which the RPC may be serviced if the
 interceptor chooses to service this RPC, or None otherwise.</p></div>
 </dd>
 </dl>
@@ -1213,7 +1215,7 @@ def service(self):
         if request.value.startswith(&#34;---YAML---\n&#34;):
             import yaml
             content = request.value[len(&#34;---YAML---\n&#34;):]
-            data = yaml.load(content, Loader=yaml.FullLoader)
+            data = yaml.safe_load(content)
             self.service.import_from_dict(data)
         else:
             self.service.import_from_file(request.value)
@@ -1340,8 +1342,9 @@ contextvars.Context, and the same Context is used for downstream
 interceptors and for the final handler call. Note that there are no
 guarantees that interceptors and handlers will be called from the
 same thread.</p>
-<h2 id="args">Args</h2>
 <dl>
+<dt>Args</dt>
+<dt>-----=</dt>
 <dt><strong><code>continuation</code></strong></dt>
 <dd>A function that takes a HandlerCallDetails and
 proceeds to invoke the next interceptor in the chain, if any,
@@ -1351,8 +1354,9 @@ the RPC is considered serviced, or None otherwise.</dd>
 <dt><strong><code>handler_call_details</code></strong></dt>
 <dd>A HandlerCallDetails describing the RPC.</dd>
 </dl>
-<h2 id="returns">Returns</h2>
-<p>An RpcMethodHandler with which the RPC may be serviced if the
+<p>Returns
+-----=
+An RpcMethodHandler with which the RPC may be serviced if the
 interceptor chooses to service this RPC, or None otherwise.</p></div>
 </dd>
 </dl>

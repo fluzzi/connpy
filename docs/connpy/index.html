@@ -41,7 +41,7 @@ el.replaceWith(d);
 <p align="center">
 <img src="https://nginx.gederico.dynu.net/images/CONNPY-resized.png" alt="App Logo">
 </p>
-<h1 id="connpy-v640b3">Connpy (v6.4.0b3)</h1>
+<h1 id="connpy-v640b4">Connpy (v6.4.0b4)</h1>
 <p><a href="https://pypi.org/pypi/connpy/"><img alt="" src="https://img.shields.io/pypi/v/connpy.svg?style=flat-square"></a>
 <a href="https://pypi.org/pypi/connpy/"><img alt="" src="https://img.shields.io/pypi/pyversions/connpy.svg?style=flat-square"></a>
 <a href="https://pypi.org/pypi/connpy/"><img alt="" src="https://img.shields.io/pypi/dm/connpy.svg?style=flat-square&amp;cacheSeconds=86400"></a>
@@ -279,6 +279,10 @@ print(response)
 <div class="desc"></div>
 </dd>
 <dt><code class="name"><a title="connpy.mcp_client" href="mcp_client.html">connpy.mcp_client</a></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt><code class="name"><a title="connpy.mcp_server" href="mcp_server.html">connpy.mcp_server</a></code></dt>
 <dd>
 <div class="desc"></div>
 </dd>
@@ -1676,7 +1680,7 @@ def getitems(self, uniques, extract = False):
 </dd>
 <dt id="connpy.node"><code class="flex name class">
 <span>class <span class="ident">node</span></span>
-<span>(</span><span>unique,<br>host,<br>options='',<br>logs='',<br>password='',<br>port='',<br>protocol='',<br>user='',<br>config='',<br>tags='',<br>jumphost='')</span>
+<span>(</span><span>unique,<br>host,<br>options='',<br>logs='',<br>password='',<br>port='',<br>protocol='',<br>user='',<br>config='',<br>tags='',<br>jumphost='',<br>allow_unsafe_options=None)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -1701,7 +1705,7 @@ class node:
 
         &#39;&#39;&#39;
     
-    def __init__(self, unique, host, options=&#39;&#39;, logs=&#39;&#39;, password=&#39;&#39;, port=&#39;&#39;, protocol=&#39;&#39;, user=&#39;&#39;, config=&#39;&#39;, tags=&#39;&#39;, jumphost=&#39;&#39;):
+    def __init__(self, unique, host, options=&#39;&#39;, logs=&#39;&#39;, password=&#39;&#39;, port=&#39;&#39;, protocol=&#39;&#39;, user=&#39;&#39;, config=&#39;&#39;, tags=&#39;&#39;, jumphost=&#39;&#39;, allow_unsafe_options=None):
         &#39;&#39;&#39; 
             
         ### Parameters:  
@@ -1736,14 +1740,22 @@ class node:
                               like &#34;os&#34;, &#34;prompt&#34; and &#34;screenleght_command&#34;
                               
             - jumphost (str): Reference another node to be used as a jumphost
+
+            - allow_unsafe_options (bool): Explicitly override safety restrictions.
         &#39;&#39;&#39;
         self.config = config
         if config == &#39;&#39;:
             self.idletime = 0
             self.key = None
         else:
-            self.idletime = config.config[&#34;idletime&#34;]
-            self.key = config.key
+            self.idletime = config.config[&#34;idletime&#34;] if (hasattr(config, &#34;config&#34;) and isinstance(config.config, dict) and &#34;idletime&#34; in config.config) else 0
+            self.key = getattr(config, &#34;key&#34;, None)
+        if allow_unsafe_options is not None:
+            self.allow_unsafe_options = bool(allow_unsafe_options)
+        elif config != &#39;&#39; and config is not None and hasattr(config, &#34;config&#34;) and isinstance(config.config, dict):
+            self.allow_unsafe_options = bool(config.config.get(&#34;allow_unsafe_options&#34;, False))
+        else:
+            self.allow_unsafe_options = False
         self.unique = unique
         attr = {&#34;host&#34;: host, &#34;logs&#34;: logs, &#34;options&#34;:options, &#34;port&#34;: port, &#34;protocol&#34;: protocol, &#34;user&#34;: user, &#34;tags&#34;: tags, &#34;jumphost&#34;: jumphost}
         for key in attr:
@@ -1813,6 +1825,79 @@ class node:
         else:
             jh_dict[&#34;password&#34;] = [jh_dict[&#34;password&#34;]]
         return jh_dict
+
+    def _is_unsafe_allowed(self) -&gt; bool:
+        if getattr(self, &#34;allow_unsafe_options&#34;, False):
+            return True
+        if hasattr(self, &#34;config&#34;) and self.config and hasattr(self.config, &#34;config&#34;) and isinstance(self.config.config, dict):
+            return bool(self.config.config.get(&#34;allow_unsafe_options&#34;, False))
+        return False
+
+    def _validate_base_fields(self, check_port=True):
+        &#34;&#34;&#34;Sanitize host, user, and port against argument injection and shell metacharacters.&#34;&#34;&#34;
+        host_s = str(self.host) if self.host is not None else &#34;&#34;
+        if not host_s:
+            raise ValueError(&#34;Host cannot be empty&#34;)
+        if host_s.startswith(&#34;-&#34;):
+            raise ValueError(f&#34;Host cannot start with &#39;-&#39;: &#39;{self.host}&#39;&#34;)
+        host_bare = (
+            host_s[1:-1]
+            if (host_s.startswith(&#34;[&#34;) and host_s.endswith(&#34;]&#34;))
+            else host_s
+        )
+        if not host_bare or host_bare.startswith(&#34;-&#34;):
+            raise ValueError(f&#34;Invalid characters in host: &#39;{self.host}&#39;&#34;)
+        if _LEGACY_SSH_UNSAFE_RE.search(host_bare):
+            raise ValueError(f&#34;Invalid characters in host: &#39;{self.host}&#39;&#34;)
+
+        user_s = str(self.user) if self.user is not None else &#34;&#34;
+        if user_s:
+            if user_s.startswith(&#34;-&#34;):
+                raise ValueError(f&#34;User cannot start with &#39;-&#39;: &#39;{self.user}&#39;&#34;)
+            if _LEGACY_SSH_UNSAFE_RE.search(user_s):
+                raise ValueError(f&#34;Invalid characters in user: &#39;{self.user}&#39;&#34;)
+
+        if check_port and self.port != &#34;&#34; and self.port is not None:
+            if isinstance(self.port, (bool, float)):
+                raise ValueError(f&#34;Invalid TCP SSH port &#39;{self.port}&#39;&#34;)
+            port_s = str(self.port).strip()
+            if port_s:
+                if (
+                    not port_s.isascii()
+                    or not re.fullmatch(r&#34;[0-9]+&#34;, port_s, re.ASCII)
+                    or not (1 &lt;= int(port_s) &lt;= 65535)
+                ):
+                    raise ValueError(f&#34;Invalid TCP SSH port &#39;{self.port}&#39;&#34;)
+
+    def _validate_options_and_safety(self):
+        &#34;&#34;&#34;Validate options string for unbalanced quotes and dangerous control characters.&#34;&#34;&#34;
+        if not self.options:
+            return
+        opts_str = str(self.options).strip()
+        if not opts_str:
+            return
+        if not self._is_unsafe_allowed():
+            if any(c in opts_str for c in (&#34;\n&#34;, &#34;\r&#34;, &#34;\x00&#34;)):
+                raise ValueError(&#34;Options cannot contain newlines or null bytes&#34;)
+            try:
+                shlex.split(opts_str)
+            except ValueError as e:
+                raise ValueError(f&#34;Invalid options: unbalanced quotes ({e})&#34;) from e
+
+    def _validate_ssh_options(self):
+        &#34;&#34;&#34;Sanitize SSH options against local command execution directives.&#34;&#34;&#34;
+        self._validate_options_and_safety()
+        if not self.options:
+            return
+        opts_str = str(self.options).strip()
+        if not opts_str:
+            return
+        if not self._is_unsafe_allowed():
+            dangerous_directives = (&#34;ProxyCommand&#34;, &#34;LocalCommand&#34;, &#34;PermitLocalCommand&#34;, &#34;KnownHostsCommand&#34;)
+            pattern = r&#39;(?:&#39; + &#39;|&#39;.join(dangerous_directives) + r&#39;)&#39;
+            match = re.search(pattern, opts_str, re.IGNORECASE)
+            if match:
+                raise ValueError(f&#34;Disallowed SSH directive in options: &#39;{match.group(0)}&#39;&#34;)
 
     @staticmethod
     def _validate_legacy_ssh_hop_fields(host, user, port):
@@ -3040,10 +3125,13 @@ class node:
 
     @MethodHook
     def _generate_ssh_sftp_cmd(self, force_ssh=False, allow_reverse_tunnel_port=None):
+        self._validate_base_fields(check_port=True)
         is_from_mosh = (
             self.protocol == &#34;mosh&#34;
             or getattr(self, &#34;_orig_protocol&#34;, &#34;&#34;) == &#34;mosh&#34;
         )
+        if not is_from_mosh:
+            self._validate_ssh_options()
         proto = &#34;ssh&#34; if force_ssh else self.protocol
         cmd = proto
         if is_from_mosh:
@@ -3134,8 +3222,9 @@ class node:
         if isinstance(self.tags, dict) and self.tags.get(&#34;mosh_ssh_options&#34;):
             ssh_opts = str(self.tags[&#34;mosh_ssh_options&#34;]).strip()
             if ssh_opts:
-                if re.search(r&#39;(?:LocalCommand|ProxyCommand)&#39;, ssh_opts, re.IGNORECASE):
-                    raise ValueError(&#34;mosh_ssh_options cannot contain LocalCommand or ProxyCommand&#34;)
+                if not self._is_unsafe_allowed():
+                    if re.search(r&#39;(?:LocalCommand|ProxyCommand|PermitLocalCommand|KnownHostsCommand)&#39;, ssh_opts, re.IGNORECASE):
+                        raise ValueError(&#34;mosh_ssh_options cannot contain LocalCommand or ProxyCommand&#34;)
                 try:
                     shlex.split(ssh_opts)
                 except ValueError as exc:
@@ -3153,8 +3242,9 @@ class node:
             if opts:
                 if re.search(r&#39;--(?:ssh|server|client)(?:=|\s|$)&#39;, opts):
                     raise ValueError(&#34;Options cannot override --ssh, --server or --client for mosh&#34;)
-                if re.search(r&#39;(?:LocalCommand|ProxyCommand)&#39;, opts, re.IGNORECASE):
-                    raise ValueError(&#34;Options cannot contain LocalCommand or ProxyCommand&#34;)
+                if not self._is_unsafe_allowed():
+                    if re.search(r&#39;(?:LocalCommand|ProxyCommand|PermitLocalCommand|KnownHostsCommand)&#39;, opts, re.IGNORECASE):
+                        raise ValueError(&#34;Options cannot contain LocalCommand or ProxyCommand&#34;)
                 try:
                     shlex.split(opts)
                 except ValueError as exc:
@@ -3167,6 +3257,8 @@ class node:
 
     @MethodHook
     def _generate_telnet_cmd(self):
+        self._validate_base_fields(check_port=True)
+        self._validate_options_and_safety()
         cmd = f&#34;telnet {self.host}&#34;
         if self.port:
             cmd += f&#34; {self.port}&#34;
@@ -3176,22 +3268,52 @@ class node:
 
     @MethodHook
     def _generate_kube_cmd(self):
-        cmd = f&#34;kubectl exec {self.options} {self.host} -it --&#34;
+        self._validate_base_fields(check_port=False)
+        self._validate_options_and_safety()
         kube_command = self.tags.get(&#34;kube_command&#34;, &#34;/bin/bash&#34;) if isinstance(self.tags, dict) else &#34;/bin/bash&#34;
+        if not self._is_unsafe_allowed() and kube_command:
+            k_str = str(kube_command)
+            if any(c in k_str for c in (&#34;\n&#34;, &#34;\r&#34;, &#34;\x00&#34;)):
+                raise ValueError(&#34;kube_command cannot contain newlines or null bytes&#34;)
+            try:
+                shlex.split(k_str)
+            except ValueError as e:
+                raise ValueError(f&#34;Invalid kube_command: unbalanced quotes ({e})&#34;) from e
+        cmd = f&#34;kubectl exec {self.options} {self.host} -it --&#34;
         cmd += f&#34; {kube_command}&#34;
         return cmd
 
     @MethodHook
     def _generate_docker_cmd(self):
-        cmd = f&#34;docker {self.options} exec -it {self.host}&#34;
+        self._validate_base_fields(check_port=False)
+        self._validate_options_and_safety()
         docker_command = self.tags.get(&#34;docker_command&#34;, &#34;/bin/bash&#34;) if isinstance(self.tags, dict) else &#34;/bin/bash&#34;
+        if not self._is_unsafe_allowed() and docker_command:
+            d_str = str(docker_command)
+            if any(c in d_str for c in (&#34;\n&#34;, &#34;\r&#34;, &#34;\x00&#34;)):
+                raise ValueError(&#34;docker_command cannot contain newlines or null bytes&#34;)
+            try:
+                shlex.split(d_str)
+            except ValueError as e:
+                raise ValueError(f&#34;Invalid docker_command: unbalanced quotes ({e})&#34;) from e
+        cmd = f&#34;docker {self.options} exec -it {self.host}&#34;
         cmd += f&#34; {docker_command}&#34;
         return cmd
 
     @MethodHook
     def _generate_ssm_cmd(self):
+        self._validate_base_fields(check_port=False)
+        self._validate_options_and_safety()
         region = self.tags.get(&#34;region&#34;, &#34;&#34;) if isinstance(self.tags, dict) else &#34;&#34;
         profile = self.tags.get(&#34;profile&#34;, &#34;&#34;) if isinstance(self.tags, dict) else &#34;&#34;
+        if not self._is_unsafe_allowed():
+            for field_name, field_val in [(&#34;region&#34;, region), (&#34;profile&#34;, profile)]:
+                if field_val:
+                    f_str = str(field_val)
+                    if f_str.startswith(&#34;-&#34;):
+                        raise ValueError(f&#34;SSM tag &#39;{field_name}&#39; cannot start with &#39;-&#39;: &#39;{field_val}&#39;&#34;)
+                    if re.search(r&#39;[\s\x00-\x1f\x7f;|&amp;$`&gt;&lt;&#34;\&#39;]&#39;, f_str):
+                        raise ValueError(f&#34;Invalid characters in SSM tag &#39;{field_name}&#39;: &#39;{field_val}&#39;&#34;)
         cmd = f&#34;aws ssm start-session --target {self.host}&#34;
         if region:
             cmd += f&#34; --region {region}&#34;
@@ -3492,6 +3614,8 @@ class node:
                   like "os", "prompt" and "screenleght_command"
 
 - jumphost (str): Reference another node to be used as a jumphost
+
+- allow_unsafe_options (bool): Explicitly override safety restrictions.
 </code></pre></div>
 <h3>Methods</h3>
 <dl>
@@ -4606,11 +4730,11 @@ def test(self, commands, expected, vars = None,*, folder = None, prompt = None, 
 <nav id="sidebar">
 <div class="toc">
 <ul>
-<li><a href="#connpy-v640b3">Connpy (v6.4.0b3)</a><ul>
+<li><a href="#connpy-v640b4">Connpy (v6.4.0b4)</a><ul>
 <li><a href="#1-ai-system">1. 🤖 AI System</a><ul>
 <li><a href="#1a-terminal-copilot-ctrlspace">1a. Terminal Copilot (Ctrl+Space)</a></li>
 <li><a href="#1b-ai-chat-conn-ai">1b. AI Chat (conn ai)</a></li>
-<li><a href="#1c-mcp-integration">1c. MCP Integration</a></li>
+<li><a href="#1c-mcp-integration-client-server">1c. MCP Integration (Client &amp; Server)</a></li>
 <li><a href="#1d-local-interactive-shell-conn-shell">1d. Local Interactive Shell (conn shell)</a></li>
 </ul>
 </li>
@@ -4667,6 +4791,7 @@ def test(self, commands, expected, vars = None,*, folder = None, prompt = None, 
 <li><code><a title="connpy.cli" href="cli/index.html">connpy.cli</a></code></li>
 <li><code><a title="connpy.grpc_layer" href="grpc_layer/index.html">connpy.grpc_layer</a></code></li>
 <li><code><a title="connpy.mcp_client" href="mcp_client.html">connpy.mcp_client</a></code></li>
+<li><code><a title="connpy.mcp_server" href="mcp_server.html">connpy.mcp_server</a></code></li>
 <li><code><a title="connpy.proto" href="proto/index.html">connpy.proto</a></code></li>
 <li><code><a title="connpy.services" href="services/index.html">connpy.services</a></code></li>
 <li><code><a title="connpy.tunnels" href="tunnels.html">connpy.tunnels</a></code></li>

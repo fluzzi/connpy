@@ -210,7 +210,10 @@ el.replaceWith(d);
         path = args.data[0]
         try:
             with open(path, &#34;r&#34;) as f:
-                playbook = yaml.load(f, Loader=yaml.FullLoader)
+                playbook = yaml.safe_load(f)
+
+            if not isinstance(playbook, dict):
+                raise TypeError(&#34;Invalid playbook format: expected a dictionary&#34;)
 
             # Check preflight first before any task runs
             if getattr(args, &#34;preflight_ai&#34;, False):
@@ -1021,7 +1024,10 @@ el.replaceWith(d);
     path = args.data[0]
     try:
         with open(path, &#34;r&#34;) as f:
-            playbook = yaml.load(f, Loader=yaml.FullLoader)
+            playbook = yaml.safe_load(f)
+
+        if not isinstance(playbook, dict):
+            raise TypeError(&#34;Invalid playbook format: expected a dictionary&#34;)
 
         # Check preflight first before any task runs
         if getattr(args, &#34;preflight_ai&#34;, False):

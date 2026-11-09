@@ -486,8 +486,9 @@ el.replaceWith(d);
 </details>
 <div class="desc"><p>Business logic for interacting with AI agents and LLM configurations.</p>
 <p>Initialize the service.</p>
-<h2 id="args">Args</h2>
 <dl>
+<dt>Args</dt>
+<dt>-----=</dt>
 <dt><strong><code>config</code></strong></dt>
 <dd>An instance of configfile (or None to instantiate a new one/use global context).</dd>
 </dl></div>
@@ -1078,8 +1079,9 @@ el.replaceWith(d);
 </details>
 <div class="desc"><p>Business logic for general application settings and state configuration.</p>
 <p>Initialize the service.</p>
-<h2 id="args">Args</h2>
 <dl>
+<dt>Args</dt>
+<dt>-----=</dt>
 <dt><strong><code>config</code></strong></dt>
 <dd>An instance of configfile (or None to instantiate a new one/use global context).</dd>
 </dl></div>
@@ -1397,8 +1399,9 @@ el.replaceWith(d);
 </details>
 <div class="desc"><p>Business logic for executing commands on nodes and running automation scripts.</p>
 <p>Initialize the service.</p>
-<h2 id="args">Args</h2>
 <dl>
+<dt>Args</dt>
+<dt>-----=</dt>
 <dt><strong><code>config</code></strong></dt>
 <dd>An instance of configfile (or None to instantiate a new one/use global context).</dd>
 </dl></div>
@@ -1622,7 +1625,7 @@ el.replaceWith(d);
             
         try:
             with open(file_path, &#34;r&#34;) as f:
-                data = yaml.load(f, Loader=yaml.FullLoader)
+                data = yaml.safe_load(f)
             self.import_from_dict(data)
         except Exception as e:
             raise InvalidConfigurationError(f&#34;Failed to read/parse import file: {e}&#34;)
@@ -1667,8 +1670,9 @@ el.replaceWith(d);
 </details>
 <div class="desc"><p>Business logic for YAML/JSON inventory import and export.</p>
 <p>Initialize the service.</p>
-<h2 id="args">Args</h2>
 <dl>
+<dt>Args</dt>
+<dt>-----=</dt>
 <dt><strong><code>config</code></strong></dt>
 <dd>An instance of configfile (or None to instantiate a new one/use global context).</dd>
 </dl></div>
@@ -1816,7 +1820,7 @@ el.replaceWith(d);
         
     try:
         with open(file_path, &#34;r&#34;) as f:
-            data = yaml.load(f, Loader=yaml.FullLoader)
+            data = yaml.safe_load(f)
         self.import_from_dict(data)
     except Exception as e:
         raise InvalidConfigurationError(f&#34;Failed to read/parse import file: {e}&#34;)</code></pre>
@@ -2176,8 +2180,9 @@ el.replaceWith(d);
 </details>
 <div class="desc"><p>Base class for all connpy services, providing common configuration access.</p>
 <p>Initialize the service.</p>
-<h2 id="args">Args</h2>
 <dl>
+<dt>Args</dt>
+<dt>-----=</dt>
 <dt><strong><code>config</code></strong></dt>
 <dd>An instance of configfile (or None to instantiate a new one/use global context).</dd>
 </dl></div>
@@ -2965,8 +2970,9 @@ el.replaceWith(d);
 </details>
 <div class="desc"><p>Business logic for enabling, disabling, and listing plugins.</p>
 <p>Initialize the service.</p>
-<h2 id="args">Args</h2>
 <dl>
+<dt>Args</dt>
+<dt>-----=</dt>
 <dt><strong><code>config</code></strong></dt>
 <dd>An instance of configfile (or None to instantiate a new one/use global context).</dd>
 </dl></div>
@@ -3542,8 +3548,9 @@ el.replaceWith(d);
 </details>
 <div class="desc"><p>Business logic for node profiles management.</p>
 <p>Initialize the service.</p>
-<h2 id="args">Args</h2>
 <dl>
+<dt>Args</dt>
+<dt>-----=</dt>
 <dt><strong><code>config</code></strong></dt>
 <dd>An instance of configfile (or None to instantiate a new one/use global context).</dd>
 </dl></div>
@@ -4140,8 +4147,9 @@ el.replaceWith(d);
 </details>
 <div class="desc"><p>Business logic for Google Drive synchronization.</p>
 <p>Initialize the service.</p>
-<h2 id="args">Args</h2>
 <dl>
+<dt>Args</dt>
+<dt>-----=</dt>
 <dt><strong><code>config</code></strong></dt>
 <dd>An instance of configfile (or None to instantiate a new one/use global context).</dd>
 </dl></div>
@@ -4740,8 +4748,9 @@ el.replaceWith(d);
 </details>
 <div class="desc"><p>Business logic for application lifecycle (API, processes).</p>
 <p>Initialize the service.</p>
-<h2 id="args">Args</h2>
 <dl>
+<dt>Args</dt>
+<dt>-----=</dt>
 <dt><strong><code>config</code></strong></dt>
 <dd>An instance of configfile (or None to instantiate a new one/use global context).</dd>
 </dl></div>

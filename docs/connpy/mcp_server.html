@@ -1,0 +1,1191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<meta name="generator" content="pdoc3 0.11.6">
+<title>connpy.mcp_server API documentation</title>
+<meta name="description" content="">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:1.5em;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:2em 0 .50em 0}h3{font-size:1.4em;margin:1.6em 0 .7em 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .2s ease-in-out}a:visited{color:#503}a:hover{color:#b62}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900;font-weight:bold}pre code{font-size:.8em;line-height:1.4em;padding:1em;display:block}code{background:#f3f3f3;font-family:"DejaVu Sans Mono",monospace;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source > summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible;min-width:max-content}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em 1em;margin:1em 0}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul ul{padding-left:1em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha512-D9gUyxqja7hBtkWpPWGt9wfbfaMGVt9gnyCvYa+jojwwPHLCzUm5i8rpk7vD7wNee9bA35eYIjobYPaQuKS1MQ==" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => {
+hljs.configure({languages: ['bash', 'css', 'diff', 'graphql', 'ini', 'javascript', 'json', 'plaintext', 'python', 'python-repl', 'rust', 'shell', 'sql', 'typescript', 'xml', 'yaml']});
+hljs.highlightAll();
+/* Collapse source docstrings */
+setTimeout(() => {
+[...document.querySelectorAll('.hljs.language-python > .hljs-string')]
+.filter(el => el.innerHTML.length > 200 && ['"""', "'''"].includes(el.innerHTML.substring(0, 3)))
+.forEach(el => {
+let d = document.createElement('details');
+d.classList.add('hljs-string');
+d.innerHTML = '<summary>"""</summary>' + el.innerHTML.substring(3);
+el.replaceWith(d);
+});
+}, 100);
+})</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>connpy.mcp_server</code></h1>
+</header>
+<section id="section-intro">
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="connpy.mcp_server.ConnpyMCPServer"><code class="flex name class">
+<span>class <span class="ident">ConnpyMCPServer</span></span>
+<span>(</span><span>config=None, services=None, trust: bool = False)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class ConnpyMCPServer:
+    &#34;&#34;&#34;Native Model Context Protocol (MCP) Server for connpy.&#34;&#34;&#34;
+
+    SAFE_COMMANDS: ClassVar[list[str]] = [
+        r&#34;^show\s+&#34;,
+        r&#34;^ls\s*&#34;,
+        r&#34;^cat\s+&#34;,
+        r&#34;^ip\s+&#34;,
+        r&#34;^pwd$&#34;,
+        r&#34;^hostname$&#34;,
+        r&#34;^uname&#34;,
+        r&#34;^df\s*&#34;,
+        r&#34;^free\s*&#34;,
+        r&#34;^ps\s*&#34;,
+        r&#34;^ping\s+&#34;,
+        r&#34;^traceroute\s+&#34;,
+        r&#34;^whois\s+&#34;,
+        r&#34;^kubectl\s+(get|describe|version|logs|top|explain|cluster-info|api-resources|api-versions)\s+&#34;,
+        r&#34;^systemctl\s+status\s+&#34;,
+        r&#34;^journalctl\s+&#34;,
+    ]
+
+    def __init__(self, config=None, services=None, trust: bool = False):
+        self.config = config
+        self.services = services
+        if self.services is None:
+            if self.config is not None:
+                from .services.provider import ServiceProvider
+
+                self.services = ServiceProvider(self.config)
+        elif self.config is None and hasattr(self.services, &#34;config&#34;):
+            self.config = self.services.config
+
+        self.trust = bool(trust)
+
+        # Build list of safe commands (SAFE_COMMANDS + trusted_commands from config)
+        aiconfig = {}
+        if self.config:
+            if hasattr(self.config, &#34;get_effective_setting&#34;):
+                aiconfig = self.config.get_effective_setting(&#34;ai&#34;, {})
+            elif hasattr(self.config, &#34;config&#34;) and isinstance(self.config.config, dict):
+                aiconfig = self.config.config.get(&#34;ai&#34;, {})
+
+        custom_trusted = aiconfig.get(&#34;trusted_commands&#34;, []) if isinstance(aiconfig, dict) else []
+        if isinstance(custom_trusted, str):
+            custom_trusted = [c.strip() for c in custom_trusted.split(&#34;,&#34;) if c.strip()]
+        self.safe_commands = list(self.SAFE_COMMANDS) + (
+            custom_trusted if isinstance(custom_trusted, list) else []
+        )
+
+        # Initialize MCP Server
+        if MCPServer is not None:
+            self.server = MCPServer(&#34;connpy&#34;)
+            self._register_tools()
+        else:
+            self.server = None
+
+    def _register_tools(self):
+        &#34;&#34;&#34;Register the 3 tiers of MCP tools.&#34;&#34;&#34;
+        if not self.server:
+            return
+
+        # Level 1 Tools (Read-Only)
+        self.server.tool()(self.list_nodes)
+        self.server.tool()(self.list_folders)
+        self.server.tool()(self.get_node_info)
+        self.server.tool()(self.list_profiles)
+        self.server.tool()(self.get_active_context)
+
+        # Level 2 Tools (Execution, Testing, Playbooks)
+        self.server.tool()(self.run_commands)
+        self.server.tool()(self.test_commands)
+        self.server.tool()(self.validate_playbook)
+        self.server.tool()(self.run_playbook)
+
+        # Level 3 Tools (CRUD - Requires trust=True)
+        self.server.tool()(self.add_node)
+        self.server.tool()(self.update_node)
+        self.server.tool()(self.delete_node)
+
+    # -------------------------------------------------------------------------
+    # Security Validation
+    # -------------------------------------------------------------------------
+
+    def is_safe_command(self, cmd: str) -&gt; bool:
+        &#34;&#34;&#34;Validate if a command is considered safe under current trust settings.
+
+        - If trust is True, all commands are allowed.
+        - Block chaining/injection characters: &#39;;&#39;, &#39;&amp;&amp;&#39;, &#39;||&#39;, &#39;|&#39;, &#39;`&#39;, &#39;$(&#39;, &#39;&gt;&#39;, &#39;&lt;&#39;, &#39;\\n&#39;, &#39;\\r&#39;, &#39;&amp;&#39;.
+        - Validates against self.safe_commands (SAFE_COMMANDS + trusted_commands).
+        &#34;&#34;&#34;
+        if self.trust:
+            return True
+
+        if not isinstance(cmd, str):
+            cmd = str(cmd)
+
+        # Check for shell chaining and redirection injection tokens
+        injection_tokens = [&#34;;&#34;, &#34;&amp;&amp;&#34;, &#34;||&#34;, &#34;|&#34;, &#34;`&#34;, &#34;$(&#34;, &#34;&gt;&#34;, &#34;&lt;&#34;, &#34;\n&#34;, &#34;\r&#34;, &#34;&amp;&#34;]
+        if any(tok in cmd for tok in injection_tokens):
+            return False
+
+        clean_cmd = cmd.strip()
+        return any(re.match(pattern, clean_cmd, re.IGNORECASE) for pattern in self.safe_commands)
+
+    def _mask_secrets(self, val: Any) -&gt; Any:
+        &#34;&#34;&#34;Recursively mask passwords, passphrases, secrets, and auth tokens with &#39;***&#39;.&#34;&#34;&#34;
+        if isinstance(val, dict):
+            masked = {}
+            for k, v in val.items():
+                k_lower = str(k).lower()
+                if any(sec in k_lower for sec in [&#34;password&#34;, &#34;passphrase&#34;, &#34;secret&#34;, &#34;token&#34;]):
+                    masked[k] = &#34;***&#34;
+                elif isinstance(v, (dict, list)):
+                    masked[k] = self._mask_secrets(v)
+                else:
+                    masked[k] = v
+            return masked
+        if isinstance(val, list):
+            return [self._mask_secrets(item) for item in val]
+        return val
+
+    # -------------------------------------------------------------------------
+    # Level 1: Read-Only Inventory and Context Tools
+    # -------------------------------------------------------------------------
+
+    def list_nodes(self, filter_pattern: str = &#34;&#34;, format_str: str = &#34;&#34;) -&gt; list[str]:
+        &#34;&#34;&#34;List inventory nodes, optionally filtered by regex pattern and formatted.&#34;&#34;&#34;
+        if not self.services or not hasattr(self.services, &#34;nodes&#34;):
+            return []
+        f = filter_pattern if filter_pattern else None
+        fmt = format_str if format_str else None
+        return self.services.nodes.list_nodes(filter_str=f, format_str=fmt)
+
+    def list_folders(self, filter_pattern: str = &#34;&#34;) -&gt; list[str]:
+        &#34;&#34;&#34;List inventory folders, optionally filtered by regex pattern.&#34;&#34;&#34;
+        if not self.services or not hasattr(self.services, &#34;nodes&#34;):
+            return []
+        f = filter_pattern if filter_pattern else None
+        return self.services.nodes.list_folders(filter_str=f)
+
+    def get_node_info(self, node_name: str) -&gt; dict:
+        &#34;&#34;&#34;Get full configuration metadata for a specific node.
+
+        Passwords, passphrases, and secrets are ALWAYS masked with &#39;***&#39;.
+        &#34;&#34;&#34;
+        if not self.services or not hasattr(self.services, &#34;nodes&#34;):
+            return {&#34;error&#34;: &#34;Node service unavailable.&#34;}
+        try:
+            details = self.services.nodes.get_node_details(node_name)
+            if hasattr(self.services, &#34;profiles&#34;):
+                with contextlib.suppress(Exception):
+                    details = self.services.profiles.resolve_node_data(details)
+            return self._mask_secrets(details)
+        except Exception as e:  # noqa: BLE001
+            return {&#34;error&#34;: f&#34;Node &#39;{node_name}&#39; not found: {e}&#34;}
+
+    def list_profiles(self, filter_pattern: str = &#34;&#34;) -&gt; list[str]:
+        &#34;&#34;&#34;List all available node connection profiles.&#34;&#34;&#34;
+        if not self.services or not hasattr(self.services, &#34;profiles&#34;):
+            return []
+        f = filter_pattern if filter_pattern else None
+        return self.services.profiles.list_profiles(filter_str=f)
+
+    def get_active_context(self) -&gt; dict:
+        &#34;&#34;&#34;Get the currently active context name and its matching regex patterns.&#34;&#34;&#34;
+        if not self.services or not hasattr(self.services, &#34;context&#34;):
+            return {&#34;context&#34;: &#34;all&#34;, &#34;patterns&#34;: [&#34;.*&#34;]}
+        try:
+            ctx_name = self.services.context.current_context
+            patterns = [p.pattern for p in self.services.context.get_active_regexes()]
+            return {&#34;context&#34;: ctx_name, &#34;patterns&#34;: patterns}
+        except Exception as e:  # noqa: BLE001
+            return {&#34;context&#34;: &#34;unknown&#34;, &#34;error&#34;: str(e)}
+
+    # -------------------------------------------------------------------------
+    # Level 2: Execution, Testing, and Playbooks Tools
+    # -------------------------------------------------------------------------
+
+    def run_commands(
+        self,
+        nodes_filter: str,
+        commands: list[str] | str,
+        parallel: bool = True,
+        timeout: int = 30,
+    ) -&gt; dict:
+        &#34;&#34;&#34;Execute commands on nodes matching the filter pattern.
+
+        Unsafe commands are blocked unless trust mode is enabled.
+        &#34;&#34;&#34;
+        if not self.services or not hasattr(self.services, &#34;execution&#34;):
+            return {&#34;success&#34;: False, &#34;error&#34;: &#34;Execution service unavailable.&#34;}
+
+        # Normalize commands list
+        if isinstance(commands, str):
+            try:
+                import json
+
+                parsed = json.loads(commands)
+                commands = parsed if isinstance(parsed, list) else [commands]
+            except Exception:  # noqa: BLE001
+                commands = [c.strip() for c in commands.splitlines() if c.strip()]
+        elif not isinstance(commands, list):
+            commands = [str(commands)]
+
+        # Check safety
+        if not self.trust:
+            unsafe = [cmd for cmd in commands if not self.is_safe_command(cmd)]
+            if unsafe:
+                return {
+                    &#34;success&#34;: False,
+                    &#34;error&#34;: f&#34;Permission denied: unsafe commands detected: {unsafe}. Requires trust=True.&#34;,
+                }
+
+        par_count = 10 if parallel is True else (parallel if isinstance(parallel, int) else 1)
+        try:
+            results = self.services.execution.run_commands(
+                nodes_filter=nodes_filter,
+                commands=commands,
+                parallel=par_count,
+                timeout=timeout,
+            )
+            return {&#34;success&#34;: True, &#34;results&#34;: results}
+        except Exception as e:  # noqa: BLE001
+            return {&#34;success&#34;: False, &#34;error&#34;: str(e)}
+
+    def test_commands(
+        self,
+        nodes_filter: str,
+        commands: list[str] | str,
+        expected: list[str] | str = &#34;&#34;,
+        parallel: bool = True,
+        timeout: int = 30,
+    ) -&gt; dict:
+        &#34;&#34;&#34;Execute commands and assert expected patterns on nodes matching the filter.&#34;&#34;&#34;
+        if not self.services or not hasattr(self.services, &#34;execution&#34;):
+            return {&#34;success&#34;: False, &#34;error&#34;: &#34;Execution service unavailable.&#34;}
+
+        # Normalize commands
+        if isinstance(commands, str):
+            try:
+                import json
+
+                parsed = json.loads(commands)
+                commands = parsed if isinstance(parsed, list) else [commands]
+            except Exception:  # noqa: BLE001
+                commands = [c.strip() for c in commands.splitlines() if c.strip()]
+        elif not isinstance(commands, list):
+            commands = [str(commands)]
+
+        # Normalize expected
+        if isinstance(expected, str):
+            try:
+                import json
+
+                parsed = json.loads(expected)
+                expected = parsed if isinstance(parsed, list) else ([expected] if expected else [])
+            except Exception:  # noqa: BLE001
+                expected = [expected] if expected else []
+        elif not isinstance(expected, list):
+            expected = [str(expected)] if expected else []
+
+        # Check safety
+        if not self.trust:
+            unsafe = [cmd for cmd in commands if not self.is_safe_command(cmd)]
+            if unsafe:
+                return {
+                    &#34;success&#34;: False,
+                    &#34;error&#34;: f&#34;Permission denied: unsafe commands detected: {unsafe}. Requires trust=True.&#34;,
+                }
+
+        par_count = 10 if parallel is True else (parallel if isinstance(parallel, int) else 1)
+        try:
+            results = self.services.execution.test_commands(
+                nodes_filter=nodes_filter,
+                commands=commands,
+                expected=expected,
+                parallel=par_count,
+                timeout=timeout,
+            )
+            return {&#34;success&#34;: True, &#34;results&#34;: results}
+        except Exception as e:  # noqa: BLE001
+            return {&#34;success&#34;: False, &#34;error&#34;: str(e)}
+
+    def validate_playbook(self, playbook_yaml: str) -&gt; dict:
+        &#34;&#34;&#34;Validate the syntax, schema, and tasks of a Connpy YAML playbook.&#34;&#34;&#34;
+        try:
+            data = yaml.safe_load(playbook_yaml)
+        except Exception as e:  # noqa: BLE001
+            return {&#34;valid&#34;: False, &#34;error&#34;: f&#34;YAML Syntax Error: {e}&#34;}
+
+        if not isinstance(data, dict):
+            return {&#34;valid&#34;: False, &#34;error&#34;: &#34;Playbook must be a YAML dictionary.&#34;}
+
+        if &#34;tasks&#34; not in data:
+            return {&#34;valid&#34;: False, &#34;error&#34;: &#34;Playbook missing mandatory root &#39;tasks&#39; key.&#34;}
+
+        tasks = data[&#34;tasks&#34;]
+        if not isinstance(tasks, list):
+            return {&#34;valid&#34;: False, &#34;error&#34;: &#34;&#39;tasks&#39; must be a list of tasks.&#34;}
+
+        for idx, task in enumerate(tasks):
+            if not isinstance(task, dict):
+                return {&#34;valid&#34;: False, &#34;error&#34;: f&#34;Task index {idx} must be a dictionary.&#34;}
+
+            name = task.get(&#34;name&#34;, f&#34;Task {idx}&#34;)
+            mandatory = [&#34;name&#34;, &#34;action&#34;, &#34;nodes&#34;, &#34;commands&#34;, &#34;output&#34;]
+            missing = [f for f in mandatory if f not in task]
+            if missing:
+                return {
+                    &#34;valid&#34;: False,
+                    &#34;error&#34;: f&#34;Task &#39;{name}&#39; (index {idx}) is missing mandatory fields: {missing}&#34;,
+                }
+
+            nodes = task[&#34;nodes&#34;]
+            if not isinstance(nodes, (str, list)):
+                return {
+                    &#34;valid&#34;: False,
+                    &#34;error&#34;: f&#34;Task &#39;{name}&#39; (index {idx}) &#39;nodes&#39; must be a string or list of strings.&#34;,
+                }
+
+            if isinstance(nodes, list):
+                for n_idx, node_item in enumerate(nodes):
+                    if not isinstance(node_item, str):
+                        return {
+                            &#34;valid&#34;: False,
+                            &#34;error&#34;: f&#34;Task &#39;{name}&#39; (index {idx}) &#39;nodes&#39; contains non-string at index {n_idx}: {node_item}&#34;,
+                        }
+
+            action = task[&#34;action&#34;]
+            if action not in [&#34;run&#34;, &#34;test&#34;]:
+                return {
+                    &#34;valid&#34;: False,
+                    &#34;error&#34;: f&#34;Task &#39;{name}&#39; (index {idx}) invalid action &#39;{action}&#39;. Choices: &#39;run&#39;, &#39;test&#39;.&#34;,
+                }
+
+            if action == &#34;test&#34; and &#34;expected&#34; not in task:
+                return {
+                    &#34;valid&#34;: False,
+                    &#34;error&#34;: f&#34;Task &#39;{name}&#39; (index {idx}) action &#39;test&#39; requires &#39;expected&#39; key.&#34;,
+                }
+
+            output = task[&#34;output&#34;]
+            if output not in [None, &#34;stdout&#34;, &#34;null&#34;] and not str(output).startswith(&#34;/&#34;):
+                return {
+                    &#34;valid&#34;: False,
+                    &#34;error&#34;: f&#34;Task &#39;{name}&#39; (index {idx}) output &#39;{output}&#39; must be &#39;stdout&#39;, &#39;null&#39; or an absolute path.&#34;,
+                }
+
+        return {&#34;valid&#34;: True, &#34;message&#34;: &#34;Playbook schema and syntax is valid.&#34;}
+
+    def run_playbook(self, playbook_yaml: str) -&gt; dict:
+        &#34;&#34;&#34;Validate and execute a playbook, verifying commands beforehand if trust=False.&#34;&#34;&#34;
+        val = self.validate_playbook(playbook_yaml)
+        if not val.get(&#34;valid&#34;):
+            return {&#34;success&#34;: False, &#34;error&#34;: f&#34;Invalid playbook: {val.get(&#39;error&#39;)}&#34;}
+
+        data = yaml.safe_load(playbook_yaml)
+        tasks = data.get(&#34;tasks&#34;, [])
+
+        # Pre-verify commands if not trusted
+        if not self.trust:
+            for idx, task in enumerate(tasks):
+                name = task.get(&#34;name&#34;, f&#34;Task {idx}&#34;)
+                commands = task.get(&#34;commands&#34;, [])
+                if isinstance(commands, str):
+                    commands = [commands]
+                unsafe = [cmd for cmd in commands if not self.is_safe_command(cmd)]
+                if unsafe:
+                    return {
+                        &#34;success&#34;: False,
+                        &#34;error&#34;: f&#34;Permission denied: unsafe commands detected in task &#39;{name}&#39;: {unsafe}. Requires trust=True.&#34;,
+                    }
+
+        # Execute tasks
+        results = {}
+        for idx, task in enumerate(tasks):
+            name = task.get(&#34;name&#34;, f&#34;task_{idx}&#34;)
+            action = task.get(&#34;action&#34;)
+            nodes = task.get(&#34;nodes&#34;)
+            commands = task.get(&#34;commands&#34;)
+            if isinstance(commands, str):
+                commands = [commands]
+
+            try:
+                if action == &#34;run&#34;:
+                    res = self.services.execution.run_commands(nodes_filter=nodes, commands=commands)
+                elif action == &#34;test&#34;:
+                    expected = task.get(&#34;expected&#34;, [])
+                    if isinstance(expected, str):
+                        expected = [expected]
+                    res = self.services.execution.test_commands(
+                        nodes_filter=nodes, commands=commands, expected=expected
+                    )
+                else:
+                    res = f&#34;Unsupported action: {action}&#34;
+                results[name] = res
+            except Exception as e:  # noqa: BLE001
+                return {
+                    &#34;success&#34;: False,
+                    &#34;error&#34;: f&#34;Execution failed at task &#39;{name}&#39;: {e}&#34;,
+                    &#34;partial_results&#34;: results,
+                }
+
+        return {&#34;success&#34;: True, &#34;results&#34;: results}
+
+    # -------------------------------------------------------------------------
+    # Level 3: Inventory Mutation Tools (CRUD - Requires trust=True)
+    # -------------------------------------------------------------------------
+
+    def add_node(
+        self, unique_id: str, data: dict | None = None, is_folder: bool = False, **kwargs
+    ) -&gt; dict:
+        &#34;&#34;&#34;Add a new node or folder to the inventory (requires trust=True).&#34;&#34;&#34;
+        if not self.trust:
+            return {
+                &#34;success&#34;: False,
+                &#34;error&#34;: &#34;Permission denied: CRUD operations require trust mode (--trust).&#34;,
+            }
+
+        if not self.services or not hasattr(self.services, &#34;nodes&#34;):
+            return {&#34;success&#34;: False, &#34;error&#34;: &#34;Node service unavailable.&#34;}
+
+        node_data = (data or {}).copy()
+        node_data.update(kwargs)
+
+        try:
+            self.services.nodes.add_node(unique_id, node_data, is_folder=is_folder)
+            return {
+                &#34;success&#34;: True,
+                &#34;message&#34;: f&#34;{&#39;Folder&#39; if is_folder else &#39;Node&#39;} &#39;{unique_id}&#39; created successfully.&#34;,
+            }
+        except Exception as e:  # noqa: BLE001
+            return {&#34;success&#34;: False, &#34;error&#34;: str(e)}
+
+    def update_node(self, unique_id: str, updates: dict | None = None, **kwargs) -&gt; dict:
+        &#34;&#34;&#34;Update an existing node configuration (requires trust=True).&#34;&#34;&#34;
+        if not self.trust:
+            return {
+                &#34;success&#34;: False,
+                &#34;error&#34;: &#34;Permission denied: CRUD operations require trust mode (--trust).&#34;,
+            }
+
+        if not self.services or not hasattr(self.services, &#34;nodes&#34;):
+            return {&#34;success&#34;: False, &#34;error&#34;: &#34;Node service unavailable.&#34;}
+
+        node_updates = (updates or {}).copy()
+        node_updates.update(kwargs)
+
+        try:
+            self.services.nodes.update_node(unique_id, node_updates)
+            return {&#34;success&#34;: True, &#34;message&#34;: f&#34;Node &#39;{unique_id}&#39; updated successfully.&#34;}
+        except Exception as e:  # noqa: BLE001
+            return {&#34;success&#34;: False, &#34;error&#34;: str(e)}
+
+    def delete_node(self, unique_id: str, is_folder: bool = False) -&gt; dict:
+        &#34;&#34;&#34;Delete a node or folder from the inventory (requires trust=True).&#34;&#34;&#34;
+        if not self.trust:
+            return {
+                &#34;success&#34;: False,
+                &#34;error&#34;: &#34;Permission denied: CRUD operations require trust mode (--trust).&#34;,
+            }
+
+        if not self.services or not hasattr(self.services, &#34;nodes&#34;):
+            return {&#34;success&#34;: False, &#34;error&#34;: &#34;Node service unavailable.&#34;}
+
+        try:
+            self.services.nodes.delete_node(unique_id, is_folder=is_folder)
+            return {
+                &#34;success&#34;: True,
+                &#34;message&#34;: f&#34;{&#39;Folder&#39; if is_folder else &#39;Node&#39;} &#39;{unique_id}&#39; deleted successfully.&#34;,
+            }
+        except Exception as e:  # noqa: BLE001
+            return {&#34;success&#34;: False, &#34;error&#34;: str(e)}
+
+    # -------------------------------------------------------------------------
+    # Server Execution and Async Helper
+    # -------------------------------------------------------------------------
+
+    async def call_tool(self, name: str, arguments: dict | None = None) -&gt; Any:
+        &#34;&#34;&#34;Call an MCP tool asynchronously via the underlying MCP server.&#34;&#34;&#34;
+        if not self.server:
+            raise RuntimeError(&#34;MCP SDK is not initialized.&#34;)
+        return await self.server.call_tool(name, arguments or {})
+
+    def run(self, transport: str = &#34;stdio&#34;, host: str = &#34;127.0.0.1&#34;, port: int = 8000, **kwargs):
+        &#34;&#34;&#34;Run the MCP server using either stdio or sse transport.&#34;&#34;&#34;
+        if not self.server:
+            raise RuntimeError(&#34;MCP server cannot start: &#39;mcp&#39; package is not installed.&#34;)
+
+        if transport == &#34;stdio&#34;:
+            # Redirect logs and printer outputs to sys.stderr for JSON-RPC
+            with contextlib.suppress(Exception):
+                from . import printer
+
+                printer.set_thread_stream(sys.stderr)
+
+            for handler in logging.root.handlers:
+                if hasattr(handler, &#34;stream&#34;) and handler.stream == sys.stdout:
+                    handler.stream = sys.stderr
+            logging.basicConfig(stream=sys.stderr, level=logging.INFO)
+
+            return self.server.run(transport=&#34;stdio&#34;, **kwargs)
+
+        if transport == &#34;sse&#34;:
+            if hasattr(self.server, &#34;settings&#34;):
+                if hasattr(self.server.settings, &#34;host&#34;):
+                    self.server.settings.host = host
+                if hasattr(self.server.settings, &#34;port&#34;):
+                    self.server.settings.port = port
+            try:
+                return self.server.run(transport=&#34;sse&#34;, host=host, port=port, **kwargs)
+            except TypeError:
+                return self.server.run(transport=&#34;sse&#34;, **kwargs)
+
+        msg = f&#34;Unknown transport: {transport}. Supported transports: &#39;stdio&#39;, &#39;sse&#39;&#34;
+        raise ValueError(msg)</code></pre>
+</details>
+<div class="desc"><p>Native Model Context Protocol (MCP) Server for connpy.</p></div>
+<h3>Class variables</h3>
+<dl>
+<dt id="connpy.mcp_server.ConnpyMCPServer.SAFE_COMMANDS"><code class="name">var <span class="ident">SAFE_COMMANDS</span> : ClassVar[list[str]]</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+</dl>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.mcp_server.ConnpyMCPServer.add_node"><code class="name flex">
+<span>def <span class="ident">add_node</span></span>(<span>self, unique_id: str, data: dict | None = None, is_folder: bool = False, **kwargs) ‑> dict</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def add_node(
+    self, unique_id: str, data: dict | None = None, is_folder: bool = False, **kwargs
+) -&gt; dict:
+    &#34;&#34;&#34;Add a new node or folder to the inventory (requires trust=True).&#34;&#34;&#34;
+    if not self.trust:
+        return {
+            &#34;success&#34;: False,
+            &#34;error&#34;: &#34;Permission denied: CRUD operations require trust mode (--trust).&#34;,
+        }
+
+    if not self.services or not hasattr(self.services, &#34;nodes&#34;):
+        return {&#34;success&#34;: False, &#34;error&#34;: &#34;Node service unavailable.&#34;}
+
+    node_data = (data or {}).copy()
+    node_data.update(kwargs)
+
+    try:
+        self.services.nodes.add_node(unique_id, node_data, is_folder=is_folder)
+        return {
+            &#34;success&#34;: True,
+            &#34;message&#34;: f&#34;{&#39;Folder&#39; if is_folder else &#39;Node&#39;} &#39;{unique_id}&#39; created successfully.&#34;,
+        }
+    except Exception as e:  # noqa: BLE001
+        return {&#34;success&#34;: False, &#34;error&#34;: str(e)}</code></pre>
+</details>
+<div class="desc"><p>Add a new node or folder to the inventory (requires trust=True).</p></div>
+</dd>
+<dt id="connpy.mcp_server.ConnpyMCPServer.call_tool"><code class="name flex">
+<span>async def <span class="ident">call_tool</span></span>(<span>self, name: str, arguments: dict | None = None) ‑> Any</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">async def call_tool(self, name: str, arguments: dict | None = None) -&gt; Any:
+    &#34;&#34;&#34;Call an MCP tool asynchronously via the underlying MCP server.&#34;&#34;&#34;
+    if not self.server:
+        raise RuntimeError(&#34;MCP SDK is not initialized.&#34;)
+    return await self.server.call_tool(name, arguments or {})</code></pre>
+</details>
+<div class="desc"><p>Call an MCP tool asynchronously via the underlying MCP server.</p></div>
+</dd>
+<dt id="connpy.mcp_server.ConnpyMCPServer.delete_node"><code class="name flex">
+<span>def <span class="ident">delete_node</span></span>(<span>self, unique_id: str, is_folder: bool = False) ‑> dict</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def delete_node(self, unique_id: str, is_folder: bool = False) -&gt; dict:
+    &#34;&#34;&#34;Delete a node or folder from the inventory (requires trust=True).&#34;&#34;&#34;
+    if not self.trust:
+        return {
+            &#34;success&#34;: False,
+            &#34;error&#34;: &#34;Permission denied: CRUD operations require trust mode (--trust).&#34;,
+        }
+
+    if not self.services or not hasattr(self.services, &#34;nodes&#34;):
+        return {&#34;success&#34;: False, &#34;error&#34;: &#34;Node service unavailable.&#34;}
+
+    try:
+        self.services.nodes.delete_node(unique_id, is_folder=is_folder)
+        return {
+            &#34;success&#34;: True,
+            &#34;message&#34;: f&#34;{&#39;Folder&#39; if is_folder else &#39;Node&#39;} &#39;{unique_id}&#39; deleted successfully.&#34;,
+        }
+    except Exception as e:  # noqa: BLE001
+        return {&#34;success&#34;: False, &#34;error&#34;: str(e)}</code></pre>
+</details>
+<div class="desc"><p>Delete a node or folder from the inventory (requires trust=True).</p></div>
+</dd>
+<dt id="connpy.mcp_server.ConnpyMCPServer.get_active_context"><code class="name flex">
+<span>def <span class="ident">get_active_context</span></span>(<span>self) ‑> dict</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_active_context(self) -&gt; dict:
+    &#34;&#34;&#34;Get the currently active context name and its matching regex patterns.&#34;&#34;&#34;
+    if not self.services or not hasattr(self.services, &#34;context&#34;):
+        return {&#34;context&#34;: &#34;all&#34;, &#34;patterns&#34;: [&#34;.*&#34;]}
+    try:
+        ctx_name = self.services.context.current_context
+        patterns = [p.pattern for p in self.services.context.get_active_regexes()]
+        return {&#34;context&#34;: ctx_name, &#34;patterns&#34;: patterns}
+    except Exception as e:  # noqa: BLE001
+        return {&#34;context&#34;: &#34;unknown&#34;, &#34;error&#34;: str(e)}</code></pre>
+</details>
+<div class="desc"><p>Get the currently active context name and its matching regex patterns.</p></div>
+</dd>
+<dt id="connpy.mcp_server.ConnpyMCPServer.get_node_info"><code class="name flex">
+<span>def <span class="ident">get_node_info</span></span>(<span>self, node_name: str) ‑> dict</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_node_info(self, node_name: str) -&gt; dict:
+    &#34;&#34;&#34;Get full configuration metadata for a specific node.
+
+    Passwords, passphrases, and secrets are ALWAYS masked with &#39;***&#39;.
+    &#34;&#34;&#34;
+    if not self.services or not hasattr(self.services, &#34;nodes&#34;):
+        return {&#34;error&#34;: &#34;Node service unavailable.&#34;}
+    try:
+        details = self.services.nodes.get_node_details(node_name)
+        if hasattr(self.services, &#34;profiles&#34;):
+            with contextlib.suppress(Exception):
+                details = self.services.profiles.resolve_node_data(details)
+        return self._mask_secrets(details)
+    except Exception as e:  # noqa: BLE001
+        return {&#34;error&#34;: f&#34;Node &#39;{node_name}&#39; not found: {e}&#34;}</code></pre>
+</details>
+<div class="desc"><p>Get full configuration metadata for a specific node.</p>
+<p>Passwords, passphrases, and secrets are ALWAYS masked with '***'.</p></div>
+</dd>
+<dt id="connpy.mcp_server.ConnpyMCPServer.is_safe_command"><code class="name flex">
+<span>def <span class="ident">is_safe_command</span></span>(<span>self, cmd: str) ‑> bool</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def is_safe_command(self, cmd: str) -&gt; bool:
+    &#34;&#34;&#34;Validate if a command is considered safe under current trust settings.
+
+    - If trust is True, all commands are allowed.
+    - Block chaining/injection characters: &#39;;&#39;, &#39;&amp;&amp;&#39;, &#39;||&#39;, &#39;|&#39;, &#39;`&#39;, &#39;$(&#39;, &#39;&gt;&#39;, &#39;&lt;&#39;, &#39;\\n&#39;, &#39;\\r&#39;, &#39;&amp;&#39;.
+    - Validates against self.safe_commands (SAFE_COMMANDS + trusted_commands).
+    &#34;&#34;&#34;
+    if self.trust:
+        return True
+
+    if not isinstance(cmd, str):
+        cmd = str(cmd)
+
+    # Check for shell chaining and redirection injection tokens
+    injection_tokens = [&#34;;&#34;, &#34;&amp;&amp;&#34;, &#34;||&#34;, &#34;|&#34;, &#34;`&#34;, &#34;$(&#34;, &#34;&gt;&#34;, &#34;&lt;&#34;, &#34;\n&#34;, &#34;\r&#34;, &#34;&amp;&#34;]
+    if any(tok in cmd for tok in injection_tokens):
+        return False
+
+    clean_cmd = cmd.strip()
+    return any(re.match(pattern, clean_cmd, re.IGNORECASE) for pattern in self.safe_commands)</code></pre>
+</details>
+<div class="desc"><p>Validate if a command is considered safe under current trust settings.</p>
+<ul>
+<li>If trust is True, all commands are allowed.</li>
+<li>Block chaining/injection characters: ';', '&amp;&amp;', '||', '|', '`', '$(', '&gt;', '&lt;', '\n', '\r', '&amp;'.</li>
+<li>Validates against self.safe_commands (SAFE_COMMANDS + trusted_commands).</li>
+</ul></div>
+</dd>
+<dt id="connpy.mcp_server.ConnpyMCPServer.list_folders"><code class="name flex">
+<span>def <span class="ident">list_folders</span></span>(<span>self, filter_pattern: str = '') ‑> list[str]</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def list_folders(self, filter_pattern: str = &#34;&#34;) -&gt; list[str]:
+    &#34;&#34;&#34;List inventory folders, optionally filtered by regex pattern.&#34;&#34;&#34;
+    if not self.services or not hasattr(self.services, &#34;nodes&#34;):
+        return []
+    f = filter_pattern if filter_pattern else None
+    return self.services.nodes.list_folders(filter_str=f)</code></pre>
+</details>
+<div class="desc"><p>List inventory folders, optionally filtered by regex pattern.</p></div>
+</dd>
+<dt id="connpy.mcp_server.ConnpyMCPServer.list_nodes"><code class="name flex">
+<span>def <span class="ident">list_nodes</span></span>(<span>self, filter_pattern: str = '', format_str: str = '') ‑> list[str]</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def list_nodes(self, filter_pattern: str = &#34;&#34;, format_str: str = &#34;&#34;) -&gt; list[str]:
+    &#34;&#34;&#34;List inventory nodes, optionally filtered by regex pattern and formatted.&#34;&#34;&#34;
+    if not self.services or not hasattr(self.services, &#34;nodes&#34;):
+        return []
+    f = filter_pattern if filter_pattern else None
+    fmt = format_str if format_str else None
+    return self.services.nodes.list_nodes(filter_str=f, format_str=fmt)</code></pre>
+</details>
+<div class="desc"><p>List inventory nodes, optionally filtered by regex pattern and formatted.</p></div>
+</dd>
+<dt id="connpy.mcp_server.ConnpyMCPServer.list_profiles"><code class="name flex">
+<span>def <span class="ident">list_profiles</span></span>(<span>self, filter_pattern: str = '') ‑> list[str]</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def list_profiles(self, filter_pattern: str = &#34;&#34;) -&gt; list[str]:
+    &#34;&#34;&#34;List all available node connection profiles.&#34;&#34;&#34;
+    if not self.services or not hasattr(self.services, &#34;profiles&#34;):
+        return []
+    f = filter_pattern if filter_pattern else None
+    return self.services.profiles.list_profiles(filter_str=f)</code></pre>
+</details>
+<div class="desc"><p>List all available node connection profiles.</p></div>
+</dd>
+<dt id="connpy.mcp_server.ConnpyMCPServer.run"><code class="name flex">
+<span>def <span class="ident">run</span></span>(<span>self, transport: str = 'stdio', host: str = '127.0.0.1', port: int = 8000, **kwargs)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def run(self, transport: str = &#34;stdio&#34;, host: str = &#34;127.0.0.1&#34;, port: int = 8000, **kwargs):
+    &#34;&#34;&#34;Run the MCP server using either stdio or sse transport.&#34;&#34;&#34;
+    if not self.server:
+        raise RuntimeError(&#34;MCP server cannot start: &#39;mcp&#39; package is not installed.&#34;)
+
+    if transport == &#34;stdio&#34;:
+        # Redirect logs and printer outputs to sys.stderr for JSON-RPC
+        with contextlib.suppress(Exception):
+            from . import printer
+
+            printer.set_thread_stream(sys.stderr)
+
+        for handler in logging.root.handlers:
+            if hasattr(handler, &#34;stream&#34;) and handler.stream == sys.stdout:
+                handler.stream = sys.stderr
+        logging.basicConfig(stream=sys.stderr, level=logging.INFO)
+
+        return self.server.run(transport=&#34;stdio&#34;, **kwargs)
+
+    if transport == &#34;sse&#34;:
+        if hasattr(self.server, &#34;settings&#34;):
+            if hasattr(self.server.settings, &#34;host&#34;):
+                self.server.settings.host = host
+            if hasattr(self.server.settings, &#34;port&#34;):
+                self.server.settings.port = port
+        try:
+            return self.server.run(transport=&#34;sse&#34;, host=host, port=port, **kwargs)
+        except TypeError:
+            return self.server.run(transport=&#34;sse&#34;, **kwargs)
+
+    msg = f&#34;Unknown transport: {transport}. Supported transports: &#39;stdio&#39;, &#39;sse&#39;&#34;
+    raise ValueError(msg)</code></pre>
+</details>
+<div class="desc"><p>Run the MCP server using either stdio or sse transport.</p></div>
+</dd>
+<dt id="connpy.mcp_server.ConnpyMCPServer.run_commands"><code class="name flex">
+<span>def <span class="ident">run_commands</span></span>(<span>self,<br>nodes_filter: str,<br>commands: list[str] | str,<br>parallel: bool = True,<br>timeout: int = 30) ‑> dict</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def run_commands(
+    self,
+    nodes_filter: str,
+    commands: list[str] | str,
+    parallel: bool = True,
+    timeout: int = 30,
+) -&gt; dict:
+    &#34;&#34;&#34;Execute commands on nodes matching the filter pattern.
+
+    Unsafe commands are blocked unless trust mode is enabled.
+    &#34;&#34;&#34;
+    if not self.services or not hasattr(self.services, &#34;execution&#34;):
+        return {&#34;success&#34;: False, &#34;error&#34;: &#34;Execution service unavailable.&#34;}
+
+    # Normalize commands list
+    if isinstance(commands, str):
+        try:
+            import json
+
+            parsed = json.loads(commands)
+            commands = parsed if isinstance(parsed, list) else [commands]
+        except Exception:  # noqa: BLE001
+            commands = [c.strip() for c in commands.splitlines() if c.strip()]
+    elif not isinstance(commands, list):
+        commands = [str(commands)]
+
+    # Check safety
+    if not self.trust:
+        unsafe = [cmd for cmd in commands if not self.is_safe_command(cmd)]
+        if unsafe:
+            return {
+                &#34;success&#34;: False,
+                &#34;error&#34;: f&#34;Permission denied: unsafe commands detected: {unsafe}. Requires trust=True.&#34;,
+            }
+
+    par_count = 10 if parallel is True else (parallel if isinstance(parallel, int) else 1)
+    try:
+        results = self.services.execution.run_commands(
+            nodes_filter=nodes_filter,
+            commands=commands,
+            parallel=par_count,
+            timeout=timeout,
+        )
+        return {&#34;success&#34;: True, &#34;results&#34;: results}
+    except Exception as e:  # noqa: BLE001
+        return {&#34;success&#34;: False, &#34;error&#34;: str(e)}</code></pre>
+</details>
+<div class="desc"><p>Execute commands on nodes matching the filter pattern.</p>
+<p>Unsafe commands are blocked unless trust mode is enabled.</p></div>
+</dd>
+<dt id="connpy.mcp_server.ConnpyMCPServer.run_playbook"><code class="name flex">
+<span>def <span class="ident">run_playbook</span></span>(<span>self, playbook_yaml: str) ‑> dict</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def run_playbook(self, playbook_yaml: str) -&gt; dict:
+    &#34;&#34;&#34;Validate and execute a playbook, verifying commands beforehand if trust=False.&#34;&#34;&#34;
+    val = self.validate_playbook(playbook_yaml)
+    if not val.get(&#34;valid&#34;):
+        return {&#34;success&#34;: False, &#34;error&#34;: f&#34;Invalid playbook: {val.get(&#39;error&#39;)}&#34;}
+
+    data = yaml.safe_load(playbook_yaml)
+    tasks = data.get(&#34;tasks&#34;, [])
+
+    # Pre-verify commands if not trusted
+    if not self.trust:
+        for idx, task in enumerate(tasks):
+            name = task.get(&#34;name&#34;, f&#34;Task {idx}&#34;)
+            commands = task.get(&#34;commands&#34;, [])
+            if isinstance(commands, str):
+                commands = [commands]
+            unsafe = [cmd for cmd in commands if not self.is_safe_command(cmd)]
+            if unsafe:
+                return {
+                    &#34;success&#34;: False,
+                    &#34;error&#34;: f&#34;Permission denied: unsafe commands detected in task &#39;{name}&#39;: {unsafe}. Requires trust=True.&#34;,
+                }
+
+    # Execute tasks
+    results = {}
+    for idx, task in enumerate(tasks):
+        name = task.get(&#34;name&#34;, f&#34;task_{idx}&#34;)
+        action = task.get(&#34;action&#34;)
+        nodes = task.get(&#34;nodes&#34;)
+        commands = task.get(&#34;commands&#34;)
+        if isinstance(commands, str):
+            commands = [commands]
+
+        try:
+            if action == &#34;run&#34;:
+                res = self.services.execution.run_commands(nodes_filter=nodes, commands=commands)
+            elif action == &#34;test&#34;:
+                expected = task.get(&#34;expected&#34;, [])
+                if isinstance(expected, str):
+                    expected = [expected]
+                res = self.services.execution.test_commands(
+                    nodes_filter=nodes, commands=commands, expected=expected
+                )
+            else:
+                res = f&#34;Unsupported action: {action}&#34;
+            results[name] = res
+        except Exception as e:  # noqa: BLE001
+            return {
+                &#34;success&#34;: False,
+                &#34;error&#34;: f&#34;Execution failed at task &#39;{name}&#39;: {e}&#34;,
+                &#34;partial_results&#34;: results,
+            }
+
+    return {&#34;success&#34;: True, &#34;results&#34;: results}</code></pre>
+</details>
+<div class="desc"><p>Validate and execute a playbook, verifying commands beforehand if trust=False.</p></div>
+</dd>
+<dt id="connpy.mcp_server.ConnpyMCPServer.test_commands"><code class="name flex">
+<span>def <span class="ident">test_commands</span></span>(<span>self,<br>nodes_filter: str,<br>commands: list[str] | str,<br>expected: list[str] | str = '',<br>parallel: bool = True,<br>timeout: int = 30) ‑> dict</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_commands(
+    self,
+    nodes_filter: str,
+    commands: list[str] | str,
+    expected: list[str] | str = &#34;&#34;,
+    parallel: bool = True,
+    timeout: int = 30,
+) -&gt; dict:
+    &#34;&#34;&#34;Execute commands and assert expected patterns on nodes matching the filter.&#34;&#34;&#34;
+    if not self.services or not hasattr(self.services, &#34;execution&#34;):
+        return {&#34;success&#34;: False, &#34;error&#34;: &#34;Execution service unavailable.&#34;}
+
+    # Normalize commands
+    if isinstance(commands, str):
+        try:
+            import json
+
+            parsed = json.loads(commands)
+            commands = parsed if isinstance(parsed, list) else [commands]
+        except Exception:  # noqa: BLE001
+            commands = [c.strip() for c in commands.splitlines() if c.strip()]
+    elif not isinstance(commands, list):
+        commands = [str(commands)]
+
+    # Normalize expected
+    if isinstance(expected, str):
+        try:
+            import json
+
+            parsed = json.loads(expected)
+            expected = parsed if isinstance(parsed, list) else ([expected] if expected else [])
+        except Exception:  # noqa: BLE001
+            expected = [expected] if expected else []
+    elif not isinstance(expected, list):
+        expected = [str(expected)] if expected else []
+
+    # Check safety
+    if not self.trust:
+        unsafe = [cmd for cmd in commands if not self.is_safe_command(cmd)]
+        if unsafe:
+            return {
+                &#34;success&#34;: False,
+                &#34;error&#34;: f&#34;Permission denied: unsafe commands detected: {unsafe}. Requires trust=True.&#34;,
+            }
+
+    par_count = 10 if parallel is True else (parallel if isinstance(parallel, int) else 1)
+    try:
+        results = self.services.execution.test_commands(
+            nodes_filter=nodes_filter,
+            commands=commands,
+            expected=expected,
+            parallel=par_count,
+            timeout=timeout,
+        )
+        return {&#34;success&#34;: True, &#34;results&#34;: results}
+    except Exception as e:  # noqa: BLE001
+        return {&#34;success&#34;: False, &#34;error&#34;: str(e)}</code></pre>
+</details>
+<div class="desc"><p>Execute commands and assert expected patterns on nodes matching the filter.</p></div>
+</dd>
+<dt id="connpy.mcp_server.ConnpyMCPServer.update_node"><code class="name flex">
+<span>def <span class="ident">update_node</span></span>(<span>self, unique_id: str, updates: dict | None = None, **kwargs) ‑> dict</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def update_node(self, unique_id: str, updates: dict | None = None, **kwargs) -&gt; dict:
+    &#34;&#34;&#34;Update an existing node configuration (requires trust=True).&#34;&#34;&#34;
+    if not self.trust:
+        return {
+            &#34;success&#34;: False,
+            &#34;error&#34;: &#34;Permission denied: CRUD operations require trust mode (--trust).&#34;,
+        }
+
+    if not self.services or not hasattr(self.services, &#34;nodes&#34;):
+        return {&#34;success&#34;: False, &#34;error&#34;: &#34;Node service unavailable.&#34;}
+
+    node_updates = (updates or {}).copy()
+    node_updates.update(kwargs)
+
+    try:
+        self.services.nodes.update_node(unique_id, node_updates)
+        return {&#34;success&#34;: True, &#34;message&#34;: f&#34;Node &#39;{unique_id}&#39; updated successfully.&#34;}
+    except Exception as e:  # noqa: BLE001
+        return {&#34;success&#34;: False, &#34;error&#34;: str(e)}</code></pre>
+</details>
+<div class="desc"><p>Update an existing node configuration (requires trust=True).</p></div>
+</dd>
+<dt id="connpy.mcp_server.ConnpyMCPServer.validate_playbook"><code class="name flex">
+<span>def <span class="ident">validate_playbook</span></span>(<span>self, playbook_yaml: str) ‑> dict</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def validate_playbook(self, playbook_yaml: str) -&gt; dict:
+    &#34;&#34;&#34;Validate the syntax, schema, and tasks of a Connpy YAML playbook.&#34;&#34;&#34;
+    try:
+        data = yaml.safe_load(playbook_yaml)
+    except Exception as e:  # noqa: BLE001
+        return {&#34;valid&#34;: False, &#34;error&#34;: f&#34;YAML Syntax Error: {e}&#34;}
+
+    if not isinstance(data, dict):
+        return {&#34;valid&#34;: False, &#34;error&#34;: &#34;Playbook must be a YAML dictionary.&#34;}
+
+    if &#34;tasks&#34; not in data:
+        return {&#34;valid&#34;: False, &#34;error&#34;: &#34;Playbook missing mandatory root &#39;tasks&#39; key.&#34;}
+
+    tasks = data[&#34;tasks&#34;]
+    if not isinstance(tasks, list):
+        return {&#34;valid&#34;: False, &#34;error&#34;: &#34;&#39;tasks&#39; must be a list of tasks.&#34;}
+
+    for idx, task in enumerate(tasks):
+        if not isinstance(task, dict):
+            return {&#34;valid&#34;: False, &#34;error&#34;: f&#34;Task index {idx} must be a dictionary.&#34;}
+
+        name = task.get(&#34;name&#34;, f&#34;Task {idx}&#34;)
+        mandatory = [&#34;name&#34;, &#34;action&#34;, &#34;nodes&#34;, &#34;commands&#34;, &#34;output&#34;]
+        missing = [f for f in mandatory if f not in task]
+        if missing:
+            return {
+                &#34;valid&#34;: False,
+                &#34;error&#34;: f&#34;Task &#39;{name}&#39; (index {idx}) is missing mandatory fields: {missing}&#34;,
+            }
+
+        nodes = task[&#34;nodes&#34;]
+        if not isinstance(nodes, (str, list)):
+            return {
+                &#34;valid&#34;: False,
+                &#34;error&#34;: f&#34;Task &#39;{name}&#39; (index {idx}) &#39;nodes&#39; must be a string or list of strings.&#34;,
+            }
+
+        if isinstance(nodes, list):
+            for n_idx, node_item in enumerate(nodes):
+                if not isinstance(node_item, str):
+                    return {
+                        &#34;valid&#34;: False,
+                        &#34;error&#34;: f&#34;Task &#39;{name}&#39; (index {idx}) &#39;nodes&#39; contains non-string at index {n_idx}: {node_item}&#34;,
+                    }
+
+        action = task[&#34;action&#34;]
+        if action not in [&#34;run&#34;, &#34;test&#34;]:
+            return {
+                &#34;valid&#34;: False,
+                &#34;error&#34;: f&#34;Task &#39;{name}&#39; (index {idx}) invalid action &#39;{action}&#39;. Choices: &#39;run&#39;, &#39;test&#39;.&#34;,
+            }
+
+        if action == &#34;test&#34; and &#34;expected&#34; not in task:
+            return {
+                &#34;valid&#34;: False,
+                &#34;error&#34;: f&#34;Task &#39;{name}&#39; (index {idx}) action &#39;test&#39; requires &#39;expected&#39; key.&#34;,
+            }
+
+        output = task[&#34;output&#34;]
+        if output not in [None, &#34;stdout&#34;, &#34;null&#34;] and not str(output).startswith(&#34;/&#34;):
+            return {
+                &#34;valid&#34;: False,
+                &#34;error&#34;: f&#34;Task &#39;{name}&#39; (index {idx}) output &#39;{output}&#39; must be &#39;stdout&#39;, &#39;null&#39; or an absolute path.&#34;,
+            }
+
+    return {&#34;valid&#34;: True, &#34;message&#34;: &#34;Playbook schema and syntax is valid.&#34;}</code></pre>
+</details>
+<div class="desc"><p>Validate the syntax, schema, and tasks of a Connpy YAML playbook.</p></div>
+</dd>
+</dl>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="connpy" href="index.html">connpy</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="connpy.mcp_server.ConnpyMCPServer" href="#connpy.mcp_server.ConnpyMCPServer">ConnpyMCPServer</a></code></h4>
+<ul class="two-column">
+<li><code><a title="connpy.mcp_server.ConnpyMCPServer.SAFE_COMMANDS" href="#connpy.mcp_server.ConnpyMCPServer.SAFE_COMMANDS">SAFE_COMMANDS</a></code></li>
+<li><code><a title="connpy.mcp_server.ConnpyMCPServer.add_node" href="#connpy.mcp_server.ConnpyMCPServer.add_node">add_node</a></code></li>
+<li><code><a title="connpy.mcp_server.ConnpyMCPServer.call_tool" href="#connpy.mcp_server.ConnpyMCPServer.call_tool">call_tool</a></code></li>
+<li><code><a title="connpy.mcp_server.ConnpyMCPServer.delete_node" href="#connpy.mcp_server.ConnpyMCPServer.delete_node">delete_node</a></code></li>
+<li><code><a title="connpy.mcp_server.ConnpyMCPServer.get_active_context" href="#connpy.mcp_server.ConnpyMCPServer.get_active_context">get_active_context</a></code></li>
+<li><code><a title="connpy.mcp_server.ConnpyMCPServer.get_node_info" href="#connpy.mcp_server.ConnpyMCPServer.get_node_info">get_node_info</a></code></li>
+<li><code><a title="connpy.mcp_server.ConnpyMCPServer.is_safe_command" href="#connpy.mcp_server.ConnpyMCPServer.is_safe_command">is_safe_command</a></code></li>
+<li><code><a title="connpy.mcp_server.ConnpyMCPServer.list_folders" href="#connpy.mcp_server.ConnpyMCPServer.list_folders">list_folders</a></code></li>
+<li><code><a title="connpy.mcp_server.ConnpyMCPServer.list_nodes" href="#connpy.mcp_server.ConnpyMCPServer.list_nodes">list_nodes</a></code></li>
+<li><code><a title="connpy.mcp_server.ConnpyMCPServer.list_profiles" href="#connpy.mcp_server.ConnpyMCPServer.list_profiles">list_profiles</a></code></li>
+<li><code><a title="connpy.mcp_server.ConnpyMCPServer.run" href="#connpy.mcp_server.ConnpyMCPServer.run">run</a></code></li>
+<li><code><a title="connpy.mcp_server.ConnpyMCPServer.run_commands" href="#connpy.mcp_server.ConnpyMCPServer.run_commands">run_commands</a></code></li>
+<li><code><a title="connpy.mcp_server.ConnpyMCPServer.run_playbook" href="#connpy.mcp_server.ConnpyMCPServer.run_playbook">run_playbook</a></code></li>
+<li><code><a title="connpy.mcp_server.ConnpyMCPServer.test_commands" href="#connpy.mcp_server.ConnpyMCPServer.test_commands">test_commands</a></code></li>
+<li><code><a title="connpy.mcp_server.ConnpyMCPServer.update_node" href="#connpy.mcp_server.ConnpyMCPServer.update_node">update_node</a></code></li>
+<li><code><a title="connpy.mcp_server.ConnpyMCPServer.validate_playbook" href="#connpy.mcp_server.ConnpyMCPServer.validate_playbook">validate_playbook</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+</footer>
+</body>
+</html>
