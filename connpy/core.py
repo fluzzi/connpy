@@ -103,7 +103,7 @@ class node:
 
         '''
     
-    def __init__(self, unique, host, options='', logs='', password='', port='', protocol='', user='', config='', tags='', jumphost=''):
+    def __init__(self, unique, host, options='', logs='', password='', port='', protocol='', user='', config='', tags='', jumphost='', allow_unsafe_options=None):
         ''' 
             
         ### Parameters:  
@@ -138,14 +138,22 @@ class node:
                               like "os", "prompt" and "screenleght_command"
                               
             - jumphost (str): Reference another node to be used as a jumphost
+
+            - allow_unsafe_options (bool): Explicitly override safety restrictions.
         '''
         self.config = config
         if config == '':
             self.idletime = 0
             self.key = None
         else:
-            self.idletime = config.config["idletime"]
-            self.key = config.key
+            self.idletime = config.config["idletime"] if (hasattr(config, "config") and isinstance(config.config, dict) and "idletime" in config.config) else 0
+            self.key = getattr(config, "key", None)
+        if allow_unsafe_options is not None:
+            self.allow_unsafe_options = bool(allow_unsafe_options)
+        elif config != '' and config is not None and hasattr(config, "config") and isinstance(config.config, dict):
+            self.allow_unsafe_options = bool(config.config.get("allow_unsafe_options", False))
+        else:
+            self.allow_unsafe_options = False
         self.unique = unique
         attr = {"host": host, "logs": logs, "options":options, "port": port, "protocol": protocol, "user": user, "tags": tags, "jumphost": jumphost}
         for key in attr:
@@ -215,6 +223,79 @@ class node:
         else:
             jh_dict["password"] = [jh_dict["password"]]
         return jh_dict
+
+    def _is_unsafe_allowed(self) -> bool:
+        if getattr(self, "allow_unsafe_options", False):
+            return True
+        if hasattr(self, "config") and self.config and hasattr(self.config, "config") and isinstance(self.config.config, dict):
+            return bool(self.config.config.get("allow_unsafe_options", False))
+        return False
+
+    def _validate_base_fields(self, check_port=True):
+        """Sanitize host, user, and port against argument injection and shell metacharacters."""
+        host_s = str(self.host) if self.host is not None else ""
+        if not host_s:
+            raise ValueError("Host cannot be empty")
+        if host_s.startswith("-"):
+            raise ValueError(f"Host cannot start with '-': '{self.host}'")
+        host_bare = (
+            host_s[1:-1]
+            if (host_s.startswith("[") and host_s.endswith("]"))
+            else host_s
+        )
+        if not host_bare or host_bare.startswith("-"):
+            raise ValueError(f"Invalid characters in host: '{self.host}'")
+        if _LEGACY_SSH_UNSAFE_RE.search(host_bare):
+            raise ValueError(f"Invalid characters in host: '{self.host}'")
+
+        user_s = str(self.user) if self.user is not None else ""
+        if user_s:
+            if user_s.startswith("-"):
+                raise ValueError(f"User cannot start with '-': '{self.user}'")
+            if _LEGACY_SSH_UNSAFE_RE.search(user_s):
+                raise ValueError(f"Invalid characters in user: '{self.user}'")
+
+        if check_port and self.port != "" and self.port is not None:
+            if isinstance(self.port, (bool, float)):
+                raise ValueError(f"Invalid TCP SSH port '{self.port}'")
+            port_s = str(self.port).strip()
+            if port_s:
+                if (
+                    not port_s.isascii()
+                    or not re.fullmatch(r"[0-9]+", port_s, re.ASCII)
+                    or not (1 <= int(port_s) <= 65535)
+                ):
+                    raise ValueError(f"Invalid TCP SSH port '{self.port}'")
+
+    def _validate_options_and_safety(self):
+        """Validate options string for unbalanced quotes and dangerous control characters."""
+        if not self.options:
+            return
+        opts_str = str(self.options).strip()
+        if not opts_str:
+            return
+        if not self._is_unsafe_allowed():
+            if any(c in opts_str for c in ("\n", "\r", "\x00")):
+                raise ValueError("Options cannot contain newlines or null bytes")
+            try:
+                shlex.split(opts_str)
+            except ValueError as e:
+                raise ValueError(f"Invalid options: unbalanced quotes ({e})") from e
+
+    def _validate_ssh_options(self):
+        """Sanitize SSH options against local command execution directives."""
+        self._validate_options_and_safety()
+        if not self.options:
+            return
+        opts_str = str(self.options).strip()
+        if not opts_str:
+            return
+        if not self._is_unsafe_allowed():
+            dangerous_directives = ("ProxyCommand", "LocalCommand", "PermitLocalCommand", "KnownHostsCommand")
+            pattern = r'(?:' + '|'.join(dangerous_directives) + r')'
+            match = re.search(pattern, opts_str, re.IGNORECASE)
+            if match:
+                raise ValueError(f"Disallowed SSH directive in options: '{match.group(0)}'")
 
     @staticmethod
     def _validate_legacy_ssh_hop_fields(host, user, port):
@@ -1442,10 +1523,13 @@ class node:
 
     @MethodHook
     def _generate_ssh_sftp_cmd(self, force_ssh=False, allow_reverse_tunnel_port=None):
+        self._validate_base_fields(check_port=True)
         is_from_mosh = (
             self.protocol == "mosh"
             or getattr(self, "_orig_protocol", "") == "mosh"
         )
+        if not is_from_mosh:
+            self._validate_ssh_options()
         proto = "ssh" if force_ssh else self.protocol
         cmd = proto
         if is_from_mosh:
@@ -1536,8 +1620,9 @@ class node:
         if isinstance(self.tags, dict) and self.tags.get("mosh_ssh_options"):
             ssh_opts = str(self.tags["mosh_ssh_options"]).strip()
             if ssh_opts:
-                if re.search(r'(?:LocalCommand|ProxyCommand)', ssh_opts, re.IGNORECASE):
-                    raise ValueError("mosh_ssh_options cannot contain LocalCommand or ProxyCommand")
+                if not self._is_unsafe_allowed():
+                    if re.search(r'(?:LocalCommand|ProxyCommand|PermitLocalCommand|KnownHostsCommand)', ssh_opts, re.IGNORECASE):
+                        raise ValueError("mosh_ssh_options cannot contain LocalCommand or ProxyCommand")
                 try:
                     shlex.split(ssh_opts)
                 except ValueError as exc:
@@ -1555,8 +1640,9 @@ class node:
             if opts:
                 if re.search(r'--(?:ssh|server|client)(?:=|\s|$)', opts):
                     raise ValueError("Options cannot override --ssh, --server or --client for mosh")
-                if re.search(r'(?:LocalCommand|ProxyCommand)', opts, re.IGNORECASE):
-                    raise ValueError("Options cannot contain LocalCommand or ProxyCommand")
+                if not self._is_unsafe_allowed():
+                    if re.search(r'(?:LocalCommand|ProxyCommand|PermitLocalCommand|KnownHostsCommand)', opts, re.IGNORECASE):
+                        raise ValueError("Options cannot contain LocalCommand or ProxyCommand")
                 try:
                     shlex.split(opts)
                 except ValueError as exc:
@@ -1569,6 +1655,8 @@ class node:
 
     @MethodHook
     def _generate_telnet_cmd(self):
+        self._validate_base_fields(check_port=True)
+        self._validate_options_and_safety()
         cmd = f"telnet {self.host}"
         if self.port:
             cmd += f" {self.port}"
@@ -1578,22 +1666,52 @@ class node:
 
     @MethodHook
     def _generate_kube_cmd(self):
-        cmd = f"kubectl exec {self.options} {self.host} -it --"
+        self._validate_base_fields(check_port=False)
+        self._validate_options_and_safety()
         kube_command = self.tags.get("kube_command", "/bin/bash") if isinstance(self.tags, dict) else "/bin/bash"
+        if not self._is_unsafe_allowed() and kube_command:
+            k_str = str(kube_command)
+            if any(c in k_str for c in ("\n", "\r", "\x00")):
+                raise ValueError("kube_command cannot contain newlines or null bytes")
+            try:
+                shlex.split(k_str)
+            except ValueError as e:
+                raise ValueError(f"Invalid kube_command: unbalanced quotes ({e})") from e
+        cmd = f"kubectl exec {self.options} {self.host} -it --"
         cmd += f" {kube_command}"
         return cmd
 
     @MethodHook
     def _generate_docker_cmd(self):
-        cmd = f"docker {self.options} exec -it {self.host}"
+        self._validate_base_fields(check_port=False)
+        self._validate_options_and_safety()
         docker_command = self.tags.get("docker_command", "/bin/bash") if isinstance(self.tags, dict) else "/bin/bash"
+        if not self._is_unsafe_allowed() and docker_command:
+            d_str = str(docker_command)
+            if any(c in d_str for c in ("\n", "\r", "\x00")):
+                raise ValueError("docker_command cannot contain newlines or null bytes")
+            try:
+                shlex.split(d_str)
+            except ValueError as e:
+                raise ValueError(f"Invalid docker_command: unbalanced quotes ({e})") from e
+        cmd = f"docker {self.options} exec -it {self.host}"
         cmd += f" {docker_command}"
         return cmd
 
     @MethodHook
     def _generate_ssm_cmd(self):
+        self._validate_base_fields(check_port=False)
+        self._validate_options_and_safety()
         region = self.tags.get("region", "") if isinstance(self.tags, dict) else ""
         profile = self.tags.get("profile", "") if isinstance(self.tags, dict) else ""
+        if not self._is_unsafe_allowed():
+            for field_name, field_val in [("region", region), ("profile", profile)]:
+                if field_val:
+                    f_str = str(field_val)
+                    if f_str.startswith("-"):
+                        raise ValueError(f"SSM tag '{field_name}' cannot start with '-': '{field_val}'")
+                    if re.search(r'[\s\x00-\x1f\x7f;|&$`><"\']', f_str):
+                        raise ValueError(f"Invalid characters in SSM tag '{field_name}': '{field_val}'")
         cmd = f"aws ssm start-session --target {self.host}"
         if region:
             cmd += f" --region {region}"

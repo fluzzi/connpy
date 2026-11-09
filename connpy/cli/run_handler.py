@@ -162,7 +162,10 @@ class RunHandler:
         path = args.data[0]
         try:
             with open(path, "r") as f:
-                playbook = yaml.load(f, Loader=yaml.FullLoader)
+                playbook = yaml.safe_load(f)
+
+            if not isinstance(playbook, dict):
+                raise TypeError("Invalid playbook format: expected a dictionary")
 
             # Check preflight first before any task runs
             if getattr(args, "preflight_ai", False):
