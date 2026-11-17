@@ -9,6 +9,7 @@ import os
 import pickle
 import random
 import string
+import subprocess
 import sys
 import textwrap
 import threading
@@ -1605,7 +1606,10 @@ def test_signoff_fallback_inheritance_fail_closed_json_masking_and_atomic_budget
     assert dec_err_info.value.__suppress_context__ is True
     assert "InnerKeySecret" not in str(dec_err_info.value)
 
-    # 4. RecursionError protection on deep JSON & literal passwords starting with '[' or '{'
+    # Double-pass log redaction (both before and after control-char/ANSI stripping)
+    assert sanitize_log_message("pw=\x07Sec!", secrets=["\x07Sec"]) == "pw=***!"
+
+    # 4. RecursionError protection & fail-closed malformed JSON in top-level fallback
     deep_json = "[" * 1500 + "1" + "]" * 1500
     with pytest.raises(ValueError):
         validate_json_depth_and_size(deep_json)
@@ -1613,8 +1617,13 @@ def test_signoff_fallback_inheritance_fail_closed_json_masking_and_atomic_budget
     deep_ref_json = "[" * 1500 + '"@tacacs"' + "]" * 1500
     assert extract_profile_refs_from_value(deep_ref_json) == set()
 
-    assert validate_fallback_entries("{Admin}123") == ["{Admin}123"]
-    assert validate_fallback_entries("[Pa$$") == ["[Pa$$"]
+    with pytest.raises(ValueError):
+        validate_fallback_entries('[{"user":"a","password":"s3cr3t"')
+    with pytest.raises(ValueError):
+        validate_fallback_entries("{Admin}123")
+    assert validate_fallback_entries([{"user": "u", "password": "{Admin}123"}]) == [
+        {"user": "u", "password": "{Admin}123"}
+    ]
     with pytest.raises(ValueError):
         validate_fallback_entries("[[[[[1]]]]]")
     with pytest.raises(ValueError):
@@ -1679,3 +1688,114 @@ def test_signoff_fallback_inheritance_fail_closed_json_masking_and_atomic_budget
         res_locked = n_locked._connect(unattended=True, attempt_tracker=t_atomic)
     assert "[HOST_BUDGET_EXHAUSTED]" in str(res_locked)
     assert t_atomic.remaining_user("shared_u", limit=1) == 1
+
+
+def test_signoff_ronda2_eof_empty_profiles_host_re_shlex_and_lazy_import() -> None:
+    # (a) Single-candidate EOF after sending password -> AUTH_FAILED; premature EOF -> TRANSPORT_ERROR
+    n_single = NodeClass(
+        "r_eof_single",
+        host="10.0.0.80",
+        user="u",
+        password="p1",
+    )
+
+    def _spawn_eof_after_pw(*_a, **_kw):
+        step = {"i": 0}
+        ch = None
+
+        def _exp(_p, timeout=None):
+            i = step["i"]
+            step["i"] += 1
+            if i == 0:
+                ch.after = b"Password:"
+                return 8
+            ch.before = b""
+            ch.after = b""
+            return 11
+
+        ch = _make_mock_child(expect_fn=_exp)
+        return ch
+
+    with patch("connpy.core.pexpect.spawn", side_effect=_spawn_eof_after_pw):
+        res_after = n_single._connect(unattended=True)
+    assert res_after is not True
+    assert "[AUTH_FAILED]" in str(res_after)
+
+    def _spawn_eof_before_pw(*_a, **_kw):
+        ch = _make_mock_child(
+            expect_fn=lambda _p, timeout=None: (
+                setattr(ch, "before", b""),
+                setattr(ch, "after", b""),
+                11,
+            )[-1]
+        )
+        return ch
+
+    with patch("connpy.core.pexpect.spawn", side_effect=_spawn_eof_before_pw):
+        res_before = n_single._connect(unattended=True)
+    assert res_before is not True
+    assert "[TRANSPORT_ERROR]" in str(res_before)
+
+    # (b) Empty referenced fallback profiles must fail closed
+    with pytest.raises(ValueError, match="no credentials"):
+        resolve_fallback_entries(["@empty_prof"], {"empty_prof": {"user": "", "password": ""}})
+    with pytest.raises(ValueError, match="no credentials"):
+        resolve_fallback_entries(
+            ["@empty_sub"],
+            {"empty_sub": {"user": "", "password": "", "fallback": "[]"}},
+        )
+
+    # (c) host_exact_re boundary coverage
+    host_re = host_exact_re("host1")
+    for matching_prompt in (
+        "host1#",
+        "user@host1>",
+        "user@host1$",
+        "(user@host1) Password:",
+        "host1, ",
+    ):
+        assert host_re.search(matching_prompt) is not None
+    for non_matching_prompt in ("host10#", "host1.attacker.com#"):
+        assert host_re.search(non_matching_prompt) is None
+
+    # (d) shlex-based insecure hostkey detection
+    for insecure_opt in (
+        '-o "StrictHostKeyChecking=no"',
+        "-o StrictHostKeyChecking no",
+        "-o StrictHostKeyChecking=off",
+        "-oStrictHostKeyChecking=no",
+        "-o UserKnownHostsFile=/dev/null",
+        "-oUserKnownHostsFile=/dev/null",
+    ):
+        assert has_insecure_hostkey_checking(insecure_opt) is True
+    assert has_insecure_hostkey_checking("-o StrictHostKeyChecking=yes") is False
+
+    # (e) Isolated import of connpy.auth_utils + AuthAttemptTracker strict limit validation
+    repo_root = str(Path(__file__).resolve().parents[2])
+    subprocess.run(
+        [sys.executable, "-c", "import connpy.auth_utils"],
+        check=True,
+        cwd=repo_root,
+    )
+    subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import sys, connpy.auth_utils as au; "
+                "assert 'connpy.services' not in sys.modules; "
+                "from connpy.services.exceptions import ConnpyError; "
+                "assert issubclass(au.SanitizedAuthError, ConnpyError)"
+            ),
+        ],
+        check=True,
+        cwd=repo_root,
+    )
+    for bad_limit in (True, False, 0, -1, 11, "2"):
+        with pytest.raises(ValueError):
+            AuthAttemptTracker(default_max_host_attempts=bad_limit)
+        with pytest.raises(ValueError):
+            AuthAttemptTracker(default_max_hop_attempts=bad_limit)
+    for bad_user_limit in (True, False, 0, -1, 1001, "2"):
+        with pytest.raises(ValueError):
+            AuthAttemptTracker(default_max_global_user_attempts=bad_user_limit)

@@ -3658,24 +3658,36 @@ class node:
                                 next_action = "next_candidate"
                                 break
 
-                            if (
-                                unattended
-                                and not transport_error_seen
-                                and st["target_creds_sent"]
-                            ):
-                                if (int(st["cand_idx"]) + 1) < len(runtime_candidates):
-                                    eof_adv = int(st["eof_fallback_advances"])
-                                    if eof_adv < MAX_EOF_FALLBACK_ADVANCES:
-                                        st["eof_fallback_advances"] = eof_adv + 1
-                                        st["cand_idx"] = int(st["cand_idx"]) + 1
-                                        next_action = "next_candidate"
-                                        break
+                            if unattended and not transport_error_seen:
+                                if st["target_creds_sent"]:
+                                    if (int(st["cand_idx"]) + 1) < len(runtime_candidates):
+                                        eof_adv = int(st["eof_fallback_advances"])
+                                        if eof_adv < MAX_EOF_FALLBACK_ADVANCES:
+                                            st["eof_fallback_advances"] = eof_adv + 1
+                                            st["cand_idx"] = int(st["cand_idx"]) + 1
+                                            next_action = "next_candidate"
+                                            break
+                                        return str(
+                                            sanitize_exception(
+                                                None,
+                                                code="EOF_BUDGET_EXHAUSTED",
+                                                secrets=raw_secrets,
+                                            )
+                                        )
                                     return str(
-                                        sanitize_exception(None, code="EOF_BUDGET_EXHAUSTED", secrets=raw_secrets)
+                                        sanitize_exception(
+                                            None,
+                                            code="AUTH_FAILED",
+                                            secrets=raw_secrets,
+                                        )
                                     )
-                                if int(st["eof_fallback_advances"]) > 0:
+                                if effective_protocol != "local":
                                     return str(
-                                        sanitize_exception(None, code="AUTH_FAILED", secrets=raw_secrets)
+                                        sanitize_exception(
+                                            None,
+                                            code="TRANSPORT_ERROR",
+                                            secrets=raw_secrets,
+                                        )
                                     )
 
                             try:

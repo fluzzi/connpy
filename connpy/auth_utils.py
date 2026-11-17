@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import ast
+import importlib
+import importlib.util
 import json
 import math
 import re
+import shlex
+import sys
 import threading
 import time
 import traceback
@@ -14,9 +18,28 @@ from collections.abc import Callable, Iterable
 from contextlib import suppress
 from copy import deepcopy
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, NoReturn
 
-from connpy.services.exceptions import ConnpyError
+
+def _load_connpy_error() -> type[Exception]:
+    mod_name = "connpy.services.exceptions"
+    existing = sys.modules.get(mod_name)
+    if existing is not None and hasattr(existing, "ConnpyError"):
+        return existing.ConnpyError
+    if "connpy.services" not in sys.modules:
+        exc_path = Path(__file__).resolve().parent / "services" / "exceptions.py"
+        spec = importlib.util.spec_from_file_location(mod_name, exc_path)
+        if spec is not None and spec.loader is not None:
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules[mod_name] = mod
+            spec.loader.exec_module(mod)
+            return mod.ConnpyError
+    mod = importlib.import_module(mod_name)
+    return mod.ConnpyError
+
+
+ConnpyError = _load_connpy_error()
 
 MAX_FALLBACK_ENTRIES = 5
 MAX_PROFILE_DEPTH = 5
@@ -57,7 +80,7 @@ _ANSI_CSI_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b[@-Z\\-_]")
 _PROFILE_REF_BODY_RE = re.compile(r"[A-Za-z0-9_.$:/-]+", re.ASCII)
 _RSA_BLOB_RE = re.compile(r"""^b(["']).+\1$""", re.DOTALL)
 _INSECURE_HOSTKEY_RE = re.compile(
-    r"(?:^|\s)(?:-o\s*)?stricthostkeychecking\s*=\s*no(?:\s|$)",
+    r"(?:^|\s)(?:-o\s*)?(?:stricthostkeychecking\s*=\s*(?:no|off)|userknownhostsfile\s*=\s*/dev/null)(?=\s|$)",
     re.IGNORECASE,
 )
 
@@ -204,14 +227,8 @@ def clear_exception_frames(exc: BaseException | None) -> None:
 
         tb = getattr(cur, "__traceback__", None)
         if tb is not None:
-            try:
+            with suppress(RuntimeError):
                 traceback.clear_frames(tb)
-            except RuntimeError:
-                node = tb
-                while node is not None:
-                    with suppress(RuntimeError, AttributeError):
-                        node.tb_frame.clear()
-                    node = node.tb_next
 
         with suppress(AttributeError, TypeError):
             cur.__traceback__ = None
@@ -244,6 +261,7 @@ def redact_known_secrets(
 def sanitize_log_message(message: str, *, secrets: Iterable[str] = ()) -> str:
     """Strip ANSI sequences, control chars, and known secrets from a log line."""
     text = str(message) if message is not None else ""
+    text = redact_known_secrets(text, secrets=secrets, min_len=1)
     text = _ANSI_OSC_RE.sub("", text)
     text = _ANSI_CSI_RE.sub("", text)
     text = _CONTROL_CHAR_RE.sub("", text)
@@ -833,17 +851,7 @@ def validate_fallback_entries(
         if not stripped:
             return []
         if stripped.startswith(("[", "{")):
-            if (
-                len(stripped) > MAX_JSON_INPUT_BYTES
-                or len(stripped.encode("utf-8", errors="replace")) > MAX_JSON_INPUT_BYTES
-            ):
-                raise ValueError(
-                    f"JSON input exceeds maximum size of {MAX_JSON_INPUT_BYTES} bytes"
-                )
-            try:
-                parsed = validate_json_depth_and_size(stripped)
-            except json.JSONDecodeError:
-                return [stripped]
+            parsed = validate_json_depth_and_size(stripped)
         else:
             if stripped.startswith("compose:"):
                 validate_compose_syntax(stripped)
@@ -999,13 +1007,13 @@ def _resolve_fallback_entries_internal(
                 )
                 own_user = str(u) if u not in (None, "") else ""
                 own_pw: Any = p if p not in (None, "", []) else ""
+                has_own = (
+                    bool(own_user)
+                    or (isinstance(own_pw, list) and bool(own_pw))
+                    or (isinstance(own_pw, str) and own_pw != "")
+                )
                 prof_fb = prof_obj.get("fallback")
                 if prof_fb not in (None, "", []):
-                    has_own = (
-                        bool(own_user)
-                        or (isinstance(own_pw, list) and bool(own_pw))
-                        or (isinstance(own_pw, str) and own_pw != "")
-                    )
                     if has_own:
                         if len(resolved) >= max_entries:
                             raise ValueError(
@@ -1019,6 +1027,10 @@ def _resolve_fallback_entries_internal(
                         _depth=_depth + 1,
                         _visited=_visited | {ref_name},
                     )
+                    if not has_own and not sub_entries:
+                        raise ValueError(
+                            f"Referenced fallback profile {ref_name!r} has no credentials"
+                        )
                     for sub in sub_entries:
                         if len(resolved) >= max_entries:
                             raise ValueError(
@@ -1026,6 +1038,10 @@ def _resolve_fallback_entries_internal(
                             )
                         resolved.append(sub)
                 else:
+                    if not has_own:
+                        raise ValueError(
+                            f"Referenced fallback profile {ref_name!r} has no credentials"
+                        )
                     if len(resolved) >= max_entries:
                         raise ValueError(
                             f"Fallback exceeds maximum of {max_entries} entries"
@@ -1213,7 +1229,7 @@ def host_exact_re(host: str) -> re.Pattern[str]:
     """Compile an exact host boundary regex with zero FQDN subdomain wildcard risk."""
     escaped = re.escape(str(host))
     return re.compile(
-        rf"(?<![A-Za-z0-9._-]){escaped}(?![A-Za-z0-9._-])(?=$|[\s:\]'\"])",
+        rf"(?<![A-Za-z0-9._-]){escaped}(?![A-Za-z0-9._-])(?=$|[\s:\]'\"#>$),])",
         re.IGNORECASE | re.ASCII,
     )
 
@@ -1231,12 +1247,58 @@ def normalize_prompt_line(before_bytes: bytes, after_bytes: bytes) -> str:
     return _CONTROL_CHAR_RE.sub("", lines[-1]).strip()
 
 
+def _is_insecure_ssh_opt_spec(spec: str) -> bool:
+    norm = re.sub(r"\s+", " ", spec.strip()).lower()
+    if "=" in norm:
+        key, val = norm.split("=", 1)
+    else:
+        parts = norm.split(None, 1)
+        if len(parts) != 2:
+            return False
+        key, val = parts[0], parts[1]
+    key = key.strip().strip("\"'")
+    val = val.strip().strip("\"'")
+    return (key == "stricthostkeychecking" and val in ("no", "off")) or (
+        key == "userknownhostsfile" and val == "/dev/null"
+    )
+
+
+def _has_insecure_ssh_options(raw_opts: str) -> bool:
+    if _INSECURE_HOSTKEY_RE.search(raw_opts):
+        return True
+    try:
+        tokens = shlex.split(raw_opts)
+    except ValueError:
+        tokens = raw_opts.split()
+
+    n = len(tokens)
+    for i, tok in enumerate(tokens):
+        if tok.lower() == "-o":
+            if i + 1 < n and _is_insecure_ssh_opt_spec(tokens[i + 1]):
+                return True
+            if i + 2 < n and _is_insecure_ssh_opt_spec(f"{tokens[i + 1]} {tokens[i + 2]}"):
+                return True
+            continue
+        if tok[:2].lower() == "-o" and len(tok) > 2:
+            opt_body = tok[2:]
+            if _is_insecure_ssh_opt_spec(opt_body):
+                return True
+            if i + 1 < n and _is_insecure_ssh_opt_spec(f"{opt_body} {tokens[i + 1]}"):
+                return True
+            continue
+        if _is_insecure_ssh_opt_spec(tok):
+            return True
+        if i + 1 < n and _is_insecure_ssh_opt_spec(f"{tok} {tokens[i + 1]}"):
+            return True
+    return False
+
+
 def has_insecure_hostkey_checking(
     options: str = "",
     tags: Any = None,
     hop_metas: Iterable[dict[str, Any]] = (),
 ) -> bool:
-    """Return True if StrictHostKeyChecking=no is present on target, mosh_ssh_options, or hops."""
+    """Return True if StrictHostKeyChecking=no/off or UserKnownHostsFile=/dev/null is configured."""
     candidates: list[str] = []
     if options:
         candidates.append(str(options))
@@ -1256,7 +1318,7 @@ def has_insecure_hostkey_checking(
                     v = h_tags.get(k)
                     if v:
                         candidates.append(str(v))
-    return any(_INSECURE_HOSTKEY_RE.search(c) for c in candidates)
+    return any(_has_insecure_ssh_options(c) for c in candidates)
 
 
 class AuthAttemptTracker:
@@ -1283,9 +1345,28 @@ class AuthAttemptTracker:
             raise ValueError(f"Invalid max_entries: expected >= 1, got {max_entries!r}")
         self._ttl_seconds = ttl_val
         self._max_entries = max_entries
-        self._default_max_host_attempts = int(default_max_host_attempts)
-        self._default_max_hop_attempts = int(default_max_hop_attempts)
-        self._default_max_global_user_attempts = default_max_global_user_attempts
+        self._default_max_host_attempts = validate_strict_int_range(
+            default_max_host_attempts,
+            "default_max_host_attempts",
+            MIN_TOTAL_AUTH_ATTEMPTS,
+            MAX_TOTAL_AUTH_ATTEMPTS_CAP,
+        )
+        self._default_max_hop_attempts = validate_strict_int_range(
+            default_max_hop_attempts,
+            "default_max_hop_attempts",
+            MIN_HOP_HOST_ATTEMPTS,
+            MAX_HOP_HOST_ATTEMPTS_CAP,
+        )
+        self._default_max_global_user_attempts: int | None = (
+            validate_strict_int_range(
+                default_max_global_user_attempts,
+                "default_max_global_user_attempts",
+                1,
+                1000,
+            )
+            if default_max_global_user_attempts is not None
+            else None
+        )
         self._clock = clock
         self._lock = threading.Lock()
         self._unblocked: OrderedDict[Any, _BudgetEntry] = OrderedDict()
