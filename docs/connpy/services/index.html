@@ -1255,6 +1255,7 @@ el.replaceWith(d);
 </ul>
 <h3>Subclasses</h3>
 <ul class="hlist">
+<li><a title="connpy.auth_utils.SanitizedAuthError" href="../auth_utils.html#connpy.auth_utils.SanitizedAuthError">SanitizedAuthError</a></li>
 <li><a title="connpy.services.exceptions.ExecutionError" href="exceptions.html#connpy.services.exceptions.ExecutionError">ExecutionError</a></li>
 <li><a title="connpy.services.exceptions.InvalidConfigurationError" href="exceptions.html#connpy.services.exceptions.InvalidConfigurationError">InvalidConfigurationError</a></li>
 <li><a title="connpy.services.exceptions.NodeAlreadyExistsError" href="exceptions.html#connpy.services.exceptions.NodeAlreadyExistsError">NodeAlreadyExistsError</a></li>
@@ -1287,7 +1288,7 @@ el.replaceWith(d);
 </dd>
 <dt id="connpy.services.ExecutionService"><code class="flex name class">
 <span>class <span class="ident">ExecutionService</span></span>
-<span>(</span><span>config=None)</span>
+<span>(</span><span>config=None, remote_stub=None, attempt_tracker=None)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -1297,104 +1298,239 @@ el.replaceWith(d);
 <pre><code class="python">class ExecutionService(BaseService):
     &#34;&#34;&#34;Business logic for executing commands on nodes and running automation scripts.&#34;&#34;&#34;
 
-    def run_commands(
-        self, 
-        nodes_filter: str, 
-        commands: List[str], 
-        variables: Optional[Dict[str, Any]] = None,
-        parallel: int = 10,
-        timeout: int = 20,
-        folder: Optional[str] = None,
-        prompt: Optional[str] = None,
-        on_node_complete: Optional[Callable] = None,
-        logger: Optional[Callable] = None,
-        name: Optional[str] = None
-    ) -&gt; Dict[str, str]:
+    def __init__(self, config=None, remote_stub=None, attempt_tracker=None):
+        super().__init__(config)
+        self.remote_stub = remote_stub
+        self.attempt_tracker = (
+            attempt_tracker if attempt_tracker is not None else AuthAttemptTracker()
+        )
+        self.last_fallback_used: dict[str, bool] = {}
 
+    def _is_remote_backend(self) -&gt; bool:
+        &#34;&#34;&#34;Return True when execution is configured to run against a remote gRPC backend.&#34;&#34;&#34;
+        if getattr(self, &#34;remote_stub&#34;, None) is not None:
+            return True
+        cfg = getattr(self.config, &#34;config&#34;, None)
+        return isinstance(cfg, dict) and cfg.get(&#34;service_mode&#34;) == &#34;remote&#34;
+
+    def _ensure_backend_supports_stage_timeouts(
+        self,
+        connect_timeout: int | None = None,
+        auth_timeout: int | None = None,
+    ) -&gt; None:
+        &#34;&#34;&#34;Raise ConnpyError if per-stage timeout overrides are used on gRPC remote backend.&#34;&#34;&#34;
+        if self._is_remote_backend() and (connect_timeout is not None or auth_timeout is not None):
+            raise ConnpyError(
+                &#34;connect_timeout and auth_timeout overrides are not supported in remote gRPC mode&#34;
+            )
+
+    def _get_remote_stub(self):
+        &#34;&#34;&#34;Return the configured or lazily constructed ExecutionStub for remote gRPC mode.&#34;&#34;&#34;
+        if getattr(self, &#34;remote_stub&#34;, None) is not None:
+            return self.remote_stub
+        cfg = getattr(self.config, &#34;config&#34;, None)
+        remote_host = cfg.get(&#34;remote_host&#34;) if isinstance(cfg, dict) else None
+        if not remote_host:
+            raise ConnpyError(&#34;Remote host must be specified in remote mode&#34;)
+
+        import grpc
+
+        from connpy.grpc_layer.stubs import AuthClientInterceptor, ExecutionStub
+
+        def get_token():
+            env_token = os.environ.get(&#34;CONNPY_TOKEN&#34;)
+            if env_token:
+                return env_token
+            defaultdir = getattr(self.config, &#34;defaultdir&#34;, None)
+            if defaultdir:
+                token_path = os.path.join(defaultdir, &#34;.token&#34;)
+                if os.path.exists(token_path):
+                    with suppress(OSError), open(token_path) as f:
+                        return f.read().strip()
+            return None
+
+        channel = grpc.insecure_channel(remote_host)
+        channel = grpc.intercept_channel(channel, AuthClientInterceptor(get_token))
+        return ExecutionStub(channel, remote_host=remote_host)
+
+    def run_commands(
+        self,
+        nodes_filter: str,
+        commands: list[str],
+        variables: dict[str, Any] | None = None,
+        parallel: int = 10,
+        timeout: int | None = None,
+        folder: str | None = None,
+        prompt: str | None = None,
+        on_node_complete: Callable | None = None,
+        logger: Callable | None = None,
+        name: str | None = None,
+        connect_timeout: int | None = None,
+        auth_timeout: int | None = None,
+    ) -&gt; dict[str, Any]:
         &#34;&#34;&#34;Execute commands on a set of nodes.&#34;&#34;&#34;
         try:
+            self._ensure_backend_supports_stage_timeouts(
+                connect_timeout=connect_timeout,
+                auth_timeout=auth_timeout,
+            )
+
+            if self._is_remote_backend():
+                stub = self._get_remote_stub()
+                return stub.run_commands(
+                    nodes_filter=nodes_filter,
+                    commands=commands,
+                    variables=variables,
+                    parallel=parallel,
+                    timeout=timeout if timeout is not None else 20,
+                    folder=folder,
+                    prompt=prompt,
+                    on_node_complete=on_node_complete,
+                    logger=logger,
+                    name=name or &#34;&#34;,
+                )
+
             matched_names = self.config._getallnodes(nodes_filter)
             if not matched_names:
                 raise ConnpyError(f&#34;No nodes found matching filter: {nodes_filter}&#34;)
-            
+
             node_data = self.config.getitems(matched_names, extract=True)
             executor = Nodes(node_data, config=self.config)
             self.last_executor = executor
-            
-            results = executor.run(
-                commands=commands,
-                vars=variables,
-                parallel=parallel,
-                timeout=timeout,
-                folder=folder,
-                prompt=prompt,
-                on_complete=on_node_complete,
-                logger=logger
-            )
 
-            # Combine output and status for the caller
+            run_kwargs: dict[str, Any] = {
+                &#34;commands&#34;: commands,
+                &#34;vars&#34;: variables,
+                &#34;parallel&#34;: parallel,
+                &#34;timeout&#34;: timeout,
+                &#34;folder&#34;: folder,
+                &#34;prompt&#34;: prompt,
+                &#34;on_complete&#34;: on_node_complete,
+                &#34;logger&#34;: logger,
+                &#34;connect_timeout&#34;: connect_timeout,
+                &#34;auth_timeout&#34;: auth_timeout,
+                &#34;_default_cmd_timeout&#34;: 20,
+            }
+            run_params = inspect.signature(executor.run).parameters
+            if &#34;unattended&#34; in run_params:
+                run_kwargs[&#34;unattended&#34;] = True
+            if &#34;attempt_tracker&#34; in run_params:
+                run_kwargs[&#34;attempt_tracker&#34;] = self.attempt_tracker
+
+            results = executor.run(**run_kwargs)
+
+            fb_map = getattr(executor, &#34;fallback_used&#34;, {})
+            fb_dict = fb_map if isinstance(fb_map, dict) else {}
+
+            # Combine output, status, and fallback metadata for the caller
             full_results = {}
+            self.last_fallback_used = {}
             for unique in results:
+                fb_used = bool(fb_dict.get(unique, False))
                 full_results[unique] = {
                     &#34;output&#34;: results[unique],
-                    &#34;status&#34;: executor.status.get(unique, 1)
+                    &#34;status&#34;: executor.status.get(unique, 1),
+                    &#34;fallback_used&#34;: fb_used,
                 }
+                self.last_fallback_used[unique] = fb_used
 
             return full_results
-        except Exception as e:
-            raise ConnpyError(f&#34;Execution failed: {e}&#34;)
+        except ConnpyError:
+            raise
+        except Exception as e:  # noqa: BLE001
+            raise_sanitized_auth_error(e, code=&#34;AUTH_FAILED&#34;, context_label=&#34;execution failed&#34;)
 
     def test_commands(
         self,
         nodes_filter: str,
-        commands: List[str],
-        expected: List[str],
-        variables: Optional[Dict[str, Any]] = None,
+        commands: list[str],
+        expected: list[str],
+        variables: dict[str, Any] | None = None,
         parallel: int = 10,
-        timeout: int = 20,
-        folder: Optional[str] = None,
-        prompt: Optional[str] = None,
-        on_node_complete: Optional[Callable] = None,
-        logger: Optional[Callable] = None,
-        name: Optional[str] = None
-    ) -&gt; Dict[str, Dict[str, bool]]:
-
+        timeout: int | None = None,
+        folder: str | None = None,
+        prompt: str | None = None,
+        on_node_complete: Callable | None = None,
+        logger: Callable | None = None,
+        name: str | None = None,
+        connect_timeout: int | None = None,
+        auth_timeout: int | None = None,
+    ) -&gt; dict[str, dict[str, bool]]:
         &#34;&#34;&#34;Run commands and verify expected output on a set of nodes.&#34;&#34;&#34;
         try:
+            self._ensure_backend_supports_stage_timeouts(
+                connect_timeout=connect_timeout,
+                auth_timeout=auth_timeout,
+            )
+
+            if self._is_remote_backend():
+                stub = self._get_remote_stub()
+                return stub.test_commands(
+                    nodes_filter=nodes_filter,
+                    commands=commands,
+                    expected=expected,
+                    variables=variables,
+                    parallel=parallel,
+                    timeout=timeout if timeout is not None else 20,
+                    folder=folder or &#34;&#34;,
+                    prompt=prompt,
+                    on_node_complete=on_node_complete,
+                    logger=logger,
+                    name=name or &#34;&#34;,
+                )
+
             matched_names = self.config._getallnodes(nodes_filter)
             if not matched_names:
                 raise ConnpyError(f&#34;No nodes found matching filter: {nodes_filter}&#34;)
-            
+
             node_data = self.config.getitems(matched_names, extract=True)
             executor = Nodes(node_data, config=self.config)
             self.last_executor = executor
-            
-            results = executor.test(
-                commands=commands,
-                expected=expected,
-                vars=variables,
-                parallel=parallel,
-                timeout=timeout,
-                folder=folder,
-                prompt=prompt,
-                on_complete=on_node_complete,
-                logger=logger
-            )
-            return results
-        except Exception as e:
-            raise ConnpyError(f&#34;Testing failed: {e}&#34;)
 
-    def run_cli_script(self, nodes_filter: str, script_path: str, parallel: int = 10) -&gt; Dict[str, str]:
+            test_kwargs: dict[str, Any] = {
+                &#34;commands&#34;: commands,
+                &#34;expected&#34;: expected,
+                &#34;vars&#34;: variables,
+                &#34;parallel&#34;: parallel,
+                &#34;timeout&#34;: timeout,
+                &#34;folder&#34;: folder,
+                &#34;prompt&#34;: prompt,
+                &#34;on_complete&#34;: on_node_complete,
+                &#34;logger&#34;: logger,
+                &#34;connect_timeout&#34;: connect_timeout,
+                &#34;auth_timeout&#34;: auth_timeout,
+                &#34;_default_cmd_timeout&#34;: 20,
+            }
+            test_params = inspect.signature(executor.test).parameters
+            if &#34;unattended&#34; in test_params:
+                test_kwargs[&#34;unattended&#34;] = True
+            if &#34;attempt_tracker&#34; in test_params:
+                test_kwargs[&#34;attempt_tracker&#34;] = self.attempt_tracker
+
+            res = executor.test(**test_kwargs)
+            fb_map = getattr(executor, &#34;fallback_used&#34;, {})
+            fb_dict = fb_map if isinstance(fb_map, dict) else {}
+            if isinstance(res, dict):
+                self.last_fallback_used = {u: bool(fb_dict.get(u, False)) for u in res}
+            else:
+                self.last_fallback_used = {}
+            return res
+        except ConnpyError:
+            raise
+        except Exception as e:  # noqa: BLE001
+            raise_sanitized_auth_error(e, code=&#34;AUTH_FAILED&#34;, context_label=&#34;testing failed&#34;)
+
+    def run_cli_script(self, nodes_filter: str, script_path: str, parallel: int = 10) -&gt; dict[str, str]:
         &#34;&#34;&#34;Run a plain-text script containing one command per line.&#34;&#34;&#34;
         if not os.path.exists(script_path):
             raise ConnpyError(f&#34;Script file not found: {script_path}&#34;)
-            
+
         try:
-            with open(script_path, &#34;r&#34;) as f:
+            with open(script_path) as f:
                 commands = [line.strip() for line in f if line.strip()]
-        except Exception as e:
-            raise ConnpyError(f&#34;Failed to read script {script_path}: {e}&#34;)
-            
+        except OSError:
+            raise ConnpyError(&#34;Failed to read script file&#34;) from None
+
         return self.run_commands(nodes_filter, commands, parallel=parallel)</code></pre>
 </details>
 <div class="desc"><p>Business logic for executing commands on nodes and running automation scripts.</p>
@@ -1412,30 +1548,30 @@ el.replaceWith(d);
 <h3>Methods</h3>
 <dl>
 <dt id="connpy.services.ExecutionService.run_cli_script"><code class="name flex">
-<span>def <span class="ident">run_cli_script</span></span>(<span>self, nodes_filter: str, script_path: str, parallel: int = 10) ‑> Dict[str, str]</span>
+<span>def <span class="ident">run_cli_script</span></span>(<span>self, nodes_filter: str, script_path: str, parallel: int = 10) ‑> dict[str, str]</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def run_cli_script(self, nodes_filter: str, script_path: str, parallel: int = 10) -&gt; Dict[str, str]:
+<pre><code class="python">def run_cli_script(self, nodes_filter: str, script_path: str, parallel: int = 10) -&gt; dict[str, str]:
     &#34;&#34;&#34;Run a plain-text script containing one command per line.&#34;&#34;&#34;
     if not os.path.exists(script_path):
         raise ConnpyError(f&#34;Script file not found: {script_path}&#34;)
-        
+
     try:
-        with open(script_path, &#34;r&#34;) as f:
+        with open(script_path) as f:
             commands = [line.strip() for line in f if line.strip()]
-    except Exception as e:
-        raise ConnpyError(f&#34;Failed to read script {script_path}: {e}&#34;)
-        
+    except OSError:
+        raise ConnpyError(&#34;Failed to read script file&#34;) from None
+
     return self.run_commands(nodes_filter, commands, parallel=parallel)</code></pre>
 </details>
 <div class="desc"><p>Run a plain-text script containing one command per line.</p></div>
 </dd>
 <dt id="connpy.services.ExecutionService.run_commands"><code class="name flex">
-<span>def <span class="ident">run_commands</span></span>(<span>self,<br>nodes_filter: str,<br>commands: List[str],<br>variables: Dict[str, Any] | None = None,<br>parallel: int = 10,<br>timeout: int = 20,<br>folder: str | None = None,<br>prompt: str | None = None,<br>on_node_complete: Callable | None = None,<br>logger: Callable | None = None,<br>name: str | None = None) ‑> Dict[str, str]</span>
+<span>def <span class="ident">run_commands</span></span>(<span>self,<br>nodes_filter: str,<br>commands: list[str],<br>variables: dict[str, typing.Any] | None = None,<br>parallel: int = 10,<br>timeout: int | None = None,<br>folder: str | None = None,<br>prompt: str | None = None,<br>on_node_complete: collections.abc.Callable | None = None,<br>logger: collections.abc.Callable | None = None,<br>name: str | None = None,<br>connect_timeout: int | None = None,<br>auth_timeout: int | None = None) ‑> dict[str, typing.Any]</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -1443,56 +1579,96 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def run_commands(
-    self, 
-    nodes_filter: str, 
-    commands: List[str], 
-    variables: Optional[Dict[str, Any]] = None,
+    self,
+    nodes_filter: str,
+    commands: list[str],
+    variables: dict[str, Any] | None = None,
     parallel: int = 10,
-    timeout: int = 20,
-    folder: Optional[str] = None,
-    prompt: Optional[str] = None,
-    on_node_complete: Optional[Callable] = None,
-    logger: Optional[Callable] = None,
-    name: Optional[str] = None
-) -&gt; Dict[str, str]:
-
+    timeout: int | None = None,
+    folder: str | None = None,
+    prompt: str | None = None,
+    on_node_complete: Callable | None = None,
+    logger: Callable | None = None,
+    name: str | None = None,
+    connect_timeout: int | None = None,
+    auth_timeout: int | None = None,
+) -&gt; dict[str, Any]:
     &#34;&#34;&#34;Execute commands on a set of nodes.&#34;&#34;&#34;
     try:
+        self._ensure_backend_supports_stage_timeouts(
+            connect_timeout=connect_timeout,
+            auth_timeout=auth_timeout,
+        )
+
+        if self._is_remote_backend():
+            stub = self._get_remote_stub()
+            return stub.run_commands(
+                nodes_filter=nodes_filter,
+                commands=commands,
+                variables=variables,
+                parallel=parallel,
+                timeout=timeout if timeout is not None else 20,
+                folder=folder,
+                prompt=prompt,
+                on_node_complete=on_node_complete,
+                logger=logger,
+                name=name or &#34;&#34;,
+            )
+
         matched_names = self.config._getallnodes(nodes_filter)
         if not matched_names:
             raise ConnpyError(f&#34;No nodes found matching filter: {nodes_filter}&#34;)
-        
+
         node_data = self.config.getitems(matched_names, extract=True)
         executor = Nodes(node_data, config=self.config)
         self.last_executor = executor
-        
-        results = executor.run(
-            commands=commands,
-            vars=variables,
-            parallel=parallel,
-            timeout=timeout,
-            folder=folder,
-            prompt=prompt,
-            on_complete=on_node_complete,
-            logger=logger
-        )
 
-        # Combine output and status for the caller
+        run_kwargs: dict[str, Any] = {
+            &#34;commands&#34;: commands,
+            &#34;vars&#34;: variables,
+            &#34;parallel&#34;: parallel,
+            &#34;timeout&#34;: timeout,
+            &#34;folder&#34;: folder,
+            &#34;prompt&#34;: prompt,
+            &#34;on_complete&#34;: on_node_complete,
+            &#34;logger&#34;: logger,
+            &#34;connect_timeout&#34;: connect_timeout,
+            &#34;auth_timeout&#34;: auth_timeout,
+            &#34;_default_cmd_timeout&#34;: 20,
+        }
+        run_params = inspect.signature(executor.run).parameters
+        if &#34;unattended&#34; in run_params:
+            run_kwargs[&#34;unattended&#34;] = True
+        if &#34;attempt_tracker&#34; in run_params:
+            run_kwargs[&#34;attempt_tracker&#34;] = self.attempt_tracker
+
+        results = executor.run(**run_kwargs)
+
+        fb_map = getattr(executor, &#34;fallback_used&#34;, {})
+        fb_dict = fb_map if isinstance(fb_map, dict) else {}
+
+        # Combine output, status, and fallback metadata for the caller
         full_results = {}
+        self.last_fallback_used = {}
         for unique in results:
+            fb_used = bool(fb_dict.get(unique, False))
             full_results[unique] = {
                 &#34;output&#34;: results[unique],
-                &#34;status&#34;: executor.status.get(unique, 1)
+                &#34;status&#34;: executor.status.get(unique, 1),
+                &#34;fallback_used&#34;: fb_used,
             }
+            self.last_fallback_used[unique] = fb_used
 
         return full_results
-    except Exception as e:
-        raise ConnpyError(f&#34;Execution failed: {e}&#34;)</code></pre>
+    except ConnpyError:
+        raise
+    except Exception as e:  # noqa: BLE001
+        raise_sanitized_auth_error(e, code=&#34;AUTH_FAILED&#34;, context_label=&#34;execution failed&#34;)</code></pre>
 </details>
 <div class="desc"><p>Execute commands on a set of nodes.</p></div>
 </dd>
 <dt id="connpy.services.ExecutionService.test_commands"><code class="name flex">
-<span>def <span class="ident">test_commands</span></span>(<span>self,<br>nodes_filter: str,<br>commands: List[str],<br>expected: List[str],<br>variables: Dict[str, Any] | None = None,<br>parallel: int = 10,<br>timeout: int = 20,<br>folder: str | None = None,<br>prompt: str | None = None,<br>on_node_complete: Callable | None = None,<br>logger: Callable | None = None,<br>name: str | None = None) ‑> Dict[str, Dict[str, bool]]</span>
+<span>def <span class="ident">test_commands</span></span>(<span>self,<br>nodes_filter: str,<br>commands: list[str],<br>expected: list[str],<br>variables: dict[str, typing.Any] | None = None,<br>parallel: int = 10,<br>timeout: int | None = None,<br>folder: str | None = None,<br>prompt: str | None = None,<br>on_node_complete: collections.abc.Callable | None = None,<br>logger: collections.abc.Callable | None = None,<br>name: str | None = None,<br>connect_timeout: int | None = None,<br>auth_timeout: int | None = None) ‑> dict[str, dict[str, bool]]</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -1502,42 +1678,82 @@ el.replaceWith(d);
 <pre><code class="python">def test_commands(
     self,
     nodes_filter: str,
-    commands: List[str],
-    expected: List[str],
-    variables: Optional[Dict[str, Any]] = None,
+    commands: list[str],
+    expected: list[str],
+    variables: dict[str, Any] | None = None,
     parallel: int = 10,
-    timeout: int = 20,
-    folder: Optional[str] = None,
-    prompt: Optional[str] = None,
-    on_node_complete: Optional[Callable] = None,
-    logger: Optional[Callable] = None,
-    name: Optional[str] = None
-) -&gt; Dict[str, Dict[str, bool]]:
-
+    timeout: int | None = None,
+    folder: str | None = None,
+    prompt: str | None = None,
+    on_node_complete: Callable | None = None,
+    logger: Callable | None = None,
+    name: str | None = None,
+    connect_timeout: int | None = None,
+    auth_timeout: int | None = None,
+) -&gt; dict[str, dict[str, bool]]:
     &#34;&#34;&#34;Run commands and verify expected output on a set of nodes.&#34;&#34;&#34;
     try:
+        self._ensure_backend_supports_stage_timeouts(
+            connect_timeout=connect_timeout,
+            auth_timeout=auth_timeout,
+        )
+
+        if self._is_remote_backend():
+            stub = self._get_remote_stub()
+            return stub.test_commands(
+                nodes_filter=nodes_filter,
+                commands=commands,
+                expected=expected,
+                variables=variables,
+                parallel=parallel,
+                timeout=timeout if timeout is not None else 20,
+                folder=folder or &#34;&#34;,
+                prompt=prompt,
+                on_node_complete=on_node_complete,
+                logger=logger,
+                name=name or &#34;&#34;,
+            )
+
         matched_names = self.config._getallnodes(nodes_filter)
         if not matched_names:
             raise ConnpyError(f&#34;No nodes found matching filter: {nodes_filter}&#34;)
-        
+
         node_data = self.config.getitems(matched_names, extract=True)
         executor = Nodes(node_data, config=self.config)
         self.last_executor = executor
-        
-        results = executor.test(
-            commands=commands,
-            expected=expected,
-            vars=variables,
-            parallel=parallel,
-            timeout=timeout,
-            folder=folder,
-            prompt=prompt,
-            on_complete=on_node_complete,
-            logger=logger
-        )
-        return results
-    except Exception as e:
-        raise ConnpyError(f&#34;Testing failed: {e}&#34;)</code></pre>
+
+        test_kwargs: dict[str, Any] = {
+            &#34;commands&#34;: commands,
+            &#34;expected&#34;: expected,
+            &#34;vars&#34;: variables,
+            &#34;parallel&#34;: parallel,
+            &#34;timeout&#34;: timeout,
+            &#34;folder&#34;: folder,
+            &#34;prompt&#34;: prompt,
+            &#34;on_complete&#34;: on_node_complete,
+            &#34;logger&#34;: logger,
+            &#34;connect_timeout&#34;: connect_timeout,
+            &#34;auth_timeout&#34;: auth_timeout,
+            &#34;_default_cmd_timeout&#34;: 20,
+        }
+        test_params = inspect.signature(executor.test).parameters
+        if &#34;unattended&#34; in test_params:
+            test_kwargs[&#34;unattended&#34;] = True
+        if &#34;attempt_tracker&#34; in test_params:
+            test_kwargs[&#34;attempt_tracker&#34;] = self.attempt_tracker
+
+        res = executor.test(**test_kwargs)
+        fb_map = getattr(executor, &#34;fallback_used&#34;, {})
+        fb_dict = fb_map if isinstance(fb_map, dict) else {}
+        if isinstance(res, dict):
+            self.last_fallback_used = {u: bool(fb_dict.get(u, False)) for u in res}
+        else:
+            self.last_fallback_used = {}
+        return res
+    except ConnpyError:
+        raise
+    except Exception as e:  # noqa: BLE001
+        raise_sanitized_auth_error(e, code=&#34;AUTH_FAILED&#34;, context_label=&#34;testing failed&#34;)</code></pre>
 </details>
 <div class="desc"><p>Run commands and verify expected output on a set of nodes.</p></div>
 </dd>
@@ -1910,8 +2126,52 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class NodeService(BaseService):
+    _CONNECTION_FIELDS: ClassVar[frozenset[str]] = frozenset({
+        &#34;id&#34;,
+        &#34;host&#34;,
+        &#34;folder&#34;,
+        &#34;subfolder&#34;,
+        &#34;options&#34;,
+        &#34;logs&#34;,
+        &#34;password&#34;,
+        &#34;port&#34;,
+        &#34;protocol&#34;,
+        &#34;user&#34;,
+        &#34;tags&#34;,
+        &#34;jumphost&#34;,
+        &#34;fallback&#34;,
+        &#34;type&#34;,
+    })
+
     def __init__(self, config=None):
         super().__init__(config)
+
+    @staticmethod
+    def _validate_node_payload(data):
+        if not isinstance(data, dict):
+            return
+        from ..auth_utils import (
+            SanitizedAuthError,
+            is_compose_expression,
+            validate_auth_budget_tags,
+            validate_compose_syntax,
+            validate_fallback_entries,
+        )
+
+        try:
+            if &#34;tags&#34; in data and data[&#34;tags&#34;] not in (&#34;&#34;, None):
+                validate_auth_budget_tags(data[&#34;tags&#34;])
+            if &#34;fallback&#34; in data and data[&#34;fallback&#34;] not in (None, &#34;&#34;, []):
+                validate_fallback_entries(data[&#34;fallback&#34;])
+            pw = data.get(&#34;password&#34;)
+            if is_compose_expression(pw):
+                validate_compose_syntax(pw)
+            elif isinstance(pw, (list, tuple)):
+                for item in pw:
+                    if is_compose_expression(item):
+                        validate_compose_syntax(item)
+        except (ValueError, TypeError, SanitizedAuthError) as exc:
+            raise InvalidConfigurationError(str(exc)) from None
 
 
     def list_nodes(self, filter_str=None, format_str=None):
@@ -1989,7 +2249,7 @@ el.replaceWith(d);
                 raise NodeNotFoundError(f&#34;Node &#39;{unique_id}&#39; not found.&#34;)
             return details
         except (KeyError, TypeError):
-            raise NodeNotFoundError(f&#34;Node &#39;{unique_id}&#39; not found.&#34;)
+            raise NodeNotFoundError(f&#34;Node &#39;{unique_id}&#39; not found.&#34;) from None
 
     def explode_unique(self, unique_id):
         &#34;&#34;&#34;Explode a unique ID into a dictionary of its parts.&#34;&#34;&#34;
@@ -2019,58 +2279,127 @@ el.replaceWith(d);
         &#34;&#34;&#34;Logic for adding a new node or folder to configuration.&#34;&#34;&#34;
         if not is_folder:
             self._validate_node_name(unique_id)
-            
+            self._validate_node_payload(data)
+
+        if _supports_transactional_update(self.config):
+            def _mut(cfg):
+                all_nodes = cfg._getallnodes_unlocked()
+                all_folders = cfg._getallfolders_unlocked()
+                if is_folder:
+                    if unique_id in all_folders:
+                        raise NodeAlreadyExistsError(f&#34;Folder &#39;{unique_id}&#39; already exists.&#34;)
+                    uniques = cfg._explode_unique_unlocked(unique_id)
+                    if not uniques:
+                        raise InvalidConfigurationError(f&#34;Invalid folder name &#39;{unique_id}&#39;.&#34;)
+                    if &#34;subfolder&#34; in uniques:
+                        parent_folder = f&#34;@{uniques[&#39;folder&#39;]}&#34;
+                        if parent_folder not in all_folders:
+                            raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
+                    cfg._folder_add_unlocked(**uniques)
+                else:
+                    if unique_id in all_nodes:
+                        raise NodeAlreadyExistsError(f&#34;Node &#39;{unique_id}&#39; already exists.&#34;)
+                    node_folder = unique_id.partition(&#34;@&#34;)[2]
+                    if node_folder:
+                        parent_folder = f&#34;@{node_folder}&#34;
+                        if parent_folder not in all_folders:
+                            raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
+                    payload = deepcopy(data)
+                    if &#34;id&#34; not in payload:
+                        uniques = cfg._explode_unique_unlocked(unique_id)
+                        if uniques and &#34;id&#34; in uniques:
+                            payload[&#34;id&#34;] = uniques[&#34;id&#34;]
+                    cfg._connections_add_unlocked(**payload)
+
+            self.config.transactional_update(_mut)
+            return
+
         all_nodes = self.config._getallnodes()
         all_folders = self.config._getallfolders()
-        
+
         if is_folder:
             if unique_id in all_folders:
                 raise NodeAlreadyExistsError(f&#34;Folder &#39;{unique_id}&#39; already exists.&#34;)
             uniques = self.config._explode_unique(unique_id)
             if not uniques:
                 raise InvalidConfigurationError(f&#34;Invalid folder name &#39;{unique_id}&#39;.&#34;)
-            
-            # Check if parent folder exists when creating a subfolder
+
             if &#34;subfolder&#34; in uniques:
                 self.validate_parent_folder(unique_id, is_folder=True)
-                    
+
             self.config._folder_add(**uniques)
             self.config._saveconfig(self.config.file)
         else:
             if unique_id in all_nodes:
                 raise NodeAlreadyExistsError(f&#34;Node &#39;{unique_id}&#39; already exists.&#34;)
-                
-            # Check if parent folder exists when creating a node in a folder
+
             self.validate_parent_folder(unique_id)
-                    
-            # Ensure &#39;id&#39; is in data for config._connections_add
-            if &#34;id&#34; not in data:
+
+            payload = deepcopy(data)
+            if &#34;id&#34; not in payload:
                 uniques = self.config._explode_unique(unique_id)
                 if uniques and &#34;id&#34; in uniques:
-                    data[&#34;id&#34;] = uniques[&#34;id&#34;]
-            
-            self.config._connections_add(**data)
+                    payload[&#34;id&#34;] = uniques[&#34;id&#34;]
+
+            self.config._connections_add(**payload)
             self.config._saveconfig(self.config.file)
+
+    def _build_update_payload(self, unique_id, data, existing, uniques):
+        if isinstance(existing, dict):
+            merged = deepcopy(existing)
+            if isinstance(uniques, dict):
+                merged.update({k: v for k, v in uniques.items() if v})
+            merged.update(deepcopy(data))
+            filtered = {k: v for k, v in merged.items() if k in self._CONNECTION_FIELDS}
+        else:
+            filtered = deepcopy(data)
+            if &#34;id&#34; not in filtered and isinstance(uniques, dict) and &#34;id&#34; in uniques:
+                filtered[&#34;id&#34;] = uniques[&#34;id&#34;]
+        self._validate_node_payload(filtered)
+        return filtered
 
     def update_node(self, unique_id, data, save=True):
         &#34;&#34;&#34;Explicitly update an existing node.&#34;&#34;&#34;
+        if _supports_transactional_update(self.config) and save:
+            def _mut(cfg):
+                all_nodes = cfg._getallnodes_unlocked()
+                if unique_id not in all_nodes:
+                    raise NodeNotFoundError(f&#34;Node &#39;{unique_id}&#39; not found.&#34;)
+                uniques = cfg._explode_unique_unlocked(unique_id)
+                existing = cfg.getitem_unlocked(unique_id, extract=False)
+                payload = self._build_update_payload(unique_id, data, existing, uniques)
+                cfg._connections_add_unlocked(**payload)
+
+            self.config.transactional_update(_mut)
+            return
+
         all_nodes = self.config._getallnodes()
         if unique_id not in all_nodes:
             raise NodeNotFoundError(f&#34;Node &#39;{unique_id}&#39; not found.&#34;)
-            
-        # Ensure &#39;id&#39; is in data for config._connections_add
-        if &#34;id&#34; not in data:
-            uniques = self.config._explode_unique(unique_id)
-            if uniques:
-                data[&#34;id&#34;] = uniques[&#34;id&#34;]
-            
-        # config._connections_add actually handles updates if ID exists correctly
-        self.config._connections_add(**data)
+
+        uniques = self.config._explode_unique(unique_id)
+        existing = self.config.getitem(unique_id, extract=False)
+        payload = self._build_update_payload(unique_id, data, existing, uniques)
+        self.config._connections_add(**payload)
         if save:
             self.config._saveconfig(self.config.file)
 
     def delete_node(self, unique_id, is_folder=False, save=True):
         &#34;&#34;&#34;Logic for deleting a node or folder.&#34;&#34;&#34;
+        if _supports_transactional_update(self.config) and save:
+            def _mut(cfg):
+                uniques = cfg._explode_unique_unlocked(unique_id)
+                if not uniques:
+                    label = &#34;Folder&#34; if is_folder else &#34;Node&#34;
+                    raise NodeNotFoundError(f&#34;{label} &#39;{unique_id}&#39; not found or invalid.&#34;)
+                if is_folder:
+                    cfg._folder_del_unlocked(**uniques)
+                else:
+                    cfg._connections_del_unlocked(**uniques)
+
+            self.config.transactional_update(_mut)
+            return
+
         if is_folder:
             uniques = self.config._explode_unique(unique_id)
             if not uniques:
@@ -2081,23 +2410,40 @@ el.replaceWith(d);
             if not uniques:
                 raise NodeNotFoundError(f&#34;Node &#39;{unique_id}&#39; not found or invalid.&#34;)
             self.config._connections_del(**uniques)
-            
+
         if save:
             self.config._saveconfig(self.config.file)
 
     def connect_node(self, unique_id, sftp=False, debug=False, logger=None):
         &#34;&#34;&#34;Interact with a node directly.&#34;&#34;&#34;
         from connpy.core import node
+
+        from ..auth_utils import resolve_fallback_entries
         from .profile_service import ProfileService
-        
+
         node_data = self.config.getitem(unique_id, extract=False)
         if not node_data:
             raise NodeNotFoundError(f&#34;Node &#39;{unique_id}&#39; not found.&#34;)
-            
-        # Resolve profiles
+
         profile_service = ProfileService(self.config)
         resolved_data = profile_service.resolve_node_data(node_data)
-            
+
+        node_params = inspect.signature(node.__init__).parameters
+        if &#34;fallback&#34; not in node_params and &#34;fallback&#34; in resolved_data:
+            raw_fb = resolved_data.pop(&#34;fallback&#34;, None)
+            if raw_fb not in (None, &#34;&#34;, []):
+                resolved_fb = resolve_fallback_entries(raw_fb, self.config.profiles)
+                if resolved_fb:
+                    tags_val = resolved_data.get(&#34;tags&#34;, &#34;&#34;)
+                    if isinstance(tags_val, dict):
+                        tags_copy = deepcopy(tags_val)
+                        tags_copy[&#34;_fallback&#34;] = resolved_fb
+                        resolved_data[&#34;tags&#34;] = tags_copy
+                    elif tags_val in (&#34;&#34;, None):
+                        resolved_data[&#34;tags&#34;] = {&#34;_fallback&#34;: resolved_fb}
+                    else:
+                        resolved_data[&#34;tags&#34;] = {&#34;_raw&#34;: tags_val, &#34;_fallback&#34;: resolved_fb}
+
         n = node(unique_id, **resolved_data, config=self.config)
         if sftp:
             n.protocol = &#34;sftp&#34;
@@ -2107,50 +2453,109 @@ el.replaceWith(d);
     def move_node(self, src_id, dst_id, copy=False):
         &#34;&#34;&#34;Move or copy a node.&#34;&#34;&#34;
         self._validate_node_name(dst_id)
-        
+
+        if _supports_transactional_update(self.config):
+            def _mut(cfg):
+                try:
+                    node_data = cfg.getitem_unlocked(src_id)
+                except (KeyError, TypeError):
+                    node_data = None
+                if not node_data:
+                    raise NodeNotFoundError(f&#34;Source node &#39;{src_id}&#39; not found.&#34;)
+                if dst_id in cfg._getallnodes_unlocked():
+                    raise NodeAlreadyExistsError(f&#34;Destination node &#39;{dst_id}&#39; already exists.&#34;)
+                new_uniques = cfg._explode_unique_unlocked(dst_id)
+                if not new_uniques:
+                    raise InvalidConfigurationError(f&#34;Invalid destination format &#39;{dst_id}&#39;.&#34;)
+                new_node_data = deepcopy(node_data)
+                new_node_data.update(new_uniques)
+                cfg._connections_add_unlocked(**new_node_data)
+                if not copy:
+                    src_uniques = cfg._explode_unique_unlocked(src_id)
+                    cfg._connections_del_unlocked(**src_uniques)
+
+            self.config.transactional_update(_mut)
+            return
+
         node_data = self.config.getitem(src_id)
         if not node_data:
             raise NodeNotFoundError(f&#34;Source node &#39;{src_id}&#39; not found.&#34;)
-            
+
         if dst_id in self.config._getallnodes():
             raise NodeAlreadyExistsError(f&#34;Destination node &#39;{dst_id}&#39; already exists.&#34;)
-            
+
         new_uniques = self.config._explode_unique(dst_id)
         if not new_uniques:
             raise InvalidConfigurationError(f&#34;Invalid destination format &#39;{dst_id}&#39;.&#34;)
-            
+
         new_node_data = node_data.copy()
         new_node_data.update(new_uniques)
-        
+
         self.config._connections_add(**new_node_data)
-        
+
         if not copy:
             src_uniques = self.config._explode_unique(src_id)
             self.config._connections_del(**src_uniques)
-            
+
         self.config._saveconfig(self.config.file)
 
     def bulk_add(self, ids, hosts, common_data):
         &#34;&#34;&#34;Add multiple nodes with shared common configuration.&#34;&#34;&#34;
+        self._validate_node_payload(common_data)
+
+        if _supports_transactional_update(self.config):
+            def _build_entries(cfg):
+                all_nodes = cfg._getallnodes_unlocked()
+                planned = []
+                for i, uid in enumerate(ids):
+                    if uid in all_nodes:
+                        continue
+                    try:
+                        self._validate_node_name(uid)
+                    except ReservedNameError:
+                        continue
+                    host = hosts[i] if i &lt; len(hosts) else hosts[0]
+                    uniques = cfg._explode_unique_unlocked(uid)
+                    if not uniques:
+                        continue
+                    node_data = deepcopy(common_data)
+                    node_data.pop(&#34;ids&#34;, None)
+                    node_data.pop(&#34;location&#34;, None)
+                    node_data.update(uniques)
+                    node_data[&#34;host&#34;] = host
+                    node_data[&#34;type&#34;] = &#34;connection&#34;
+                    planned.append(node_data)
+                return planned
+
+            with self.config._mutation_lock:
+                if not _build_entries(self.config):
+                    return 0
+
+            def _mut(cfg):
+                entries = _build_entries(cfg)
+                for node_data in entries:
+                    cfg._connections_add_unlocked(**node_data)
+                return len(entries)
+
+            return self.config.transactional_update(_mut)
+
         count = 0
         all_nodes = self.config._getallnodes()
-        
+
         for i, uid in enumerate(ids):
             if uid in all_nodes:
                 continue
-                
+
             try:
                 self._validate_node_name(uid)
             except ReservedNameError:
-                # For bulk, we might want to just skip or log. 
-                # CLI caller will handle if it wants to be strict.
                 continue
-                
+
             host = hosts[i] if i &lt; len(hosts) else hosts[0]
             uniques = self.config._explode_unique(uid)
             if not uniques:
                 continue
-                
+
             node_data = common_data.copy()
             node_data.pop(&#34;ids&#34;, None)
             node_data.pop(&#34;location&#34;, None)
@@ -2160,13 +2565,28 @@ el.replaceWith(d);
 
             self.config._connections_add(**node_data)
             count += 1
-            
+
         if count &gt; 0:
             self.config._saveconfig(self.config.file)
         return count
 
     def full_replace(self, connections, profiles):
         &#34;&#34;&#34;Replace all connections and profiles with new data.&#34;&#34;&#34;
+        from ..auth_utils import SanitizedAuthError
+
+        if _supports_transactional_update(self.config):
+            def _mut(cfg):
+                cfg.connections.clear()
+                cfg.connections.update(deepcopy(connections))
+                cfg.profiles.clear()
+                cfg.profiles.update(deepcopy(profiles))
+
+            try:
+                self.config.transactional_update(_mut)
+            except (ValueError, TypeError, SanitizedAuthError) as exc:
+                raise InvalidConfigurationError(str(exc)) from None
+            return
+
         self.config.connections = connections
         self.config.profiles = profiles
         self.config._saveconfig(self.config.file)
@@ -2204,37 +2624,69 @@ el.replaceWith(d);
     &#34;&#34;&#34;Logic for adding a new node or folder to configuration.&#34;&#34;&#34;
     if not is_folder:
         self._validate_node_name(unique_id)
-        
+        self._validate_node_payload(data)
+
+    if _supports_transactional_update(self.config):
+        def _mut(cfg):
+            all_nodes = cfg._getallnodes_unlocked()
+            all_folders = cfg._getallfolders_unlocked()
+            if is_folder:
+                if unique_id in all_folders:
+                    raise NodeAlreadyExistsError(f&#34;Folder &#39;{unique_id}&#39; already exists.&#34;)
+                uniques = cfg._explode_unique_unlocked(unique_id)
+                if not uniques:
+                    raise InvalidConfigurationError(f&#34;Invalid folder name &#39;{unique_id}&#39;.&#34;)
+                if &#34;subfolder&#34; in uniques:
+                    parent_folder = f&#34;@{uniques[&#39;folder&#39;]}&#34;
+                    if parent_folder not in all_folders:
+                        raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
+                cfg._folder_add_unlocked(**uniques)
+            else:
+                if unique_id in all_nodes:
+                    raise NodeAlreadyExistsError(f&#34;Node &#39;{unique_id}&#39; already exists.&#34;)
+                node_folder = unique_id.partition(&#34;@&#34;)[2]
+                if node_folder:
+                    parent_folder = f&#34;@{node_folder}&#34;
+                    if parent_folder not in all_folders:
+                        raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
+                payload = deepcopy(data)
+                if &#34;id&#34; not in payload:
+                    uniques = cfg._explode_unique_unlocked(unique_id)
+                    if uniques and &#34;id&#34; in uniques:
+                        payload[&#34;id&#34;] = uniques[&#34;id&#34;]
+                cfg._connections_add_unlocked(**payload)
+
+        self.config.transactional_update(_mut)
+        return
+
     all_nodes = self.config._getallnodes()
     all_folders = self.config._getallfolders()
-    
+
     if is_folder:
         if unique_id in all_folders:
             raise NodeAlreadyExistsError(f&#34;Folder &#39;{unique_id}&#39; already exists.&#34;)
         uniques = self.config._explode_unique(unique_id)
         if not uniques:
             raise InvalidConfigurationError(f&#34;Invalid folder name &#39;{unique_id}&#39;.&#34;)
-        
-        # Check if parent folder exists when creating a subfolder
+
         if &#34;subfolder&#34; in uniques:
             self.validate_parent_folder(unique_id, is_folder=True)
-                
+
         self.config._folder_add(**uniques)
         self.config._saveconfig(self.config.file)
     else:
         if unique_id in all_nodes:
             raise NodeAlreadyExistsError(f&#34;Node &#39;{unique_id}&#39; already exists.&#34;)
-            
-        # Check if parent folder exists when creating a node in a folder
+
         self.validate_parent_folder(unique_id)
-                
-        # Ensure &#39;id&#39; is in data for config._connections_add
-        if &#34;id&#34; not in data:
+
+        payload = deepcopy(data)
+        if &#34;id&#34; not in payload:
             uniques = self.config._explode_unique(unique_id)
             if uniques and &#34;id&#34; in uniques:
-                data[&#34;id&#34;] = uniques[&#34;id&#34;]
-        
-        self.config._connections_add(**data)
+                payload[&#34;id&#34;] = uniques[&#34;id&#34;]
+
+        self.config._connections_add(**payload)
         self.config._saveconfig(self.config.file)</code></pre>
 </details>
 <div class="desc"><p>Logic for adding a new node or folder to configuration.</p></div>
@@ -2249,25 +2701,61 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def bulk_add(self, ids, hosts, common_data):
     &#34;&#34;&#34;Add multiple nodes with shared common configuration.&#34;&#34;&#34;
+    self._validate_node_payload(common_data)
+
+    if _supports_transactional_update(self.config):
+        def _build_entries(cfg):
+            all_nodes = cfg._getallnodes_unlocked()
+            planned = []
+            for i, uid in enumerate(ids):
+                if uid in all_nodes:
+                    continue
+                try:
+                    self._validate_node_name(uid)
+                except ReservedNameError:
+                    continue
+                host = hosts[i] if i &lt; len(hosts) else hosts[0]
+                uniques = cfg._explode_unique_unlocked(uid)
+                if not uniques:
+                    continue
+                node_data = deepcopy(common_data)
+                node_data.pop(&#34;ids&#34;, None)
+                node_data.pop(&#34;location&#34;, None)
+                node_data.update(uniques)
+                node_data[&#34;host&#34;] = host
+                node_data[&#34;type&#34;] = &#34;connection&#34;
+                planned.append(node_data)
+            return planned
+
+        with self.config._mutation_lock:
+            if not _build_entries(self.config):
+                return 0
+
+        def _mut(cfg):
+            entries = _build_entries(cfg)
+            for node_data in entries:
+                cfg._connections_add_unlocked(**node_data)
+            return len(entries)
+
+        return self.config.transactional_update(_mut)
+
     count = 0
     all_nodes = self.config._getallnodes()
-    
+
     for i, uid in enumerate(ids):
         if uid in all_nodes:
             continue
-            
+
         try:
             self._validate_node_name(uid)
         except ReservedNameError:
-            # For bulk, we might want to just skip or log. 
-            # CLI caller will handle if it wants to be strict.
             continue
-            
+
         host = hosts[i] if i &lt; len(hosts) else hosts[0]
         uniques = self.config._explode_unique(uid)
         if not uniques:
             continue
-            
+
         node_data = common_data.copy()
         node_data.pop(&#34;ids&#34;, None)
         node_data.pop(&#34;location&#34;, None)
@@ -2277,7 +2765,7 @@ el.replaceWith(d);
 
         self.config._connections_add(**node_data)
         count += 1
-        
+
     if count &gt; 0:
         self.config._saveconfig(self.config.file)
     return count</code></pre>
@@ -2295,16 +2783,33 @@ el.replaceWith(d);
 <pre><code class="python">def connect_node(self, unique_id, sftp=False, debug=False, logger=None):
     &#34;&#34;&#34;Interact with a node directly.&#34;&#34;&#34;
     from connpy.core import node
+
+    from ..auth_utils import resolve_fallback_entries
     from .profile_service import ProfileService
-    
+
     node_data = self.config.getitem(unique_id, extract=False)
     if not node_data:
         raise NodeNotFoundError(f&#34;Node &#39;{unique_id}&#39; not found.&#34;)
-        
-    # Resolve profiles
+
     profile_service = ProfileService(self.config)
     resolved_data = profile_service.resolve_node_data(node_data)
-        
+
+    node_params = inspect.signature(node.__init__).parameters
+    if &#34;fallback&#34; not in node_params and &#34;fallback&#34; in resolved_data:
+        raw_fb = resolved_data.pop(&#34;fallback&#34;, None)
+        if raw_fb not in (None, &#34;&#34;, []):
+            resolved_fb = resolve_fallback_entries(raw_fb, self.config.profiles)
+            if resolved_fb:
+                tags_val = resolved_data.get(&#34;tags&#34;, &#34;&#34;)
+                if isinstance(tags_val, dict):
+                    tags_copy = deepcopy(tags_val)
+                    tags_copy[&#34;_fallback&#34;] = resolved_fb
+                    resolved_data[&#34;tags&#34;] = tags_copy
+                elif tags_val in (&#34;&#34;, None):
+                    resolved_data[&#34;tags&#34;] = {&#34;_fallback&#34;: resolved_fb}
+                else:
+                    resolved_data[&#34;tags&#34;] = {&#34;_raw&#34;: tags_val, &#34;_fallback&#34;: resolved_fb}
+
     n = node(unique_id, **resolved_data, config=self.config)
     if sftp:
         n.protocol = &#34;sftp&#34;
@@ -2323,6 +2828,20 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def delete_node(self, unique_id, is_folder=False, save=True):
     &#34;&#34;&#34;Logic for deleting a node or folder.&#34;&#34;&#34;
+    if _supports_transactional_update(self.config) and save:
+        def _mut(cfg):
+            uniques = cfg._explode_unique_unlocked(unique_id)
+            if not uniques:
+                label = &#34;Folder&#34; if is_folder else &#34;Node&#34;
+                raise NodeNotFoundError(f&#34;{label} &#39;{unique_id}&#39; not found or invalid.&#34;)
+            if is_folder:
+                cfg._folder_del_unlocked(**uniques)
+            else:
+                cfg._connections_del_unlocked(**uniques)
+
+        self.config.transactional_update(_mut)
+        return
+
     if is_folder:
         uniques = self.config._explode_unique(unique_id)
         if not uniques:
@@ -2333,7 +2852,7 @@ el.replaceWith(d);
         if not uniques:
             raise NodeNotFoundError(f&#34;Node &#39;{unique_id}&#39; not found or invalid.&#34;)
         self.config._connections_del(**uniques)
-        
+
     if save:
         self.config._saveconfig(self.config.file)</code></pre>
 </details>
@@ -2363,6 +2882,21 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def full_replace(self, connections, profiles):
     &#34;&#34;&#34;Replace all connections and profiles with new data.&#34;&#34;&#34;
+    from ..auth_utils import SanitizedAuthError
+
+    if _supports_transactional_update(self.config):
+        def _mut(cfg):
+            cfg.connections.clear()
+            cfg.connections.update(deepcopy(connections))
+            cfg.profiles.clear()
+            cfg.profiles.update(deepcopy(profiles))
+
+        try:
+            self.config.transactional_update(_mut)
+        except (ValueError, TypeError, SanitizedAuthError) as exc:
+            raise InvalidConfigurationError(str(exc)) from None
+        return
+
     self.config.connections = connections
     self.config.profiles = profiles
     self.config._saveconfig(self.config.file)</code></pre>
@@ -2416,7 +2950,7 @@ el.replaceWith(d);
             raise NodeNotFoundError(f&#34;Node &#39;{unique_id}&#39; not found.&#34;)
         return details
     except (KeyError, TypeError):
-        raise NodeNotFoundError(f&#34;Node &#39;{unique_id}&#39; not found.&#34;)</code></pre>
+        raise NodeNotFoundError(f&#34;Node &#39;{unique_id}&#39; not found.&#34;) from None</code></pre>
 </details>
 <div class="desc"><p>Return full configuration dictionary for a specific node.</p></div>
 </dd>
@@ -2518,27 +3052,50 @@ el.replaceWith(d);
 <pre><code class="python">def move_node(self, src_id, dst_id, copy=False):
     &#34;&#34;&#34;Move or copy a node.&#34;&#34;&#34;
     self._validate_node_name(dst_id)
-    
+
+    if _supports_transactional_update(self.config):
+        def _mut(cfg):
+            try:
+                node_data = cfg.getitem_unlocked(src_id)
+            except (KeyError, TypeError):
+                node_data = None
+            if not node_data:
+                raise NodeNotFoundError(f&#34;Source node &#39;{src_id}&#39; not found.&#34;)
+            if dst_id in cfg._getallnodes_unlocked():
+                raise NodeAlreadyExistsError(f&#34;Destination node &#39;{dst_id}&#39; already exists.&#34;)
+            new_uniques = cfg._explode_unique_unlocked(dst_id)
+            if not new_uniques:
+                raise InvalidConfigurationError(f&#34;Invalid destination format &#39;{dst_id}&#39;.&#34;)
+            new_node_data = deepcopy(node_data)
+            new_node_data.update(new_uniques)
+            cfg._connections_add_unlocked(**new_node_data)
+            if not copy:
+                src_uniques = cfg._explode_unique_unlocked(src_id)
+                cfg._connections_del_unlocked(**src_uniques)
+
+        self.config.transactional_update(_mut)
+        return
+
     node_data = self.config.getitem(src_id)
     if not node_data:
         raise NodeNotFoundError(f&#34;Source node &#39;{src_id}&#39; not found.&#34;)
-        
+
     if dst_id in self.config._getallnodes():
         raise NodeAlreadyExistsError(f&#34;Destination node &#39;{dst_id}&#39; already exists.&#34;)
-        
+
     new_uniques = self.config._explode_unique(dst_id)
     if not new_uniques:
         raise InvalidConfigurationError(f&#34;Invalid destination format &#39;{dst_id}&#39;.&#34;)
-        
+
     new_node_data = node_data.copy()
     new_node_data.update(new_uniques)
-    
+
     self.config._connections_add(**new_node_data)
-    
+
     if not copy:
         src_uniques = self.config._explode_unique(src_id)
         self.config._connections_del(**src_uniques)
-        
+
     self.config._saveconfig(self.config.file)</code></pre>
 </details>
 <div class="desc"><p>Move or copy a node.</p></div>
@@ -2553,18 +3110,27 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def update_node(self, unique_id, data, save=True):
     &#34;&#34;&#34;Explicitly update an existing node.&#34;&#34;&#34;
+    if _supports_transactional_update(self.config) and save:
+        def _mut(cfg):
+            all_nodes = cfg._getallnodes_unlocked()
+            if unique_id not in all_nodes:
+                raise NodeNotFoundError(f&#34;Node &#39;{unique_id}&#39; not found.&#34;)
+            uniques = cfg._explode_unique_unlocked(unique_id)
+            existing = cfg.getitem_unlocked(unique_id, extract=False)
+            payload = self._build_update_payload(unique_id, data, existing, uniques)
+            cfg._connections_add_unlocked(**payload)
+
+        self.config.transactional_update(_mut)
+        return
+
     all_nodes = self.config._getallnodes()
     if unique_id not in all_nodes:
         raise NodeNotFoundError(f&#34;Node &#39;{unique_id}&#39; not found.&#34;)
-        
-    # Ensure &#39;id&#39; is in data for config._connections_add
-    if &#34;id&#34; not in data:
-        uniques = self.config._explode_unique(unique_id)
-        if uniques:
-            data[&#34;id&#34;] = uniques[&#34;id&#34;]
-        
-    # config._connections_add actually handles updates if ID exists correctly
-    self.config._connections_add(**data)
+
+    uniques = self.config._explode_unique(unique_id)
+    existing = self.config.getitem(unique_id, extract=False)
+    payload = self._build_update_payload(unique_id, data, existing, uniques)
+    self.config._connections_add(**payload)
     if save:
         self.config._saveconfig(self.config.file)</code></pre>
 </details>
@@ -3418,61 +3984,194 @@ el.replaceWith(d);
 <pre><code class="python">class ProfileService(BaseService):
     &#34;&#34;&#34;Business logic for node profiles management.&#34;&#34;&#34;
 
+    _ALLOWED_KEYS: ClassVar[frozenset[str]] = frozenset({
+        &#34;host&#34;,
+        &#34;options&#34;,
+        &#34;logs&#34;,
+        &#34;password&#34;,
+        &#34;port&#34;,
+        &#34;protocol&#34;,
+        &#34;user&#34;,
+        &#34;tags&#34;,
+        &#34;jumphost&#34;,
+        &#34;fallback&#34;,
+    })
+
+    @staticmethod
+    def _validate_profile_payload(data):
+        from ..auth_utils import (
+            SanitizedAuthError,
+            is_compose_expression,
+            validate_auth_budget_tags,
+            validate_compose_syntax,
+            validate_fallback_entries,
+        )
+
+        try:
+            if &#34;tags&#34; in data and data[&#34;tags&#34;] not in (&#34;&#34;, None):
+                validate_auth_budget_tags(data[&#34;tags&#34;])
+            if &#34;fallback&#34; in data and data[&#34;fallback&#34;] not in (None, &#34;&#34;, []):
+                validate_fallback_entries(data[&#34;fallback&#34;])
+            pw = data.get(&#34;password&#34;)
+            if is_compose_expression(pw):
+                validate_compose_syntax(pw)
+            elif isinstance(pw, (list, tuple)):
+                for item in pw:
+                    if is_compose_expression(item):
+                        validate_compose_syntax(item)
+        except (ValueError, TypeError, SanitizedAuthError) as exc:
+            raise InvalidConfigurationError(str(exc)) from None
+
+    def _get_profiles_snapshot(self):
+        lock = getattr(self.config, &#34;_mutation_lock&#34;, None)
+        if lock is not None and not hasattr(self.config, &#34;assert_called&#34;):
+            with lock:
+                return deepcopy(self.config.profiles)
+        return deepcopy(self.config.profiles)
+
     def list_profiles(self, filter_str=None):
         &#34;&#34;&#34;List all profile names, optionally filtered.&#34;&#34;&#34;
-        profiles = list(self.config.profiles.keys())
+        profiles = list(self._get_profiles_snapshot().keys())
         case_sensitive = self.config.config.get(&#34;case&#34;, False)
-        
+
         if filter_str:
             if not case_sensitive:
                 f_str = filter_str.lower()
                 return [p for p in profiles if f_str in p.lower()]
-            else:
-                return [p for p in profiles if filter_str in p]
+            return [p for p in profiles if filter_str in p]
         return profiles
 
-    def get_profile(self, name, resolve=True):
+    def get_profile(self, name, resolve=True, *, _visited=frozenset(), _depth=0):
         &#34;&#34;&#34;Get the profile dictionary, optionally resolved.&#34;&#34;&#34;
-        profile = self.config.profiles.get(name)
+        if _depth &gt;= MAX_PROFILE_DEPTH or name in _visited:
+            raise InvalidConfigurationError(
+                f&#34;Circular or overly deep profile reference involving &#39;{name}&#39;.&#34;
+            )
+        profiles = self._get_profiles_snapshot()
+        profile = profiles.get(name)
         if not profile:
             raise ProfileNotFoundError(f&#34;Profile &#39;{name}&#39; not found.&#34;)
-        
+
         if resolve:
-            return self.resolve_node_data(profile)
+            return self.resolve_node_data(
+                profile,
+                _visited=_visited | {name},
+                _depth=_depth + 1,
+                _profiles_snapshot=profiles,
+            )
         return profile
 
     def add_profile(self, name, data):
         &#34;&#34;&#34;Add a new profile.&#34;&#34;&#34;
+        filtered_data = {k: deepcopy(v) for k, v in data.items() if k in self._ALLOWED_KEYS}
+        self._validate_profile_payload(filtered_data)
+
+        if _supports_transactional_update(self.config):
+            def _mut(cfg):
+                if name in cfg.profiles:
+                    raise ProfileAlreadyExistsError(f&#34;Profile &#39;{name}&#39; already exists.&#34;)
+                cfg._profiles_add_unlocked(id=name, **filtered_data)
+
+            self.config.transactional_update(_mut)
+            return
+
         if name in self.config.profiles:
             raise ProfileAlreadyExistsError(f&#34;Profile &#39;{name}&#39; already exists.&#34;)
-            
-        # Filter data to match _profiles_add signature and ensure id is passed
-        allowed_keys = {&#34;host&#34;, &#34;options&#34;, &#34;logs&#34;, &#34;password&#34;, &#34;port&#34;, &#34;protocol&#34;, &#34;user&#34;, &#34;tags&#34;, &#34;jumphost&#34;}
-        filtered_data = {k: v for k, v in data.items() if k in allowed_keys}
-        
         self.config._profiles_add(id=name, **filtered_data)
         self.config._saveconfig(self.config.file)
 
-    def resolve_node_data(self, node_data):
-        &#34;&#34;&#34;Resolve profile references (@profile) in node data and handle inheritance.&#34;&#34;&#34;
-        resolved = node_data.copy()
-        
-        # 1. Identify all referenced profiles to support inheritance
-        referenced_profiles = []
-        for value in resolved.values():
-            if isinstance(value, str) and value.startswith(&#34;@&#34;):
-                referenced_profiles.append(value[1:])
-            elif isinstance(value, list):
-                for item in value:
-                    if isinstance(item, str) and item.startswith(&#34;@&#34;):
-                        referenced_profiles.append(item[1:])
-        
-        # 2. Resolve explicit references
+    def resolve_node_data(
+        self,
+        node_data,
+        *,
+        _visited=frozenset(),
+        _depth=0,
+        _profiles_snapshot=None,
+    ):
+        &#34;&#34;&#34;Resolve profile references (@profile) in node data while preserving compose and scalar secrets.&#34;&#34;&#34;
+        from ..auth_utils import is_compose_expression
+
+        if _depth &gt; MAX_PROFILE_DEPTH:
+            raise InvalidConfigurationError(&#34;Profile inheritance exceeds maximum depth.&#34;)
+
+        profiles = (
+            _profiles_snapshot
+            if _profiles_snapshot is not None
+            else self._get_profiles_snapshot()
+        )
+        resolved = deepcopy(node_data)
+
+        auth_referenced_profiles = []
+        other_referenced_profiles = []
         for key, value in resolved.items():
+            if key == &#34;fallback&#34;:
+                continue
+            target_refs = (
+                auth_referenced_profiles if key in (&#34;user&#34;, &#34;password&#34;) else other_referenced_profiles
+            )
+            if isinstance(value, str):
+                if not is_compose_expression(value) and value.startswith(&#34;@&#34;):
+                    ref = value[1:]
+                    if key != &#34;password&#34; or ref in profiles:
+                        target_refs.append(ref)
+            elif isinstance(value, (list, tuple)):
+                for item in value:
+                    if (
+                        isinstance(item, str)
+                        and not is_compose_expression(item)
+                        and item.startswith(&#34;@&#34;)
+                    ):
+                        ref = item[1:]
+                        if key != &#34;password&#34; or ref in profiles:
+                            target_refs.append(ref)
+
+        def _get_resolved_ref(prof_name):
+            if prof_name in _visited or _depth &gt;= MAX_PROFILE_DEPTH:
+                raise InvalidConfigurationError(
+                    f&#34;Circular or overly deep profile reference involving &#39;{prof_name}&#39;.&#34;
+                )
+            prof_raw = profiles.get(prof_name)
+            if not prof_raw:
+                raise ProfileNotFoundError(f&#34;Profile &#39;{prof_name}&#39; not found.&#34;)
+            return self.resolve_node_data(
+                prof_raw,
+                _visited=_visited | {prof_name},
+                _depth=_depth + 1,
+                _profiles_snapshot=profiles,
+            )
+
+        for key, value in list(resolved.items()):
+            if key == &#34;fallback&#34;:
+                continue
+            if key == &#34;password&#34;:
+                if isinstance(value, str):
+                    if is_compose_expression(value):
+                        continue
+                    if value.startswith(&#34;@&#34;) and value[1:] in profiles:
+                        prof_obj = _get_resolved_ref(value[1:])
+                        resolved[&#34;password&#34;] = prof_obj.get(&#34;password&#34;, &#34;&#34;)
+                elif isinstance(value, list):
+                    resolved_list = []
+                    for item in value:
+                        if (
+                            isinstance(item, str)
+                            and not is_compose_expression(item)
+                            and item.startswith(&#34;@&#34;)
+                            and item[1:] in profiles
+                        ):
+                            with suppress(ProfileNotFoundError):
+                                prof_obj = _get_resolved_ref(item[1:])
+                                if &#34;password&#34; in prof_obj:
+                                    resolved_list.append(prof_obj[&#34;password&#34;])
+                        else:
+                            resolved_list.append(item)
+                    resolved[&#34;password&#34;] = resolved_list
+                continue
+
             if isinstance(value, str) and value.startswith(&#34;@&#34;):
                 profile_name = value[1:]
                 try:
-                    profile = self.get_profile(profile_name, resolve=True)
+                    profile = _get_resolved_ref(profile_name)
                     resolved[key] = profile.get(key, &#34;&#34;)
                 except ProfileNotFoundError:
                     resolved[key] = &#34;&#34;
@@ -3481,68 +4180,87 @@ el.replaceWith(d);
                 for item in value:
                     if isinstance(item, str) and item.startswith(&#34;@&#34;):
                         profile_name = item[1:]
-                        try:
-                            profile = self.get_profile(profile_name, resolve=True)
+                        with suppress(ProfileNotFoundError):
+                            profile = _get_resolved_ref(profile_name)
                             if &#34;password&#34; in profile:
                                 resolved_list.append(profile[&#34;password&#34;])
-                        except ProfileNotFoundError:
-                            pass
                     else:
                         resolved_list.append(item)
                 resolved[key] = resolved_list
-        
-        # 3. Inheritance: Fill empty keys from the first referenced profile
-        if referenced_profiles:
-            base_profile_name = referenced_profiles[0]
-            try:
-                base_profile = self.get_profile(base_profile_name, resolve=True)
-                for key, value in base_profile.items():
-                    # Fill if key is missing or empty
-                    if key not in resolved or resolved[key] == &#34;&#34; or resolved[key] == [] or resolved[key] is None:
-                        resolved[key] = value
-            except ProfileNotFoundError:
-                pass
 
-        # 4. Handle default protocol
-        if resolved.get(&#34;protocol&#34;) == &#34;&#34; or resolved.get(&#34;protocol&#34;) is None:
+        ordered_profiles = list(dict.fromkeys(auth_referenced_profiles + other_referenced_profiles))
+        for base_profile_name in ordered_profiles:
+            with suppress(ProfileNotFoundError):
+                base_profile = _get_resolved_ref(base_profile_name)
+                for key, value in base_profile.items():
+                    if (key not in resolved or resolved[key] in (&#34;&#34;, [], None)) and (
+                        value not in (&#34;&#34;, [], None) or key not in resolved
+                    ):
+                        resolved[key] = deepcopy(value)
+
+        if resolved.get(&#34;protocol&#34;) in (&#34;&#34;, None):
             try:
-                default_profile = self.get_profile(&#34;default&#34;, resolve=True)
-                resolved[&#34;protocol&#34;] = default_profile.get(&#34;protocol&#34;, &#34;ssh&#34;)
+                default_profile = _get_resolved_ref(&#34;default&#34;)
+                resolved[&#34;protocol&#34;] = default_profile.get(&#34;protocol&#34;, &#34;ssh&#34;) or &#34;ssh&#34;
             except ProfileNotFoundError:
                 resolved[&#34;protocol&#34;] = &#34;ssh&#34;
-                
+
         return resolved
 
     def delete_profile(self, name):
         &#34;&#34;&#34;Delete an existing profile, with safety checks.&#34;&#34;&#34;
+        if _supports_transactional_update(self.config):
+            def _mut(cfg):
+                if name not in cfg.profiles:
+                    raise ProfileNotFoundError(f&#34;Profile &#39;{name}&#39; not found.&#34;)
+                if name == &#34;default&#34;:
+                    raise InvalidConfigurationError(&#34;Cannot delete the &#39;default&#39; profile.&#34;)
+                used_by = cfg._profileused_unlocked(name)
+                if used_by:
+                    raise InvalidConfigurationError(
+                        f&#34;Profile &#39;{name}&#39; is used by nodes: {&#39;, &#39;.join(used_by)}&#34;
+                    )
+                cfg._profiles_del_unlocked(id=name)
+
+            self.config.transactional_update(_mut)
+            return
+
         if name not in self.config.profiles:
             raise ProfileNotFoundError(f&#34;Profile &#39;{name}&#39; not found.&#34;)
-            
         if name == &#34;default&#34;:
             raise InvalidConfigurationError(&#34;Cannot delete the &#39;default&#39; profile.&#34;)
-            
         used_by = self.config._profileused(name)
         if used_by:
-            # We return the list of nodes using it so the UI can inform the user
-            raise InvalidConfigurationError(f&#34;Profile &#39;{name}&#39; is used by nodes: {&#39;, &#39;.join(used_by)}&#34;)
-            
+            raise InvalidConfigurationError(
+                f&#34;Profile &#39;{name}&#39; is used by nodes: {&#39;, &#39;.join(used_by)}&#34;
+            )
         self.config._profiles_del(id=name)
         self.config._saveconfig(self.config.file)
 
     def update_profile(self, name, data):
         &#34;&#34;&#34;Update an existing profile.&#34;&#34;&#34;
+        if _supports_transactional_update(self.config):
+            def _mut(cfg):
+                if name not in cfg.profiles:
+                    raise ProfileNotFoundError(f&#34;Profile &#39;{name}&#39; not found.&#34;)
+                updated_data = deepcopy(cfg.profiles[name])
+                updated_data.update(deepcopy(data))
+                filtered_data = {
+                    k: v for k, v in updated_data.items() if k in self._ALLOWED_KEYS
+                }
+                self._validate_profile_payload(filtered_data)
+                cfg._profiles_add_unlocked(id=name, **filtered_data)
+
+            self.config.transactional_update(_mut)
+            return
+
         if name not in self.config.profiles:
             raise ProfileNotFoundError(f&#34;Profile &#39;{name}&#39; not found.&#34;)
-            
-        # Merge with existing data
         existing = self.get_profile(name, resolve=False)
-        updated_data = existing.copy()
+        updated_data = deepcopy(existing)
         updated_data.update(data)
-        
-        # Filter data to match _profiles_add signature
-        allowed_keys = {&#34;host&#34;, &#34;options&#34;, &#34;logs&#34;, &#34;password&#34;, &#34;port&#34;, &#34;protocol&#34;, &#34;user&#34;, &#34;tags&#34;, &#34;jumphost&#34;}
-        filtered_data = {k: v for k, v in updated_data.items() if k in allowed_keys}
-        
+        filtered_data = {k: v for k, v in updated_data.items() if k in self._ALLOWED_KEYS}
+        self._validate_profile_payload(filtered_data)
         self.config._profiles_add(id=name, **filtered_data)
         self.config._saveconfig(self.config.file)</code></pre>
 </details>
@@ -3570,13 +4288,20 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def add_profile(self, name, data):
     &#34;&#34;&#34;Add a new profile.&#34;&#34;&#34;
+    filtered_data = {k: deepcopy(v) for k, v in data.items() if k in self._ALLOWED_KEYS}
+    self._validate_profile_payload(filtered_data)
+
+    if _supports_transactional_update(self.config):
+        def _mut(cfg):
+            if name in cfg.profiles:
+                raise ProfileAlreadyExistsError(f&#34;Profile &#39;{name}&#39; already exists.&#34;)
+            cfg._profiles_add_unlocked(id=name, **filtered_data)
+
+        self.config.transactional_update(_mut)
+        return
+
     if name in self.config.profiles:
         raise ProfileAlreadyExistsError(f&#34;Profile &#39;{name}&#39; already exists.&#34;)
-        
-    # Filter data to match _profiles_add signature and ensure id is passed
-    allowed_keys = {&#34;host&#34;, &#34;options&#34;, &#34;logs&#34;, &#34;password&#34;, &#34;port&#34;, &#34;protocol&#34;, &#34;user&#34;, &#34;tags&#34;, &#34;jumphost&#34;}
-    filtered_data = {k: v for k, v in data.items() if k in allowed_keys}
-    
     self.config._profiles_add(id=name, **filtered_data)
     self.config._saveconfig(self.config.file)</code></pre>
 </details>
@@ -3592,17 +4317,31 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def delete_profile(self, name):
     &#34;&#34;&#34;Delete an existing profile, with safety checks.&#34;&#34;&#34;
+    if _supports_transactional_update(self.config):
+        def _mut(cfg):
+            if name not in cfg.profiles:
+                raise ProfileNotFoundError(f&#34;Profile &#39;{name}&#39; not found.&#34;)
+            if name == &#34;default&#34;:
+                raise InvalidConfigurationError(&#34;Cannot delete the &#39;default&#39; profile.&#34;)
+            used_by = cfg._profileused_unlocked(name)
+            if used_by:
+                raise InvalidConfigurationError(
+                    f&#34;Profile &#39;{name}&#39; is used by nodes: {&#39;, &#39;.join(used_by)}&#34;
+                )
+            cfg._profiles_del_unlocked(id=name)
+
+        self.config.transactional_update(_mut)
+        return
+
     if name not in self.config.profiles:
         raise ProfileNotFoundError(f&#34;Profile &#39;{name}&#39; not found.&#34;)
-        
     if name == &#34;default&#34;:
         raise InvalidConfigurationError(&#34;Cannot delete the &#39;default&#39; profile.&#34;)
-        
     used_by = self.config._profileused(name)
     if used_by:
-        # We return the list of nodes using it so the UI can inform the user
-        raise InvalidConfigurationError(f&#34;Profile &#39;{name}&#39; is used by nodes: {&#39;, &#39;.join(used_by)}&#34;)
-        
+        raise InvalidConfigurationError(
+            f&#34;Profile &#39;{name}&#39; is used by nodes: {&#39;, &#39;.join(used_by)}&#34;
+        )
     self.config._profiles_del(id=name)
     self.config._saveconfig(self.config.file)</code></pre>
 </details>
@@ -3616,14 +4355,24 @@ el.replaceWith(d);
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_profile(self, name, resolve=True):
+<pre><code class="python">def get_profile(self, name, resolve=True, *, _visited=frozenset(), _depth=0):
     &#34;&#34;&#34;Get the profile dictionary, optionally resolved.&#34;&#34;&#34;
-    profile = self.config.profiles.get(name)
+    if _depth &gt;= MAX_PROFILE_DEPTH or name in _visited:
+        raise InvalidConfigurationError(
+            f&#34;Circular or overly deep profile reference involving &#39;{name}&#39;.&#34;
+        )
+    profiles = self._get_profiles_snapshot()
+    profile = profiles.get(name)
     if not profile:
         raise ProfileNotFoundError(f&#34;Profile &#39;{name}&#39; not found.&#34;)
-    
+
     if resolve:
-        return self.resolve_node_data(profile)
+        return self.resolve_node_data(
+            profile,
+            _visited=_visited | {name},
+            _depth=_depth + 1,
+            _profiles_snapshot=profiles,
+        )
     return profile</code></pre>
 </details>
 <div class="desc"><p>Get the profile dictionary, optionally resolved.</p></div>
@@ -3638,15 +4387,14 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def list_profiles(self, filter_str=None):
     &#34;&#34;&#34;List all profile names, optionally filtered.&#34;&#34;&#34;
-    profiles = list(self.config.profiles.keys())
+    profiles = list(self._get_profiles_snapshot().keys())
     case_sensitive = self.config.config.get(&#34;case&#34;, False)
-    
+
     if filter_str:
         if not case_sensitive:
             f_str = filter_str.lower()
             return [p for p in profiles if f_str in p.lower()]
-        else:
-            return [p for p in profiles if filter_str in p]
+        return [p for p in profiles if filter_str in p]
     return profiles</code></pre>
 </details>
 <div class="desc"><p>List all profile names, optionally filtered.</p></div>
@@ -3659,26 +4407,98 @@ el.replaceWith(d);
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def resolve_node_data(self, node_data):
-    &#34;&#34;&#34;Resolve profile references (@profile) in node data and handle inheritance.&#34;&#34;&#34;
-    resolved = node_data.copy()
-    
-    # 1. Identify all referenced profiles to support inheritance
-    referenced_profiles = []
-    for value in resolved.values():
-        if isinstance(value, str) and value.startswith(&#34;@&#34;):
-            referenced_profiles.append(value[1:])
-        elif isinstance(value, list):
-            for item in value:
-                if isinstance(item, str) and item.startswith(&#34;@&#34;):
-                    referenced_profiles.append(item[1:])
-    
-    # 2. Resolve explicit references
+<pre><code class="python">def resolve_node_data(
+    self,
+    node_data,
+    *,
+    _visited=frozenset(),
+    _depth=0,
+    _profiles_snapshot=None,
+):
+    &#34;&#34;&#34;Resolve profile references (@profile) in node data while preserving compose and scalar secrets.&#34;&#34;&#34;
+    from ..auth_utils import is_compose_expression
+
+    if _depth &gt; MAX_PROFILE_DEPTH:
+        raise InvalidConfigurationError(&#34;Profile inheritance exceeds maximum depth.&#34;)
+
+    profiles = (
+        _profiles_snapshot
+        if _profiles_snapshot is not None
+        else self._get_profiles_snapshot()
+    )
+    resolved = deepcopy(node_data)
+
+    auth_referenced_profiles = []
+    other_referenced_profiles = []
     for key, value in resolved.items():
+        if key == &#34;fallback&#34;:
+            continue
+        target_refs = (
+            auth_referenced_profiles if key in (&#34;user&#34;, &#34;password&#34;) else other_referenced_profiles
+        )
+        if isinstance(value, str):
+            if not is_compose_expression(value) and value.startswith(&#34;@&#34;):
+                ref = value[1:]
+                if key != &#34;password&#34; or ref in profiles:
+                    target_refs.append(ref)
+        elif isinstance(value, (list, tuple)):
+            for item in value:
+                if (
+                    isinstance(item, str)
+                    and not is_compose_expression(item)
+                    and item.startswith(&#34;@&#34;)
+                ):
+                    ref = item[1:]
+                    if key != &#34;password&#34; or ref in profiles:
+                        target_refs.append(ref)
+
+    def _get_resolved_ref(prof_name):
+        if prof_name in _visited or _depth &gt;= MAX_PROFILE_DEPTH:
+            raise InvalidConfigurationError(
+                f&#34;Circular or overly deep profile reference involving &#39;{prof_name}&#39;.&#34;
+            )
+        prof_raw = profiles.get(prof_name)
+        if not prof_raw:
+            raise ProfileNotFoundError(f&#34;Profile &#39;{prof_name}&#39; not found.&#34;)
+        return self.resolve_node_data(
+            prof_raw,
+            _visited=_visited | {prof_name},
+            _depth=_depth + 1,
+            _profiles_snapshot=profiles,
+        )
+
+    for key, value in list(resolved.items()):
+        if key == &#34;fallback&#34;:
+            continue
+        if key == &#34;password&#34;:
+            if isinstance(value, str):
+                if is_compose_expression(value):
+                    continue
+                if value.startswith(&#34;@&#34;) and value[1:] in profiles:
+                    prof_obj = _get_resolved_ref(value[1:])
+                    resolved[&#34;password&#34;] = prof_obj.get(&#34;password&#34;, &#34;&#34;)
+            elif isinstance(value, list):
+                resolved_list = []
+                for item in value:
+                    if (
+                        isinstance(item, str)
+                        and not is_compose_expression(item)
+                        and item.startswith(&#34;@&#34;)
+                        and item[1:] in profiles
+                    ):
+                        with suppress(ProfileNotFoundError):
+                            prof_obj = _get_resolved_ref(item[1:])
+                            if &#34;password&#34; in prof_obj:
+                                resolved_list.append(prof_obj[&#34;password&#34;])
+                    else:
+                        resolved_list.append(item)
+                resolved[&#34;password&#34;] = resolved_list
+            continue
+
         if isinstance(value, str) and value.startswith(&#34;@&#34;):
             profile_name = value[1:]
             try:
-                profile = self.get_profile(profile_name, resolve=True)
+                profile = _get_resolved_ref(profile_name)
                 resolved[key] = profile.get(key, &#34;&#34;)
             except ProfileNotFoundError:
                 resolved[key] = &#34;&#34;
@@ -3687,39 +4507,34 @@ el.replaceWith(d);
             for item in value:
                 if isinstance(item, str) and item.startswith(&#34;@&#34;):
                     profile_name = item[1:]
-                    try:
-                        profile = self.get_profile(profile_name, resolve=True)
+                    with suppress(ProfileNotFoundError):
+                        profile = _get_resolved_ref(profile_name)
                         if &#34;password&#34; in profile:
                             resolved_list.append(profile[&#34;password&#34;])
-                    except ProfileNotFoundError:
-                        pass
                 else:
                     resolved_list.append(item)
             resolved[key] = resolved_list
-    
-    # 3. Inheritance: Fill empty keys from the first referenced profile
-    if referenced_profiles:
-        base_profile_name = referenced_profiles[0]
-        try:
-            base_profile = self.get_profile(base_profile_name, resolve=True)
-            for key, value in base_profile.items():
-                # Fill if key is missing or empty
-                if key not in resolved or resolved[key] == &#34;&#34; or resolved[key] == [] or resolved[key] is None:
-                    resolved[key] = value
-        except ProfileNotFoundError:
-            pass
 
-    # 4. Handle default protocol
-    if resolved.get(&#34;protocol&#34;) == &#34;&#34; or resolved.get(&#34;protocol&#34;) is None:
+    ordered_profiles = list(dict.fromkeys(auth_referenced_profiles + other_referenced_profiles))
+    for base_profile_name in ordered_profiles:
+        with suppress(ProfileNotFoundError):
+            base_profile = _get_resolved_ref(base_profile_name)
+            for key, value in base_profile.items():
+                if (key not in resolved or resolved[key] in (&#34;&#34;, [], None)) and (
+                    value not in (&#34;&#34;, [], None) or key not in resolved
+                ):
+                    resolved[key] = deepcopy(value)
+
+    if resolved.get(&#34;protocol&#34;) in (&#34;&#34;, None):
         try:
-            default_profile = self.get_profile(&#34;default&#34;, resolve=True)
-            resolved[&#34;protocol&#34;] = default_profile.get(&#34;protocol&#34;, &#34;ssh&#34;)
+            default_profile = _get_resolved_ref(&#34;default&#34;)
+            resolved[&#34;protocol&#34;] = default_profile.get(&#34;protocol&#34;, &#34;ssh&#34;) or &#34;ssh&#34;
         except ProfileNotFoundError:
             resolved[&#34;protocol&#34;] = &#34;ssh&#34;
-            
+
     return resolved</code></pre>
 </details>
-<div class="desc"><p>Resolve profile references (@profile) in node data and handle inheritance.</p></div>
+<div class="desc"><p>Resolve profile references (@profile) in node data while preserving compose and scalar secrets.</p></div>
 </dd>
 <dt id="connpy.services.ProfileService.update_profile"><code class="name flex">
 <span>def <span class="ident">update_profile</span></span>(<span>self, name, data)</span>
@@ -3731,18 +4546,28 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def update_profile(self, name, data):
     &#34;&#34;&#34;Update an existing profile.&#34;&#34;&#34;
+    if _supports_transactional_update(self.config):
+        def _mut(cfg):
+            if name not in cfg.profiles:
+                raise ProfileNotFoundError(f&#34;Profile &#39;{name}&#39; not found.&#34;)
+            updated_data = deepcopy(cfg.profiles[name])
+            updated_data.update(deepcopy(data))
+            filtered_data = {
+                k: v for k, v in updated_data.items() if k in self._ALLOWED_KEYS
+            }
+            self._validate_profile_payload(filtered_data)
+            cfg._profiles_add_unlocked(id=name, **filtered_data)
+
+        self.config.transactional_update(_mut)
+        return
+
     if name not in self.config.profiles:
         raise ProfileNotFoundError(f&#34;Profile &#39;{name}&#39; not found.&#34;)
-        
-    # Merge with existing data
     existing = self.get_profile(name, resolve=False)
-    updated_data = existing.copy()
+    updated_data = deepcopy(existing)
     updated_data.update(data)
-    
-    # Filter data to match _profiles_add signature
-    allowed_keys = {&#34;host&#34;, &#34;options&#34;, &#34;logs&#34;, &#34;password&#34;, &#34;port&#34;, &#34;protocol&#34;, &#34;user&#34;, &#34;tags&#34;, &#34;jumphost&#34;}
-    filtered_data = {k: v for k, v in updated_data.items() if k in allowed_keys}
-    
+    filtered_data = {k: v for k, v in updated_data.items() if k in self._ALLOWED_KEYS}
+    self._validate_profile_payload(filtered_data)
     self.config._profiles_add(id=name, **filtered_data)
     self.config._saveconfig(self.config.file)</code></pre>
 </details>

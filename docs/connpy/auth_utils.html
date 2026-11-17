@@ -1,0 +1,1514 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<meta name="generator" content="pdoc3 0.11.6">
+<title>connpy.auth_utils API documentation</title>
+<meta name="description" content="Pure authentication, composition, masking, sanitization, and rate-limit helpers.">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:1.5em;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:2em 0 .50em 0}h3{font-size:1.4em;margin:1.6em 0 .7em 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .2s ease-in-out}a:visited{color:#503}a:hover{color:#b62}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900;font-weight:bold}pre code{font-size:.8em;line-height:1.4em;padding:1em;display:block}code{background:#f3f3f3;font-family:"DejaVu Sans Mono",monospace;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source > summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible;min-width:max-content}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em 1em;margin:1em 0}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul ul{padding-left:1em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha512-D9gUyxqja7hBtkWpPWGt9wfbfaMGVt9gnyCvYa+jojwwPHLCzUm5i8rpk7vD7wNee9bA35eYIjobYPaQuKS1MQ==" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => {
+hljs.configure({languages: ['bash', 'css', 'diff', 'graphql', 'ini', 'javascript', 'json', 'plaintext', 'python', 'python-repl', 'rust', 'shell', 'sql', 'typescript', 'xml', 'yaml']});
+hljs.highlightAll();
+/* Collapse source docstrings */
+setTimeout(() => {
+[...document.querySelectorAll('.hljs.language-python > .hljs-string')]
+.filter(el => el.innerHTML.length > 200 && ['"""', "'''"].includes(el.innerHTML.substring(0, 3)))
+.forEach(el => {
+let d = document.createElement('details');
+d.classList.add('hljs-string');
+d.innerHTML = '<summary>"""</summary>' + el.innerHTML.substring(3);
+el.replaceWith(d);
+});
+}, 100);
+})</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>connpy.auth_utils</code></h1>
+</header>
+<section id="section-intro">
+<p>Pure authentication, composition, masking, sanitization, and rate-limit helpers.</p>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-functions">Functions</h2>
+<dl>
+<dt id="connpy.auth_utils.clear_exception_frames"><code class="name flex">
+<span>def <span class="ident">clear_exception_frames</span></span>(<span>exc: BaseException | None) ‑> None</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def clear_exception_frames(exc: BaseException | None) -&gt; None:
+    &#34;&#34;&#34;Clear local variables on all frames in an exception&#39;s traceback chain.&#34;&#34;&#34;
+    seen: set[int] = set()
+    stack: list[BaseException] = []
+    if exc is not None:
+        stack.append(exc)
+    while stack:
+        cur = stack.pop()
+        obj_id = id(cur)
+        if obj_id in seen:
+            continue
+        seen.add(obj_id)
+        cause = getattr(cur, &#34;__cause__&#34;, None)
+        ctx = getattr(cur, &#34;__context__&#34;, None)
+        if cause is not None:
+            stack.append(cause)
+        if ctx is not None:
+            stack.append(ctx)
+
+        tb = getattr(cur, &#34;__traceback__&#34;, None)
+        if tb is not None:
+            with suppress(RuntimeError):
+                traceback.clear_frames(tb)
+
+        with suppress(AttributeError, TypeError):
+            cur.__traceback__ = None
+        with suppress(AttributeError, TypeError):
+            cur.__cause__ = None
+        with suppress(AttributeError, TypeError):
+            cur.__context__ = None</code></pre>
+</details>
+<div class="desc"><p>Clear local variables on all frames in an exception's traceback chain.</p></div>
+</dd>
+<dt id="connpy.auth_utils.extract_compose_profile_refs"><code class="name flex">
+<span>def <span class="ident">extract_compose_profile_refs</span></span>(<span>expr: str) ‑> set[str]</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def extract_compose_profile_refs(expr: str) -&gt; set[str]:
+    &#34;&#34;&#34;Return profile names referenced via @profile tokens in a compose: expression.&#34;&#34;&#34;
+    if not isinstance(expr, str) or not expr.startswith(&#34;compose:&#34;):
+        return set()
+    if len(expr) &gt; MAX_COMPOSE_EXPR_LEN:
+        return set()
+    body = expr[len(&#34;compose:&#34;) :]
+    if not body or not body.strip():
+        return set()
+    try:
+        tokens = _tokenize_compose_body(body)
+    except SanitizedAuthError:
+        return set()
+    return {tok_val for tok_type, tok_val in tokens if tok_type == &#34;profile_ref&#34;}</code></pre>
+</details>
+<div class="desc"><p>Return profile names referenced via @profile tokens in a compose: expression.</p></div>
+</dd>
+<dt id="connpy.auth_utils.extract_profile_refs_from_value"><code class="name flex">
+<span>def <span class="ident">extract_profile_refs_from_value</span></span>(<span>value: Any) ‑> set[str]</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def extract_profile_refs_from_value(value: Any) -&gt; set[str]:
+    &#34;&#34;&#34;Extract all @profile names referenced directly or via compose:/fallback in a value.&#34;&#34;&#34;
+    return _extract_profile_refs_internal(value, set())</code></pre>
+</details>
+<div class="desc"><p>Extract all @profile names referenced directly or via compose:/fallback in a value.</p></div>
+</dd>
+<dt id="connpy.auth_utils.has_insecure_hostkey_checking"><code class="name flex">
+<span>def <span class="ident">has_insecure_hostkey_checking</span></span>(<span>options: str = '', tags: Any = None, hop_metas: Iterable[dict[str, Any]] = ()) ‑> bool</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def has_insecure_hostkey_checking(
+    options: str = &#34;&#34;,
+    tags: Any = None,
+    hop_metas: Iterable[dict[str, Any]] = (),
+) -&gt; bool:
+    &#34;&#34;&#34;Return True if StrictHostKeyChecking=no/off or UserKnownHostsFile=/dev/null is configured.&#34;&#34;&#34;
+    candidates: list[str] = []
+    if options:
+        candidates.append(str(options))
+    if isinstance(tags, dict):
+        for k in (&#34;mosh_ssh_options&#34;, &#34;ssh_options&#34;):
+            v = tags.get(k)
+            if v:
+                candidates.append(str(v))
+    for hop in hop_metas or ():
+        if isinstance(hop, dict):
+            h_opts = hop.get(&#34;options&#34;, &#34;&#34;)
+            if h_opts:
+                candidates.append(str(h_opts))
+            h_tags = hop.get(&#34;tags&#34;)
+            if isinstance(h_tags, dict):
+                for k in (&#34;mosh_ssh_options&#34;, &#34;ssh_options&#34;):
+                    v = h_tags.get(k)
+                    if v:
+                        candidates.append(str(v))
+    return any(_has_insecure_ssh_options(c) for c in candidates)</code></pre>
+</details>
+<div class="desc"><p>Return True if StrictHostKeyChecking=no/off or UserKnownHostsFile=/dev/null is configured.</p></div>
+</dd>
+<dt id="connpy.auth_utils.host_exact_re"><code class="name flex">
+<span>def <span class="ident">host_exact_re</span></span>(<span>host: str) ‑> re.Pattern[str]</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def host_exact_re(host: str) -&gt; re.Pattern[str]:
+    &#34;&#34;&#34;Compile an exact host boundary regex with zero FQDN subdomain wildcard risk.&#34;&#34;&#34;
+    escaped = re.escape(str(host))
+    return re.compile(
+        rf&#34;(?&lt;![A-Za-z0-9._-]){escaped}(?![A-Za-z0-9._-])(?=$|[\s:\]&#39;\&#34;#&gt;$),])&#34;,
+        re.IGNORECASE | re.ASCII,
+    )</code></pre>
+</details>
+<div class="desc"><p>Compile an exact host boundary regex with zero FQDN subdomain wildcard risk.</p></div>
+</dd>
+<dt id="connpy.auth_utils.is_compose_expression"><code class="name flex">
+<span>def <span class="ident">is_compose_expression</span></span>(<span>value: Any) ‑> bool</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def is_compose_expression(value: Any) -&gt; bool:
+    &#34;&#34;&#34;Return True if value is a string with the explicit compose: prefix.&#34;&#34;&#34;
+    return isinstance(value, str) and value.startswith(&#34;compose:&#34;)</code></pre>
+</details>
+<div class="desc"><p>Return True if value is a string with the explicit compose: prefix.</p></div>
+</dd>
+<dt id="connpy.auth_utils.is_rsa_blob"><code class="name flex">
+<span>def <span class="ident">is_rsa_blob</span></span>(<span>value: Any) ‑> bool</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def is_rsa_blob(value: Any) -&gt; bool:
+    &#34;&#34;&#34;Return True if value matches an encrypted RSA bytes literal string.&#34;&#34;&#34;
+    return isinstance(value, str) and bool(_RSA_BLOB_RE.match(value))</code></pre>
+</details>
+<div class="desc"><p>Return True if value matches an encrypted RSA bytes literal string.</p></div>
+</dd>
+<dt id="connpy.auth_utils.mask_node_secrets"><code class="name flex">
+<span>def <span class="ident">mask_node_secrets</span></span>(<span>obj: Any) ‑> Any</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def mask_node_secrets(obj: Any) -&gt; Any:
+    &#34;&#34;&#34;Recursively mask sensitive node/profile credentials with &#39;***&#39; using a closed key list.&#34;&#34;&#34;
+    visiting: set[int] = set()
+
+    def _recurse(val: Any, *, in_fallback_list: bool = False) -&gt; Any:
+        if isinstance(val, dict):
+            obj_id = id(val)
+            if obj_id in visiting:
+                return &#34;***&#34;
+            visiting.add(obj_id)
+            try:
+                out: dict[Any, Any] = {}
+                for k, v in val.items():
+                    k_lower = k.lower() if isinstance(k, str) else str(k).lower()
+                    if _mask_secret_key(k_lower):
+                        out[k] = &#34;***&#34;
+                    elif k_lower in (&#34;fallback&#34;, &#34;_fallback&#34;):
+                        if isinstance(v, (dict, list, tuple)):
+                            out[k] = _recurse(v, in_fallback_list=True)
+                        elif v in (&#34;&#34;, None):
+                            out[k] = v
+                        else:
+                            out[k] = &#34;***&#34;
+                    else:
+                        out[k] = _recurse(v, in_fallback_list=False)
+                return out
+            finally:
+                visiting.discard(obj_id)
+
+        if isinstance(val, list):
+            obj_id = id(val)
+            if obj_id in visiting:
+                return &#34;***&#34;
+            visiting.add(obj_id)
+            try:
+                return [
+                    &#34;***&#34;
+                    if (in_fallback_list and isinstance(item, str) and item != &#34;&#34;)
+                    else _recurse(item, in_fallback_list=in_fallback_list)
+                    for item in val
+                ]
+            finally:
+                visiting.discard(obj_id)
+
+        if isinstance(val, tuple):
+            obj_id = id(val)
+            if obj_id in visiting:
+                return &#34;***&#34;
+            visiting.add(obj_id)
+            try:
+                return tuple(
+                    &#34;***&#34;
+                    if (in_fallback_list and isinstance(item, str) and item != &#34;&#34;)
+                    else _recurse(item, in_fallback_list=in_fallback_list)
+                    for item in val
+                )
+            finally:
+                visiting.discard(obj_id)
+
+        return val
+
+    return _recurse(obj)</code></pre>
+</details>
+<div class="desc"><p>Recursively mask sensitive node/profile credentials with '***' using a closed key list.</p></div>
+</dd>
+<dt id="connpy.auth_utils.normalize_prompt_line"><code class="name flex">
+<span>def <span class="ident">normalize_prompt_line</span></span>(<span>before_bytes: bytes, after_bytes: bytes) ‑> str</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def normalize_prompt_line(before_bytes: bytes, after_bytes: bytes) -&gt; str:
+    &#34;&#34;&#34;Return the normalized final prompt line stripped of ANSI and control sequences.&#34;&#34;&#34;
+    combined = (before_bytes or b&#34;&#34;) + (after_bytes or b&#34;&#34;)
+    text = combined.decode(&#34;utf-8&#34;, errors=&#34;replace&#34;)
+    text = _ANSI_OSC_RE.sub(&#34;&#34;, text)
+    text = _ANSI_CSI_RE.sub(&#34;&#34;, text)
+    text = text.replace(&#34;\r\n&#34;, &#34;\n&#34;).replace(&#34;\r&#34;, &#34;\n&#34;)
+    lines = [line.strip() for line in text.split(&#34;\n&#34;) if line.strip()]
+    if not lines:
+        return &#34;&#34;
+    return _CONTROL_CHAR_RE.sub(&#34;&#34;, lines[-1]).strip()</code></pre>
+</details>
+<div class="desc"><p>Return the normalized final prompt line stripped of ANSI and control sequences.</p></div>
+</dd>
+<dt id="connpy.auth_utils.parse_compose_expression"><code class="name flex">
+<span>def <span class="ident">parse_compose_expression</span></span>(<span>expr: str,<br>*,<br>profiles: dict[str, Any] | None = None,<br>decrypt_fn: Callable[[str], str] | None = None,<br>max_depth: int = 5,<br>max_variants: int = 10) ‑> list[str]</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def parse_compose_expression(
+    expr: str,
+    *,
+    profiles: dict[str, Any] | None = None,
+    decrypt_fn: Callable[[str], str] | None = None,
+    max_depth: int = MAX_PROFILE_DEPTH,
+    max_variants: int = MAX_COMPOSE_VARIANTS,
+) -&gt; list[str]:
+    &#34;&#34;&#34;Parse and evaluate a compose: password expression into up to max_variants strings.&#34;&#34;&#34;
+    return _resolve_compose_internal(
+        expr,
+        profiles=profiles,
+        decrypt_fn=decrypt_fn,
+        depth=0,
+        visited=frozenset(),
+        max_depth=max_depth,
+        max_variants=max_variants,
+    )</code></pre>
+</details>
+<div class="desc"><p>Parse and evaluate a compose: password expression into up to max_variants strings.</p></div>
+</dd>
+<dt id="connpy.auth_utils.raise_sanitized_auth_error"><code class="name flex">
+<span>def <span class="ident">raise_sanitized_auth_error</span></span>(<span>orig_exc: BaseException | None = None,<br>*,<br>code: str = 'AUTH_FAILED',<br>secrets: Iterable[str] = (),<br>context_label: str = '') ‑> NoReturn</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def raise_sanitized_auth_error(
+    orig_exc: BaseException | None = None,
+    *,
+    code: str = &#34;AUTH_FAILED&#34;,
+    secrets: Iterable[str] = (),
+    context_label: str = &#34;&#34;,
+) -&gt; NoReturn:
+    &#34;&#34;&#34;Clear original frames and raise SanitizedAuthError with cause and context suppressed.&#34;&#34;&#34;
+    err: SanitizedAuthError | None = None
+    try:
+        err = sanitize_exception(
+            orig_exc,
+            code=code,
+            secrets=secrets,
+            context_label=context_label,
+            clear_orig_frames=True,
+        )
+    finally:
+        if orig_exc is not None:
+            clear_exception_frames(orig_exc)
+        del orig_exc
+        del secrets
+    err.__context__ = None
+    err.__cause__ = None
+    raise err from None</code></pre>
+</details>
+<div class="desc"><p>Clear original frames and raise SanitizedAuthError with cause and context suppressed.</p></div>
+</dd>
+<dt id="connpy.auth_utils.redact_known_secrets"><code class="name flex">
+<span>def <span class="ident">redact_known_secrets</span></span>(<span>text: str, secrets: Iterable[str] = (), *, min_len: int = 4) ‑> str</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def redact_known_secrets(
+    text: str,
+    secrets: Iterable[str] = (),
+    *,
+    min_len: int = 4,
+) -&gt; str:
+    &#34;&#34;&#34;Replace any non-trivial secret strings in text with &#39;***&#39;.&#34;&#34;&#34;
+    if not text or not secrets:
+        return text
+    out = str(text)
+    unique_secrets = sorted(
+        {s for s in secrets if isinstance(s, str) and len(s) &gt;= min_len},
+        key=len,
+        reverse=True,
+    )
+    for sec in unique_secrets:
+        out = out.replace(sec, &#34;***&#34;)
+    return out</code></pre>
+</details>
+<div class="desc"><p>Replace any non-trivial secret strings in text with '***'.</p></div>
+</dd>
+<dt id="connpy.auth_utils.resolve_fallback_entries"><code class="name flex">
+<span>def <span class="ident">resolve_fallback_entries</span></span>(<span>raw_fallback: Any, profiles: dict[str, Any] | None, *, max_entries: int = 5) ‑> list[dict[str, typing.Any]]</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def resolve_fallback_entries(
+    raw_fallback: Any,
+    profiles: dict[str, Any] | None,
+    *,
+    max_entries: int = MAX_FALLBACK_ENTRIES,
+) -&gt; list[dict[str, Any]]:
+    &#34;&#34;&#34;Normalize fallback entries and resolve any @profile references safely.&#34;&#34;&#34;
+    return _resolve_fallback_entries_internal(
+        raw_fallback,
+        profiles,
+        max_entries=max_entries,
+    )</code></pre>
+</details>
+<div class="desc"><p>Normalize fallback entries and resolve any @profile references safely.</p></div>
+</dd>
+<dt id="connpy.auth_utils.sanitize_exception"><code class="name flex">
+<span>def <span class="ident">sanitize_exception</span></span>(<span>orig_exc: BaseException | None,<br>*,<br>code: str = 'AUTH_FAILED',<br>secrets: Iterable[str] = (),<br>context_label: str = '',<br>clear_orig_frames: bool = True) ‑> <a title="connpy.auth_utils.SanitizedAuthError" href="#connpy.auth_utils.SanitizedAuthError">SanitizedAuthError</a></span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def sanitize_exception(
+    orig_exc: BaseException | None,
+    *,
+    code: str = &#34;AUTH_FAILED&#34;,
+    secrets: Iterable[str] = (),
+    context_label: str = &#34;&#34;,
+    clear_orig_frames: bool = True,
+) -&gt; SanitizedAuthError:
+    &#34;&#34;&#34;Convert any exception into a SanitizedAuthError without leaking secrets or tracebacks.&#34;&#34;&#34;
+    resolved_code = code if code in SAFE_ERROR_TEMPLATES else &#34;AUTH_FAILED&#34;
+    try:
+        if isinstance(orig_exc, SanitizedAuthError):
+            existing_code = (
+                orig_exc.code if orig_exc.code in SAFE_ERROR_TEMPLATES else resolved_code
+            )
+            safe_existing = sanitize_log_message(str(orig_exc), secrets=secrets).strip()
+            msg = safe_existing or SAFE_ERROR_TEMPLATES[existing_code]
+            return SanitizedAuthError(msg, code=existing_code)
+
+        msg = SAFE_ERROR_TEMPLATES[resolved_code]
+        if context_label:
+            safe_ctx = sanitize_log_message(context_label, secrets=secrets).strip()
+            if safe_ctx:
+                msg = f&#34;{msg} ({safe_ctx})&#34;
+        return SanitizedAuthError(msg, code=resolved_code)
+    finally:
+        if clear_orig_frames and orig_exc is not None:
+            clear_exception_frames(orig_exc)</code></pre>
+</details>
+<div class="desc"><p>Convert any exception into a SanitizedAuthError without leaking secrets or tracebacks.</p></div>
+</dd>
+<dt id="connpy.auth_utils.sanitize_log_message"><code class="name flex">
+<span>def <span class="ident">sanitize_log_message</span></span>(<span>message: str, *, secrets: Iterable[str] = ()) ‑> str</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def sanitize_log_message(message: str, *, secrets: Iterable[str] = ()) -&gt; str:
+    &#34;&#34;&#34;Strip ANSI sequences, control chars, and known secrets from a log line.&#34;&#34;&#34;
+    text = str(message) if message is not None else &#34;&#34;
+    text = redact_known_secrets(text, secrets=secrets, min_len=1)
+    text = _ANSI_OSC_RE.sub(&#34;&#34;, text)
+    text = _ANSI_CSI_RE.sub(&#34;&#34;, text)
+    text = _CONTROL_CHAR_RE.sub(&#34;&#34;, text)
+    return redact_known_secrets(text, secrets=secrets, min_len=1)</code></pre>
+</details>
+<div class="desc"><p>Strip ANSI sequences, control chars, and known secrets from a log line.</p></div>
+</dd>
+<dt id="connpy.auth_utils.validate_auth_budget_tags"><code class="name flex">
+<span>def <span class="ident">validate_auth_budget_tags</span></span>(<span>tags: Any) ‑> None</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def validate_auth_budget_tags(tags: Any) -&gt; None:
+    &#34;&#34;&#34;Validate optional auth budget and policy keys in a node/profile tags dict.&#34;&#34;&#34;
+    if not isinstance(tags, dict):
+        return
+    if &#34;max_auth_prompts&#34; in tags and tags[&#34;max_auth_prompts&#34;] is not None:
+        validate_strict_int_range(
+            tags[&#34;max_auth_prompts&#34;],
+            &#34;tags.max_auth_prompts&#34;,
+            MIN_AUTH_PROMPTS,
+            MAX_AUTH_PROMPTS_CAP,
+        )
+    if &#34;max_total_auth_attempts&#34; in tags and tags[&#34;max_total_auth_attempts&#34;] is not None:
+        validate_strict_int_range(
+            tags[&#34;max_total_auth_attempts&#34;],
+            &#34;tags.max_total_auth_attempts&#34;,
+            MIN_TOTAL_AUTH_ATTEMPTS,
+            MAX_TOTAL_AUTH_ATTEMPTS_CAP,
+        )
+    if &#34;max_hop_host_attempts&#34; in tags and tags[&#34;max_hop_host_attempts&#34;] is not None:
+        validate_strict_int_range(
+            tags[&#34;max_hop_host_attempts&#34;],
+            &#34;tags.max_hop_host_attempts&#34;,
+            MIN_HOP_HOST_ATTEMPTS,
+            MAX_HOP_HOST_ATTEMPTS_CAP,
+        )
+    if &#34;max_global_user_attempts&#34; in tags and tags[&#34;max_global_user_attempts&#34;] is not None:
+        validate_strict_int_range(
+            tags[&#34;max_global_user_attempts&#34;],
+            &#34;tags.max_global_user_attempts&#34;,
+            1,
+            1000,
+        )
+    for bool_key in (
+        &#34;allow_fallback&#34;,
+        &#34;allow_ambiguous_single_hop_prompt&#34;,
+        &#34;disable_fallback_on_insecure_hostkey&#34;,
+    ):
+        if bool_key in tags and tags[bool_key] is not None and not isinstance(tags[bool_key], bool):
+            raise ValueError(f&#34;Invalid tags.{bool_key}: expected boolean&#34;)
+    if &#34;fallback&#34; in tags and tags[&#34;fallback&#34;] not in (None, &#34;&#34;, []):
+        validate_fallback_entries(tags[&#34;fallback&#34;])</code></pre>
+</details>
+<div class="desc"><p>Validate optional auth budget and policy keys in a node/profile tags dict.</p></div>
+</dd>
+<dt id="connpy.auth_utils.validate_compose_syntax"><code class="name flex">
+<span>def <span class="ident">validate_compose_syntax</span></span>(<span>expr: str) ‑> None</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def validate_compose_syntax(expr: str) -&gt; None:
+    &#34;&#34;&#34;Validate compose: syntax and length without resolving profiles or decrypting.&#34;&#34;&#34;
+    if not isinstance(expr, str) or len(expr) &gt; MAX_COMPOSE_EXPR_LEN:
+        raise_sanitized_auth_error(
+            code=&#34;AUTH_FAILED&#34;,
+            context_label=&#34;compose expression exceeds maximum length&#34;,
+        )
+    body = expr.removeprefix(&#34;compose:&#34;)
+    if not body or not body.strip():
+        raise_sanitized_auth_error(
+            code=&#34;AUTH_FAILED&#34;,
+            context_label=&#34;empty compose expression&#34;,
+        )
+    _tokenize_compose_body(body)</code></pre>
+</details>
+<div class="desc"><p>Validate compose: syntax and length without resolving profiles or decrypting.</p></div>
+</dd>
+<dt id="connpy.auth_utils.validate_config_auth_settings"><code class="name flex">
+<span>def <span class="ident">validate_config_auth_settings</span></span>(<span>cfg: Any) ‑> None</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def validate_config_auth_settings(cfg: Any) -&gt; None:
+    &#34;&#34;&#34;Validate global config auth budget and policy keys.&#34;&#34;&#34;
+    if not isinstance(cfg, dict):
+        raise TypeError(&#34;Config section must be a dictionary&#34;)
+    if &#34;max_auth_prompts&#34; in cfg and cfg[&#34;max_auth_prompts&#34;] is not None:
+        validate_strict_int_range(
+            cfg[&#34;max_auth_prompts&#34;],
+            &#34;config.max_auth_prompts&#34;,
+            MIN_AUTH_PROMPTS,
+            MAX_AUTH_PROMPTS_CAP,
+        )
+    if &#34;max_total_auth_attempts&#34; in cfg and cfg[&#34;max_total_auth_attempts&#34;] is not None:
+        validate_strict_int_range(
+            cfg[&#34;max_total_auth_attempts&#34;],
+            &#34;config.max_total_auth_attempts&#34;,
+            MIN_TOTAL_AUTH_ATTEMPTS,
+            MAX_TOTAL_AUTH_ATTEMPTS_CAP,
+        )
+    if &#34;max_hop_host_attempts&#34; in cfg and cfg[&#34;max_hop_host_attempts&#34;] is not None:
+        validate_strict_int_range(
+            cfg[&#34;max_hop_host_attempts&#34;],
+            &#34;config.max_hop_host_attempts&#34;,
+            MIN_HOP_HOST_ATTEMPTS,
+            MAX_HOP_HOST_ATTEMPTS_CAP,
+        )
+    if &#34;max_global_user_attempts&#34; in cfg and cfg[&#34;max_global_user_attempts&#34;] is not None:
+        validate_strict_int_range(
+            cfg[&#34;max_global_user_attempts&#34;],
+            &#34;config.max_global_user_attempts&#34;,
+            1,
+            1000,
+        )
+    if (
+        &#34;disable_fallback_on_insecure_hostkey&#34; in cfg
+        and cfg[&#34;disable_fallback_on_insecure_hostkey&#34;] is not None
+        and not isinstance(cfg[&#34;disable_fallback_on_insecure_hostkey&#34;], bool)
+    ):
+        raise ValueError(&#34;Invalid config.disable_fallback_on_insecure_hostkey: expected boolean&#34;)</code></pre>
+</details>
+<div class="desc"><p>Validate global config auth budget and policy keys.</p></div>
+</dd>
+<dt id="connpy.auth_utils.validate_fallback_entries"><code class="name flex">
+<span>def <span class="ident">validate_fallback_entries</span></span>(<span>raw_fallback: Any, *, max_entries: int = 5) ‑> list[dict[str, typing.Any] | str]</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def validate_fallback_entries(
+    raw_fallback: Any,
+    *,
+    max_entries: int = MAX_FALLBACK_ENTRIES,
+) -&gt; list[dict[str, Any] | str]:
+    &#34;&#34;&#34;Validate and normalize fallback config entries without expanding profiles.&#34;&#34;&#34;
+    if raw_fallback in (None, &#34;&#34;, []):
+        return []
+
+    parsed = raw_fallback
+    if isinstance(raw_fallback, str):
+        stripped = raw_fallback.strip()
+        if not stripped:
+            return []
+        if stripped.startswith((&#34;[&#34;, &#34;{&#34;)):
+            parsed = validate_json_depth_and_size(stripped)
+        else:
+            if stripped.startswith(&#34;compose:&#34;):
+                validate_compose_syntax(stripped)
+            return [stripped]
+
+    if isinstance(parsed, dict):
+        items: list[Any] = [parsed]
+    elif isinstance(parsed, (list, tuple)):
+        items = list(parsed)
+    else:
+        raise TypeError(
+            &#34;Fallback must be a list of credential dicts/strings, a dict, @profile, or JSON&#34;
+        )
+
+    if len(items) &gt; max_entries:
+        raise ValueError(f&#34;Fallback exceeds maximum of {max_entries} entries&#34;)
+
+    normalized: list[dict[str, Any] | str] = []
+    allowed_entry_keys = {&#34;user&#34;, &#34;password&#34;}
+    for idx, entry in enumerate(items):
+        if isinstance(entry, str):
+            if not entry:
+                raise ValueError(f&#34;Fallback entry {idx} cannot be empty&#34;)
+            if entry.startswith(&#34;compose:&#34;):
+                validate_compose_syntax(entry)
+            normalized.append(entry)
+        elif isinstance(entry, dict):
+            unknown_keys = set(entry.keys()) - allowed_entry_keys
+            if unknown_keys:
+                raise ValueError(
+                    f&#34;Unsupported keys in fallback entry {idx}: {sorted(unknown_keys)}&#34;
+                )
+            user_val = entry.get(&#34;user&#34;, &#34;&#34;)
+            pw_val = entry.get(&#34;password&#34;, &#34;&#34;)
+            if user_val is not None and not isinstance(user_val, str):
+                raise ValueError(f&#34;Fallback entry {idx} &#39;user&#39; must be a string&#34;)
+            if isinstance(pw_val, (list, tuple)):
+                if not pw_val or not all(isinstance(p, str) and p != &#34;&#34; for p in pw_val):
+                    raise ValueError(
+                        f&#34;Fallback entry {idx} &#39;password&#39; list must contain non-empty strings&#34;
+                    )
+                for p in pw_val:
+                    if p.startswith(&#34;compose:&#34;):
+                        validate_compose_syntax(p)
+            elif pw_val is not None and not isinstance(pw_val, str):
+                raise ValueError(f&#34;Fallback entry {idx} &#39;password&#39; must be a string or list&#34;)
+            elif isinstance(pw_val, str) and pw_val.startswith(&#34;compose:&#34;):
+                validate_compose_syntax(pw_val)
+
+            if not (user_val or pw_val):
+                raise ValueError(
+                    f&#34;Fallback entry {idx} must specify &#39;user&#39; and/or &#39;password&#39;&#34;
+                )
+            normalized.append(deepcopy(entry))
+        else:
+            raise TypeError(f&#34;Fallback entry {idx} must be a dict or string&#34;)
+
+    return normalized</code></pre>
+</details>
+<div class="desc"><p>Validate and normalize fallback config entries without expanding profiles.</p></div>
+</dd>
+<dt id="connpy.auth_utils.validate_json_depth_and_size"><code class="name flex">
+<span>def <span class="ident">validate_json_depth_and_size</span></span>(<span>raw_or_obj: Any, *, max_bytes: int = 8192, max_depth: int = 4) ‑> Any</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def validate_json_depth_and_size(
+    raw_or_obj: Any,
+    *,
+    max_bytes: int = MAX_JSON_INPUT_BYTES,
+    max_depth: int = MAX_JSON_INPUT_DEPTH,
+) -&gt; Any:
+    &#34;&#34;&#34;Parse (if str) and enforce byte length and nesting depth limits on JSON inputs.&#34;&#34;&#34;
+    if isinstance(raw_or_obj, str):
+        if len(raw_or_obj) &gt; max_bytes or len(raw_or_obj.encode(&#34;utf-8&#34;, errors=&#34;replace&#34;)) &gt; max_bytes:
+            raise ValueError(f&#34;JSON input exceeds maximum size of {max_bytes} bytes&#34;)
+        try:
+            parsed = json.loads(raw_or_obj)
+        except RecursionError:
+            raise ValueError(
+                f&#34;JSON nesting exceeds maximum depth of {max_depth}&#34;
+            ) from None
+    else:
+        parsed = raw_or_obj
+    _check_depth(parsed, max_depth, 0)
+    return parsed</code></pre>
+</details>
+<div class="desc"><p>Parse (if str) and enforce byte length and nesting depth limits on JSON inputs.</p></div>
+</dd>
+<dt id="connpy.auth_utils.validate_strict_int_range"><code class="name flex">
+<span>def <span class="ident">validate_strict_int_range</span></span>(<span>value: Any, name: str, min_val: int, max_val: int) ‑> int</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def validate_strict_int_range(
+    value: Any,
+    name: str,
+    min_val: int,
+    max_val: int,
+) -&gt; int:
+    &#34;&#34;&#34;Validate that value is a strict plain int (not bool/float/str) in [min_val, max_val].&#34;&#34;&#34;
+    if type(value) is not int or value &lt; min_val or value &gt; max_val:
+        raise ValueError(
+            f&#34;Invalid {name}: expected integer in [{min_val}, {max_val}], got {value!r}&#34;
+        )
+    return value</code></pre>
+</details>
+<div class="desc"><p>Validate that value is a strict plain int (not bool/float/str) in [min_val, max_val].</p></div>
+</dd>
+</dl>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="connpy.auth_utils.AuthAttemptTracker"><code class="flex name class">
+<span>class <span class="ident">AuthAttemptTracker</span></span>
+<span>(</span><span>*,<br>ttl_seconds: float = 300,<br>max_entries: int = 10000,<br>default_max_host_attempts: int = 6,<br>default_max_hop_attempts: int = 6,<br>default_max_global_user_attempts: int | None = None,<br>clock: Callable[[], float] = &lt;built-in function monotonic&gt;)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class AuthAttemptTracker:
+    &#34;&#34;&#34;Thread-safe intra-process authentication attempt tracker with safe anti-flood eviction.&#34;&#34;&#34;
+
+    def __init__(
+        self,
+        *,
+        ttl_seconds: float = DEFAULT_TRACKER_TTL_SECONDS,
+        max_entries: int = MAX_TRACKER_ENTRIES,
+        default_max_host_attempts: int = DEFAULT_MAX_TOTAL_AUTH_ATTEMPTS,
+        default_max_hop_attempts: int = DEFAULT_MAX_HOP_HOST_ATTEMPTS,
+        default_max_global_user_attempts: int | None = None,
+        clock: Callable[[], float] = time.monotonic,
+    ) -&gt; None:
+        if isinstance(ttl_seconds, bool) or not isinstance(ttl_seconds, (int, float)):
+            raise TypeError(f&#34;Invalid ttl_seconds: expected number &gt; 0, got {ttl_seconds!r}&#34;)
+        ttl_val = float(ttl_seconds)
+        if not math.isfinite(ttl_val) or ttl_val &lt;= 0:
+            raise ValueError(f&#34;Invalid ttl_seconds: expected &gt; 0, got {ttl_seconds!r}&#34;)
+        if isinstance(max_entries, bool) or not isinstance(max_entries, int):
+            raise TypeError(f&#34;Invalid max_entries: expected int &gt;= 1, got {max_entries!r}&#34;)
+        if max_entries &lt; 1:
+            raise ValueError(f&#34;Invalid max_entries: expected &gt;= 1, got {max_entries!r}&#34;)
+        self._ttl_seconds = ttl_val
+        self._max_entries = max_entries
+        self._default_max_host_attempts = validate_strict_int_range(
+            default_max_host_attempts,
+            &#34;default_max_host_attempts&#34;,
+            MIN_TOTAL_AUTH_ATTEMPTS,
+            MAX_TOTAL_AUTH_ATTEMPTS_CAP,
+        )
+        self._default_max_hop_attempts = validate_strict_int_range(
+            default_max_hop_attempts,
+            &#34;default_max_hop_attempts&#34;,
+            MIN_HOP_HOST_ATTEMPTS,
+            MAX_HOP_HOST_ATTEMPTS_CAP,
+        )
+        self._default_max_global_user_attempts: int | None = (
+            validate_strict_int_range(
+                default_max_global_user_attempts,
+                &#34;default_max_global_user_attempts&#34;,
+                1,
+                1000,
+            )
+            if default_max_global_user_attempts is not None
+            else None
+        )
+        self._clock = clock
+        self._lock = threading.Lock()
+        self._unblocked: OrderedDict[Any, _BudgetEntry] = OrderedDict()
+        self._blocked: OrderedDict[Any, _BudgetEntry] = OrderedDict()
+
+    def _purge_expired_unlocked(self, now: float) -&gt; None:
+        for bucket in (self._unblocked, self._blocked):
+            expired_keys = [
+                k for k, entry in bucket.items() if (now - entry.last_ts) &gt;= self._ttl_seconds
+            ]
+            for k in expired_keys:
+                del bucket[k]
+
+    def _evict_if_full_unlocked(self, now: float) -&gt; None:
+        if (len(self._unblocked) + len(self._blocked)) &lt; self._max_entries:
+            return
+        self._purge_expired_unlocked(now)
+        while (len(self._unblocked) + len(self._blocked)) &gt;= self._max_entries:
+            if self._unblocked:
+                self._unblocked.popitem(last=False)
+            elif self._blocked:
+                self._blocked.popitem(last=False)
+            else:
+                break
+
+    def _get_live_entry_unlocked(self, key: Any, now: float) -&gt; _BudgetEntry | None:
+        if key in self._unblocked:
+            entry = self._unblocked[key]
+            if (now - entry.last_ts) &gt;= self._ttl_seconds:
+                del self._unblocked[key]
+                return None
+            return entry
+        if key in self._blocked:
+            entry = self._blocked[key]
+            if (now - entry.last_ts) &gt;= self._ttl_seconds:
+                del self._blocked[key]
+                return None
+            return entry
+        return None
+
+    def _can_acquire_unlocked(self, key: Any, limit: int, now: float) -&gt; bool:
+        if limit &lt;= 0:
+            return False
+        entry = self._get_live_entry_unlocked(key, now)
+        if entry is None:
+            return True
+        if entry.count &gt;= limit:
+            entry.limit = limit
+            if key in self._unblocked:
+                del self._unblocked[key]
+                self._blocked[key] = entry
+            return False
+        return True
+
+    def _commit_acquire_unlocked(self, key: Any, limit: int, now: float) -&gt; None:
+        entry = self._get_live_entry_unlocked(key, now)
+        if entry is None:
+            self._evict_if_full_unlocked(now)
+            new_entry = _BudgetEntry(count=1, limit=limit, last_ts=now)
+            if 1 &gt;= limit:
+                self._blocked[key] = new_entry
+            else:
+                self._unblocked[key] = new_entry
+            return
+
+        entry.count += 1
+        entry.limit = limit
+        entry.last_ts = now
+        if entry.count &gt;= limit:
+            if key in self._unblocked:
+                del self._unblocked[key]
+            self._blocked[key] = entry
+            self._blocked.move_to_end(key)
+        else:
+            if key in self._blocked:
+                del self._blocked[key]
+            self._unblocked[key] = entry
+            self._unblocked.move_to_end(key)
+
+    def try_acquire(self, key: Any, *, limit: int) -&gt; bool:
+        &#34;&#34;&#34;Attempt to consume 1 attempt slot for key within limit. Returns False if exhausted.&#34;&#34;&#34;
+        if limit &lt;= 0:
+            return False
+        now = self._clock()
+        with self._lock:
+            if not self._can_acquire_unlocked(key, limit, now):
+                return False
+            self._commit_acquire_unlocked(key, limit, now)
+            return True
+
+    def try_acquire_target_attempt(
+        self,
+        *,
+        host: str,
+        port: str = &#34;&#34;,
+        protocol: str = &#34;ssh&#34;,
+        user: str = &#34;&#34;,
+        host_limit: int | None = None,
+        user_limit: int | None = None,
+    ) -&gt; tuple[bool, str | None]:
+        &#34;&#34;&#34;Atomically verify and consume both user and host attempt slots under one lock.&#34;&#34;&#34;
+        eff_host_limit = self._default_max_host_attempts if host_limit is None else int(host_limit)
+        eff_user_limit = self._default_max_global_user_attempts if user_limit is None else user_limit
+        host_key = self._host_key(host, port, protocol)
+        user_key = self._user_key(user) if (user and eff_user_limit is not None) else None
+        now = self._clock()
+        with self._lock:
+            if user_key is not None and not self._can_acquire_unlocked(
+                user_key, int(eff_user_limit), now
+            ):
+                return False, &#34;USER_BUDGET_EXHAUSTED&#34;
+            if not self._can_acquire_unlocked(host_key, eff_host_limit, now):
+                return False, &#34;HOST_BUDGET_EXHAUSTED&#34;
+            if user_key is not None:
+                self._commit_acquire_unlocked(user_key, int(eff_user_limit), now)
+            self._commit_acquire_unlocked(host_key, eff_host_limit, now)
+            return True, None
+
+    def remaining(self, key: Any, *, limit: int) -&gt; int:
+        &#34;&#34;&#34;Return remaining attempt quota for key.&#34;&#34;&#34;
+        now = self._clock()
+        with self._lock:
+            entry = self._get_live_entry_unlocked(key, now)
+            if entry is None:
+                return max(0, limit)
+            return max(0, limit - entry.count)
+
+    @staticmethod
+    def _host_key(host: str, port: str = &#34;&#34;, protocol: str = &#34;ssh&#34;) -&gt; tuple[str, str, str, str]:
+        return (&#34;host&#34;, str(host).lower(), str(port or &#34;&#34;).strip(), str(protocol or &#34;&#34;).lower())
+
+    @staticmethod
+    def _hop_key(host: str, port: str = &#34;&#34;, protocol: str = &#34;ssh&#34;) -&gt; tuple[str, str, str, str]:
+        return (&#34;hop&#34;, str(host).lower(), str(port or &#34;&#34;).strip(), str(protocol or &#34;&#34;).lower())
+
+    @staticmethod
+    def _user_key(user: str) -&gt; tuple[str, str]:
+        return (&#34;user&#34;, str(user))
+
+    def try_acquire_host(
+        self,
+        host: str,
+        port: str = &#34;&#34;,
+        protocol: str = &#34;ssh&#34;,
+        *,
+        limit: int | None = None,
+    ) -&gt; bool:
+        &#34;&#34;&#34;Consume 1 target-host authentication attempt if within budget.&#34;&#34;&#34;
+        eff_limit = self._default_max_host_attempts if limit is None else int(limit)
+        return self.try_acquire(self._host_key(host, port, protocol), limit=eff_limit)
+
+    def try_acquire_hop(
+        self,
+        host: str,
+        port: str = &#34;&#34;,
+        protocol: str = &#34;ssh&#34;,
+        *,
+        limit: int | None = None,
+    ) -&gt; bool:
+        &#34;&#34;&#34;Consume 1 jumphost authentication attempt if within budget.&#34;&#34;&#34;
+        eff_limit = self._default_max_hop_attempts if limit is None else int(limit)
+        return self.try_acquire(self._hop_key(host, port, protocol), limit=eff_limit)
+
+    def try_acquire_user(
+        self,
+        user: str,
+        *,
+        limit: int | None = None,
+    ) -&gt; bool:
+        &#34;&#34;&#34;Consume 1 global username authentication attempt if a global limit is active.&#34;&#34;&#34;
+        if not user:
+            return True
+        eff_limit = self._default_max_global_user_attempts if limit is None else limit
+        if eff_limit is None:
+            return True
+        return self.try_acquire(self._user_key(user), limit=int(eff_limit))
+
+    def remaining_host(
+        self,
+        host: str,
+        port: str = &#34;&#34;,
+        protocol: str = &#34;ssh&#34;,
+        *,
+        limit: int | None = None,
+    ) -&gt; int:
+        &#34;&#34;&#34;Return remaining target-host attempt quota.&#34;&#34;&#34;
+        eff_limit = self._default_max_host_attempts if limit is None else int(limit)
+        return self.remaining(self._host_key(host, port, protocol), limit=eff_limit)
+
+    def remaining_hop(
+        self,
+        host: str,
+        port: str = &#34;&#34;,
+        protocol: str = &#34;ssh&#34;,
+        *,
+        limit: int | None = None,
+    ) -&gt; int:
+        &#34;&#34;&#34;Return remaining jumphost attempt quota.&#34;&#34;&#34;
+        eff_limit = self._default_max_hop_attempts if limit is None else int(limit)
+        return self.remaining(self._hop_key(host, port, protocol), limit=eff_limit)
+
+    def remaining_user(
+        self,
+        user: str,
+        *,
+        limit: int | None = None,
+    ) -&gt; int | None:
+        &#34;&#34;&#34;Return remaining global username quota, or None if unlimited.&#34;&#34;&#34;
+        eff_limit = self._default_max_global_user_attempts if limit is None else limit
+        if eff_limit is None:
+            return None
+        return self.remaining(self._user_key(user), limit=int(eff_limit))
+
+    def is_blocked(self, key: Any) -&gt; bool:
+        &#34;&#34;&#34;Return True if key currently has an active exhausted budget entry.&#34;&#34;&#34;
+        now = self._clock()
+        with self._lock:
+            entry = self._get_live_entry_unlocked(key, now)
+            return entry is not None and entry.count &gt;= entry.limit
+
+    def entry_count(self) -&gt; int:
+        &#34;&#34;&#34;Return total number of tracked entries (before TTL expiry).&#34;&#34;&#34;
+        with self._lock:
+            return len(self._unblocked) + len(self._blocked)
+
+    def reset(self) -&gt; None:
+        &#34;&#34;&#34;Clear all tracked entries.&#34;&#34;&#34;
+        with self._lock:
+            self._unblocked.clear()
+            self._blocked.clear()</code></pre>
+</details>
+<div class="desc"><p>Thread-safe intra-process authentication attempt tracker with safe anti-flood eviction.</p></div>
+<h3>Methods</h3>
+<dl>
+<dt id="connpy.auth_utils.AuthAttemptTracker.entry_count"><code class="name flex">
+<span>def <span class="ident">entry_count</span></span>(<span>self) ‑> int</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def entry_count(self) -&gt; int:
+    &#34;&#34;&#34;Return total number of tracked entries (before TTL expiry).&#34;&#34;&#34;
+    with self._lock:
+        return len(self._unblocked) + len(self._blocked)</code></pre>
+</details>
+<div class="desc"><p>Return total number of tracked entries (before TTL expiry).</p></div>
+</dd>
+<dt id="connpy.auth_utils.AuthAttemptTracker.is_blocked"><code class="name flex">
+<span>def <span class="ident">is_blocked</span></span>(<span>self, key: Any) ‑> bool</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def is_blocked(self, key: Any) -&gt; bool:
+    &#34;&#34;&#34;Return True if key currently has an active exhausted budget entry.&#34;&#34;&#34;
+    now = self._clock()
+    with self._lock:
+        entry = self._get_live_entry_unlocked(key, now)
+        return entry is not None and entry.count &gt;= entry.limit</code></pre>
+</details>
+<div class="desc"><p>Return True if key currently has an active exhausted budget entry.</p></div>
+</dd>
+<dt id="connpy.auth_utils.AuthAttemptTracker.remaining"><code class="name flex">
+<span>def <span class="ident">remaining</span></span>(<span>self, key: Any, *, limit: int) ‑> int</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def remaining(self, key: Any, *, limit: int) -&gt; int:
+    &#34;&#34;&#34;Return remaining attempt quota for key.&#34;&#34;&#34;
+    now = self._clock()
+    with self._lock:
+        entry = self._get_live_entry_unlocked(key, now)
+        if entry is None:
+            return max(0, limit)
+        return max(0, limit - entry.count)</code></pre>
+</details>
+<div class="desc"><p>Return remaining attempt quota for key.</p></div>
+</dd>
+<dt id="connpy.auth_utils.AuthAttemptTracker.remaining_hop"><code class="name flex">
+<span>def <span class="ident">remaining_hop</span></span>(<span>self, host: str, port: str = '', protocol: str = 'ssh', *, limit: int | None = None) ‑> int</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def remaining_hop(
+    self,
+    host: str,
+    port: str = &#34;&#34;,
+    protocol: str = &#34;ssh&#34;,
+    *,
+    limit: int | None = None,
+) -&gt; int:
+    &#34;&#34;&#34;Return remaining jumphost attempt quota.&#34;&#34;&#34;
+    eff_limit = self._default_max_hop_attempts if limit is None else int(limit)
+    return self.remaining(self._hop_key(host, port, protocol), limit=eff_limit)</code></pre>
+</details>
+<div class="desc"><p>Return remaining jumphost attempt quota.</p></div>
+</dd>
+<dt id="connpy.auth_utils.AuthAttemptTracker.remaining_host"><code class="name flex">
+<span>def <span class="ident">remaining_host</span></span>(<span>self, host: str, port: str = '', protocol: str = 'ssh', *, limit: int | None = None) ‑> int</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def remaining_host(
+    self,
+    host: str,
+    port: str = &#34;&#34;,
+    protocol: str = &#34;ssh&#34;,
+    *,
+    limit: int | None = None,
+) -&gt; int:
+    &#34;&#34;&#34;Return remaining target-host attempt quota.&#34;&#34;&#34;
+    eff_limit = self._default_max_host_attempts if limit is None else int(limit)
+    return self.remaining(self._host_key(host, port, protocol), limit=eff_limit)</code></pre>
+</details>
+<div class="desc"><p>Return remaining target-host attempt quota.</p></div>
+</dd>
+<dt id="connpy.auth_utils.AuthAttemptTracker.remaining_user"><code class="name flex">
+<span>def <span class="ident">remaining_user</span></span>(<span>self, user: str, *, limit: int | None = None) ‑> int | None</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def remaining_user(
+    self,
+    user: str,
+    *,
+    limit: int | None = None,
+) -&gt; int | None:
+    &#34;&#34;&#34;Return remaining global username quota, or None if unlimited.&#34;&#34;&#34;
+    eff_limit = self._default_max_global_user_attempts if limit is None else limit
+    if eff_limit is None:
+        return None
+    return self.remaining(self._user_key(user), limit=int(eff_limit))</code></pre>
+</details>
+<div class="desc"><p>Return remaining global username quota, or None if unlimited.</p></div>
+</dd>
+<dt id="connpy.auth_utils.AuthAttemptTracker.reset"><code class="name flex">
+<span>def <span class="ident">reset</span></span>(<span>self) ‑> None</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def reset(self) -&gt; None:
+    &#34;&#34;&#34;Clear all tracked entries.&#34;&#34;&#34;
+    with self._lock:
+        self._unblocked.clear()
+        self._blocked.clear()</code></pre>
+</details>
+<div class="desc"><p>Clear all tracked entries.</p></div>
+</dd>
+<dt id="connpy.auth_utils.AuthAttemptTracker.try_acquire"><code class="name flex">
+<span>def <span class="ident">try_acquire</span></span>(<span>self, key: Any, *, limit: int) ‑> bool</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def try_acquire(self, key: Any, *, limit: int) -&gt; bool:
+    &#34;&#34;&#34;Attempt to consume 1 attempt slot for key within limit. Returns False if exhausted.&#34;&#34;&#34;
+    if limit &lt;= 0:
+        return False
+    now = self._clock()
+    with self._lock:
+        if not self._can_acquire_unlocked(key, limit, now):
+            return False
+        self._commit_acquire_unlocked(key, limit, now)
+        return True</code></pre>
+</details>
+<div class="desc"><p>Attempt to consume 1 attempt slot for key within limit. Returns False if exhausted.</p></div>
+</dd>
+<dt id="connpy.auth_utils.AuthAttemptTracker.try_acquire_hop"><code class="name flex">
+<span>def <span class="ident">try_acquire_hop</span></span>(<span>self, host: str, port: str = '', protocol: str = 'ssh', *, limit: int | None = None) ‑> bool</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def try_acquire_hop(
+    self,
+    host: str,
+    port: str = &#34;&#34;,
+    protocol: str = &#34;ssh&#34;,
+    *,
+    limit: int | None = None,
+) -&gt; bool:
+    &#34;&#34;&#34;Consume 1 jumphost authentication attempt if within budget.&#34;&#34;&#34;
+    eff_limit = self._default_max_hop_attempts if limit is None else int(limit)
+    return self.try_acquire(self._hop_key(host, port, protocol), limit=eff_limit)</code></pre>
+</details>
+<div class="desc"><p>Consume 1 jumphost authentication attempt if within budget.</p></div>
+</dd>
+<dt id="connpy.auth_utils.AuthAttemptTracker.try_acquire_host"><code class="name flex">
+<span>def <span class="ident">try_acquire_host</span></span>(<span>self, host: str, port: str = '', protocol: str = 'ssh', *, limit: int | None = None) ‑> bool</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def try_acquire_host(
+    self,
+    host: str,
+    port: str = &#34;&#34;,
+    protocol: str = &#34;ssh&#34;,
+    *,
+    limit: int | None = None,
+) -&gt; bool:
+    &#34;&#34;&#34;Consume 1 target-host authentication attempt if within budget.&#34;&#34;&#34;
+    eff_limit = self._default_max_host_attempts if limit is None else int(limit)
+    return self.try_acquire(self._host_key(host, port, protocol), limit=eff_limit)</code></pre>
+</details>
+<div class="desc"><p>Consume 1 target-host authentication attempt if within budget.</p></div>
+</dd>
+<dt id="connpy.auth_utils.AuthAttemptTracker.try_acquire_target_attempt"><code class="name flex">
+<span>def <span class="ident">try_acquire_target_attempt</span></span>(<span>self,<br>*,<br>host: str,<br>port: str = '',<br>protocol: str = 'ssh',<br>user: str = '',<br>host_limit: int | None = None,<br>user_limit: int | None = None) ‑> tuple[bool, str | None]</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def try_acquire_target_attempt(
+    self,
+    *,
+    host: str,
+    port: str = &#34;&#34;,
+    protocol: str = &#34;ssh&#34;,
+    user: str = &#34;&#34;,
+    host_limit: int | None = None,
+    user_limit: int | None = None,
+) -&gt; tuple[bool, str | None]:
+    &#34;&#34;&#34;Atomically verify and consume both user and host attempt slots under one lock.&#34;&#34;&#34;
+    eff_host_limit = self._default_max_host_attempts if host_limit is None else int(host_limit)
+    eff_user_limit = self._default_max_global_user_attempts if user_limit is None else user_limit
+    host_key = self._host_key(host, port, protocol)
+    user_key = self._user_key(user) if (user and eff_user_limit is not None) else None
+    now = self._clock()
+    with self._lock:
+        if user_key is not None and not self._can_acquire_unlocked(
+            user_key, int(eff_user_limit), now
+        ):
+            return False, &#34;USER_BUDGET_EXHAUSTED&#34;
+        if not self._can_acquire_unlocked(host_key, eff_host_limit, now):
+            return False, &#34;HOST_BUDGET_EXHAUSTED&#34;
+        if user_key is not None:
+            self._commit_acquire_unlocked(user_key, int(eff_user_limit), now)
+        self._commit_acquire_unlocked(host_key, eff_host_limit, now)
+        return True, None</code></pre>
+</details>
+<div class="desc"><p>Atomically verify and consume both user and host attempt slots under one lock.</p></div>
+</dd>
+<dt id="connpy.auth_utils.AuthAttemptTracker.try_acquire_user"><code class="name flex">
+<span>def <span class="ident">try_acquire_user</span></span>(<span>self, user: str, *, limit: int | None = None) ‑> bool</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def try_acquire_user(
+    self,
+    user: str,
+    *,
+    limit: int | None = None,
+) -&gt; bool:
+    &#34;&#34;&#34;Consume 1 global username authentication attempt if a global limit is active.&#34;&#34;&#34;
+    if not user:
+        return True
+    eff_limit = self._default_max_global_user_attempts if limit is None else limit
+    if eff_limit is None:
+        return True
+    return self.try_acquire(self._user_key(user), limit=int(eff_limit))</code></pre>
+</details>
+<div class="desc"><p>Consume 1 global username authentication attempt if a global limit is active.</p></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.auth_utils.AuthCandidate"><code class="flex name class">
+<span>class <span class="ident">AuthCandidate</span></span>
+<span>(</span><span>user: str,<br>password_spec: str | tuple[str, ...],<br>is_fallback: bool = False,<br>label: str = '')</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@dataclass(frozen=True)
+class AuthCandidate:
+    &#34;&#34;&#34;Immutable credential candidate entry for primary or backup authentication.&#34;&#34;&#34;
+
+    user: str
+    password_spec: str | tuple[str, ...]
+    is_fallback: bool = False
+    label: str = &#34;&#34;</code></pre>
+</details>
+<div class="desc"><p>Immutable credential candidate entry for primary or backup authentication.</p></div>
+<h3>Instance variables</h3>
+<dl>
+<dt id="connpy.auth_utils.AuthCandidate.is_fallback"><code class="name">var <span class="ident">is_fallback</span> : bool</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.auth_utils.AuthCandidate.label"><code class="name">var <span class="ident">label</span> : str</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.auth_utils.AuthCandidate.password_spec"><code class="name">var <span class="ident">password_spec</span> : str | tuple[str, ...]</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.auth_utils.AuthCandidate.user"><code class="name">var <span class="ident">user</span> : str</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.auth_utils.RuntimeAuthCandidate"><code class="flex name class">
+<span>class <span class="ident">RuntimeAuthCandidate</span></span>
+<span>(</span><span>user: str,<br>password: str,<br>has_password: bool,<br>is_fallback: bool = False,<br>label: str = '')</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@dataclass(frozen=True)
+class RuntimeAuthCandidate:
+    &#34;&#34;&#34;Per-call resolved credential candidate with decrypted secret.&#34;&#34;&#34;
+
+    user: str
+    password: str
+    has_password: bool
+    is_fallback: bool = False
+    label: str = &#34;&#34;</code></pre>
+</details>
+<div class="desc"><p>Per-call resolved credential candidate with decrypted secret.</p></div>
+<h3>Instance variables</h3>
+<dl>
+<dt id="connpy.auth_utils.RuntimeAuthCandidate.has_password"><code class="name">var <span class="ident">has_password</span> : bool</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.auth_utils.RuntimeAuthCandidate.is_fallback"><code class="name">var <span class="ident">is_fallback</span> : bool</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.auth_utils.RuntimeAuthCandidate.label"><code class="name">var <span class="ident">label</span> : str</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.auth_utils.RuntimeAuthCandidate.password"><code class="name">var <span class="ident">password</span> : str</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.auth_utils.RuntimeAuthCandidate.user"><code class="name">var <span class="ident">user</span> : str</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="connpy.auth_utils.SanitizedAuthError"><code class="flex name class">
+<span>class <span class="ident">SanitizedAuthError</span></span>
+<span>(</span><span>message: str = '', code: str = 'AUTH_FAILED')</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class SanitizedAuthError(ConnpyError):
+    &#34;&#34;&#34;Authentication error guaranteed free of secrets and chained tracebacks.&#34;&#34;&#34;
+
+    __suppress_context__ = True
+
+    def __init__(self, message: str = &#34;&#34;, code: str = &#34;AUTH_FAILED&#34;) -&gt; None:
+        super().__init__(message)
+        self.code = code
+        self.__suppress_context__ = True
+        self.__cause__ = None
+
+    @property
+    def __context__(self) -&gt; None:
+        &#34;&#34;&#34;Never retain or expose an underlying exception context.&#34;&#34;&#34;
+        return None
+
+    @__context__.setter
+    def __context__(self, _value: BaseException | None) -&gt; None:
+        return
+
+    def __reduce__(self) -&gt; tuple[type[SanitizedAuthError], tuple[str, str]]:
+        msg = str(self.args[0]) if self.args else &#34;&#34;
+        return (self.__class__, (msg, str(self.code)))</code></pre>
+</details>
+<div class="desc"><p>Authentication error guaranteed free of secrets and chained tracebacks.</p></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="connpy.services.exceptions.ConnpyError" href="services/exceptions.html#connpy.services.exceptions.ConnpyError">ConnpyError</a></li>
+<li>builtins.Exception</li>
+<li>builtins.BaseException</li>
+</ul>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="connpy" href="index.html">connpy</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-functions">Functions</a></h3>
+<ul class="">
+<li><code><a title="connpy.auth_utils.clear_exception_frames" href="#connpy.auth_utils.clear_exception_frames">clear_exception_frames</a></code></li>
+<li><code><a title="connpy.auth_utils.extract_compose_profile_refs" href="#connpy.auth_utils.extract_compose_profile_refs">extract_compose_profile_refs</a></code></li>
+<li><code><a title="connpy.auth_utils.extract_profile_refs_from_value" href="#connpy.auth_utils.extract_profile_refs_from_value">extract_profile_refs_from_value</a></code></li>
+<li><code><a title="connpy.auth_utils.has_insecure_hostkey_checking" href="#connpy.auth_utils.has_insecure_hostkey_checking">has_insecure_hostkey_checking</a></code></li>
+<li><code><a title="connpy.auth_utils.host_exact_re" href="#connpy.auth_utils.host_exact_re">host_exact_re</a></code></li>
+<li><code><a title="connpy.auth_utils.is_compose_expression" href="#connpy.auth_utils.is_compose_expression">is_compose_expression</a></code></li>
+<li><code><a title="connpy.auth_utils.is_rsa_blob" href="#connpy.auth_utils.is_rsa_blob">is_rsa_blob</a></code></li>
+<li><code><a title="connpy.auth_utils.mask_node_secrets" href="#connpy.auth_utils.mask_node_secrets">mask_node_secrets</a></code></li>
+<li><code><a title="connpy.auth_utils.normalize_prompt_line" href="#connpy.auth_utils.normalize_prompt_line">normalize_prompt_line</a></code></li>
+<li><code><a title="connpy.auth_utils.parse_compose_expression" href="#connpy.auth_utils.parse_compose_expression">parse_compose_expression</a></code></li>
+<li><code><a title="connpy.auth_utils.raise_sanitized_auth_error" href="#connpy.auth_utils.raise_sanitized_auth_error">raise_sanitized_auth_error</a></code></li>
+<li><code><a title="connpy.auth_utils.redact_known_secrets" href="#connpy.auth_utils.redact_known_secrets">redact_known_secrets</a></code></li>
+<li><code><a title="connpy.auth_utils.resolve_fallback_entries" href="#connpy.auth_utils.resolve_fallback_entries">resolve_fallback_entries</a></code></li>
+<li><code><a title="connpy.auth_utils.sanitize_exception" href="#connpy.auth_utils.sanitize_exception">sanitize_exception</a></code></li>
+<li><code><a title="connpy.auth_utils.sanitize_log_message" href="#connpy.auth_utils.sanitize_log_message">sanitize_log_message</a></code></li>
+<li><code><a title="connpy.auth_utils.validate_auth_budget_tags" href="#connpy.auth_utils.validate_auth_budget_tags">validate_auth_budget_tags</a></code></li>
+<li><code><a title="connpy.auth_utils.validate_compose_syntax" href="#connpy.auth_utils.validate_compose_syntax">validate_compose_syntax</a></code></li>
+<li><code><a title="connpy.auth_utils.validate_config_auth_settings" href="#connpy.auth_utils.validate_config_auth_settings">validate_config_auth_settings</a></code></li>
+<li><code><a title="connpy.auth_utils.validate_fallback_entries" href="#connpy.auth_utils.validate_fallback_entries">validate_fallback_entries</a></code></li>
+<li><code><a title="connpy.auth_utils.validate_json_depth_and_size" href="#connpy.auth_utils.validate_json_depth_and_size">validate_json_depth_and_size</a></code></li>
+<li><code><a title="connpy.auth_utils.validate_strict_int_range" href="#connpy.auth_utils.validate_strict_int_range">validate_strict_int_range</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="connpy.auth_utils.AuthAttemptTracker" href="#connpy.auth_utils.AuthAttemptTracker">AuthAttemptTracker</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.auth_utils.AuthAttemptTracker.entry_count" href="#connpy.auth_utils.AuthAttemptTracker.entry_count">entry_count</a></code></li>
+<li><code><a title="connpy.auth_utils.AuthAttemptTracker.is_blocked" href="#connpy.auth_utils.AuthAttemptTracker.is_blocked">is_blocked</a></code></li>
+<li><code><a title="connpy.auth_utils.AuthAttemptTracker.remaining" href="#connpy.auth_utils.AuthAttemptTracker.remaining">remaining</a></code></li>
+<li><code><a title="connpy.auth_utils.AuthAttemptTracker.remaining_hop" href="#connpy.auth_utils.AuthAttemptTracker.remaining_hop">remaining_hop</a></code></li>
+<li><code><a title="connpy.auth_utils.AuthAttemptTracker.remaining_host" href="#connpy.auth_utils.AuthAttemptTracker.remaining_host">remaining_host</a></code></li>
+<li><code><a title="connpy.auth_utils.AuthAttemptTracker.remaining_user" href="#connpy.auth_utils.AuthAttemptTracker.remaining_user">remaining_user</a></code></li>
+<li><code><a title="connpy.auth_utils.AuthAttemptTracker.reset" href="#connpy.auth_utils.AuthAttemptTracker.reset">reset</a></code></li>
+<li><code><a title="connpy.auth_utils.AuthAttemptTracker.try_acquire" href="#connpy.auth_utils.AuthAttemptTracker.try_acquire">try_acquire</a></code></li>
+<li><code><a title="connpy.auth_utils.AuthAttemptTracker.try_acquire_hop" href="#connpy.auth_utils.AuthAttemptTracker.try_acquire_hop">try_acquire_hop</a></code></li>
+<li><code><a title="connpy.auth_utils.AuthAttemptTracker.try_acquire_host" href="#connpy.auth_utils.AuthAttemptTracker.try_acquire_host">try_acquire_host</a></code></li>
+<li><code><a title="connpy.auth_utils.AuthAttemptTracker.try_acquire_target_attempt" href="#connpy.auth_utils.AuthAttemptTracker.try_acquire_target_attempt">try_acquire_target_attempt</a></code></li>
+<li><code><a title="connpy.auth_utils.AuthAttemptTracker.try_acquire_user" href="#connpy.auth_utils.AuthAttemptTracker.try_acquire_user">try_acquire_user</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.auth_utils.AuthCandidate" href="#connpy.auth_utils.AuthCandidate">AuthCandidate</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.auth_utils.AuthCandidate.is_fallback" href="#connpy.auth_utils.AuthCandidate.is_fallback">is_fallback</a></code></li>
+<li><code><a title="connpy.auth_utils.AuthCandidate.label" href="#connpy.auth_utils.AuthCandidate.label">label</a></code></li>
+<li><code><a title="connpy.auth_utils.AuthCandidate.password_spec" href="#connpy.auth_utils.AuthCandidate.password_spec">password_spec</a></code></li>
+<li><code><a title="connpy.auth_utils.AuthCandidate.user" href="#connpy.auth_utils.AuthCandidate.user">user</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.auth_utils.RuntimeAuthCandidate" href="#connpy.auth_utils.RuntimeAuthCandidate">RuntimeAuthCandidate</a></code></h4>
+<ul class="">
+<li><code><a title="connpy.auth_utils.RuntimeAuthCandidate.has_password" href="#connpy.auth_utils.RuntimeAuthCandidate.has_password">has_password</a></code></li>
+<li><code><a title="connpy.auth_utils.RuntimeAuthCandidate.is_fallback" href="#connpy.auth_utils.RuntimeAuthCandidate.is_fallback">is_fallback</a></code></li>
+<li><code><a title="connpy.auth_utils.RuntimeAuthCandidate.label" href="#connpy.auth_utils.RuntimeAuthCandidate.label">label</a></code></li>
+<li><code><a title="connpy.auth_utils.RuntimeAuthCandidate.password" href="#connpy.auth_utils.RuntimeAuthCandidate.password">password</a></code></li>
+<li><code><a title="connpy.auth_utils.RuntimeAuthCandidate.user" href="#connpy.auth_utils.RuntimeAuthCandidate.user">user</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="connpy.auth_utils.SanitizedAuthError" href="#connpy.auth_utils.SanitizedAuthError">SanitizedAuthError</a></code></h4>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.6</a>.</p>
+</footer>
+</body>
+</html>

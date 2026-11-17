@@ -55,6 +55,7 @@ el.replaceWith(d);
 <pre><code class="python">def handle_errors(func):
     import inspect
     if inspect.isgeneratorfunction(func):
+        @functools.wraps(func)
         def wrapper(*args, **kwargs):
             try:
                 for item in func(*args, **kwargs):
@@ -75,6 +76,7 @@ el.replaceWith(d);
                 printer.clear_thread_state()
         return wrapper
     else:
+        @functools.wraps(func)
         def wrapper(*args, **kwargs):
             try:
                 return func(*args, **kwargs)
@@ -1425,8 +1427,24 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
             self.server_console.print(f&#34;[debug][DEBUG][/debug] gRPC interact_node request for: [bold cyan]{unique_id}[/bold cyan]&#34;)
 
         if first_req.connection_params_json:
-            import json
-            params = json.loads(first_req.connection_params_json)
+            try:
+                params = validate_json_depth_and_size(
+                    first_req.connection_params_json,
+                    max_bytes=MAX_JSON_INPUT_BYTES,
+                    max_depth=MAX_JSON_INPUT_DEPTH,
+                )
+                if not isinstance(params, dict):
+                    raise TypeError(&#34;connection_params_json must be a JSON object&#34;)
+                if &#34;fallback&#34; in params and params[&#34;fallback&#34;] not in (None, &#34;&#34;, []):
+                    validate_fallback_entries(
+                        params[&#34;fallback&#34;],
+                        max_entries=MAX_FALLBACK_ENTRIES,
+                    )
+                if &#34;tags&#34; in params and params[&#34;tags&#34;] not in (&#34;&#34;, None):
+                    validate_auth_budget_tags(params[&#34;tags&#34;])
+            except (ValueError, TypeError, SanitizedAuthError) as exc:
+                context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(exc))
+
             base_node_id = params.get(&#34;base_node&#34;)
             # Valid attributes that a node object accepts
             valid_attrs = [&#39;host&#39;, &#39;options&#39;, &#39;logs&#39;, &#39;password&#39;, &#39;port&#39;, &#39;protocol&#39;, &#39;user&#39;, &#39;jumphost&#39;]
@@ -1444,6 +1462,8 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
                     for attr in valid_attrs:
                         if attr in params:
                             device[attr] = params[attr]
+                    if &#34;fallback&#34; in params:
+                        device[&#34;fallback&#34;] = params[&#34;fallback&#34;]
 
                     if &#34;tags&#34; in params:
                         device_tags = device.get(&#34;tags&#34;, {})
@@ -1457,20 +1477,30 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
                 else:
                     # base_node not found, fall back to dynamic
                     node_name = params.get(&#34;name&#34;, fallback_id)
-                    n = node(node_name, host=params.get(&#34;host&#34;, &#34;&#34;), config=user_config)
-                    for attr in valid_attrs:
-                        if attr in params:
-                            setattr(n, attr, params[attr])
+                    dyn_kwargs = {k: params[k] for k in valid_attrs if k in params and k != &#34;host&#34;}
+                    if &#34;fallback&#34; in params:
+                        dyn_kwargs[&#34;fallback&#34;] = params[&#34;fallback&#34;]
                     if &#34;tags&#34; in params:
-                        n.tags = params[&#34;tags&#34;]
+                        dyn_kwargs[&#34;tags&#34;] = params[&#34;tags&#34;]
+                    n = node(
+                        node_name,
+                        host=params.get(&#34;host&#34;, &#34;&#34;),
+                        config=user_config,
+                        **dyn_kwargs,
+                    )
             else:
                 node_name = params.get(&#34;name&#34;, fallback_id)
-                n = node(node_name, host=params.get(&#34;host&#34;, &#34;&#34;), config=user_config)
-                for attr in valid_attrs:
-                    if attr in params:
-                        setattr(n, attr, params[attr])
+                dyn_kwargs = {k: params[k] for k in valid_attrs if k in params and k != &#34;host&#34;}
+                if &#34;fallback&#34; in params:
+                    dyn_kwargs[&#34;fallback&#34;] = params[&#34;fallback&#34;]
                 if &#34;tags&#34; in params:
-                    n.tags = params[&#34;tags&#34;]
+                    dyn_kwargs[&#34;tags&#34;] = params[&#34;tags&#34;]
+                n = node(
+                    node_name,
+                    host=params.get(&#34;host&#34;, &#34;&#34;),
+                    config=user_config,
+                    **dyn_kwargs,
+                )
             n._orig_protocol = n.protocol
             if sftp:
                 n.protocol = &#34;sftp&#34;
@@ -1491,9 +1521,11 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
         debug_chunks = []
         if debug:
             from io import StringIO
+
             from rich.console import Console as RichConsole
-            from ..printer import connpy_theme
+
             from .. import printer as _printer
+            from ..printer import connpy_theme
 
             def remote_logger(msg_type, message):
                 buf = StringIO()
@@ -1514,7 +1546,14 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
         else:
             remote_logger = None
 
-        connect = n._connect(debug=debug, logger=remote_logger)
+        try:
+            connect = n._connect(
+                debug=debug,
+                logger=remote_logger,
+                attempt_tracker=getattr(provider, &#34;auth_tracker&#34;, None),
+            )
+        except Exception as exc:  # noqa: BLE001
+            connect = str(sanitize_exception(exc, code=&#34;AUTH_FAILED&#34;))
 
         # Send debug output to client before checking result (always show the command)
         for chunk in debug_chunks:
@@ -1845,10 +1884,9 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
                         continue
 
                 asyncio.run(n._async_interact_loop(remote_stream, resize_callback, copilot_handler=remote_copilot_handler))
-            except Exception as e:
-                import traceback
-                print(f&#34;[ERROR in run_async_loop] {e}&#34;)
-                traceback.print_exc()
+            except Exception as e:  # noqa: BLE001
+                sanitized_err = sanitize_exception(e, code=&#34;TRANSPORT_ERROR&#34;, context_label=&#34;interact stream&#34;)
+                print(f&#34;[ERROR in run_async_loop] {sanitized_err}&#34;)
             finally:
                 n._teardown_interact_environment()
                 response_queue.put(None)  # Signal EOF

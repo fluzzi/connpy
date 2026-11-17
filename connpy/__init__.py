@@ -5,7 +5,7 @@
 </p>
 
 
-# Connpy (v6.4.0b4)
+# Connpy (v6.5.0b1)
 [![](https://img.shields.io/pypi/v/connpy.svg?style=flat-square)](https://pypi.org/pypi/connpy/)
 [![](https://img.shields.io/pypi/pyversions/connpy.svg?style=flat-square)](https://pypi.org/pypi/connpy/)
 [![](https://img.shields.io/pypi/dm/connpy.svg?style=flat-square&cacheSeconds=86400)](https://pypi.org/pypi/connpy/)
@@ -139,6 +139,12 @@ Customize connection settings dynamically using tags. Configure per-node setting
 tags: { "os": "cisco_ios", "prompt": ".*#", "screen_length_command": "terminal length 0" }
 ```
 
+### 3f. Credential Fallback Chain, `compose:` & Auth Budgets
+Configure automatic backup credentials (`fallback`) on nodes or `@profile` templates so both interactive (`conn <node>`) and unattended (`conn run` / MCP) sessions switch seamlessly when primary TACACS+/AAA authentication fails (opt-out via `tags.allow_fallback: false`).
+* **Fallback Formats**: Accepts `@profile`, explicit JSON list/dict entries (`[{"user": "backup", "password": "..."}]`), or `compose:` expressions. Nodes referencing multiple profiles inherit `fallback` with priority from `user`/`password` `@profile` references.
+* **Password Composition (`compose:`)**: Concatenate secrets and literals explicitly using `compose:@prof1+@prof2+"suffix"` (use `@@` to escape leading literal `@`).
+* **Anti-Lockout Guardrails (`conn config`)**: Enforce strict attempt bounds via `--max-auth-prompts`, `--max-total-auth-attempts`, `--max-hop-host-attempts`, `--max-global-user-attempts`, and `--disable-fallback-on-insecure-hostkey`.
+
 
 ---
 
@@ -158,6 +164,9 @@ Support for single or chained intermediate gateway nodes (SSH, Mosh, SSM, kubect
 
 ### 4c. Debug Mode, Keepalive, Logging
 Track connection steps (`conn --debug node`), set idle keepalive intervals (`conn config --keepalive <seconds>`), or define dynamic output log files using variables like `${unique}`, `${host}`, `${port}`, `${user}`, `${protocol}`, or `${date 'format'}`.
+
+### 4d. Adaptive Multi-Hop Timeouts
+Differentiate `--connect-timeout` and `--auth-timeout` stages (`conn run` / `conn config`), automatically computing topological per-hop latency budgets for chained `SSM` and `Jumphost` tunnels with bounded progress extensions on slow handshakes.
 
 
 ---

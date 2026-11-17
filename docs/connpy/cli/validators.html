@@ -106,10 +106,40 @@ el.replaceWith(d);
         return True
 
     def pass_validation(self, answers, current, regex = &#34;(^@.+$)&#34;):
+        if is_compose_expression(current):
+            try:
+                validate_compose_syntax(current)
+            except SanitizedAuthError as exc:
+                _raise_val_err(str(exc))
+            return True
         profiles = current.split(&#34;,&#34;)
         for i in profiles:
             if not re.match(regex, i) or i[1:] not in self.app.profiles:
                 _raise_val_err(&#34;Profile {} don&#39;t exist&#34;.format(i))
+        return True
+
+    def _validate_tags_dict(self, current: str):
+        if len(current.encode(&#34;utf-8&#34;, errors=&#34;replace&#34;)) &gt; MAX_JSON_INPUT_BYTES:
+            _raise_val_err(f&#34;Tags exceed maximum size of {MAX_JSON_INPUT_BYTES} bytes&#34;)
+        parsed = None
+        try:
+            parsed = json.loads(current)
+        except (ValueError, TypeError):
+            try:
+                parsed = ast.literal_eval(current)
+            except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):
+                parsed = None
+        if not isinstance(parsed, dict):
+            _raise_val_err(&#34;Tags should be a python dictionary.&#34;)
+        try:
+            validate_json_depth_and_size(
+                parsed,
+                max_bytes=MAX_JSON_INPUT_BYTES,
+                max_depth=MAX_JSON_INPUT_DEPTH,
+            )
+            validate_auth_budget_tags(parsed)
+        except (ValueError, TypeError, SanitizedAuthError) as exc:
+            _raise_val_err(str(exc))
         return True
 
     def tags_validation(self, answers, current):
@@ -117,24 +147,39 @@ el.replaceWith(d);
             if current[1:] not in self.app.profiles:
                 _raise_val_err(&#34;Profile {} don&#39;t exist&#34;.format(current))
         elif current != &#34;&#34;:
-            isdict = False
-            try:
-                isdict = ast.literal_eval(current)
-            except Exception:
-                pass
-            if not isinstance (isdict, dict):
-                _raise_val_err(&#34;Tags should be a python dictionary.&#34;.format(current))
+            return self._validate_tags_dict(current)
         return True
 
     def profile_tags_validation(self, answers, current):
         if current != &#34;&#34;:
-            isdict = False
-            try:
-                isdict = ast.literal_eval(current)
-            except Exception:
-                pass
-            if not isinstance (isdict, dict):
-                _raise_val_err(&#34;Tags should be a python dictionary.&#34;.format(current))
+            return self._validate_tags_dict(current)
+        return True
+
+    def fallback_validation(self, answers, current):
+        if current in (None, &#34;&#34;):
+            return True
+        stripped = str(current).strip()
+        if not stripped:
+            return True
+        if len(stripped.encode(&#34;utf-8&#34;, errors=&#34;replace&#34;)) &gt; MAX_JSON_INPUT_BYTES:
+            _raise_val_err(f&#34;Fallback exceeds maximum size of {MAX_JSON_INPUT_BYTES} bytes&#34;)
+        if stripped.startswith(&#34;@&#34;) and &#34;+&#34; not in stripped:
+            if stripped[1:] not in self.app.profiles:
+                _raise_val_err(f&#34;Profile {stripped} don&#39;t exist&#34;)
+            return True
+        try:
+            if is_compose_expression(stripped):
+                validate_compose_syntax(stripped)
+                return True
+            if stripped.startswith((&#34;[&#34;, &#34;{&#34;)):
+                validate_json_depth_and_size(
+                    stripped,
+                    max_bytes=MAX_JSON_INPUT_BYTES,
+                    max_depth=MAX_JSON_INPUT_DEPTH,
+                )
+            validate_fallback_entries(stripped, max_entries=MAX_FALLBACK_ENTRIES)
+        except (ValueError, TypeError, SanitizedAuthError) as exc:
+            _raise_val_err(str(exc))
         return True
 
     def jumphost_validation(self, answers, current):
@@ -273,6 +318,43 @@ el.replaceWith(d);
 </details>
 <div class="desc"></div>
 </dd>
+<dt id="connpy.cli.validators.Validators.fallback_validation"><code class="name flex">
+<span>def <span class="ident">fallback_validation</span></span>(<span>self, answers, current)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def fallback_validation(self, answers, current):
+    if current in (None, &#34;&#34;):
+        return True
+    stripped = str(current).strip()
+    if not stripped:
+        return True
+    if len(stripped.encode(&#34;utf-8&#34;, errors=&#34;replace&#34;)) &gt; MAX_JSON_INPUT_BYTES:
+        _raise_val_err(f&#34;Fallback exceeds maximum size of {MAX_JSON_INPUT_BYTES} bytes&#34;)
+    if stripped.startswith(&#34;@&#34;) and &#34;+&#34; not in stripped:
+        if stripped[1:] not in self.app.profiles:
+            _raise_val_err(f&#34;Profile {stripped} don&#39;t exist&#34;)
+        return True
+    try:
+        if is_compose_expression(stripped):
+            validate_compose_syntax(stripped)
+            return True
+        if stripped.startswith((&#34;[&#34;, &#34;{&#34;)):
+            validate_json_depth_and_size(
+                stripped,
+                max_bytes=MAX_JSON_INPUT_BYTES,
+                max_depth=MAX_JSON_INPUT_DEPTH,
+            )
+        validate_fallback_entries(stripped, max_entries=MAX_FALLBACK_ENTRIES)
+    except (ValueError, TypeError, SanitizedAuthError) as exc:
+        _raise_val_err(str(exc))
+    return True</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
 <dt id="connpy.cli.validators.Validators.host_validation"><code class="name flex">
 <span>def <span class="ident">host_validation</span></span>(<span>self, answers, current, regex='^.+$')</span>
 </code></dt>
@@ -319,6 +401,12 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def pass_validation(self, answers, current, regex = &#34;(^@.+$)&#34;):
+    if is_compose_expression(current):
+        try:
+            validate_compose_syntax(current)
+        except SanitizedAuthError as exc:
+            _raise_val_err(str(exc))
+        return True
     profiles = current.split(&#34;,&#34;)
     for i in profiles:
         if not re.match(regex, i) or i[1:] not in self.app.profiles:
@@ -413,13 +501,7 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def profile_tags_validation(self, answers, current):
     if current != &#34;&#34;:
-        isdict = False
-        try:
-            isdict = ast.literal_eval(current)
-        except Exception:
-            pass
-        if not isinstance (isdict, dict):
-            _raise_val_err(&#34;Tags should be a python dictionary.&#34;.format(current))
+        return self._validate_tags_dict(current)
     return True</code></pre>
 </details>
 <div class="desc"></div>
@@ -455,13 +537,7 @@ el.replaceWith(d);
         if current[1:] not in self.app.profiles:
             _raise_val_err(&#34;Profile {} don&#39;t exist&#34;.format(current))
     elif current != &#34;&#34;:
-        isdict = False
-        try:
-            isdict = ast.literal_eval(current)
-        except Exception:
-            pass
-        if not isinstance (isdict, dict):
-            _raise_val_err(&#34;Tags should be a python dictionary.&#34;.format(current))
+        return self._validate_tags_dict(current)
     return True</code></pre>
 </details>
 <div class="desc"></div>
@@ -490,6 +566,7 @@ el.replaceWith(d);
 <li><code><a title="connpy.cli.validators.Validators.bulk_host_validation" href="#connpy.cli.validators.Validators.bulk_host_validation">bulk_host_validation</a></code></li>
 <li><code><a title="connpy.cli.validators.Validators.bulk_node_validation" href="#connpy.cli.validators.Validators.bulk_node_validation">bulk_node_validation</a></code></li>
 <li><code><a title="connpy.cli.validators.Validators.default_validation" href="#connpy.cli.validators.Validators.default_validation">default_validation</a></code></li>
+<li><code><a title="connpy.cli.validators.Validators.fallback_validation" href="#connpy.cli.validators.Validators.fallback_validation">fallback_validation</a></code></li>
 <li><code><a title="connpy.cli.validators.Validators.host_validation" href="#connpy.cli.validators.Validators.host_validation">host_validation</a></code></li>
 <li><code><a title="connpy.cli.validators.Validators.jumphost_validation" href="#connpy.cli.validators.Validators.jumphost_validation">jumphost_validation</a></code></li>
 <li><code><a title="connpy.cli.validators.Validators.pass_validation" href="#connpy.cli.validators.Validators.pass_validation">pass_validation</a></code></li>

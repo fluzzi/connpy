@@ -48,7 +48,7 @@ el.replaceWith(d);
 <dl>
 <dt id="connpy.services.execution_service.ExecutionService"><code class="flex name class">
 <span>class <span class="ident">ExecutionService</span></span>
-<span>(</span><span>config=None)</span>
+<span>(</span><span>config=None, remote_stub=None, attempt_tracker=None)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -58,104 +58,239 @@ el.replaceWith(d);
 <pre><code class="python">class ExecutionService(BaseService):
     &#34;&#34;&#34;Business logic for executing commands on nodes and running automation scripts.&#34;&#34;&#34;
 
-    def run_commands(
-        self, 
-        nodes_filter: str, 
-        commands: List[str], 
-        variables: Optional[Dict[str, Any]] = None,
-        parallel: int = 10,
-        timeout: int = 20,
-        folder: Optional[str] = None,
-        prompt: Optional[str] = None,
-        on_node_complete: Optional[Callable] = None,
-        logger: Optional[Callable] = None,
-        name: Optional[str] = None
-    ) -&gt; Dict[str, str]:
+    def __init__(self, config=None, remote_stub=None, attempt_tracker=None):
+        super().__init__(config)
+        self.remote_stub = remote_stub
+        self.attempt_tracker = (
+            attempt_tracker if attempt_tracker is not None else AuthAttemptTracker()
+        )
+        self.last_fallback_used: dict[str, bool] = {}
 
+    def _is_remote_backend(self) -&gt; bool:
+        &#34;&#34;&#34;Return True when execution is configured to run against a remote gRPC backend.&#34;&#34;&#34;
+        if getattr(self, &#34;remote_stub&#34;, None) is not None:
+            return True
+        cfg = getattr(self.config, &#34;config&#34;, None)
+        return isinstance(cfg, dict) and cfg.get(&#34;service_mode&#34;) == &#34;remote&#34;
+
+    def _ensure_backend_supports_stage_timeouts(
+        self,
+        connect_timeout: int | None = None,
+        auth_timeout: int | None = None,
+    ) -&gt; None:
+        &#34;&#34;&#34;Raise ConnpyError if per-stage timeout overrides are used on gRPC remote backend.&#34;&#34;&#34;
+        if self._is_remote_backend() and (connect_timeout is not None or auth_timeout is not None):
+            raise ConnpyError(
+                &#34;connect_timeout and auth_timeout overrides are not supported in remote gRPC mode&#34;
+            )
+
+    def _get_remote_stub(self):
+        &#34;&#34;&#34;Return the configured or lazily constructed ExecutionStub for remote gRPC mode.&#34;&#34;&#34;
+        if getattr(self, &#34;remote_stub&#34;, None) is not None:
+            return self.remote_stub
+        cfg = getattr(self.config, &#34;config&#34;, None)
+        remote_host = cfg.get(&#34;remote_host&#34;) if isinstance(cfg, dict) else None
+        if not remote_host:
+            raise ConnpyError(&#34;Remote host must be specified in remote mode&#34;)
+
+        import grpc
+
+        from connpy.grpc_layer.stubs import AuthClientInterceptor, ExecutionStub
+
+        def get_token():
+            env_token = os.environ.get(&#34;CONNPY_TOKEN&#34;)
+            if env_token:
+                return env_token
+            defaultdir = getattr(self.config, &#34;defaultdir&#34;, None)
+            if defaultdir:
+                token_path = os.path.join(defaultdir, &#34;.token&#34;)
+                if os.path.exists(token_path):
+                    with suppress(OSError), open(token_path) as f:
+                        return f.read().strip()
+            return None
+
+        channel = grpc.insecure_channel(remote_host)
+        channel = grpc.intercept_channel(channel, AuthClientInterceptor(get_token))
+        return ExecutionStub(channel, remote_host=remote_host)
+
+    def run_commands(
+        self,
+        nodes_filter: str,
+        commands: list[str],
+        variables: dict[str, Any] | None = None,
+        parallel: int = 10,
+        timeout: int | None = None,
+        folder: str | None = None,
+        prompt: str | None = None,
+        on_node_complete: Callable | None = None,
+        logger: Callable | None = None,
+        name: str | None = None,
+        connect_timeout: int | None = None,
+        auth_timeout: int | None = None,
+    ) -&gt; dict[str, Any]:
         &#34;&#34;&#34;Execute commands on a set of nodes.&#34;&#34;&#34;
         try:
+            self._ensure_backend_supports_stage_timeouts(
+                connect_timeout=connect_timeout,
+                auth_timeout=auth_timeout,
+            )
+
+            if self._is_remote_backend():
+                stub = self._get_remote_stub()
+                return stub.run_commands(
+                    nodes_filter=nodes_filter,
+                    commands=commands,
+                    variables=variables,
+                    parallel=parallel,
+                    timeout=timeout if timeout is not None else 20,
+                    folder=folder,
+                    prompt=prompt,
+                    on_node_complete=on_node_complete,
+                    logger=logger,
+                    name=name or &#34;&#34;,
+                )
+
             matched_names = self.config._getallnodes(nodes_filter)
             if not matched_names:
                 raise ConnpyError(f&#34;No nodes found matching filter: {nodes_filter}&#34;)
-            
+
             node_data = self.config.getitems(matched_names, extract=True)
             executor = Nodes(node_data, config=self.config)
             self.last_executor = executor
-            
-            results = executor.run(
-                commands=commands,
-                vars=variables,
-                parallel=parallel,
-                timeout=timeout,
-                folder=folder,
-                prompt=prompt,
-                on_complete=on_node_complete,
-                logger=logger
-            )
 
-            # Combine output and status for the caller
+            run_kwargs: dict[str, Any] = {
+                &#34;commands&#34;: commands,
+                &#34;vars&#34;: variables,
+                &#34;parallel&#34;: parallel,
+                &#34;timeout&#34;: timeout,
+                &#34;folder&#34;: folder,
+                &#34;prompt&#34;: prompt,
+                &#34;on_complete&#34;: on_node_complete,
+                &#34;logger&#34;: logger,
+                &#34;connect_timeout&#34;: connect_timeout,
+                &#34;auth_timeout&#34;: auth_timeout,
+                &#34;_default_cmd_timeout&#34;: 20,
+            }
+            run_params = inspect.signature(executor.run).parameters
+            if &#34;unattended&#34; in run_params:
+                run_kwargs[&#34;unattended&#34;] = True
+            if &#34;attempt_tracker&#34; in run_params:
+                run_kwargs[&#34;attempt_tracker&#34;] = self.attempt_tracker
+
+            results = executor.run(**run_kwargs)
+
+            fb_map = getattr(executor, &#34;fallback_used&#34;, {})
+            fb_dict = fb_map if isinstance(fb_map, dict) else {}
+
+            # Combine output, status, and fallback metadata for the caller
             full_results = {}
+            self.last_fallback_used = {}
             for unique in results:
+                fb_used = bool(fb_dict.get(unique, False))
                 full_results[unique] = {
                     &#34;output&#34;: results[unique],
-                    &#34;status&#34;: executor.status.get(unique, 1)
+                    &#34;status&#34;: executor.status.get(unique, 1),
+                    &#34;fallback_used&#34;: fb_used,
                 }
+                self.last_fallback_used[unique] = fb_used
 
             return full_results
-        except Exception as e:
-            raise ConnpyError(f&#34;Execution failed: {e}&#34;)
+        except ConnpyError:
+            raise
+        except Exception as e:  # noqa: BLE001
+            raise_sanitized_auth_error(e, code=&#34;AUTH_FAILED&#34;, context_label=&#34;execution failed&#34;)
 
     def test_commands(
         self,
         nodes_filter: str,
-        commands: List[str],
-        expected: List[str],
-        variables: Optional[Dict[str, Any]] = None,
+        commands: list[str],
+        expected: list[str],
+        variables: dict[str, Any] | None = None,
         parallel: int = 10,
-        timeout: int = 20,
-        folder: Optional[str] = None,
-        prompt: Optional[str] = None,
-        on_node_complete: Optional[Callable] = None,
-        logger: Optional[Callable] = None,
-        name: Optional[str] = None
-    ) -&gt; Dict[str, Dict[str, bool]]:
-
+        timeout: int | None = None,
+        folder: str | None = None,
+        prompt: str | None = None,
+        on_node_complete: Callable | None = None,
+        logger: Callable | None = None,
+        name: str | None = None,
+        connect_timeout: int | None = None,
+        auth_timeout: int | None = None,
+    ) -&gt; dict[str, dict[str, bool]]:
         &#34;&#34;&#34;Run commands and verify expected output on a set of nodes.&#34;&#34;&#34;
         try:
+            self._ensure_backend_supports_stage_timeouts(
+                connect_timeout=connect_timeout,
+                auth_timeout=auth_timeout,
+            )
+
+            if self._is_remote_backend():
+                stub = self._get_remote_stub()
+                return stub.test_commands(
+                    nodes_filter=nodes_filter,
+                    commands=commands,
+                    expected=expected,
+                    variables=variables,
+                    parallel=parallel,
+                    timeout=timeout if timeout is not None else 20,
+                    folder=folder or &#34;&#34;,
+                    prompt=prompt,
+                    on_node_complete=on_node_complete,
+                    logger=logger,
+                    name=name or &#34;&#34;,
+                )
+
             matched_names = self.config._getallnodes(nodes_filter)
             if not matched_names:
                 raise ConnpyError(f&#34;No nodes found matching filter: {nodes_filter}&#34;)
-            
+
             node_data = self.config.getitems(matched_names, extract=True)
             executor = Nodes(node_data, config=self.config)
             self.last_executor = executor
-            
-            results = executor.test(
-                commands=commands,
-                expected=expected,
-                vars=variables,
-                parallel=parallel,
-                timeout=timeout,
-                folder=folder,
-                prompt=prompt,
-                on_complete=on_node_complete,
-                logger=logger
-            )
-            return results
-        except Exception as e:
-            raise ConnpyError(f&#34;Testing failed: {e}&#34;)
 
-    def run_cli_script(self, nodes_filter: str, script_path: str, parallel: int = 10) -&gt; Dict[str, str]:
+            test_kwargs: dict[str, Any] = {
+                &#34;commands&#34;: commands,
+                &#34;expected&#34;: expected,
+                &#34;vars&#34;: variables,
+                &#34;parallel&#34;: parallel,
+                &#34;timeout&#34;: timeout,
+                &#34;folder&#34;: folder,
+                &#34;prompt&#34;: prompt,
+                &#34;on_complete&#34;: on_node_complete,
+                &#34;logger&#34;: logger,
+                &#34;connect_timeout&#34;: connect_timeout,
+                &#34;auth_timeout&#34;: auth_timeout,
+                &#34;_default_cmd_timeout&#34;: 20,
+            }
+            test_params = inspect.signature(executor.test).parameters
+            if &#34;unattended&#34; in test_params:
+                test_kwargs[&#34;unattended&#34;] = True
+            if &#34;attempt_tracker&#34; in test_params:
+                test_kwargs[&#34;attempt_tracker&#34;] = self.attempt_tracker
+
+            res = executor.test(**test_kwargs)
+            fb_map = getattr(executor, &#34;fallback_used&#34;, {})
+            fb_dict = fb_map if isinstance(fb_map, dict) else {}
+            if isinstance(res, dict):
+                self.last_fallback_used = {u: bool(fb_dict.get(u, False)) for u in res}
+            else:
+                self.last_fallback_used = {}
+            return res
+        except ConnpyError:
+            raise
+        except Exception as e:  # noqa: BLE001
+            raise_sanitized_auth_error(e, code=&#34;AUTH_FAILED&#34;, context_label=&#34;testing failed&#34;)
+
+    def run_cli_script(self, nodes_filter: str, script_path: str, parallel: int = 10) -&gt; dict[str, str]:
         &#34;&#34;&#34;Run a plain-text script containing one command per line.&#34;&#34;&#34;
         if not os.path.exists(script_path):
             raise ConnpyError(f&#34;Script file not found: {script_path}&#34;)
-            
+
         try:
-            with open(script_path, &#34;r&#34;) as f:
+            with open(script_path) as f:
                 commands = [line.strip() for line in f if line.strip()]
-        except Exception as e:
-            raise ConnpyError(f&#34;Failed to read script {script_path}: {e}&#34;)
-            
+        except OSError:
+            raise ConnpyError(&#34;Failed to read script file&#34;) from None
+
         return self.run_commands(nodes_filter, commands, parallel=parallel)</code></pre>
 </details>
 <div class="desc"><p>Business logic for executing commands on nodes and running automation scripts.</p>
@@ -173,30 +308,30 @@ el.replaceWith(d);
 <h3>Methods</h3>
 <dl>
 <dt id="connpy.services.execution_service.ExecutionService.run_cli_script"><code class="name flex">
-<span>def <span class="ident">run_cli_script</span></span>(<span>self, nodes_filter: str, script_path: str, parallel: int = 10) ‑> Dict[str, str]</span>
+<span>def <span class="ident">run_cli_script</span></span>(<span>self, nodes_filter: str, script_path: str, parallel: int = 10) ‑> dict[str, str]</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def run_cli_script(self, nodes_filter: str, script_path: str, parallel: int = 10) -&gt; Dict[str, str]:
+<pre><code class="python">def run_cli_script(self, nodes_filter: str, script_path: str, parallel: int = 10) -&gt; dict[str, str]:
     &#34;&#34;&#34;Run a plain-text script containing one command per line.&#34;&#34;&#34;
     if not os.path.exists(script_path):
         raise ConnpyError(f&#34;Script file not found: {script_path}&#34;)
-        
+
     try:
-        with open(script_path, &#34;r&#34;) as f:
+        with open(script_path) as f:
             commands = [line.strip() for line in f if line.strip()]
-    except Exception as e:
-        raise ConnpyError(f&#34;Failed to read script {script_path}: {e}&#34;)
-        
+    except OSError:
+        raise ConnpyError(&#34;Failed to read script file&#34;) from None
+
     return self.run_commands(nodes_filter, commands, parallel=parallel)</code></pre>
 </details>
 <div class="desc"><p>Run a plain-text script containing one command per line.</p></div>
 </dd>
 <dt id="connpy.services.execution_service.ExecutionService.run_commands"><code class="name flex">
-<span>def <span class="ident">run_commands</span></span>(<span>self,<br>nodes_filter: str,<br>commands: List[str],<br>variables: Dict[str, Any] | None = None,<br>parallel: int = 10,<br>timeout: int = 20,<br>folder: str | None = None,<br>prompt: str | None = None,<br>on_node_complete: Callable | None = None,<br>logger: Callable | None = None,<br>name: str | None = None) ‑> Dict[str, str]</span>
+<span>def <span class="ident">run_commands</span></span>(<span>self,<br>nodes_filter: str,<br>commands: list[str],<br>variables: dict[str, typing.Any] | None = None,<br>parallel: int = 10,<br>timeout: int | None = None,<br>folder: str | None = None,<br>prompt: str | None = None,<br>on_node_complete: collections.abc.Callable | None = None,<br>logger: collections.abc.Callable | None = None,<br>name: str | None = None,<br>connect_timeout: int | None = None,<br>auth_timeout: int | None = None) ‑> dict[str, typing.Any]</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -204,56 +339,96 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def run_commands(
-    self, 
-    nodes_filter: str, 
-    commands: List[str], 
-    variables: Optional[Dict[str, Any]] = None,
+    self,
+    nodes_filter: str,
+    commands: list[str],
+    variables: dict[str, Any] | None = None,
     parallel: int = 10,
-    timeout: int = 20,
-    folder: Optional[str] = None,
-    prompt: Optional[str] = None,
-    on_node_complete: Optional[Callable] = None,
-    logger: Optional[Callable] = None,
-    name: Optional[str] = None
-) -&gt; Dict[str, str]:
-
+    timeout: int | None = None,
+    folder: str | None = None,
+    prompt: str | None = None,
+    on_node_complete: Callable | None = None,
+    logger: Callable | None = None,
+    name: str | None = None,
+    connect_timeout: int | None = None,
+    auth_timeout: int | None = None,
+) -&gt; dict[str, Any]:
     &#34;&#34;&#34;Execute commands on a set of nodes.&#34;&#34;&#34;
     try:
+        self._ensure_backend_supports_stage_timeouts(
+            connect_timeout=connect_timeout,
+            auth_timeout=auth_timeout,
+        )
+
+        if self._is_remote_backend():
+            stub = self._get_remote_stub()
+            return stub.run_commands(
+                nodes_filter=nodes_filter,
+                commands=commands,
+                variables=variables,
+                parallel=parallel,
+                timeout=timeout if timeout is not None else 20,
+                folder=folder,
+                prompt=prompt,
+                on_node_complete=on_node_complete,
+                logger=logger,
+                name=name or &#34;&#34;,
+            )
+
         matched_names = self.config._getallnodes(nodes_filter)
         if not matched_names:
             raise ConnpyError(f&#34;No nodes found matching filter: {nodes_filter}&#34;)
-        
+
         node_data = self.config.getitems(matched_names, extract=True)
         executor = Nodes(node_data, config=self.config)
         self.last_executor = executor
-        
-        results = executor.run(
-            commands=commands,
-            vars=variables,
-            parallel=parallel,
-            timeout=timeout,
-            folder=folder,
-            prompt=prompt,
-            on_complete=on_node_complete,
-            logger=logger
-        )
 
-        # Combine output and status for the caller
+        run_kwargs: dict[str, Any] = {
+            &#34;commands&#34;: commands,
+            &#34;vars&#34;: variables,
+            &#34;parallel&#34;: parallel,
+            &#34;timeout&#34;: timeout,
+            &#34;folder&#34;: folder,
+            &#34;prompt&#34;: prompt,
+            &#34;on_complete&#34;: on_node_complete,
+            &#34;logger&#34;: logger,
+            &#34;connect_timeout&#34;: connect_timeout,
+            &#34;auth_timeout&#34;: auth_timeout,
+            &#34;_default_cmd_timeout&#34;: 20,
+        }
+        run_params = inspect.signature(executor.run).parameters
+        if &#34;unattended&#34; in run_params:
+            run_kwargs[&#34;unattended&#34;] = True
+        if &#34;attempt_tracker&#34; in run_params:
+            run_kwargs[&#34;attempt_tracker&#34;] = self.attempt_tracker
+
+        results = executor.run(**run_kwargs)
+
+        fb_map = getattr(executor, &#34;fallback_used&#34;, {})
+        fb_dict = fb_map if isinstance(fb_map, dict) else {}
+
+        # Combine output, status, and fallback metadata for the caller
         full_results = {}
+        self.last_fallback_used = {}
         for unique in results:
+            fb_used = bool(fb_dict.get(unique, False))
             full_results[unique] = {
                 &#34;output&#34;: results[unique],
-                &#34;status&#34;: executor.status.get(unique, 1)
+                &#34;status&#34;: executor.status.get(unique, 1),
+                &#34;fallback_used&#34;: fb_used,
             }
+            self.last_fallback_used[unique] = fb_used
 
         return full_results
-    except Exception as e:
-        raise ConnpyError(f&#34;Execution failed: {e}&#34;)</code></pre>
+    except ConnpyError:
+        raise
+    except Exception as e:  # noqa: BLE001
+        raise_sanitized_auth_error(e, code=&#34;AUTH_FAILED&#34;, context_label=&#34;execution failed&#34;)</code></pre>
 </details>
 <div class="desc"><p>Execute commands on a set of nodes.</p></div>
 </dd>
 <dt id="connpy.services.execution_service.ExecutionService.test_commands"><code class="name flex">
-<span>def <span class="ident">test_commands</span></span>(<span>self,<br>nodes_filter: str,<br>commands: List[str],<br>expected: List[str],<br>variables: Dict[str, Any] | None = None,<br>parallel: int = 10,<br>timeout: int = 20,<br>folder: str | None = None,<br>prompt: str | None = None,<br>on_node_complete: Callable | None = None,<br>logger: Callable | None = None,<br>name: str | None = None) ‑> Dict[str, Dict[str, bool]]</span>
+<span>def <span class="ident">test_commands</span></span>(<span>self,<br>nodes_filter: str,<br>commands: list[str],<br>expected: list[str],<br>variables: dict[str, typing.Any] | None = None,<br>parallel: int = 10,<br>timeout: int | None = None,<br>folder: str | None = None,<br>prompt: str | None = None,<br>on_node_complete: collections.abc.Callable | None = None,<br>logger: collections.abc.Callable | None = None,<br>name: str | None = None,<br>connect_timeout: int | None = None,<br>auth_timeout: int | None = None) ‑> dict[str, dict[str, bool]]</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -263,42 +438,82 @@ el.replaceWith(d);
 <pre><code class="python">def test_commands(
     self,
     nodes_filter: str,
-    commands: List[str],
-    expected: List[str],
-    variables: Optional[Dict[str, Any]] = None,
+    commands: list[str],
+    expected: list[str],
+    variables: dict[str, Any] | None = None,
     parallel: int = 10,
-    timeout: int = 20,
-    folder: Optional[str] = None,
-    prompt: Optional[str] = None,
-    on_node_complete: Optional[Callable] = None,
-    logger: Optional[Callable] = None,
-    name: Optional[str] = None
-) -&gt; Dict[str, Dict[str, bool]]:
-
+    timeout: int | None = None,
+    folder: str | None = None,
+    prompt: str | None = None,
+    on_node_complete: Callable | None = None,
+    logger: Callable | None = None,
+    name: str | None = None,
+    connect_timeout: int | None = None,
+    auth_timeout: int | None = None,
+) -&gt; dict[str, dict[str, bool]]:
     &#34;&#34;&#34;Run commands and verify expected output on a set of nodes.&#34;&#34;&#34;
     try:
+        self._ensure_backend_supports_stage_timeouts(
+            connect_timeout=connect_timeout,
+            auth_timeout=auth_timeout,
+        )
+
+        if self._is_remote_backend():
+            stub = self._get_remote_stub()
+            return stub.test_commands(
+                nodes_filter=nodes_filter,
+                commands=commands,
+                expected=expected,
+                variables=variables,
+                parallel=parallel,
+                timeout=timeout if timeout is not None else 20,
+                folder=folder or &#34;&#34;,
+                prompt=prompt,
+                on_node_complete=on_node_complete,
+                logger=logger,
+                name=name or &#34;&#34;,
+            )
+
         matched_names = self.config._getallnodes(nodes_filter)
         if not matched_names:
             raise ConnpyError(f&#34;No nodes found matching filter: {nodes_filter}&#34;)
-        
+
         node_data = self.config.getitems(matched_names, extract=True)
         executor = Nodes(node_data, config=self.config)
         self.last_executor = executor
-        
-        results = executor.test(
-            commands=commands,
-            expected=expected,
-            vars=variables,
-            parallel=parallel,
-            timeout=timeout,
-            folder=folder,
-            prompt=prompt,
-            on_complete=on_node_complete,
-            logger=logger
-        )
-        return results
-    except Exception as e:
-        raise ConnpyError(f&#34;Testing failed: {e}&#34;)</code></pre>
+
+        test_kwargs: dict[str, Any] = {
+            &#34;commands&#34;: commands,
+            &#34;expected&#34;: expected,
+            &#34;vars&#34;: variables,
+            &#34;parallel&#34;: parallel,
+            &#34;timeout&#34;: timeout,
+            &#34;folder&#34;: folder,
+            &#34;prompt&#34;: prompt,
+            &#34;on_complete&#34;: on_node_complete,
+            &#34;logger&#34;: logger,
+            &#34;connect_timeout&#34;: connect_timeout,
+            &#34;auth_timeout&#34;: auth_timeout,
+            &#34;_default_cmd_timeout&#34;: 20,
+        }
+        test_params = inspect.signature(executor.test).parameters
+        if &#34;unattended&#34; in test_params:
+            test_kwargs[&#34;unattended&#34;] = True
+        if &#34;attempt_tracker&#34; in test_params:
+            test_kwargs[&#34;attempt_tracker&#34;] = self.attempt_tracker
+
+        res = executor.test(**test_kwargs)
+        fb_map = getattr(executor, &#34;fallback_used&#34;, {})
+        fb_dict = fb_map if isinstance(fb_map, dict) else {}
+        if isinstance(res, dict):
+            self.last_fallback_used = {u: bool(fb_dict.get(u, False)) for u in res}
+        else:
+            self.last_fallback_used = {}
+        return res
+    except ConnpyError:
+        raise
+    except Exception as e:  # noqa: BLE001
+        raise_sanitized_auth_error(e, code=&#34;AUTH_FAILED&#34;, context_label=&#34;testing failed&#34;)</code></pre>
 </details>
 <div class="desc"><p>Run commands and verify expected output on a set of nodes.</p></div>
 </dd>

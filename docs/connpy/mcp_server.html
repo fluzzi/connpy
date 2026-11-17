@@ -162,20 +162,7 @@ el.replaceWith(d);
 
     def _mask_secrets(self, val: Any) -&gt; Any:
         &#34;&#34;&#34;Recursively mask passwords, passphrases, secrets, and auth tokens with &#39;***&#39;.&#34;&#34;&#34;
-        if isinstance(val, dict):
-            masked = {}
-            for k, v in val.items():
-                k_lower = str(k).lower()
-                if any(sec in k_lower for sec in [&#34;password&#34;, &#34;passphrase&#34;, &#34;secret&#34;, &#34;token&#34;]):
-                    masked[k] = &#34;***&#34;
-                elif isinstance(v, (dict, list)):
-                    masked[k] = self._mask_secrets(v)
-                else:
-                    masked[k] = v
-            return masked
-        if isinstance(val, list):
-            return [self._mask_secrets(item) for item in val]
-        return val
+        return mask_node_secrets(val)
 
     # -------------------------------------------------------------------------
     # Level 1: Read-Only Inventory and Context Tools
@@ -234,6 +221,31 @@ el.replaceWith(d);
     # Level 2: Execution, Testing, and Playbooks Tools
     # -------------------------------------------------------------------------
 
+    @staticmethod
+    def _parse_json_list_or_lines(raw_val: list[str] | str, *, allow_empty_str: bool = False) -&gt; list[str]:
+        if isinstance(raw_val, str):
+            if len(raw_val.encode(&#34;utf-8&#34;, errors=&#34;replace&#34;)) &gt; MAX_JSON_INPUT_BYTES:
+                raise ValueError(f&#34;Input exceeds maximum size of {MAX_JSON_INPUT_BYTES} bytes&#34;)
+            stripped = raw_val.strip()
+            if stripped.startswith((&#34;[&#34;, &#34;{&#34;)):
+                parsed = validate_json_depth_and_size(
+                    stripped,
+                    max_bytes=MAX_JSON_INPUT_BYTES,
+                    max_depth=MAX_JSON_INPUT_DEPTH,
+                )
+                return parsed if isinstance(parsed, list) else [raw_val]
+            return ([raw_val] if raw_val else []) if allow_empty_str else [
+                c.strip() for c in raw_val.splitlines() if c.strip()
+            ]
+        if isinstance(raw_val, list):
+            validate_json_depth_and_size(
+                raw_val,
+                max_bytes=MAX_JSON_INPUT_BYTES,
+                max_depth=MAX_JSON_INPUT_DEPTH,
+            )
+            return raw_val
+        return [str(raw_val)] if (raw_val or not allow_empty_str) else []
+
     def run_commands(
         self,
         nodes_filter: str,
@@ -248,17 +260,10 @@ el.replaceWith(d);
         if not self.services or not hasattr(self.services, &#34;execution&#34;):
             return {&#34;success&#34;: False, &#34;error&#34;: &#34;Execution service unavailable.&#34;}
 
-        # Normalize commands list
-        if isinstance(commands, str):
-            try:
-                import json
-
-                parsed = json.loads(commands)
-                commands = parsed if isinstance(parsed, list) else [commands]
-            except Exception:  # noqa: BLE001
-                commands = [c.strip() for c in commands.splitlines() if c.strip()]
-        elif not isinstance(commands, list):
-            commands = [str(commands)]
+        try:
+            commands = self._parse_json_list_or_lines(commands, allow_empty_str=False)
+        except ValueError as exc:
+            return {&#34;success&#34;: False, &#34;error&#34;: str(exc)}
 
         # Check safety
         if not self.trust:
@@ -277,9 +282,24 @@ el.replaceWith(d);
                 parallel=par_count,
                 timeout=timeout,
             )
-            return {&#34;success&#34;: True, &#34;results&#34;: results}
+            fb_used = False
+            if isinstance(results, dict):
+                fb_used = any(
+                    isinstance(v, dict) and bool(v.get(&#34;fallback_used&#34;, False))
+                    for v in results.values()
+                )
+            if not fb_used:
+                fb_map = getattr(self.services.execution, &#34;last_fallback_used&#34;, {})
+                if isinstance(fb_map, dict):
+                    fb_used = any(bool(v) for v in fb_map.values())
+            return {&#34;success&#34;: True, &#34;results&#34;: results, &#34;fallback_used&#34;: fb_used}
         except Exception as e:  # noqa: BLE001
-            return {&#34;success&#34;: False, &#34;error&#34;: str(e)}
+            san = sanitize_exception(
+                e,
+                code=&#34;AUTH_FAILED&#34;,
+                context_label=&#34;command execution failed&#34;,
+            )
+            return {&#34;success&#34;: False, &#34;error&#34;: str(san)}
 
     def test_commands(
         self,
@@ -293,29 +313,11 @@ el.replaceWith(d);
         if not self.services or not hasattr(self.services, &#34;execution&#34;):
             return {&#34;success&#34;: False, &#34;error&#34;: &#34;Execution service unavailable.&#34;}
 
-        # Normalize commands
-        if isinstance(commands, str):
-            try:
-                import json
-
-                parsed = json.loads(commands)
-                commands = parsed if isinstance(parsed, list) else [commands]
-            except Exception:  # noqa: BLE001
-                commands = [c.strip() for c in commands.splitlines() if c.strip()]
-        elif not isinstance(commands, list):
-            commands = [str(commands)]
-
-        # Normalize expected
-        if isinstance(expected, str):
-            try:
-                import json
-
-                parsed = json.loads(expected)
-                expected = parsed if isinstance(parsed, list) else ([expected] if expected else [])
-            except Exception:  # noqa: BLE001
-                expected = [expected] if expected else []
-        elif not isinstance(expected, list):
-            expected = [str(expected)] if expected else []
+        try:
+            commands = self._parse_json_list_or_lines(commands, allow_empty_str=False)
+            expected = self._parse_json_list_or_lines(expected, allow_empty_str=True)
+        except ValueError as exc:
+            return {&#34;success&#34;: False, &#34;error&#34;: str(exc)}
 
         # Check safety
         if not self.trust:
@@ -335,9 +337,16 @@ el.replaceWith(d);
                 parallel=par_count,
                 timeout=timeout,
             )
-            return {&#34;success&#34;: True, &#34;results&#34;: results}
+            fb_map = getattr(self.services.execution, &#34;last_fallback_used&#34;, {})
+            fb_used = any(bool(v) for v in fb_map.values()) if isinstance(fb_map, dict) else False
+            return {&#34;success&#34;: True, &#34;results&#34;: results, &#34;fallback_used&#34;: fb_used}
         except Exception as e:  # noqa: BLE001
-            return {&#34;success&#34;: False, &#34;error&#34;: str(e)}
+            san = sanitize_exception(
+                e,
+                code=&#34;AUTH_FAILED&#34;,
+                context_label=&#34;test execution failed&#34;,
+            )
+            return {&#34;success&#34;: False, &#34;error&#34;: str(san)}
 
     def validate_playbook(self, playbook_yaml: str) -&gt; dict:
         &#34;&#34;&#34;Validate the syntax, schema, and tasks of a Connpy YAML playbook.&#34;&#34;&#34;
@@ -465,6 +474,47 @@ el.replaceWith(d);
     # Level 3: Inventory Mutation Tools (CRUD - Requires trust=True)
     # -------------------------------------------------------------------------
 
+    @staticmethod
+    def _validate_and_normalize_node_payload(node_data: dict[str, Any]) -&gt; dict[str, Any]:
+        validate_json_depth_and_size(
+            node_data,
+            max_bytes=MAX_JSON_INPUT_BYTES,
+            max_depth=MAX_JSON_INPUT_DEPTH,
+        )
+        normalized = node_data.copy()
+        if &#34;tags&#34; in normalized and normalized[&#34;tags&#34;] not in (&#34;&#34;, None):
+            tags_val = normalized[&#34;tags&#34;]
+            if isinstance(tags_val, str) and tags_val.strip().startswith(&#34;{&#34;):
+                tags_val = validate_json_depth_and_size(
+                    tags_val,
+                    max_bytes=MAX_JSON_INPUT_BYTES,
+                    max_depth=MAX_JSON_INPUT_DEPTH,
+                )
+                normalized[&#34;tags&#34;] = tags_val
+            validate_auth_budget_tags(tags_val)
+
+        if &#34;fallback&#34; in normalized and normalized[&#34;fallback&#34;] not in (None, &#34;&#34;, []):
+            fb_val = normalized[&#34;fallback&#34;]
+            if isinstance(fb_val, str) and fb_val.strip().startswith((&#34;[&#34;, &#34;{&#34;)):
+                fb_val = validate_json_depth_and_size(
+                    fb_val,
+                    max_bytes=MAX_JSON_INPUT_BYTES,
+                    max_depth=MAX_JSON_INPUT_DEPTH,
+                )
+            normalized[&#34;fallback&#34;] = validate_fallback_entries(
+                fb_val,
+                max_entries=MAX_FALLBACK_ENTRIES,
+            )
+
+        pw = normalized.get(&#34;password&#34;)
+        if is_compose_expression(pw):
+            validate_compose_syntax(pw)
+        elif isinstance(pw, (list, tuple)):
+            for item in pw:
+                if is_compose_expression(item):
+                    validate_compose_syntax(item)
+        return normalized
+
     def add_node(
         self, unique_id: str, data: dict | None = None, is_folder: bool = False, **kwargs
     ) -&gt; dict:
@@ -482,11 +532,14 @@ el.replaceWith(d);
         node_data.update(kwargs)
 
         try:
+            node_data = self._validate_and_normalize_node_payload(node_data)
             self.services.nodes.add_node(unique_id, node_data, is_folder=is_folder)
             return {
                 &#34;success&#34;: True,
                 &#34;message&#34;: f&#34;{&#39;Folder&#39; if is_folder else &#39;Node&#39;} &#39;{unique_id}&#39; created successfully.&#34;,
             }
+        except (ValueError, TypeError, SanitizedAuthError) as exc:
+            return {&#34;success&#34;: False, &#34;error&#34;: str(exc)}
         except Exception as e:  # noqa: BLE001
             return {&#34;success&#34;: False, &#34;error&#34;: str(e)}
 
@@ -505,8 +558,11 @@ el.replaceWith(d);
         node_updates.update(kwargs)
 
         try:
+            node_updates = self._validate_and_normalize_node_payload(node_updates)
             self.services.nodes.update_node(unique_id, node_updates)
             return {&#34;success&#34;: True, &#34;message&#34;: f&#34;Node &#39;{unique_id}&#39; updated successfully.&#34;}
+        except (ValueError, TypeError, SanitizedAuthError) as exc:
+            return {&#34;success&#34;: False, &#34;error&#34;: str(exc)}
         except Exception as e:  # noqa: BLE001
             return {&#34;success&#34;: False, &#34;error&#34;: str(e)}
 
@@ -608,11 +664,14 @@ el.replaceWith(d);
     node_data.update(kwargs)
 
     try:
+        node_data = self._validate_and_normalize_node_payload(node_data)
         self.services.nodes.add_node(unique_id, node_data, is_folder=is_folder)
         return {
             &#34;success&#34;: True,
             &#34;message&#34;: f&#34;{&#39;Folder&#39; if is_folder else &#39;Node&#39;} &#39;{unique_id}&#39; created successfully.&#34;,
         }
+    except (ValueError, TypeError, SanitizedAuthError) as exc:
+        return {&#34;success&#34;: False, &#34;error&#34;: str(exc)}
     except Exception as e:  # noqa: BLE001
         return {&#34;success&#34;: False, &#34;error&#34;: str(e)}</code></pre>
 </details>
@@ -865,17 +924,10 @@ el.replaceWith(d);
     if not self.services or not hasattr(self.services, &#34;execution&#34;):
         return {&#34;success&#34;: False, &#34;error&#34;: &#34;Execution service unavailable.&#34;}
 
-    # Normalize commands list
-    if isinstance(commands, str):
-        try:
-            import json
-
-            parsed = json.loads(commands)
-            commands = parsed if isinstance(parsed, list) else [commands]
-        except Exception:  # noqa: BLE001
-            commands = [c.strip() for c in commands.splitlines() if c.strip()]
-    elif not isinstance(commands, list):
-        commands = [str(commands)]
+    try:
+        commands = self._parse_json_list_or_lines(commands, allow_empty_str=False)
+    except ValueError as exc:
+        return {&#34;success&#34;: False, &#34;error&#34;: str(exc)}
 
     # Check safety
     if not self.trust:
@@ -894,9 +946,24 @@ el.replaceWith(d);
             parallel=par_count,
             timeout=timeout,
         )
-        return {&#34;success&#34;: True, &#34;results&#34;: results}
+        fb_used = False
+        if isinstance(results, dict):
+            fb_used = any(
+                isinstance(v, dict) and bool(v.get(&#34;fallback_used&#34;, False))
+                for v in results.values()
+            )
+        if not fb_used:
+            fb_map = getattr(self.services.execution, &#34;last_fallback_used&#34;, {})
+            if isinstance(fb_map, dict):
+                fb_used = any(bool(v) for v in fb_map.values())
+        return {&#34;success&#34;: True, &#34;results&#34;: results, &#34;fallback_used&#34;: fb_used}
     except Exception as e:  # noqa: BLE001
-        return {&#34;success&#34;: False, &#34;error&#34;: str(e)}</code></pre>
+        san = sanitize_exception(
+            e,
+            code=&#34;AUTH_FAILED&#34;,
+            context_label=&#34;command execution failed&#34;,
+        )
+        return {&#34;success&#34;: False, &#34;error&#34;: str(san)}</code></pre>
 </details>
 <div class="desc"><p>Execute commands on nodes matching the filter pattern.</p>
 <p>Unsafe commands are blocked unless trust mode is enabled.</p></div>
@@ -986,29 +1053,11 @@ el.replaceWith(d);
     if not self.services or not hasattr(self.services, &#34;execution&#34;):
         return {&#34;success&#34;: False, &#34;error&#34;: &#34;Execution service unavailable.&#34;}
 
-    # Normalize commands
-    if isinstance(commands, str):
-        try:
-            import json
-
-            parsed = json.loads(commands)
-            commands = parsed if isinstance(parsed, list) else [commands]
-        except Exception:  # noqa: BLE001
-            commands = [c.strip() for c in commands.splitlines() if c.strip()]
-    elif not isinstance(commands, list):
-        commands = [str(commands)]
-
-    # Normalize expected
-    if isinstance(expected, str):
-        try:
-            import json
-
-            parsed = json.loads(expected)
-            expected = parsed if isinstance(parsed, list) else ([expected] if expected else [])
-        except Exception:  # noqa: BLE001
-            expected = [expected] if expected else []
-    elif not isinstance(expected, list):
-        expected = [str(expected)] if expected else []
+    try:
+        commands = self._parse_json_list_or_lines(commands, allow_empty_str=False)
+        expected = self._parse_json_list_or_lines(expected, allow_empty_str=True)
+    except ValueError as exc:
+        return {&#34;success&#34;: False, &#34;error&#34;: str(exc)}
 
     # Check safety
     if not self.trust:
@@ -1028,9 +1077,16 @@ el.replaceWith(d);
             parallel=par_count,
             timeout=timeout,
         )
-        return {&#34;success&#34;: True, &#34;results&#34;: results}
+        fb_map = getattr(self.services.execution, &#34;last_fallback_used&#34;, {})
+        fb_used = any(bool(v) for v in fb_map.values()) if isinstance(fb_map, dict) else False
+        return {&#34;success&#34;: True, &#34;results&#34;: results, &#34;fallback_used&#34;: fb_used}
     except Exception as e:  # noqa: BLE001
-        return {&#34;success&#34;: False, &#34;error&#34;: str(e)}</code></pre>
+        san = sanitize_exception(
+            e,
+            code=&#34;AUTH_FAILED&#34;,
+            context_label=&#34;test execution failed&#34;,
+        )
+        return {&#34;success&#34;: False, &#34;error&#34;: str(san)}</code></pre>
 </details>
 <div class="desc"><p>Execute commands and assert expected patterns on nodes matching the filter.</p></div>
 </dd>
@@ -1057,8 +1113,11 @@ el.replaceWith(d);
     node_updates.update(kwargs)
 
     try:
+        node_updates = self._validate_and_normalize_node_payload(node_updates)
         self.services.nodes.update_node(unique_id, node_updates)
         return {&#34;success&#34;: True, &#34;message&#34;: f&#34;Node &#39;{unique_id}&#39; updated successfully.&#34;}
+    except (ValueError, TypeError, SanitizedAuthError) as exc:
+        return {&#34;success&#34;: False, &#34;error&#34;: str(exc)}
     except Exception as e:  # noqa: BLE001
         return {&#34;success&#34;: False, &#34;error&#34;: str(e)}</code></pre>
 </details>

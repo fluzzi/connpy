@@ -80,7 +80,12 @@ el.replaceWith(d);
             &#34;sync_remote&#34;: self.set_sync_remote,
             &#34;shell_command&#34;: self.set_shell_config,
             &#34;shell_prompt&#34;: self.set_shell_config,
-            &#34;shell_os&#34;: self.set_shell_config
+            &#34;shell_os&#34;: self.set_shell_config,
+            &#34;max_auth_prompts&#34;: self.set_auth_budget,
+            &#34;max_total_auth_attempts&#34;: self.set_auth_budget,
+            &#34;max_hop_host_attempts&#34;: self.set_auth_budget,
+            &#34;max_global_user_attempts&#34;: self.set_auth_budget,
+            &#34;disable_fallback_on_insecure_hostkey&#34;: self.set_disable_fallback_on_insecure_hostkey,
         }
         handler = actions.get(getattr(args, &#34;command&#34;, None))
         if handler:
@@ -251,7 +256,71 @@ el.replaceWith(d);
             self.app.services.config_svc.update_setting(&#34;shell&#34;, shell_cfg)
             printer.success(&#34;Config saved&#34;)
         except (ConnpyError, InvalidConfigurationError) as e:
-            printer.error(str(e))</code></pre>
+            printer.error(str(e))
+
+    def set_auth_budget(self, args):
+        key = args.command
+        raw_val = args.data[0] if isinstance(args.data, list) else args.data
+        bounds_map = {
+            &#34;max_auth_prompts&#34;: (MIN_AUTH_PROMPTS, MAX_AUTH_PROMPTS_CAP),
+            &#34;max_total_auth_attempts&#34;: (MIN_TOTAL_AUTH_ATTEMPTS, MAX_TOTAL_AUTH_ATTEMPTS_CAP),
+            &#34;max_hop_host_attempts&#34;: (MIN_HOP_HOST_ATTEMPTS, MAX_HOP_HOST_ATTEMPTS_CAP),
+            &#34;max_global_user_attempts&#34;: (1, 1000),
+        }
+        if key not in bounds_map:
+            raise InvalidConfigurationError(f&#34;Unknown auth budget setting: {key}&#34;)
+
+        if isinstance(raw_val, bool):
+            msg = f&#34;Invalid {key}: boolean is not permitted&#34;
+            printer.error(msg)
+            raise InvalidConfigurationError(msg)
+
+        if isinstance(raw_val, int):
+            val = raw_val
+        elif isinstance(raw_val, str) and re.fullmatch(r&#34;[+-]?\d+&#34;, raw_val.strip()):
+            val = int(raw_val.strip())
+        else:
+            msg = f&#34;Invalid {key}: expected integer, got {raw_val!r}&#34;
+            printer.error(msg)
+            raise InvalidConfigurationError(msg)
+
+        if val == 0:
+            cfg_obj = self.app.config
+            if not hasattr(cfg_obj, &#34;assert_called&#34;) and callable(
+                getattr(cfg_obj, &#34;transactional_update&#34;, None)
+            ):
+                cfg_obj.transactional_update(lambda c: c.config.pop(key, None))
+            else:
+                cfg_obj.config.pop(key, None)
+                cfg_obj._saveconfig(cfg_obj.file)
+            printer.success(&#34;Config saved&#34;)
+            return
+
+        min_v, max_v = bounds_map[key]
+        try:
+            validate_strict_int_range(val, key, min_v, max_v)
+        except ValueError as exc:
+            printer.error(str(exc))
+            raise InvalidConfigurationError(str(exc)) from None
+
+        self.app.services.config_svc.update_setting(key, val)
+        printer.success(&#34;Config saved&#34;)
+
+    def set_disable_fallback_on_insecure_hostkey(self, args):
+        raw_val = args.data[0] if isinstance(args.data, list) else args.data
+        if isinstance(raw_val, bool):
+            val = raw_val
+        elif isinstance(raw_val, str) and raw_val.strip().lower() in (&#34;true&#34;, &#34;false&#34;):
+            val = raw_val.strip().lower() == &#34;true&#34;
+        else:
+            msg = &#34;Invalid disable_fallback_on_insecure_hostkey: expected &#39;true&#39; or &#39;false&#39;&#34;
+            printer.error(msg)
+            raise InvalidConfigurationError(msg)
+        self.app.services.config_svc.update_setting(
+            &#34;disable_fallback_on_insecure_hostkey&#34;,
+            val,
+        )
+        printer.success(&#34;Config saved&#34;)</code></pre>
 </details>
 <div class="desc"></div>
 <h3>Methods</h3>
@@ -285,7 +354,12 @@ el.replaceWith(d);
         &#34;sync_remote&#34;: self.set_sync_remote,
         &#34;shell_command&#34;: self.set_shell_config,
         &#34;shell_prompt&#34;: self.set_shell_config,
-        &#34;shell_os&#34;: self.set_shell_config
+        &#34;shell_os&#34;: self.set_shell_config,
+        &#34;max_auth_prompts&#34;: self.set_auth_budget,
+        &#34;max_total_auth_attempts&#34;: self.set_auth_budget,
+        &#34;max_hop_host_attempts&#34;: self.set_auth_budget,
+        &#34;max_global_user_attempts&#34;: self.set_auth_budget,
+        &#34;disable_fallback_on_insecure_hostkey&#34;: self.set_disable_fallback_on_insecure_hostkey,
     }
     handler = actions.get(getattr(args, &#34;command&#34;, None))
     if handler:
@@ -333,6 +407,64 @@ el.replaceWith(d);
 </details>
 <div class="desc"></div>
 </dd>
+<dt id="connpy.cli.config_handler.ConfigHandler.set_auth_budget"><code class="name flex">
+<span>def <span class="ident">set_auth_budget</span></span>(<span>self, args)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def set_auth_budget(self, args):
+    key = args.command
+    raw_val = args.data[0] if isinstance(args.data, list) else args.data
+    bounds_map = {
+        &#34;max_auth_prompts&#34;: (MIN_AUTH_PROMPTS, MAX_AUTH_PROMPTS_CAP),
+        &#34;max_total_auth_attempts&#34;: (MIN_TOTAL_AUTH_ATTEMPTS, MAX_TOTAL_AUTH_ATTEMPTS_CAP),
+        &#34;max_hop_host_attempts&#34;: (MIN_HOP_HOST_ATTEMPTS, MAX_HOP_HOST_ATTEMPTS_CAP),
+        &#34;max_global_user_attempts&#34;: (1, 1000),
+    }
+    if key not in bounds_map:
+        raise InvalidConfigurationError(f&#34;Unknown auth budget setting: {key}&#34;)
+
+    if isinstance(raw_val, bool):
+        msg = f&#34;Invalid {key}: boolean is not permitted&#34;
+        printer.error(msg)
+        raise InvalidConfigurationError(msg)
+
+    if isinstance(raw_val, int):
+        val = raw_val
+    elif isinstance(raw_val, str) and re.fullmatch(r&#34;[+-]?\d+&#34;, raw_val.strip()):
+        val = int(raw_val.strip())
+    else:
+        msg = f&#34;Invalid {key}: expected integer, got {raw_val!r}&#34;
+        printer.error(msg)
+        raise InvalidConfigurationError(msg)
+
+    if val == 0:
+        cfg_obj = self.app.config
+        if not hasattr(cfg_obj, &#34;assert_called&#34;) and callable(
+            getattr(cfg_obj, &#34;transactional_update&#34;, None)
+        ):
+            cfg_obj.transactional_update(lambda c: c.config.pop(key, None))
+        else:
+            cfg_obj.config.pop(key, None)
+            cfg_obj._saveconfig(cfg_obj.file)
+        printer.success(&#34;Config saved&#34;)
+        return
+
+    min_v, max_v = bounds_map[key]
+    try:
+        validate_strict_int_range(val, key, min_v, max_v)
+    except ValueError as exc:
+        printer.error(str(exc))
+        raise InvalidConfigurationError(str(exc)) from None
+
+    self.app.services.config_svc.update_setting(key, val)
+    printer.success(&#34;Config saved&#34;)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
 <dt id="connpy.cli.config_handler.ConfigHandler.set_case"><code class="name flex">
 <span>def <span class="ident">set_case</span></span>(<span>self, args)</span>
 </code></dt>
@@ -364,6 +496,32 @@ el.replaceWith(d);
     except ConnpyError as e:
         printer.error(str(e))
         sys.exit(1)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.cli.config_handler.ConfigHandler.set_disable_fallback_on_insecure_hostkey"><code class="name flex">
+<span>def <span class="ident">set_disable_fallback_on_insecure_hostkey</span></span>(<span>self, args)</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def set_disable_fallback_on_insecure_hostkey(self, args):
+    raw_val = args.data[0] if isinstance(args.data, list) else args.data
+    if isinstance(raw_val, bool):
+        val = raw_val
+    elif isinstance(raw_val, str) and raw_val.strip().lower() in (&#34;true&#34;, &#34;false&#34;):
+        val = raw_val.strip().lower() == &#34;true&#34;
+    else:
+        msg = &#34;Invalid disable_fallback_on_insecure_hostkey: expected &#39;true&#39; or &#39;false&#39;&#34;
+        printer.error(msg)
+        raise InvalidConfigurationError(msg)
+    self.app.services.config_svc.update_setting(
+        &#34;disable_fallback_on_insecure_hostkey&#34;,
+        val,
+    )
+    printer.success(&#34;Config saved&#34;)</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -577,11 +735,13 @@ el.replaceWith(d);
 <ul>
 <li>
 <h4><code><a title="connpy.cli.config_handler.ConfigHandler" href="#connpy.cli.config_handler.ConfigHandler">ConfigHandler</a></code></h4>
-<ul class="two-column">
+<ul class="">
 <li><code><a title="connpy.cli.config_handler.ConfigHandler.dispatch" href="#connpy.cli.config_handler.ConfigHandler.dispatch">dispatch</a></code></li>
 <li><code><a title="connpy.cli.config_handler.ConfigHandler.set_ai_config" href="#connpy.cli.config_handler.ConfigHandler.set_ai_config">set_ai_config</a></code></li>
+<li><code><a title="connpy.cli.config_handler.ConfigHandler.set_auth_budget" href="#connpy.cli.config_handler.ConfigHandler.set_auth_budget">set_auth_budget</a></code></li>
 <li><code><a title="connpy.cli.config_handler.ConfigHandler.set_case" href="#connpy.cli.config_handler.ConfigHandler.set_case">set_case</a></code></li>
 <li><code><a title="connpy.cli.config_handler.ConfigHandler.set_configfolder" href="#connpy.cli.config_handler.ConfigHandler.set_configfolder">set_configfolder</a></code></li>
+<li><code><a title="connpy.cli.config_handler.ConfigHandler.set_disable_fallback_on_insecure_hostkey" href="#connpy.cli.config_handler.ConfigHandler.set_disable_fallback_on_insecure_hostkey">set_disable_fallback_on_insecure_hostkey</a></code></li>
 <li><code><a title="connpy.cli.config_handler.ConfigHandler.set_fzf" href="#connpy.cli.config_handler.ConfigHandler.set_fzf">set_fzf</a></code></li>
 <li><code><a title="connpy.cli.config_handler.ConfigHandler.set_idletime" href="#connpy.cli.config_handler.ConfigHandler.set_idletime">set_idletime</a></code></li>
 <li><code><a title="connpy.cli.config_handler.ConfigHandler.set_remote_host" href="#connpy.cli.config_handler.ConfigHandler.set_remote_host">set_remote_host</a></code></li>

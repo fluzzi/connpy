@@ -58,61 +58,194 @@ el.replaceWith(d);
 <pre><code class="python">class ProfileService(BaseService):
     &#34;&#34;&#34;Business logic for node profiles management.&#34;&#34;&#34;
 
+    _ALLOWED_KEYS: ClassVar[frozenset[str]] = frozenset({
+        &#34;host&#34;,
+        &#34;options&#34;,
+        &#34;logs&#34;,
+        &#34;password&#34;,
+        &#34;port&#34;,
+        &#34;protocol&#34;,
+        &#34;user&#34;,
+        &#34;tags&#34;,
+        &#34;jumphost&#34;,
+        &#34;fallback&#34;,
+    })
+
+    @staticmethod
+    def _validate_profile_payload(data):
+        from ..auth_utils import (
+            SanitizedAuthError,
+            is_compose_expression,
+            validate_auth_budget_tags,
+            validate_compose_syntax,
+            validate_fallback_entries,
+        )
+
+        try:
+            if &#34;tags&#34; in data and data[&#34;tags&#34;] not in (&#34;&#34;, None):
+                validate_auth_budget_tags(data[&#34;tags&#34;])
+            if &#34;fallback&#34; in data and data[&#34;fallback&#34;] not in (None, &#34;&#34;, []):
+                validate_fallback_entries(data[&#34;fallback&#34;])
+            pw = data.get(&#34;password&#34;)
+            if is_compose_expression(pw):
+                validate_compose_syntax(pw)
+            elif isinstance(pw, (list, tuple)):
+                for item in pw:
+                    if is_compose_expression(item):
+                        validate_compose_syntax(item)
+        except (ValueError, TypeError, SanitizedAuthError) as exc:
+            raise InvalidConfigurationError(str(exc)) from None
+
+    def _get_profiles_snapshot(self):
+        lock = getattr(self.config, &#34;_mutation_lock&#34;, None)
+        if lock is not None and not hasattr(self.config, &#34;assert_called&#34;):
+            with lock:
+                return deepcopy(self.config.profiles)
+        return deepcopy(self.config.profiles)
+
     def list_profiles(self, filter_str=None):
         &#34;&#34;&#34;List all profile names, optionally filtered.&#34;&#34;&#34;
-        profiles = list(self.config.profiles.keys())
+        profiles = list(self._get_profiles_snapshot().keys())
         case_sensitive = self.config.config.get(&#34;case&#34;, False)
-        
+
         if filter_str:
             if not case_sensitive:
                 f_str = filter_str.lower()
                 return [p for p in profiles if f_str in p.lower()]
-            else:
-                return [p for p in profiles if filter_str in p]
+            return [p for p in profiles if filter_str in p]
         return profiles
 
-    def get_profile(self, name, resolve=True):
+    def get_profile(self, name, resolve=True, *, _visited=frozenset(), _depth=0):
         &#34;&#34;&#34;Get the profile dictionary, optionally resolved.&#34;&#34;&#34;
-        profile = self.config.profiles.get(name)
+        if _depth &gt;= MAX_PROFILE_DEPTH or name in _visited:
+            raise InvalidConfigurationError(
+                f&#34;Circular or overly deep profile reference involving &#39;{name}&#39;.&#34;
+            )
+        profiles = self._get_profiles_snapshot()
+        profile = profiles.get(name)
         if not profile:
             raise ProfileNotFoundError(f&#34;Profile &#39;{name}&#39; not found.&#34;)
-        
+
         if resolve:
-            return self.resolve_node_data(profile)
+            return self.resolve_node_data(
+                profile,
+                _visited=_visited | {name},
+                _depth=_depth + 1,
+                _profiles_snapshot=profiles,
+            )
         return profile
 
     def add_profile(self, name, data):
         &#34;&#34;&#34;Add a new profile.&#34;&#34;&#34;
+        filtered_data = {k: deepcopy(v) for k, v in data.items() if k in self._ALLOWED_KEYS}
+        self._validate_profile_payload(filtered_data)
+
+        if _supports_transactional_update(self.config):
+            def _mut(cfg):
+                if name in cfg.profiles:
+                    raise ProfileAlreadyExistsError(f&#34;Profile &#39;{name}&#39; already exists.&#34;)
+                cfg._profiles_add_unlocked(id=name, **filtered_data)
+
+            self.config.transactional_update(_mut)
+            return
+
         if name in self.config.profiles:
             raise ProfileAlreadyExistsError(f&#34;Profile &#39;{name}&#39; already exists.&#34;)
-            
-        # Filter data to match _profiles_add signature and ensure id is passed
-        allowed_keys = {&#34;host&#34;, &#34;options&#34;, &#34;logs&#34;, &#34;password&#34;, &#34;port&#34;, &#34;protocol&#34;, &#34;user&#34;, &#34;tags&#34;, &#34;jumphost&#34;}
-        filtered_data = {k: v for k, v in data.items() if k in allowed_keys}
-        
         self.config._profiles_add(id=name, **filtered_data)
         self.config._saveconfig(self.config.file)
 
-    def resolve_node_data(self, node_data):
-        &#34;&#34;&#34;Resolve profile references (@profile) in node data and handle inheritance.&#34;&#34;&#34;
-        resolved = node_data.copy()
-        
-        # 1. Identify all referenced profiles to support inheritance
-        referenced_profiles = []
-        for value in resolved.values():
-            if isinstance(value, str) and value.startswith(&#34;@&#34;):
-                referenced_profiles.append(value[1:])
-            elif isinstance(value, list):
-                for item in value:
-                    if isinstance(item, str) and item.startswith(&#34;@&#34;):
-                        referenced_profiles.append(item[1:])
-        
-        # 2. Resolve explicit references
+    def resolve_node_data(
+        self,
+        node_data,
+        *,
+        _visited=frozenset(),
+        _depth=0,
+        _profiles_snapshot=None,
+    ):
+        &#34;&#34;&#34;Resolve profile references (@profile) in node data while preserving compose and scalar secrets.&#34;&#34;&#34;
+        from ..auth_utils import is_compose_expression
+
+        if _depth &gt; MAX_PROFILE_DEPTH:
+            raise InvalidConfigurationError(&#34;Profile inheritance exceeds maximum depth.&#34;)
+
+        profiles = (
+            _profiles_snapshot
+            if _profiles_snapshot is not None
+            else self._get_profiles_snapshot()
+        )
+        resolved = deepcopy(node_data)
+
+        auth_referenced_profiles = []
+        other_referenced_profiles = []
         for key, value in resolved.items():
+            if key == &#34;fallback&#34;:
+                continue
+            target_refs = (
+                auth_referenced_profiles if key in (&#34;user&#34;, &#34;password&#34;) else other_referenced_profiles
+            )
+            if isinstance(value, str):
+                if not is_compose_expression(value) and value.startswith(&#34;@&#34;):
+                    ref = value[1:]
+                    if key != &#34;password&#34; or ref in profiles:
+                        target_refs.append(ref)
+            elif isinstance(value, (list, tuple)):
+                for item in value:
+                    if (
+                        isinstance(item, str)
+                        and not is_compose_expression(item)
+                        and item.startswith(&#34;@&#34;)
+                    ):
+                        ref = item[1:]
+                        if key != &#34;password&#34; or ref in profiles:
+                            target_refs.append(ref)
+
+        def _get_resolved_ref(prof_name):
+            if prof_name in _visited or _depth &gt;= MAX_PROFILE_DEPTH:
+                raise InvalidConfigurationError(
+                    f&#34;Circular or overly deep profile reference involving &#39;{prof_name}&#39;.&#34;
+                )
+            prof_raw = profiles.get(prof_name)
+            if not prof_raw:
+                raise ProfileNotFoundError(f&#34;Profile &#39;{prof_name}&#39; not found.&#34;)
+            return self.resolve_node_data(
+                prof_raw,
+                _visited=_visited | {prof_name},
+                _depth=_depth + 1,
+                _profiles_snapshot=profiles,
+            )
+
+        for key, value in list(resolved.items()):
+            if key == &#34;fallback&#34;:
+                continue
+            if key == &#34;password&#34;:
+                if isinstance(value, str):
+                    if is_compose_expression(value):
+                        continue
+                    if value.startswith(&#34;@&#34;) and value[1:] in profiles:
+                        prof_obj = _get_resolved_ref(value[1:])
+                        resolved[&#34;password&#34;] = prof_obj.get(&#34;password&#34;, &#34;&#34;)
+                elif isinstance(value, list):
+                    resolved_list = []
+                    for item in value:
+                        if (
+                            isinstance(item, str)
+                            and not is_compose_expression(item)
+                            and item.startswith(&#34;@&#34;)
+                            and item[1:] in profiles
+                        ):
+                            with suppress(ProfileNotFoundError):
+                                prof_obj = _get_resolved_ref(item[1:])
+                                if &#34;password&#34; in prof_obj:
+                                    resolved_list.append(prof_obj[&#34;password&#34;])
+                        else:
+                            resolved_list.append(item)
+                    resolved[&#34;password&#34;] = resolved_list
+                continue
+
             if isinstance(value, str) and value.startswith(&#34;@&#34;):
                 profile_name = value[1:]
                 try:
-                    profile = self.get_profile(profile_name, resolve=True)
+                    profile = _get_resolved_ref(profile_name)
                     resolved[key] = profile.get(key, &#34;&#34;)
                 except ProfileNotFoundError:
                     resolved[key] = &#34;&#34;
@@ -121,68 +254,87 @@ el.replaceWith(d);
                 for item in value:
                     if isinstance(item, str) and item.startswith(&#34;@&#34;):
                         profile_name = item[1:]
-                        try:
-                            profile = self.get_profile(profile_name, resolve=True)
+                        with suppress(ProfileNotFoundError):
+                            profile = _get_resolved_ref(profile_name)
                             if &#34;password&#34; in profile:
                                 resolved_list.append(profile[&#34;password&#34;])
-                        except ProfileNotFoundError:
-                            pass
                     else:
                         resolved_list.append(item)
                 resolved[key] = resolved_list
-        
-        # 3. Inheritance: Fill empty keys from the first referenced profile
-        if referenced_profiles:
-            base_profile_name = referenced_profiles[0]
-            try:
-                base_profile = self.get_profile(base_profile_name, resolve=True)
-                for key, value in base_profile.items():
-                    # Fill if key is missing or empty
-                    if key not in resolved or resolved[key] == &#34;&#34; or resolved[key] == [] or resolved[key] is None:
-                        resolved[key] = value
-            except ProfileNotFoundError:
-                pass
 
-        # 4. Handle default protocol
-        if resolved.get(&#34;protocol&#34;) == &#34;&#34; or resolved.get(&#34;protocol&#34;) is None:
+        ordered_profiles = list(dict.fromkeys(auth_referenced_profiles + other_referenced_profiles))
+        for base_profile_name in ordered_profiles:
+            with suppress(ProfileNotFoundError):
+                base_profile = _get_resolved_ref(base_profile_name)
+                for key, value in base_profile.items():
+                    if (key not in resolved or resolved[key] in (&#34;&#34;, [], None)) and (
+                        value not in (&#34;&#34;, [], None) or key not in resolved
+                    ):
+                        resolved[key] = deepcopy(value)
+
+        if resolved.get(&#34;protocol&#34;) in (&#34;&#34;, None):
             try:
-                default_profile = self.get_profile(&#34;default&#34;, resolve=True)
-                resolved[&#34;protocol&#34;] = default_profile.get(&#34;protocol&#34;, &#34;ssh&#34;)
+                default_profile = _get_resolved_ref(&#34;default&#34;)
+                resolved[&#34;protocol&#34;] = default_profile.get(&#34;protocol&#34;, &#34;ssh&#34;) or &#34;ssh&#34;
             except ProfileNotFoundError:
                 resolved[&#34;protocol&#34;] = &#34;ssh&#34;
-                
+
         return resolved
 
     def delete_profile(self, name):
         &#34;&#34;&#34;Delete an existing profile, with safety checks.&#34;&#34;&#34;
+        if _supports_transactional_update(self.config):
+            def _mut(cfg):
+                if name not in cfg.profiles:
+                    raise ProfileNotFoundError(f&#34;Profile &#39;{name}&#39; not found.&#34;)
+                if name == &#34;default&#34;:
+                    raise InvalidConfigurationError(&#34;Cannot delete the &#39;default&#39; profile.&#34;)
+                used_by = cfg._profileused_unlocked(name)
+                if used_by:
+                    raise InvalidConfigurationError(
+                        f&#34;Profile &#39;{name}&#39; is used by nodes: {&#39;, &#39;.join(used_by)}&#34;
+                    )
+                cfg._profiles_del_unlocked(id=name)
+
+            self.config.transactional_update(_mut)
+            return
+
         if name not in self.config.profiles:
             raise ProfileNotFoundError(f&#34;Profile &#39;{name}&#39; not found.&#34;)
-            
         if name == &#34;default&#34;:
             raise InvalidConfigurationError(&#34;Cannot delete the &#39;default&#39; profile.&#34;)
-            
         used_by = self.config._profileused(name)
         if used_by:
-            # We return the list of nodes using it so the UI can inform the user
-            raise InvalidConfigurationError(f&#34;Profile &#39;{name}&#39; is used by nodes: {&#39;, &#39;.join(used_by)}&#34;)
-            
+            raise InvalidConfigurationError(
+                f&#34;Profile &#39;{name}&#39; is used by nodes: {&#39;, &#39;.join(used_by)}&#34;
+            )
         self.config._profiles_del(id=name)
         self.config._saveconfig(self.config.file)
 
     def update_profile(self, name, data):
         &#34;&#34;&#34;Update an existing profile.&#34;&#34;&#34;
+        if _supports_transactional_update(self.config):
+            def _mut(cfg):
+                if name not in cfg.profiles:
+                    raise ProfileNotFoundError(f&#34;Profile &#39;{name}&#39; not found.&#34;)
+                updated_data = deepcopy(cfg.profiles[name])
+                updated_data.update(deepcopy(data))
+                filtered_data = {
+                    k: v for k, v in updated_data.items() if k in self._ALLOWED_KEYS
+                }
+                self._validate_profile_payload(filtered_data)
+                cfg._profiles_add_unlocked(id=name, **filtered_data)
+
+            self.config.transactional_update(_mut)
+            return
+
         if name not in self.config.profiles:
             raise ProfileNotFoundError(f&#34;Profile &#39;{name}&#39; not found.&#34;)
-            
-        # Merge with existing data
         existing = self.get_profile(name, resolve=False)
-        updated_data = existing.copy()
+        updated_data = deepcopy(existing)
         updated_data.update(data)
-        
-        # Filter data to match _profiles_add signature
-        allowed_keys = {&#34;host&#34;, &#34;options&#34;, &#34;logs&#34;, &#34;password&#34;, &#34;port&#34;, &#34;protocol&#34;, &#34;user&#34;, &#34;tags&#34;, &#34;jumphost&#34;}
-        filtered_data = {k: v for k, v in updated_data.items() if k in allowed_keys}
-        
+        filtered_data = {k: v for k, v in updated_data.items() if k in self._ALLOWED_KEYS}
+        self._validate_profile_payload(filtered_data)
         self.config._profiles_add(id=name, **filtered_data)
         self.config._saveconfig(self.config.file)</code></pre>
 </details>
@@ -210,13 +362,20 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def add_profile(self, name, data):
     &#34;&#34;&#34;Add a new profile.&#34;&#34;&#34;
+    filtered_data = {k: deepcopy(v) for k, v in data.items() if k in self._ALLOWED_KEYS}
+    self._validate_profile_payload(filtered_data)
+
+    if _supports_transactional_update(self.config):
+        def _mut(cfg):
+            if name in cfg.profiles:
+                raise ProfileAlreadyExistsError(f&#34;Profile &#39;{name}&#39; already exists.&#34;)
+            cfg._profiles_add_unlocked(id=name, **filtered_data)
+
+        self.config.transactional_update(_mut)
+        return
+
     if name in self.config.profiles:
         raise ProfileAlreadyExistsError(f&#34;Profile &#39;{name}&#39; already exists.&#34;)
-        
-    # Filter data to match _profiles_add signature and ensure id is passed
-    allowed_keys = {&#34;host&#34;, &#34;options&#34;, &#34;logs&#34;, &#34;password&#34;, &#34;port&#34;, &#34;protocol&#34;, &#34;user&#34;, &#34;tags&#34;, &#34;jumphost&#34;}
-    filtered_data = {k: v for k, v in data.items() if k in allowed_keys}
-    
     self.config._profiles_add(id=name, **filtered_data)
     self.config._saveconfig(self.config.file)</code></pre>
 </details>
@@ -232,17 +391,31 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def delete_profile(self, name):
     &#34;&#34;&#34;Delete an existing profile, with safety checks.&#34;&#34;&#34;
+    if _supports_transactional_update(self.config):
+        def _mut(cfg):
+            if name not in cfg.profiles:
+                raise ProfileNotFoundError(f&#34;Profile &#39;{name}&#39; not found.&#34;)
+            if name == &#34;default&#34;:
+                raise InvalidConfigurationError(&#34;Cannot delete the &#39;default&#39; profile.&#34;)
+            used_by = cfg._profileused_unlocked(name)
+            if used_by:
+                raise InvalidConfigurationError(
+                    f&#34;Profile &#39;{name}&#39; is used by nodes: {&#39;, &#39;.join(used_by)}&#34;
+                )
+            cfg._profiles_del_unlocked(id=name)
+
+        self.config.transactional_update(_mut)
+        return
+
     if name not in self.config.profiles:
         raise ProfileNotFoundError(f&#34;Profile &#39;{name}&#39; not found.&#34;)
-        
     if name == &#34;default&#34;:
         raise InvalidConfigurationError(&#34;Cannot delete the &#39;default&#39; profile.&#34;)
-        
     used_by = self.config._profileused(name)
     if used_by:
-        # We return the list of nodes using it so the UI can inform the user
-        raise InvalidConfigurationError(f&#34;Profile &#39;{name}&#39; is used by nodes: {&#39;, &#39;.join(used_by)}&#34;)
-        
+        raise InvalidConfigurationError(
+            f&#34;Profile &#39;{name}&#39; is used by nodes: {&#39;, &#39;.join(used_by)}&#34;
+        )
     self.config._profiles_del(id=name)
     self.config._saveconfig(self.config.file)</code></pre>
 </details>
@@ -256,14 +429,24 @@ el.replaceWith(d);
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_profile(self, name, resolve=True):
+<pre><code class="python">def get_profile(self, name, resolve=True, *, _visited=frozenset(), _depth=0):
     &#34;&#34;&#34;Get the profile dictionary, optionally resolved.&#34;&#34;&#34;
-    profile = self.config.profiles.get(name)
+    if _depth &gt;= MAX_PROFILE_DEPTH or name in _visited:
+        raise InvalidConfigurationError(
+            f&#34;Circular or overly deep profile reference involving &#39;{name}&#39;.&#34;
+        )
+    profiles = self._get_profiles_snapshot()
+    profile = profiles.get(name)
     if not profile:
         raise ProfileNotFoundError(f&#34;Profile &#39;{name}&#39; not found.&#34;)
-    
+
     if resolve:
-        return self.resolve_node_data(profile)
+        return self.resolve_node_data(
+            profile,
+            _visited=_visited | {name},
+            _depth=_depth + 1,
+            _profiles_snapshot=profiles,
+        )
     return profile</code></pre>
 </details>
 <div class="desc"><p>Get the profile dictionary, optionally resolved.</p></div>
@@ -278,15 +461,14 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def list_profiles(self, filter_str=None):
     &#34;&#34;&#34;List all profile names, optionally filtered.&#34;&#34;&#34;
-    profiles = list(self.config.profiles.keys())
+    profiles = list(self._get_profiles_snapshot().keys())
     case_sensitive = self.config.config.get(&#34;case&#34;, False)
-    
+
     if filter_str:
         if not case_sensitive:
             f_str = filter_str.lower()
             return [p for p in profiles if f_str in p.lower()]
-        else:
-            return [p for p in profiles if filter_str in p]
+        return [p for p in profiles if filter_str in p]
     return profiles</code></pre>
 </details>
 <div class="desc"><p>List all profile names, optionally filtered.</p></div>
@@ -299,26 +481,98 @@ el.replaceWith(d);
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def resolve_node_data(self, node_data):
-    &#34;&#34;&#34;Resolve profile references (@profile) in node data and handle inheritance.&#34;&#34;&#34;
-    resolved = node_data.copy()
-    
-    # 1. Identify all referenced profiles to support inheritance
-    referenced_profiles = []
-    for value in resolved.values():
-        if isinstance(value, str) and value.startswith(&#34;@&#34;):
-            referenced_profiles.append(value[1:])
-        elif isinstance(value, list):
-            for item in value:
-                if isinstance(item, str) and item.startswith(&#34;@&#34;):
-                    referenced_profiles.append(item[1:])
-    
-    # 2. Resolve explicit references
+<pre><code class="python">def resolve_node_data(
+    self,
+    node_data,
+    *,
+    _visited=frozenset(),
+    _depth=0,
+    _profiles_snapshot=None,
+):
+    &#34;&#34;&#34;Resolve profile references (@profile) in node data while preserving compose and scalar secrets.&#34;&#34;&#34;
+    from ..auth_utils import is_compose_expression
+
+    if _depth &gt; MAX_PROFILE_DEPTH:
+        raise InvalidConfigurationError(&#34;Profile inheritance exceeds maximum depth.&#34;)
+
+    profiles = (
+        _profiles_snapshot
+        if _profiles_snapshot is not None
+        else self._get_profiles_snapshot()
+    )
+    resolved = deepcopy(node_data)
+
+    auth_referenced_profiles = []
+    other_referenced_profiles = []
     for key, value in resolved.items():
+        if key == &#34;fallback&#34;:
+            continue
+        target_refs = (
+            auth_referenced_profiles if key in (&#34;user&#34;, &#34;password&#34;) else other_referenced_profiles
+        )
+        if isinstance(value, str):
+            if not is_compose_expression(value) and value.startswith(&#34;@&#34;):
+                ref = value[1:]
+                if key != &#34;password&#34; or ref in profiles:
+                    target_refs.append(ref)
+        elif isinstance(value, (list, tuple)):
+            for item in value:
+                if (
+                    isinstance(item, str)
+                    and not is_compose_expression(item)
+                    and item.startswith(&#34;@&#34;)
+                ):
+                    ref = item[1:]
+                    if key != &#34;password&#34; or ref in profiles:
+                        target_refs.append(ref)
+
+    def _get_resolved_ref(prof_name):
+        if prof_name in _visited or _depth &gt;= MAX_PROFILE_DEPTH:
+            raise InvalidConfigurationError(
+                f&#34;Circular or overly deep profile reference involving &#39;{prof_name}&#39;.&#34;
+            )
+        prof_raw = profiles.get(prof_name)
+        if not prof_raw:
+            raise ProfileNotFoundError(f&#34;Profile &#39;{prof_name}&#39; not found.&#34;)
+        return self.resolve_node_data(
+            prof_raw,
+            _visited=_visited | {prof_name},
+            _depth=_depth + 1,
+            _profiles_snapshot=profiles,
+        )
+
+    for key, value in list(resolved.items()):
+        if key == &#34;fallback&#34;:
+            continue
+        if key == &#34;password&#34;:
+            if isinstance(value, str):
+                if is_compose_expression(value):
+                    continue
+                if value.startswith(&#34;@&#34;) and value[1:] in profiles:
+                    prof_obj = _get_resolved_ref(value[1:])
+                    resolved[&#34;password&#34;] = prof_obj.get(&#34;password&#34;, &#34;&#34;)
+            elif isinstance(value, list):
+                resolved_list = []
+                for item in value:
+                    if (
+                        isinstance(item, str)
+                        and not is_compose_expression(item)
+                        and item.startswith(&#34;@&#34;)
+                        and item[1:] in profiles
+                    ):
+                        with suppress(ProfileNotFoundError):
+                            prof_obj = _get_resolved_ref(item[1:])
+                            if &#34;password&#34; in prof_obj:
+                                resolved_list.append(prof_obj[&#34;password&#34;])
+                    else:
+                        resolved_list.append(item)
+                resolved[&#34;password&#34;] = resolved_list
+            continue
+
         if isinstance(value, str) and value.startswith(&#34;@&#34;):
             profile_name = value[1:]
             try:
-                profile = self.get_profile(profile_name, resolve=True)
+                profile = _get_resolved_ref(profile_name)
                 resolved[key] = profile.get(key, &#34;&#34;)
             except ProfileNotFoundError:
                 resolved[key] = &#34;&#34;
@@ -327,39 +581,34 @@ el.replaceWith(d);
             for item in value:
                 if isinstance(item, str) and item.startswith(&#34;@&#34;):
                     profile_name = item[1:]
-                    try:
-                        profile = self.get_profile(profile_name, resolve=True)
+                    with suppress(ProfileNotFoundError):
+                        profile = _get_resolved_ref(profile_name)
                         if &#34;password&#34; in profile:
                             resolved_list.append(profile[&#34;password&#34;])
-                    except ProfileNotFoundError:
-                        pass
                 else:
                     resolved_list.append(item)
             resolved[key] = resolved_list
-    
-    # 3. Inheritance: Fill empty keys from the first referenced profile
-    if referenced_profiles:
-        base_profile_name = referenced_profiles[0]
-        try:
-            base_profile = self.get_profile(base_profile_name, resolve=True)
-            for key, value in base_profile.items():
-                # Fill if key is missing or empty
-                if key not in resolved or resolved[key] == &#34;&#34; or resolved[key] == [] or resolved[key] is None:
-                    resolved[key] = value
-        except ProfileNotFoundError:
-            pass
 
-    # 4. Handle default protocol
-    if resolved.get(&#34;protocol&#34;) == &#34;&#34; or resolved.get(&#34;protocol&#34;) is None:
+    ordered_profiles = list(dict.fromkeys(auth_referenced_profiles + other_referenced_profiles))
+    for base_profile_name in ordered_profiles:
+        with suppress(ProfileNotFoundError):
+            base_profile = _get_resolved_ref(base_profile_name)
+            for key, value in base_profile.items():
+                if (key not in resolved or resolved[key] in (&#34;&#34;, [], None)) and (
+                    value not in (&#34;&#34;, [], None) or key not in resolved
+                ):
+                    resolved[key] = deepcopy(value)
+
+    if resolved.get(&#34;protocol&#34;) in (&#34;&#34;, None):
         try:
-            default_profile = self.get_profile(&#34;default&#34;, resolve=True)
-            resolved[&#34;protocol&#34;] = default_profile.get(&#34;protocol&#34;, &#34;ssh&#34;)
+            default_profile = _get_resolved_ref(&#34;default&#34;)
+            resolved[&#34;protocol&#34;] = default_profile.get(&#34;protocol&#34;, &#34;ssh&#34;) or &#34;ssh&#34;
         except ProfileNotFoundError:
             resolved[&#34;protocol&#34;] = &#34;ssh&#34;
-            
+
     return resolved</code></pre>
 </details>
-<div class="desc"><p>Resolve profile references (@profile) in node data and handle inheritance.</p></div>
+<div class="desc"><p>Resolve profile references (@profile) in node data while preserving compose and scalar secrets.</p></div>
 </dd>
 <dt id="connpy.services.profile_service.ProfileService.update_profile"><code class="name flex">
 <span>def <span class="ident">update_profile</span></span>(<span>self, name, data)</span>
@@ -371,18 +620,28 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def update_profile(self, name, data):
     &#34;&#34;&#34;Update an existing profile.&#34;&#34;&#34;
+    if _supports_transactional_update(self.config):
+        def _mut(cfg):
+            if name not in cfg.profiles:
+                raise ProfileNotFoundError(f&#34;Profile &#39;{name}&#39; not found.&#34;)
+            updated_data = deepcopy(cfg.profiles[name])
+            updated_data.update(deepcopy(data))
+            filtered_data = {
+                k: v for k, v in updated_data.items() if k in self._ALLOWED_KEYS
+            }
+            self._validate_profile_payload(filtered_data)
+            cfg._profiles_add_unlocked(id=name, **filtered_data)
+
+        self.config.transactional_update(_mut)
+        return
+
     if name not in self.config.profiles:
         raise ProfileNotFoundError(f&#34;Profile &#39;{name}&#39; not found.&#34;)
-        
-    # Merge with existing data
     existing = self.get_profile(name, resolve=False)
-    updated_data = existing.copy()
+    updated_data = deepcopy(existing)
     updated_data.update(data)
-    
-    # Filter data to match _profiles_add signature
-    allowed_keys = {&#34;host&#34;, &#34;options&#34;, &#34;logs&#34;, &#34;password&#34;, &#34;port&#34;, &#34;protocol&#34;, &#34;user&#34;, &#34;tags&#34;, &#34;jumphost&#34;}
-    filtered_data = {k: v for k, v in updated_data.items() if k in allowed_keys}
-    
+    filtered_data = {k: v for k, v in updated_data.items() if k in self._ALLOWED_KEYS}
+    self._validate_profile_payload(filtered_data)
     self.config._profiles_add(id=name, **filtered_data)
     self.config._saveconfig(self.config.file)</code></pre>
 </details>

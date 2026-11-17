@@ -72,6 +72,7 @@ el.replaceWith(d);
         questions.append(inquirer.Confirm(&#34;jumphost&#34;, message=&#34;Edit jumphost?&#34;))
         questions.append(inquirer.Confirm(&#34;user&#34;, message=&#34;Edit User?&#34;))
         questions.append(inquirer.Confirm(&#34;password&#34;, message=&#34;Edit password?&#34;))
+        questions.append(inquirer.Confirm(&#34;fallback&#34;, message=&#34;Edit fallback credentials?&#34;))
         return inquirer.prompt(questions)
 
     def questions_nodes(self, unique, uniques=None, edit=None):
@@ -82,11 +83,13 @@ el.replaceWith(d);
                 defaults[&#34;tags&#34;] = &#34;&#34;
             if &#34;jumphost&#34; not in defaults:
                 defaults[&#34;jumphost&#34;] = &#34;&#34;
-        except Exception:
-            defaults = {&#34;host&#34;: &#34;&#34;, &#34;protocol&#34;: &#34;&#34;, &#34;port&#34;: &#34;&#34;, &#34;user&#34;: &#34;&#34;, &#34;options&#34;: &#34;&#34;, &#34;logs&#34;: &#34;&#34;, &#34;tags&#34;: &#34;&#34;, &#34;password&#34;: &#34;&#34;, &#34;jumphost&#34;: &#34;&#34;}
+            if &#34;fallback&#34; not in defaults:
+                defaults[&#34;fallback&#34;] = &#34;&#34;
+        except Exception:  # noqa: BLE001
+            defaults = {&#34;host&#34;: &#34;&#34;, &#34;protocol&#34;: &#34;&#34;, &#34;port&#34;: &#34;&#34;, &#34;user&#34;: &#34;&#34;, &#34;options&#34;: &#34;&#34;, &#34;logs&#34;: &#34;&#34;, &#34;tags&#34;: &#34;&#34;, &#34;password&#34;: &#34;&#34;, &#34;jumphost&#34;: &#34;&#34;, &#34;fallback&#34;: &#34;&#34;}
         node = {}
         if edit is None:
-            edit = {&#34;host&#34;: True, &#34;protocol&#34;: True, &#34;port&#34;: True, &#34;user&#34;: True, &#34;password&#34;: True, &#34;options&#34;: True, &#34;logs&#34;: True, &#34;tags&#34;: True, &#34;jumphost&#34;: True}
+            edit = {&#34;host&#34;: True, &#34;protocol&#34;: True, &#34;port&#34;: True, &#34;user&#34;: True, &#34;password&#34;: True, &#34;options&#34;: True, &#34;logs&#34;: True, &#34;tags&#34;: True, &#34;jumphost&#34;: True, &#34;fallback&#34;: True}
         questions = []
         if edit[&#34;host&#34;]:
             questions.append(inquirer.Text(&#34;host&#34;, message=&#34;Add Hostname or IP&#34;, validate=self.validators.host_validation, default=defaults[&#34;host&#34;]))
@@ -124,11 +127,13 @@ el.replaceWith(d);
             questions.append(inquirer.List(&#34;password&#34;, message=&#34;Password: Use a local password, no password or a list of profiles to reference?&#34;, choices=[&#34;Local Password&#34;, &#34;Profiles&#34;, &#34;No Password&#34;]))
         else:
             node[&#34;password&#34;] = defaults[&#34;password&#34;]
-            
+        if not edit.get(&#34;fallback&#34;):
+            node[&#34;fallback&#34;] = defaults.get(&#34;fallback&#34;, &#34;&#34;)
+
         answer = inquirer.prompt(questions)
         if answer is None:
             return False
-            
+
         if &#34;password&#34; in answer:
             if answer[&#34;password&#34;] == &#34;Local Password&#34;:
                 passq = [inquirer.Password(&#34;password&#34;, message=&#34;Set Password&#34;)]
@@ -141,13 +146,29 @@ el.replaceWith(d);
                 passa = inquirer.prompt(passq)
                 if passa is None:
                     return False
-                answer[&#34;password&#34;] = passa[&#34;password&#34;].split(&#34;,&#34;)
+                answer[&#34;password&#34;] = [p.strip() for p in passa[&#34;password&#34;].split(&#34;,&#34;) if p.strip()]
             elif answer[&#34;password&#34;] == &#34;No Password&#34;:
                 answer[&#34;password&#34;] = &#34;&#34;
-                
-        if &#34;tags&#34; in answer and not answer[&#34;tags&#34;].startswith(&#34;@&#34;) and answer[&#34;tags&#34;]:
-            answer[&#34;tags&#34;] = ast.literal_eval(answer[&#34;tags&#34;])
-            
+
+        if edit.get(&#34;fallback&#34;):
+            raw_def_fb = defaults.get(&#34;fallback&#34;, &#34;&#34;)
+            def_fb_str = json.dumps(raw_def_fb) if isinstance(raw_def_fb, (list, dict)) else str(raw_def_fb or &#34;&#34;)
+            fbq = [
+                inquirer.Text(
+                    &#34;fallback&#34;,
+                    message=&#34;Add fallback credentials (JSON list/dict, @profile, or compose:)&#34;,
+                    validate=self.validators.fallback_validation,
+                    default=def_fb_str.replace(&#34;{&#34;, &#34;{{&#34;).replace(&#34;}&#34;, &#34;}}&#34;),
+                )
+            ]
+            fba = inquirer.prompt(fbq)
+            if fba is None:
+                return False
+            answer[&#34;fallback&#34;] = _parse_fallback_input(fba[&#34;fallback&#34;])
+
+        if &#34;tags&#34; in answer and answer[&#34;tags&#34;] and not str(answer[&#34;tags&#34;]).startswith(&#34;@&#34;):
+            answer[&#34;tags&#34;] = _parse_tags_input(answer[&#34;tags&#34;])
+
         result = {**uniques, **answer, **node}
         result[&#34;type&#34;] = &#34;connection&#34;
         return result
@@ -160,11 +181,13 @@ el.replaceWith(d);
                 defaults[&#34;tags&#34;] = &#34;&#34;
             if &#34;jumphost&#34; not in defaults:
                 defaults[&#34;jumphost&#34;] = &#34;&#34;
-        except Exception:
-            defaults = {&#34;host&#34;: &#34;&#34;, &#34;protocol&#34;: &#34;&#34;, &#34;port&#34;: &#34;&#34;, &#34;user&#34;: &#34;&#34;, &#34;options&#34;: &#34;&#34;, &#34;logs&#34;: &#34;&#34;, &#34;tags&#34;: &#34;&#34;, &#34;jumphost&#34;: &#34;&#34;}
+            if &#34;fallback&#34; not in defaults:
+                defaults[&#34;fallback&#34;] = &#34;&#34;
+        except Exception:  # noqa: BLE001
+            defaults = {&#34;host&#34;: &#34;&#34;, &#34;protocol&#34;: &#34;&#34;, &#34;port&#34;: &#34;&#34;, &#34;user&#34;: &#34;&#34;, &#34;options&#34;: &#34;&#34;, &#34;logs&#34;: &#34;&#34;, &#34;tags&#34;: &#34;&#34;, &#34;jumphost&#34;: &#34;&#34;, &#34;fallback&#34;: &#34;&#34;}
         profile = {}
         if edit is None:
-            edit = {&#34;host&#34;: True, &#34;protocol&#34;: True, &#34;port&#34;: True, &#34;user&#34;: True, &#34;password&#34;: True, &#34;options&#34;: True, &#34;logs&#34;: True, &#34;tags&#34;: True, &#34;jumphost&#34;: True}
+            edit = {&#34;host&#34;: True, &#34;protocol&#34;: True, &#34;port&#34;: True, &#34;user&#34;: True, &#34;password&#34;: True, &#34;options&#34;: True, &#34;logs&#34;: True, &#34;tags&#34;: True, &#34;jumphost&#34;: True, &#34;fallback&#34;: True}
         questions = []
         if edit[&#34;host&#34;]:
             questions.append(inquirer.Text(&#34;host&#34;, message=&#34;Add Hostname or IP&#34;, default=defaults[&#34;host&#34;]))
@@ -202,18 +225,25 @@ el.replaceWith(d);
             questions.append(inquirer.Password(&#34;password&#34;, message=&#34;Set Password&#34;))
         else:
             profile[&#34;password&#34;] = defaults[&#34;password&#34;]
-            
+        if edit.get(&#34;fallback&#34;):
+            raw_def_fb = defaults.get(&#34;fallback&#34;, &#34;&#34;)
+            def_fb_str = json.dumps(raw_def_fb) if isinstance(raw_def_fb, (list, dict)) else str(raw_def_fb or &#34;&#34;)
+            questions.append(inquirer.Text(&#34;fallback&#34;, message=&#34;Add fallback credentials (JSON list/dict, @profile, or compose:)&#34;, validate=self.validators.fallback_validation, default=def_fb_str.replace(&#34;{&#34;, &#34;{{&#34;).replace(&#34;}&#34;, &#34;}}&#34;)))
+        else:
+            profile[&#34;fallback&#34;] = defaults.get(&#34;fallback&#34;, &#34;&#34;)
+
         answer = inquirer.prompt(questions)
         if answer is None:
             return False
-            
-        if &#34;password&#34; in answer:
-            if answer[&#34;password&#34;] != &#34;&#34;:
-                answer[&#34;password&#34;] = self.app.services.config_svc.encrypt_password(answer[&#34;password&#34;])
-                
+
+        if &#34;password&#34; in answer and answer[&#34;password&#34;] != &#34;&#34;:
+            answer[&#34;password&#34;] = self.app.services.config_svc.encrypt_password(answer[&#34;password&#34;])
+
         if &#34;tags&#34; in answer and answer[&#34;tags&#34;]:
-            answer[&#34;tags&#34;] = ast.literal_eval(answer[&#34;tags&#34;])
-            
+            answer[&#34;tags&#34;] = _parse_tags_input(answer[&#34;tags&#34;])
+        if &#34;fallback&#34; in answer:
+            answer[&#34;fallback&#34;] = _parse_fallback_input(answer[&#34;fallback&#34;])
+
         result = {**answer, **profile}
         result[&#34;id&#34;] = unique
         return result
@@ -232,27 +262,43 @@ el.replaceWith(d);
         questions.append(inquirer.Text(&#34;jumphost&#34;, message=&#34;Add Jumphost node&#34;, validate=self.validators.jumphost_validation))
         questions.append(inquirer.Text(&#34;user&#34;, message=&#34;Pick username&#34;, validate=self.validators.default_validation))
         questions.append(inquirer.List(&#34;password&#34;, message=&#34;Password: Use a local password, no password or a list of profiles to reference?&#34;, choices=[&#34;Local Password&#34;, &#34;Profiles&#34;, &#34;No Password&#34;]))
-        
+
         answer = inquirer.prompt(questions)
         if answer is None:
             return False
-            
+
         if &#34;password&#34; in answer:
             if answer[&#34;password&#34;] == &#34;Local Password&#34;:
                 passq = [inquirer.Password(&#34;password&#34;, message=&#34;Set Password&#34;)]
                 passa = inquirer.prompt(passq)
+                if passa is None:
+                    return False
                 answer[&#34;password&#34;] = self.app.services.config_svc.encrypt_password(passa[&#34;password&#34;])
             elif answer[&#34;password&#34;] == &#34;Profiles&#34;:
                 passq = [(inquirer.Text(&#34;password&#34;, message=&#34;Set a @profile or a comma separated list of @profiles&#34;, validate=self.validators.pass_validation))]
                 passa = inquirer.prompt(passq)
-                answer[&#34;password&#34;] = passa[&#34;password&#34;].split(&#34;,&#34;)
+                if passa is None:
+                    return False
+                answer[&#34;password&#34;] = [p.strip() for p in passa[&#34;password&#34;].split(&#34;,&#34;) if p.strip()]
             elif answer[&#34;password&#34;] == &#34;No Password&#34;:
                 answer[&#34;password&#34;] = &#34;&#34;
-                
+
+        fbq = [
+            inquirer.Text(
+                &#34;fallback&#34;,
+                message=&#34;Add fallback credentials (JSON list/dict, @profile, or compose:)&#34;,
+                validate=self.validators.fallback_validation,
+            )
+        ]
+        fba = inquirer.prompt(fbq)
+        if fba is None:
+            return False
+        answer[&#34;fallback&#34;] = _parse_fallback_input(fba[&#34;fallback&#34;])
+
         answer[&#34;type&#34;] = &#34;connection&#34;
-        if &#34;tags&#34; in answer and not answer[&#34;tags&#34;].startswith(&#34;@&#34;) and answer[&#34;tags&#34;]:
-            answer[&#34;tags&#34;] = ast.literal_eval(answer[&#34;tags&#34;])
-            
+        if &#34;tags&#34; in answer and answer[&#34;tags&#34;] and not str(answer[&#34;tags&#34;]).startswith(&#34;@&#34;):
+            answer[&#34;tags&#34;] = _parse_tags_input(answer[&#34;tags&#34;])
+
         return answer
 
     def mcp_wizard(self, mcp_servers):
@@ -454,27 +500,43 @@ el.replaceWith(d);
     questions.append(inquirer.Text(&#34;jumphost&#34;, message=&#34;Add Jumphost node&#34;, validate=self.validators.jumphost_validation))
     questions.append(inquirer.Text(&#34;user&#34;, message=&#34;Pick username&#34;, validate=self.validators.default_validation))
     questions.append(inquirer.List(&#34;password&#34;, message=&#34;Password: Use a local password, no password or a list of profiles to reference?&#34;, choices=[&#34;Local Password&#34;, &#34;Profiles&#34;, &#34;No Password&#34;]))
-    
+
     answer = inquirer.prompt(questions)
     if answer is None:
         return False
-        
+
     if &#34;password&#34; in answer:
         if answer[&#34;password&#34;] == &#34;Local Password&#34;:
             passq = [inquirer.Password(&#34;password&#34;, message=&#34;Set Password&#34;)]
             passa = inquirer.prompt(passq)
+            if passa is None:
+                return False
             answer[&#34;password&#34;] = self.app.services.config_svc.encrypt_password(passa[&#34;password&#34;])
         elif answer[&#34;password&#34;] == &#34;Profiles&#34;:
             passq = [(inquirer.Text(&#34;password&#34;, message=&#34;Set a @profile or a comma separated list of @profiles&#34;, validate=self.validators.pass_validation))]
             passa = inquirer.prompt(passq)
-            answer[&#34;password&#34;] = passa[&#34;password&#34;].split(&#34;,&#34;)
+            if passa is None:
+                return False
+            answer[&#34;password&#34;] = [p.strip() for p in passa[&#34;password&#34;].split(&#34;,&#34;) if p.strip()]
         elif answer[&#34;password&#34;] == &#34;No Password&#34;:
             answer[&#34;password&#34;] = &#34;&#34;
-            
+
+    fbq = [
+        inquirer.Text(
+            &#34;fallback&#34;,
+            message=&#34;Add fallback credentials (JSON list/dict, @profile, or compose:)&#34;,
+            validate=self.validators.fallback_validation,
+        )
+    ]
+    fba = inquirer.prompt(fbq)
+    if fba is None:
+        return False
+    answer[&#34;fallback&#34;] = _parse_fallback_input(fba[&#34;fallback&#34;])
+
     answer[&#34;type&#34;] = &#34;connection&#34;
-    if &#34;tags&#34; in answer and not answer[&#34;tags&#34;].startswith(&#34;@&#34;) and answer[&#34;tags&#34;]:
-        answer[&#34;tags&#34;] = ast.literal_eval(answer[&#34;tags&#34;])
-        
+    if &#34;tags&#34; in answer and answer[&#34;tags&#34;] and not str(answer[&#34;tags&#34;]).startswith(&#34;@&#34;):
+        answer[&#34;tags&#34;] = _parse_tags_input(answer[&#34;tags&#34;])
+
     return answer</code></pre>
 </details>
 <div class="desc"></div>
@@ -499,6 +561,7 @@ el.replaceWith(d);
     questions.append(inquirer.Confirm(&#34;jumphost&#34;, message=&#34;Edit jumphost?&#34;))
     questions.append(inquirer.Confirm(&#34;user&#34;, message=&#34;Edit User?&#34;))
     questions.append(inquirer.Confirm(&#34;password&#34;, message=&#34;Edit password?&#34;))
+    questions.append(inquirer.Confirm(&#34;fallback&#34;, message=&#34;Edit fallback credentials?&#34;))
     return inquirer.prompt(questions)</code></pre>
 </details>
 <div class="desc"></div>
@@ -519,11 +582,13 @@ el.replaceWith(d);
             defaults[&#34;tags&#34;] = &#34;&#34;
         if &#34;jumphost&#34; not in defaults:
             defaults[&#34;jumphost&#34;] = &#34;&#34;
-    except Exception:
-        defaults = {&#34;host&#34;: &#34;&#34;, &#34;protocol&#34;: &#34;&#34;, &#34;port&#34;: &#34;&#34;, &#34;user&#34;: &#34;&#34;, &#34;options&#34;: &#34;&#34;, &#34;logs&#34;: &#34;&#34;, &#34;tags&#34;: &#34;&#34;, &#34;password&#34;: &#34;&#34;, &#34;jumphost&#34;: &#34;&#34;}
+        if &#34;fallback&#34; not in defaults:
+            defaults[&#34;fallback&#34;] = &#34;&#34;
+    except Exception:  # noqa: BLE001
+        defaults = {&#34;host&#34;: &#34;&#34;, &#34;protocol&#34;: &#34;&#34;, &#34;port&#34;: &#34;&#34;, &#34;user&#34;: &#34;&#34;, &#34;options&#34;: &#34;&#34;, &#34;logs&#34;: &#34;&#34;, &#34;tags&#34;: &#34;&#34;, &#34;password&#34;: &#34;&#34;, &#34;jumphost&#34;: &#34;&#34;, &#34;fallback&#34;: &#34;&#34;}
     node = {}
     if edit is None:
-        edit = {&#34;host&#34;: True, &#34;protocol&#34;: True, &#34;port&#34;: True, &#34;user&#34;: True, &#34;password&#34;: True, &#34;options&#34;: True, &#34;logs&#34;: True, &#34;tags&#34;: True, &#34;jumphost&#34;: True}
+        edit = {&#34;host&#34;: True, &#34;protocol&#34;: True, &#34;port&#34;: True, &#34;user&#34;: True, &#34;password&#34;: True, &#34;options&#34;: True, &#34;logs&#34;: True, &#34;tags&#34;: True, &#34;jumphost&#34;: True, &#34;fallback&#34;: True}
     questions = []
     if edit[&#34;host&#34;]:
         questions.append(inquirer.Text(&#34;host&#34;, message=&#34;Add Hostname or IP&#34;, validate=self.validators.host_validation, default=defaults[&#34;host&#34;]))
@@ -561,11 +626,13 @@ el.replaceWith(d);
         questions.append(inquirer.List(&#34;password&#34;, message=&#34;Password: Use a local password, no password or a list of profiles to reference?&#34;, choices=[&#34;Local Password&#34;, &#34;Profiles&#34;, &#34;No Password&#34;]))
     else:
         node[&#34;password&#34;] = defaults[&#34;password&#34;]
-        
+    if not edit.get(&#34;fallback&#34;):
+        node[&#34;fallback&#34;] = defaults.get(&#34;fallback&#34;, &#34;&#34;)
+
     answer = inquirer.prompt(questions)
     if answer is None:
         return False
-        
+
     if &#34;password&#34; in answer:
         if answer[&#34;password&#34;] == &#34;Local Password&#34;:
             passq = [inquirer.Password(&#34;password&#34;, message=&#34;Set Password&#34;)]
@@ -578,13 +645,29 @@ el.replaceWith(d);
             passa = inquirer.prompt(passq)
             if passa is None:
                 return False
-            answer[&#34;password&#34;] = passa[&#34;password&#34;].split(&#34;,&#34;)
+            answer[&#34;password&#34;] = [p.strip() for p in passa[&#34;password&#34;].split(&#34;,&#34;) if p.strip()]
         elif answer[&#34;password&#34;] == &#34;No Password&#34;:
             answer[&#34;password&#34;] = &#34;&#34;
-            
-    if &#34;tags&#34; in answer and not answer[&#34;tags&#34;].startswith(&#34;@&#34;) and answer[&#34;tags&#34;]:
-        answer[&#34;tags&#34;] = ast.literal_eval(answer[&#34;tags&#34;])
-        
+
+    if edit.get(&#34;fallback&#34;):
+        raw_def_fb = defaults.get(&#34;fallback&#34;, &#34;&#34;)
+        def_fb_str = json.dumps(raw_def_fb) if isinstance(raw_def_fb, (list, dict)) else str(raw_def_fb or &#34;&#34;)
+        fbq = [
+            inquirer.Text(
+                &#34;fallback&#34;,
+                message=&#34;Add fallback credentials (JSON list/dict, @profile, or compose:)&#34;,
+                validate=self.validators.fallback_validation,
+                default=def_fb_str.replace(&#34;{&#34;, &#34;{{&#34;).replace(&#34;}&#34;, &#34;}}&#34;),
+            )
+        ]
+        fba = inquirer.prompt(fbq)
+        if fba is None:
+            return False
+        answer[&#34;fallback&#34;] = _parse_fallback_input(fba[&#34;fallback&#34;])
+
+    if &#34;tags&#34; in answer and answer[&#34;tags&#34;] and not str(answer[&#34;tags&#34;]).startswith(&#34;@&#34;):
+        answer[&#34;tags&#34;] = _parse_tags_input(answer[&#34;tags&#34;])
+
     result = {**uniques, **answer, **node}
     result[&#34;type&#34;] = &#34;connection&#34;
     return result</code></pre>
@@ -607,11 +690,13 @@ el.replaceWith(d);
             defaults[&#34;tags&#34;] = &#34;&#34;
         if &#34;jumphost&#34; not in defaults:
             defaults[&#34;jumphost&#34;] = &#34;&#34;
-    except Exception:
-        defaults = {&#34;host&#34;: &#34;&#34;, &#34;protocol&#34;: &#34;&#34;, &#34;port&#34;: &#34;&#34;, &#34;user&#34;: &#34;&#34;, &#34;options&#34;: &#34;&#34;, &#34;logs&#34;: &#34;&#34;, &#34;tags&#34;: &#34;&#34;, &#34;jumphost&#34;: &#34;&#34;}
+        if &#34;fallback&#34; not in defaults:
+            defaults[&#34;fallback&#34;] = &#34;&#34;
+    except Exception:  # noqa: BLE001
+        defaults = {&#34;host&#34;: &#34;&#34;, &#34;protocol&#34;: &#34;&#34;, &#34;port&#34;: &#34;&#34;, &#34;user&#34;: &#34;&#34;, &#34;options&#34;: &#34;&#34;, &#34;logs&#34;: &#34;&#34;, &#34;tags&#34;: &#34;&#34;, &#34;jumphost&#34;: &#34;&#34;, &#34;fallback&#34;: &#34;&#34;}
     profile = {}
     if edit is None:
-        edit = {&#34;host&#34;: True, &#34;protocol&#34;: True, &#34;port&#34;: True, &#34;user&#34;: True, &#34;password&#34;: True, &#34;options&#34;: True, &#34;logs&#34;: True, &#34;tags&#34;: True, &#34;jumphost&#34;: True}
+        edit = {&#34;host&#34;: True, &#34;protocol&#34;: True, &#34;port&#34;: True, &#34;user&#34;: True, &#34;password&#34;: True, &#34;options&#34;: True, &#34;logs&#34;: True, &#34;tags&#34;: True, &#34;jumphost&#34;: True, &#34;fallback&#34;: True}
     questions = []
     if edit[&#34;host&#34;]:
         questions.append(inquirer.Text(&#34;host&#34;, message=&#34;Add Hostname or IP&#34;, default=defaults[&#34;host&#34;]))
@@ -649,18 +734,25 @@ el.replaceWith(d);
         questions.append(inquirer.Password(&#34;password&#34;, message=&#34;Set Password&#34;))
     else:
         profile[&#34;password&#34;] = defaults[&#34;password&#34;]
-        
+    if edit.get(&#34;fallback&#34;):
+        raw_def_fb = defaults.get(&#34;fallback&#34;, &#34;&#34;)
+        def_fb_str = json.dumps(raw_def_fb) if isinstance(raw_def_fb, (list, dict)) else str(raw_def_fb or &#34;&#34;)
+        questions.append(inquirer.Text(&#34;fallback&#34;, message=&#34;Add fallback credentials (JSON list/dict, @profile, or compose:)&#34;, validate=self.validators.fallback_validation, default=def_fb_str.replace(&#34;{&#34;, &#34;{{&#34;).replace(&#34;}&#34;, &#34;}}&#34;)))
+    else:
+        profile[&#34;fallback&#34;] = defaults.get(&#34;fallback&#34;, &#34;&#34;)
+
     answer = inquirer.prompt(questions)
     if answer is None:
         return False
-        
-    if &#34;password&#34; in answer:
-        if answer[&#34;password&#34;] != &#34;&#34;:
-            answer[&#34;password&#34;] = self.app.services.config_svc.encrypt_password(answer[&#34;password&#34;])
-            
+
+    if &#34;password&#34; in answer and answer[&#34;password&#34;] != &#34;&#34;:
+        answer[&#34;password&#34;] = self.app.services.config_svc.encrypt_password(answer[&#34;password&#34;])
+
     if &#34;tags&#34; in answer and answer[&#34;tags&#34;]:
-        answer[&#34;tags&#34;] = ast.literal_eval(answer[&#34;tags&#34;])
-        
+        answer[&#34;tags&#34;] = _parse_tags_input(answer[&#34;tags&#34;])
+    if &#34;fallback&#34; in answer:
+        answer[&#34;fallback&#34;] = _parse_fallback_input(answer[&#34;fallback&#34;])
+
     result = {**answer, **profile}
     result[&#34;id&#34;] = unique
     return result</code></pre>
