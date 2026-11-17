@@ -144,7 +144,7 @@ def resolve_timeouts(
             tag_max_ext,
             "tags.max_progress_extensions",
             min_val=0,
-            max_val=MAX_STAGE_TIMEOUT_CAP,
+            max_val=10,
         )
     else:
         max_ext = DEFAULT_MAX_PROGRESS_EXTENSIONS
@@ -174,7 +174,10 @@ def compile_expects(expects_map):
             elif isinstance(pat, re.Pattern):
                 if isinstance(pat.pattern, str):
                     compiled.append(
-                        re.compile(pat.pattern.encode("ascii"), pat.flags | re.DOTALL)
+                        re.compile(
+                            pat.pattern.encode("ascii"),
+                            (pat.flags & ~re.UNICODE) | re.DOTALL,
+                        )
                     )
                 else:
                     compiled.append(pat)
@@ -1089,23 +1092,27 @@ class node:
                     not self._is_unsafe_allowed() and _SSM_UNSAFE_OPTIONS_RE.search(nc_cmd)
                 ):
                     raise ValueError(f"Invalid nc_command in {jh_proto} jumphost")
+            jh_opt_joined = ""
             jh_opt_str = str(jh.get("options", "") or "").strip()
             if jh_opt_str:
                 if _CONTROL_CHAR_RE.search(jh_opt_str):
                     raise ValueError(f"Control characters disallowed in {jh_proto} options")
+                if not self._is_unsafe_allowed() and _SSM_UNSAFE_OPTIONS_RE.search(jh_opt_str):
+                    raise ValueError(f"Invalid characters in {jh_proto} options")
                 try:
-                    shlex.split(jh_opt_str)
+                    jh_opt_tokens = shlex.split(jh_opt_str)
                 except ValueError as exc:
                     raise ValueError(f"Invalid {jh_proto} options: unbalanced quotes") from exc
+                jh_opt_joined = shlex.join(jh_opt_tokens)
             if jh_proto == "kubectl":
                 cmd = "kubectl exec "
-                if jh_opt_str:
-                    cmd += f"{jh_opt_str} "
+                if jh_opt_joined:
+                    cmd += f"{jh_opt_joined} "
                 cmd += f"{jh_host} -i -- {nc_cmd} {w_target} {w_port}"
             else:
                 cmd = "docker "
-                if jh_opt_str:
-                    cmd += f"{jh_opt_str} "
+                if jh_opt_joined:
+                    cmd += f"{jh_opt_joined} "
                 cmd += f"exec -i {jh_host} {nc_cmd} {w_target} {w_port}"
         else:
             if include_meta:
@@ -1513,7 +1520,7 @@ class node:
                 if tasks[0] in done and tasks[1] not in done:
                     try:
                         await asyncio.wait_for(tasks[1], timeout=0.2)
-                    except (TimeoutError, asyncio.CancelledError):
+                    except (asyncio.TimeoutError, TimeoutError, asyncio.CancelledError):  # noqa: UP041
                         pass
                 
                 for t in tasks:

@@ -187,6 +187,12 @@ class TestResolveTimeouts:
         with pytest.raises(ValueError, match="Invalid"):
             resolve_timeouts("ssh", {}, [], auth_timeout=bad_val)
 
+    def test_max_progress_extensions_capped_at_10(self):
+        assert resolve_timeouts("ssh", {"max_progress_extensions": 0}, []) == (10, 25, 10, 0, 180)
+        assert resolve_timeouts("ssh", {"max_progress_extensions": 10}, []) == (10, 25, 10, 10, 180)
+        with pytest.raises(ValueError, match="Invalid"):
+            resolve_timeouts("ssh", {"max_progress_extensions": 11}, [])
+
     def test_connect_and_run_return_code_12_on_invalid_timeout(self):
         n = node("r1", "10.0.0.1", user="admin", protocol="ssh")
         res_conn = n._connect(timeout=True)
@@ -554,6 +560,74 @@ class TestJumphostChainAndSecurity:
             with pytest.raises(ValueError, match="cannot contain|Disallowed"):
                 node("router1", "10.20.0.5", user="netadmin", jumphost="jh_ssh", config=cfg)
 
+    def test_kubectl_and_docker_jumphost_options_reject_injection_and_serialize_shlex(self, tmp_path):
+        for jh_proto in ("kubectl", "docker"):
+            for bad_opts in ["-n ops;id", "--context=$(whoami)", "-n ops|cat", "--flag `id`"]:
+                cfg_bad = _make_config(
+                    tmp_path,
+                    {
+                        "jh": {
+                            "host": "jump-box",
+                            "protocol": jh_proto,
+                            "port": "",
+                            "user": "",
+                            "password": "",
+                            "options": bad_opts,
+                            "logs": "",
+                            "tags": "",
+                            "jumphost": "",
+                            "type": "connection",
+                        },
+                        "dest": {
+                            "host": "10.20.0.5",
+                            "protocol": "ssh",
+                            "port": "",
+                            "user": "admin",
+                            "password": "",
+                            "options": "",
+                            "logs": "",
+                            "tags": "",
+                            "jumphost": "jh",
+                            "type": "connection",
+                        },
+                    },
+                )
+                with pytest.raises(ValueError, match=f"Invalid characters in {jh_proto} options"):
+                    node("dest", "10.20.0.5", user="admin", jumphost="jh", config=cfg_bad)
+
+            cfg_ok = _make_config(
+                tmp_path,
+                {
+                    "jh": {
+                        "host": "jump-box",
+                        "protocol": jh_proto,
+                        "port": "",
+                        "user": "",
+                        "password": "",
+                        "options": "-n   ops   --context   prod",
+                        "logs": "",
+                        "tags": "",
+                        "jumphost": "",
+                        "type": "connection",
+                    },
+                    "dest": {
+                        "host": "10.20.0.5",
+                        "protocol": "ssh",
+                        "port": "",
+                        "user": "admin",
+                        "password": "",
+                        "options": "",
+                        "logs": "",
+                        "tags": "",
+                        "jumphost": "jh",
+                        "type": "connection",
+                    },
+                },
+            )
+            dest = node("dest", "10.20.0.5", user="admin", jumphost="jh", config=cfg_ok)
+            raw_cmd, _ = dest._build_jumphost_chain("jh", cfg_ok)
+            assert "-n ops --context prod" in raw_cmd
+
 
 # =============================================================================
 # 4. _connect progress extension, global deadline, finally, concurrency, redaction
@@ -791,6 +865,20 @@ class TestHardenedExpectsAndMotd:
         assert compiled["ssh"][0].flags & re.DOTALL
         assert compiled["ssh"][1] is pexpect.EOF
         assert compiled["ssh"][2] is pexpect.TIMEOUT
+
+    def test_compile_expects_masks_re_unicode_when_recompiling_str_pattern(self):
+        str_pat_default = re.compile(r"Connection refused")
+        str_pat_explicit = re.compile(r"Permission denied.*", re.IGNORECASE | re.UNICODE)
+        compiled = compile_expects({"ssh": [str_pat_default, str_pat_explicit]})
+
+        for cpat in compiled["ssh"]:
+            assert isinstance(cpat, re.Pattern)
+            assert isinstance(cpat.pattern, bytes)
+            assert cpat.flags & re.DOTALL
+            assert not (cpat.flags & re.UNICODE)
+
+        assert compiled["ssh"][1].flags & re.IGNORECASE
+        assert compiled["ssh"][1].search(b"PERMISSION DENIED\nhost") is not None
 
     def test_adversarial_motd_banners_do_not_false_positive_and_connect(self):
         # 1) SSH adversarial MOTD: TACACS+ unavailable + Permission denied retry + chunked Connection refused + closed + not supported
