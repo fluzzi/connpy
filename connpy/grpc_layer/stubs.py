@@ -728,6 +728,14 @@ class ExecutionStub:
 
         return ContextService(self.config)
 
+    def _filter_candidates_by_filter_str(self, candidates: list[str], nodes_filter: str) -> list[str]:
+        if not nodes_filter:
+            return list(candidates)
+        cfg_dict = getattr(self.config, "config", None)
+        case = cfg_dict.get("case", False) if isinstance(cfg_dict, dict) else False
+        flags = 0 if case else re.IGNORECASE
+        return [c for c in candidates if re.search(nodes_filter, c, flags)]
+
     def _resolve_remote_batches(self, nodes_filter):
         ctx_svc = self._get_context_service()
         if ctx_svc is not None and not ctx_svc.is_default_all_context():
@@ -739,6 +747,7 @@ class ExecutionStub:
                     if self.node_stub is not None
                     else []
                 )
+                candidates = self._filter_candidates_by_filter_str(candidates, nodes_filter)
                 permitted = ctx_svc.filter_node_list(result=candidates)
             if not permitted:
                 raise ConnpyError(f"No nodes found matching filter: {nodes_filter}")
@@ -816,6 +825,8 @@ class ExecutionStub:
                 if self.node_stub is not None
                 else []
             )
+            if isinstance(nodes_filter, str):
+                candidates = self._filter_candidates_by_filter_str(candidates, nodes_filter)
             permitted = ctx_svc.filter_node_list(result=candidates)
             if not permitted:
                 raise ConnpyError(f"No nodes found matching filter: {nodes_filter}")

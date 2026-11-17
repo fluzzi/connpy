@@ -128,6 +128,11 @@ class ExecutionService(BaseService):
                     if hasattr(self.config, "_getallnodes")
                     else []
                 )
+            if nodes_filter:
+                cfg_dict = getattr(self.config, "config", None)
+                case = cfg_dict.get("case", False) if isinstance(cfg_dict, dict) else False
+                flags = 0 if case else re.IGNORECASE
+                candidates = [c for c in candidates if re.search(nodes_filter, c, flags)]
             permitted = ctx_svc.filter_node_list(result=candidates)
 
         if not permitted:
