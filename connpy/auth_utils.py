@@ -852,9 +852,17 @@ def validate_fallback_entries(
             return []
         if stripped.startswith(("[", "{")):
             parsed = validate_json_depth_and_size(stripped)
+        elif stripped.startswith("compose:"):
+            validate_compose_syntax(stripped)
+            return [stripped]
+        elif stripped.startswith("@") and not stripped.startswith("@@") and "," in stripped:
+            parts = [p.strip() for p in stripped.split(",")]
+            if not parts or any(not _is_profile_ref(p) for p in parts):
+                raise ValueError(
+                    "Comma-separated fallback entries must be valid @profile references"
+                )
+            parsed = parts
         else:
-            if stripped.startswith("compose:"):
-                validate_compose_syntax(stripped)
             return [stripped]
 
     if isinstance(parsed, dict):
@@ -1114,6 +1122,10 @@ def _extract_profile_refs_internal(value: Any, seen: set[int]) -> set[str]:
             refs.update(extract_compose_profile_refs(stripped))
         elif stripped.startswith("@") and _PROFILE_REF_BODY_RE.fullmatch(stripped[1:]):
             refs.add(stripped[1:])
+        elif stripped.startswith("@") and not stripped.startswith("@@") and "," in stripped:
+            parts = [p.strip() for p in stripped.split(",")]
+            if parts and all(_is_profile_ref(p) for p in parts):
+                refs.update(p[1:] for p in parts)
         elif (
             stripped.startswith(("[", "{"))
             and len(stripped) <= MAX_JSON_INPUT_BYTES

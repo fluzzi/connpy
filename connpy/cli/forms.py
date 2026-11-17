@@ -55,7 +55,14 @@ def _parse_fallback_input(raw_fb):
                 max_depth=MAX_JSON_INPUT_DEPTH,
             )
             return validate_fallback_entries(parsed, max_entries=MAX_FALLBACK_ENTRIES)
-        validate_fallback_entries(stripped, max_entries=MAX_FALLBACK_ENTRIES)
+        validated = validate_fallback_entries(stripped, max_entries=MAX_FALLBACK_ENTRIES)
+        if (
+            stripped.startswith("@")
+            and not stripped.startswith("@@")
+            and "," in stripped
+            and not stripped.startswith("compose:")
+        ):
+            return validated
         return stripped
     validate_json_depth_and_size(
         raw_fb,
@@ -166,7 +173,7 @@ class Forms:
             fbq = [
                 inquirer.Text(
                     "fallback",
-                    message="Add fallback credentials (JSON list/dict, @profile, or compose:)",
+                    message="Add fallback credentials (@profile, @p1,@p2, JSON list/dict, or compose:)",
                     validate=self.validators.fallback_validation,
                     default=def_fb_str.replace("{", "{{").replace("}", "}}"),
                 )
@@ -238,7 +245,7 @@ class Forms:
         if edit.get("fallback"):
             raw_def_fb = defaults.get("fallback", "")
             def_fb_str = json.dumps(raw_def_fb) if isinstance(raw_def_fb, (list, dict)) else str(raw_def_fb or "")
-            questions.append(inquirer.Text("fallback", message="Add fallback credentials (JSON list/dict, @profile, or compose:)", validate=self.validators.fallback_validation, default=def_fb_str.replace("{", "{{").replace("}", "}}")))
+            questions.append(inquirer.Text("fallback", message="Add fallback credentials (@profile, @p1,@p2, JSON list/dict, or compose:)", validate=self.validators.fallback_validation, default=def_fb_str.replace("{", "{{").replace("}", "}}")))
         else:
             profile["fallback"] = defaults.get("fallback", "")
 
@@ -296,7 +303,7 @@ class Forms:
         fbq = [
             inquirer.Text(
                 "fallback",
-                message="Add fallback credentials (JSON list/dict, @profile, or compose:)",
+                message="Add fallback credentials (@profile, @p1,@p2, JSON list/dict, or compose:)",
                 validate=self.validators.fallback_validation,
             )
         ]

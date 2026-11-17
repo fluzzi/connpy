@@ -2280,3 +2280,99 @@ def test_profile_service_strict_auth_inheritance_no_options_leak_and_no_non_auth
         else:
             assert res_neg["user"] == ""
             assert res_neg["password"] == ""
+
+
+def test_fallback_comma_separated_profiles_validation_parsing_resolution_and_profileused(
+    tmp_path: Path,
+) -> None:
+    from types import SimpleNamespace
+
+    import inquirer
+
+    from connpy.cli.forms import _parse_fallback_input
+
+    app = SimpleNamespace(
+        profiles={
+            "sdnc": {"user": "sdnc_u", "password": "sdnc_p"},
+            "local": {"user": "local_u", "password": "local_p"},
+            "p1": {"user": "u1", "password": "p1"},
+            "p2": {"user": "u2", "password": "p2"},
+            "p3": {"user": "u3", "password": "p3"},
+            "p4": {"user": "u4", "password": "p4"},
+            "p5": {"user": "u5", "password": "p5"},
+            "p6": {"user": "u6", "password": "p6"},
+        }
+    )
+    validators = Validators(app)
+
+    assert validators.fallback_validation({}, "@sdnc, @local") is True
+    assert validators.fallback_validation({}, "@sdnc,@local") is True
+    assert validators.fallback_validation({}, "@sdnc") is True
+    assert validators.fallback_validation({}, "@@Pass,WithComma") is True
+
+    with pytest.raises(inquirer.errors.ValidationError) as exc_missing:
+        validators.fallback_validation({}, "@sdnc, @nonexistent")
+    assert "@nonexistent" in str(exc_missing.value.reason)
+
+    with pytest.raises(inquirer.errors.ValidationError) as exc_limit:
+        validators.fallback_validation({}, "@p1, @p2, @p3, @p4, @p5, @p6")
+    assert str(MAX_FALLBACK_ENTRIES) in str(exc_limit.value.reason)
+
+    with pytest.raises(inquirer.errors.ValidationError):
+        validators.fallback_validation({}, "@sdnc,")
+
+    with pytest.raises(inquirer.errors.ValidationError):
+        validators.fallback_validation({}, "@sdnc, local")
+
+    assert _parse_fallback_input("@sdnc, @local") == ["@sdnc", "@local"]
+    assert _parse_fallback_input("@sdnc,@local") == ["@sdnc", "@local"]
+    assert _parse_fallback_input("@sdnc") == "@sdnc"
+    assert _parse_fallback_input("@@Pass,WithComma") == "@@Pass,WithComma"
+
+    assert validate_fallback_entries("@sdnc, @local") == ["@sdnc", "@local"]
+    assert validate_fallback_entries("@@Pass,WithComma") == ["@@Pass,WithComma"]
+    with pytest.raises(ValueError):
+        validate_fallback_entries("@sdnc,")
+    with pytest.raises(ValueError):
+        validate_fallback_entries("@sdnc, local")
+    with pytest.raises(ValueError):
+        validate_fallback_entries("@p1, @p2, @p3, @p4, @p5, @p6")
+
+    resolved = resolve_fallback_entries("@sdnc, @local", app.profiles)
+    assert resolved == [
+        {"user": "sdnc_u", "password": "sdnc_p"},
+        {"user": "local_u", "password": "local_p"},
+    ]
+    assert resolve_fallback_entries("@@Pass,WithComma", app.profiles) == [
+        {"user": "", "password": "@@Pass,WithComma"}
+    ]
+
+    assert extract_profile_refs_from_value({"fallback": "@sdnc, @local"}) == {"sdnc", "local"}
+
+    cfg = _make_config(
+        tmp_path,
+        {
+            "profiles": {
+                "sdnc": {"user": "sdnc_u", "password": "sdnc_p"},
+                "local": {"user": "local_u", "password": "local_p"},
+            },
+            "connections": {
+                "router1": {
+                    "type": "connection",
+                    "host": "10.0.0.1",
+                    "protocol": "ssh",
+                    "port": "",
+                    "user": "tacacs_u",
+                    "password": "tacacs_p",
+                    "options": "",
+                    "logs": "",
+                    "tags": "",
+                    "fallback": "@sdnc, @local",
+                }
+            },
+        },
+    )
+    p_svc = ProfileService(cfg)
+    for used_name in ("sdnc", "local"):
+        with pytest.raises(InvalidConfigurationError):
+            p_svc.delete_profile(used_name)

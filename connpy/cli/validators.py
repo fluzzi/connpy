@@ -127,9 +127,19 @@ class Validators:
             return True
         if len(stripped.encode("utf-8", errors="replace")) > MAX_JSON_INPUT_BYTES:
             _raise_val_err(f"Fallback exceeds maximum size of {MAX_JSON_INPUT_BYTES} bytes")
-        if stripped.startswith("@") and "+" not in stripped:
-            if stripped[1:] not in self.app.profiles:
-                _raise_val_err(f"Profile {stripped} don't exist")
+        if stripped.startswith("@") and not stripped.startswith("@@") and "+" not in stripped:
+            parts = [p.strip() for p in stripped.split(",")]
+            if any(not p for p in parts):
+                _raise_val_err("Fallback profile entry cannot be empty")
+            if len(parts) > MAX_FALLBACK_ENTRIES:
+                _raise_val_err(f"Fallback exceeds maximum of {MAX_FALLBACK_ENTRIES} entries")
+            for p in parts:
+                if not p.startswith("@") or not re.fullmatch(r"[A-Za-z0-9_.$:/-]+", p[1:]):
+                    _raise_val_err(
+                        "Comma-separated fallback entries must be valid @profile references"
+                    )
+                if p[1:] not in self.app.profiles:
+                    _raise_val_err(f"Profile {p} don't exist")
             return True
         try:
             if is_compose_expression(stripped):
