@@ -1799,3 +1799,345 @@ def test_signoff_ronda2_eof_empty_profiles_host_re_shlex_and_lazy_import() -> No
     for bad_user_limit in (True, False, 0, -1, 1001, "2"):
         with pytest.raises(ValueError):
             AuthAttemptTracker(default_max_global_user_attempts=bad_user_limit)
+
+
+def test_forms_prompt_sequence_and_safe_cancel(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    cfg = _make_config(
+        tmp_path,
+        {
+            "profiles": {
+                "default": {"protocol": "ssh", "fallback": ""},
+                "p1": {"user": "u1", "password": "pw1"},
+                "p2": {"user": "u2", "password": "pw2"},
+                "fb": {"user": "fb_u", "password": "fb_p"},
+            }
+        },
+    )
+    app = MagicMock()
+    app.config = cfg
+    app.profiles = list(cfg.profiles.keys())
+    app.nodes_list = []
+    app.services = ServiceProvider(cfg)
+    forms = Forms(app)
+
+    # 1. questions_nodes: base questions -> passq -> fallback; spaces stripped in Profiles list
+    recorded_nodes: list[list[tuple[str, str]]] = []
+    node_answers = iter([
+        {
+            "host": "10.0.0.1",
+            "protocol": "ssh",
+            "port": "22",
+            "options": "",
+            "logs": "",
+            "tags": "",
+            "jumphost": "",
+            "user": "u",
+            "password": "Profiles",
+        },
+        {"password": " @p1 , @p2 "},
+        {"fallback": "@fb"},
+    ])
+
+    def _mock_prompt_nodes(qs, **_kw):
+        recorded_nodes.append([(q.name, str(getattr(q, "message", ""))) for q in qs])
+        return next(node_answers)
+
+    with patch("inquirer.prompt", side_effect=_mock_prompt_nodes):
+        node_res = forms.questions_nodes("r_ux", uniques={"type": "connection"})
+
+    assert isinstance(node_res, dict)
+    assert node_res["password"] == ["@p1", "@p2"]
+    assert node_res["fallback"] == "@fb"
+    assert len(recorded_nodes) == 3
+    first_names = [n for n, _ in recorded_nodes[0]]
+    assert "password" in first_names
+    assert "fallback" not in first_names
+    assert [n for n, _ in recorded_nodes[1]] == ["password"]
+    assert "@profile" in recorded_nodes[1][0][1]
+    assert [n for n, _ in recorded_nodes[2]] == ["fallback"]
+
+    # Cancel during passq returns False safely without raising
+    with patch(
+        "inquirer.prompt",
+        side_effect=[{"host": "10.0.0.1", "password": "Local Password"}, None],
+    ):
+        assert forms.questions_nodes("r_cancel", uniques={"type": "connection"}) is False
+
+    # Cancel during fbq returns False safely
+    with patch(
+        "inquirer.prompt",
+        side_effect=[{"host": "10.0.0.1", "password": "No Password"}, None],
+    ):
+        assert forms.questions_nodes("r_cancel_fb", uniques={"type": "connection"}) is False
+
+    # 2. questions_bulk: base questions -> passq -> fallback, plus cancel on passq & fbq
+    recorded_bulk: list[list[tuple[str, str]]] = []
+    bulk_answers = iter([
+        {
+            "ids": "r_b1",
+            "location": "",
+            "host": "10.1.1.1",
+            "protocol": "ssh",
+            "port": "22",
+            "options": "",
+            "logs": "",
+            "tags": "",
+            "jumphost": "",
+            "user": "u1",
+            "password": "Local Password",
+        },
+        {"password": "MyBulkPassword"},
+        {"fallback": '[{"user": "bak", "password": "p2"}]'},
+    ])
+
+    def _mock_prompt_bulk(qs, **_kw):
+        recorded_bulk.append([(q.name, str(getattr(q, "message", ""))) for q in qs])
+        return next(bulk_answers)
+
+    with patch("inquirer.prompt", side_effect=_mock_prompt_bulk):
+        bulk_res = forms.questions_bulk()
+
+    assert isinstance(bulk_res, dict)
+    assert bulk_res["fallback"] == [{"user": "bak", "password": "p2"}]
+    assert len(recorded_bulk) == 3
+    bulk_first = [n for n, _ in recorded_bulk[0]]
+    assert "password" in bulk_first
+    assert "fallback" not in bulk_first
+    assert recorded_bulk[1] == [("password", "Set Password")]
+    assert [n for n, _ in recorded_bulk[2]] == ["fallback"]
+
+    with patch(
+        "inquirer.prompt",
+        side_effect=[{"ids": "r_b2", "password": "Local Password"}, None],
+    ):
+        assert forms.questions_bulk() is False
+
+    with patch(
+        "inquirer.prompt",
+        side_effect=[{"ids": "r_b3", "password": "No Password"}, None],
+    ):
+        assert forms.questions_bulk() is False
+
+
+def test_multi_profile_fallback_inheritance_priority_and_password_list(tmp_path: Path) -> None:
+    cfg = _make_config(
+        tmp_path,
+        {
+            "profiles": {
+                "default": {"protocol": "ssh", "fallback": ""},
+                "aws": {"options": "-i ~/.ssh/id_rsa", "fallback": ""},
+                "dish": {"user": "federico.luzzi", "password": "dish_password", "fallback": "@sdnc"},
+                "sdnc": {"user": "sdnc_admin", "password": "sdnc_password", "fallback": ""},
+            }
+        },
+    )
+    cfg._connections_add(
+        id="n_multi",
+        host="10.230.86.213",
+        options="@aws",
+        jumphost="",
+        user="@dish",
+        password=["@dish"],
+        fallback="",
+    )
+    cfg._saveconfig(cfg.file)
+
+    p_svc = ProfileService(cfg)
+    raw_details = cfg.getitem("n_multi", extract=False)
+    resolved_svc = p_svc.resolve_node_data(raw_details)
+    assert resolved_svc["user"] == "federico.luzzi"
+    assert resolved_svc["password"] == ["dish_password"]
+    assert resolved_svc["options"] == "-i ~/.ssh/id_rsa"
+    assert resolved_svc["fallback"] == "@sdnc"
+
+    resolved_jh_prio = p_svc.resolve_node_data({
+        "host": "10.230.86.214",
+        "jumphost": "@aws",
+        "user": "@dish",
+        "password": ["@dish"],
+        "fallback": "",
+    })
+    assert resolved_jh_prio["fallback"] == "@sdnc"
+
+    extracted = cfg.getitem("n_multi", extract=True)
+    assert extracted["tags"]["_fallback"] == [{"user": "sdnc_admin", "password": "sdnc_password"}]
+    n_multi = NodeClass("n_multi", **extracted, config=cfg)
+    assert [(c.user, c.password_spec, c.is_fallback) for c in n_multi._auth_candidates] == [
+        ("federico.luzzi", "dish_password", False),
+        ("sdnc_admin", "sdnc_password", True),
+    ]
+
+
+def test_interactive_mode_fallback_proxycommand_sshkey_and_no_password_ux(tmp_path: Path) -> None:
+    cfg = _make_config(
+        tmp_path,
+        {
+            "profiles": {
+                "default": {"protocol": "ssh", "fallback": ""},
+                "aws": {"user": "ec2-user", "password": "", "options": "-i ~/.ssh/id_rsa", "fallback": ""},
+                "dish": {"user": "federico.luzzi", "password": "dish_password", "fallback": "@sdnc"},
+                "sdnc": {"user": "sdnc_admin", "password": "sdnc_password", "fallback": ""},
+            },
+            "connections": {
+                "aws_bastion": {
+                    "host": "bastion.example.internal",
+                    "protocol": "ssh",
+                    "port": "",
+                    "user": "ec2-user",
+                    "password": "",
+                    "options": "-i ~/.ssh/id_rsa",
+                    "logs": "",
+                    "tags": "",
+                    "jumphost": "",
+                    "type": "connection",
+                },
+                "field_router": {
+                    "host": "10.230.86.213",
+                    "protocol": "ssh",
+                    "port": "",
+                    "user": "@dish",
+                    "password": ["@dish"],
+                    "options": "",
+                    "logs": "",
+                    "tags": "",
+                    "jumphost": "aws_bastion",
+                    "fallback": "",
+                    "type": "connection",
+                },
+            },
+        },
+    )
+    extracted = cfg.getitem("field_router", extract=True)
+    n = NodeClass("field_router", **extracted, config=cfg)
+    assert len(n._jumphost_hops) == 1
+    assert n._jumphost_hops[0]["passwords"] == ()
+
+    # Case 1: Interactive mode (unattended=False) hits primary reject -> generic password prompt ->
+    # respawns as sdnc_admin, handles generic password prompt via SSH-key hop disambiguation, succeeds!
+    spawn_cmds: list[str] = []
+    sent_passwords: list[str] = []
+    events: list[str] = []
+
+    def _logger(level: str, msg: str) -> None:
+        events.append(f"{level}:{msg}")
+
+    def _spawn_field(*args, **_kw):
+        cmd_tokens: list[str] = []
+        if args:
+            if isinstance(args[0], (list, tuple)):
+                cmd_tokens.extend(str(x) for x in args[0])
+            else:
+                cmd_tokens.append(str(args[0]))
+            if len(args) > 1 and isinstance(args[1], (list, tuple)):
+                cmd_tokens.extend(str(x) for x in args[1])
+        spawn_cmds.append(" ".join(cmd_tokens))
+        conn_no = len(spawn_cmds)
+        step = {"i": 0}
+        ch = None
+
+        def _exp(_p, timeout=None):
+            i = step["i"]
+            step["i"] += 1
+            if conn_no == 1:
+                if i == 0:
+                    ch.before = b"federico.luzzi@10.230.86.213's "
+                    ch.after = b"password:"
+                    return 8
+                # Router without TACACS sends generic password: prompt on retry
+                ch.before = b""
+                ch.after = b"password:"
+                return 8
+            if i == 0:
+                # Spawn #2 receives generic password: prompt with SSH-key ProxyCommand hop
+                ch.before = b""
+                ch.after = b"password:"
+                return 8
+            ch.before = b""
+            ch.after = b"router#"
+            return 9
+
+        ch = _make_mock_child(expect_fn=_exp)
+        ch.sendline.side_effect = lambda v="": (
+            events.append(f"send:{v}"),
+            sent_passwords.append(str(v)),
+        )[-1]
+        return ch
+
+    with (
+        patch("connpy.core.pexpect.spawn", side_effect=_spawn_field),
+        patch("pexpect.fdpexpect.fdspawn", return_value=MagicMock()),
+    ):
+        res_ok = n._connect(unattended=False, logger=_logger)
+
+    assert res_ok is True
+    assert n.last_fallback_used is True
+    assert getattr(n, "missingtext", False) is False
+    assert len(spawn_cmds) == 2
+    assert "federico.luzzi@10.230.86.213" in spawn_cmds[0]
+    assert "sdnc_admin@10.230.86.213" in spawn_cmds[1]
+    assert sent_passwords == ["dish_password", "sdnc_password", ""]
+    aaa_idx = next(i for i, e in enumerate(events) if "[AAA-FALLBACK]" in e)
+    send_fb_idx = next(i for i, e in enumerate(events) if e == "send:sdnc_password")
+    assert aaa_idx < send_fb_idx
+
+    # Case 2: Configured credentials all rejected in unattended=False -> [AUTH_FAILED], no missingtext, no Connected
+    n_fail = NodeClass("field_router", **cfg.getitem("field_router", extract=True), config=cfg)
+    fail_logs: list[str] = []
+
+    def _spawn_all_reject(*_args, **_kw):
+        ch = _make_mock_child(
+            expect_fn=lambda _p, timeout=None: (
+                setattr(ch, "before", b""),
+                setattr(ch, "after", b"password:"),
+                8,
+            )[-1]
+        )
+        return ch
+
+    with patch("connpy.core.pexpect.spawn", side_effect=_spawn_all_reject):
+        res_fail = n_fail._connect(unattended=False)
+    assert res_fail is not True
+    assert "[AUTH_FAILED]" in str(res_fail)
+    assert getattr(n_fail, "missingtext", False) is False
+
+    with (
+        patch("connpy.core.pexpect.spawn", side_effect=_spawn_all_reject),
+        pytest.raises(SystemExit) as sys_exit_info,
+    ):
+        n_fail.interact(logger=lambda lvl, msg: fail_logs.append(f"{lvl}:{msg}"))
+    assert sys_exit_info.value.code == 1
+    assert not any("Connected to" in entry for entry in fail_logs)
+
+    # Case 3: "No Password" node sets missingtext=True in unattended=False and avoids duplicate print in async_mode=True
+    n_nopw = NodeClass("r_nopw", host="10.0.0.99", user="op", password="", fallback="")
+
+    def _spawn_nopw(*_args, **_kw):
+        ch = _make_mock_child(
+            expect_fn=lambda _p, timeout=None: (
+                setattr(ch, "before", b""),
+                setattr(ch, "after", b"op@10.0.0.99's password:"),
+                8,
+            )[-1]
+        )
+        return ch
+
+    with (
+        patch("connpy.core.pexpect.spawn", side_effect=_spawn_nopw),
+        patch("pexpect.fdpexpect.fdspawn", return_value=MagicMock()),
+    ):
+        res_nopw = n_nopw._connect(unattended=False)
+    assert res_nopw is True
+    assert getattr(n_nopw, "missingtext", False) is True
+    n_nopw.idletime = 0
+
+    with patch("builtins.print") as m_print:
+        n_nopw._setup_interact_environment(async_mode=True)
+    m_print.assert_not_called()
+
+    with patch("builtins.print") as m_print_sync:
+        n_nopw._setup_interact_environment(async_mode=False)
+    m_print_sync.assert_called_once()

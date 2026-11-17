@@ -1444,8 +1444,8 @@ class node:
             log_thread = threading.Thread(target=self._savelog)
             log_thread.daemon = True
             log_thread.start()
-        if 'missingtext' in dir(self):
-            print(self.child.after.decode(), end='')
+        if getattr(self, "missingtext", False) and not async_mode:
+            print(self.child.after.decode(), end="")
         if self.idletime > 0 and not async_mode:
             x = threading.Thread(target=self._keepalive)
             x.daemon = True
@@ -2841,6 +2841,7 @@ class node:
         unattended=False,
         attempt_tracker=None,
     ):
+        self.__dict__.pop("missingtext", None)
         self.last_fallback_used = False
         effective_protocol = "ssh" if force_ssh else self.protocol
         if effective_protocol == "mosh" and shutil.which("mosh") is None:
@@ -2933,6 +2934,9 @@ class node:
                 context_label="credential resolution failed",
             )
             return str(san)
+
+        has_configured_passwords = any(c.has_password for c in runtime_candidates)
+        use_auth_chain = bool(unattended or has_configured_passwords)
 
         if self.logs != '':
             self.logfile = self._logfile()
@@ -3152,9 +3156,13 @@ class node:
         }
 
         def _handle_username_prompt(child_obj) -> tuple[bool, str | None]:
-            if not unattended:
-                if self.user:
-                    child_obj.sendline(self.user)
+            if not use_auth_chain:
+                manual_user = (
+                    (runtime_candidates[0].user if runtime_candidates else "")
+                    or str(self.user or "")
+                )
+                if manual_user:
+                    child_obj.sendline(manual_user)
                     st["last_observed_bytes_len"] = 0
                     return False, None
                 self.missingtext = True
@@ -3221,28 +3229,7 @@ class node:
             cur_cand = st["cur_cand"]
             cur_user = str(st["cur_user"])
 
-            if not unattended:
-                if cur_cand is not None and cur_cand.has_password and not st["cand_sent_pw_this_conn"]:
-                    child_obj.sendline(cur_cand.password)
-                    st["cand_sent_pw_this_conn"] = True
-                    st["target_creds_sent"] = True
-                    st["handshake_progressed"] = True
-                    st["stage"] = "auth"
-                    st["last_observed_bytes_len"] = 0
-                    return False, None
-                if (cand_idx_cur + 1) < len(runtime_candidates) and not runtime_candidates[cand_idx_cur + 1].is_fallback:
-                    cand_idx_cur += 1
-                    st["cand_idx"] = cand_idx_cur
-                    cur_cand = runtime_candidates[cand_idx_cur]
-                    st["cur_cand"] = cur_cand
-                    if cur_cand.has_password:
-                        child_obj.sendline(cur_cand.password)
-                        st["cand_sent_pw_this_conn"] = True
-                        st["target_creds_sent"] = True
-                        st["handshake_progressed"] = True
-                        st["stage"] = "auth"
-                        st["last_observed_bytes_len"] = 0
-                        return False, None
+            if not use_auth_chain:
                 self.missingtext = True
                 return True, None
 
@@ -3453,7 +3440,7 @@ class node:
                                 continue
 
                             if (
-                                unattended
+                                use_auth_chain
                                 and st["stage"] == "auth"
                                 and st["target_creds_sent"]
                                 and (int(st["cand_idx"]) + 1) < len(runtime_candidates)
@@ -3492,7 +3479,7 @@ class node:
                             and b"permission denied" in (before_bytes + after_bytes).lower()
                         )
                         if (
-                            unattended
+                            use_auth_chain
                             and is_perm_denied
                             and (int(st["cand_idx"]) + 1) < len(runtime_candidates)
                             and remaining > 0
@@ -3579,15 +3566,29 @@ class node:
                                 if kind == "target":
                                     hop_cursor = len(jumphost_hops)
                                 else:
-                                    allow_ambig = bool(
-                                        tags_dict.get("allow_ambiguous_single_hop_prompt", False)
+                                    no_pending_hop_pws = all(
+                                        hop_pw_idx[i] >= len(hop_runtime_passwords[i])
+                                        for i in range(hop_cursor, len(jumphost_hops))
                                     )
-                                    if len(jumphost_hops) > 1 or not allow_ambig:
-                                        return str(
-                                            sanitize_exception(None, code="JUMP_AUTH_FAILED", secrets=raw_secrets)
+                                    if (
+                                        st["target_creds_sent"]
+                                        or hop_cursor >= len(jumphost_hops)
+                                        or no_pending_hop_pws
+                                    ):
+                                        hop_cursor = len(jumphost_hops)
+                                    else:
+                                        allow_ambig = bool(
+                                            tags_dict.get("allow_ambiguous_single_hop_prompt", False)
                                         )
-                                    if not st["target_creds_sent"] and hop_pw_idx[0] < len(hop_runtime_passwords[0]):
-                                        hop_obj = jumphost_hops[0]
+                                        if len(jumphost_hops) > 1 or not allow_ambig:
+                                            return str(
+                                                sanitize_exception(
+                                                    None,
+                                                    code="JUMP_AUTH_FAILED",
+                                                    secrets=raw_secrets,
+                                                )
+                                            )
+                                        hop_obj = jumphost_hops[hop_cursor]
                                         if not tracker.try_acquire_hop(
                                             hop_obj["host"],
                                             hop_obj["port"],
@@ -3601,8 +3602,10 @@ class node:
                                                     secrets=raw_secrets,
                                                 )
                                             )
-                                        child.sendline(hop_runtime_passwords[0][hop_pw_idx[0]])
-                                        hop_pw_idx[0] += 1
+                                        child.sendline(
+                                            hop_runtime_passwords[hop_cursor][hop_pw_idx[hop_cursor]]
+                                        )
+                                        hop_pw_idx[hop_cursor] += 1
                                         st["handshake_progressed"] = True
                                         st["last_observed_bytes_len"] = 0
                                         continue
@@ -3636,7 +3639,7 @@ class node:
                                             and b"permission denied" in m.group(0).lower()
                                         )
                                         if (
-                                            unattended
+                                            use_auth_chain
                                             and is_pd
                                             and (int(st["cand_idx"]) + 1) < len(runtime_candidates)
                                             and remaining > 0
@@ -3658,7 +3661,7 @@ class node:
                                 next_action = "next_candidate"
                                 break
 
-                            if unattended and not transport_error_seen:
+                            if use_auth_chain and not transport_error_seen:
                                 if st["target_creds_sent"]:
                                     if (int(st["cand_idx"]) + 1) < len(runtime_candidates):
                                         eof_adv = int(st["eof_fallback_advances"])

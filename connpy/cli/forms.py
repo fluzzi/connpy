@@ -137,11 +137,7 @@ class Forms:
             questions.append(inquirer.List("password", message="Password: Use a local password, no password or a list of profiles to reference?", choices=["Local Password", "Profiles", "No Password"]))
         else:
             node["password"] = defaults["password"]
-        if edit.get("fallback"):
-            raw_def_fb = defaults.get("fallback", "")
-            def_fb_str = json.dumps(raw_def_fb) if isinstance(raw_def_fb, (list, dict)) else str(raw_def_fb or "")
-            questions.append(inquirer.Text("fallback", message="Add fallback credentials (JSON list/dict, @profile, or compose:)", validate=self.validators.fallback_validation, default=def_fb_str.replace("{", "{{").replace("}", "}}")))
-        else:
+        if not edit.get("fallback"):
             node["fallback"] = defaults.get("fallback", "")
 
         answer = inquirer.prompt(questions)
@@ -160,14 +156,28 @@ class Forms:
                 passa = inquirer.prompt(passq)
                 if passa is None:
                     return False
-                answer["password"] = passa["password"].split(",")
+                answer["password"] = [p.strip() for p in passa["password"].split(",") if p.strip()]
             elif answer["password"] == "No Password":
                 answer["password"] = ""
 
+        if edit.get("fallback"):
+            raw_def_fb = defaults.get("fallback", "")
+            def_fb_str = json.dumps(raw_def_fb) if isinstance(raw_def_fb, (list, dict)) else str(raw_def_fb or "")
+            fbq = [
+                inquirer.Text(
+                    "fallback",
+                    message="Add fallback credentials (JSON list/dict, @profile, or compose:)",
+                    validate=self.validators.fallback_validation,
+                    default=def_fb_str.replace("{", "{{").replace("}", "}}"),
+                )
+            ]
+            fba = inquirer.prompt(fbq)
+            if fba is None:
+                return False
+            answer["fallback"] = _parse_fallback_input(fba["fallback"])
+
         if "tags" in answer and answer["tags"] and not str(answer["tags"]).startswith("@"):
             answer["tags"] = _parse_tags_input(answer["tags"])
-        if "fallback" in answer:
-            answer["fallback"] = _parse_fallback_input(answer["fallback"])
 
         result = {**uniques, **answer, **node}
         result["type"] = "connection"
@@ -262,7 +272,6 @@ class Forms:
         questions.append(inquirer.Text("jumphost", message="Add Jumphost node", validate=self.validators.jumphost_validation))
         questions.append(inquirer.Text("user", message="Pick username", validate=self.validators.default_validation))
         questions.append(inquirer.List("password", message="Password: Use a local password, no password or a list of profiles to reference?", choices=["Local Password", "Profiles", "No Password"]))
-        questions.append(inquirer.Text("fallback", message="Add fallback credentials (JSON list/dict, @profile, or compose:)", validate=self.validators.fallback_validation))
 
         answer = inquirer.prompt(questions)
         if answer is None:
@@ -272,19 +281,33 @@ class Forms:
             if answer["password"] == "Local Password":
                 passq = [inquirer.Password("password", message="Set Password")]
                 passa = inquirer.prompt(passq)
+                if passa is None:
+                    return False
                 answer["password"] = self.app.services.config_svc.encrypt_password(passa["password"])
             elif answer["password"] == "Profiles":
                 passq = [(inquirer.Text("password", message="Set a @profile or a comma separated list of @profiles", validate=self.validators.pass_validation))]
                 passa = inquirer.prompt(passq)
-                answer["password"] = passa["password"].split(",")
+                if passa is None:
+                    return False
+                answer["password"] = [p.strip() for p in passa["password"].split(",") if p.strip()]
             elif answer["password"] == "No Password":
                 answer["password"] = ""
+
+        fbq = [
+            inquirer.Text(
+                "fallback",
+                message="Add fallback credentials (JSON list/dict, @profile, or compose:)",
+                validate=self.validators.fallback_validation,
+            )
+        ]
+        fba = inquirer.prompt(fbq)
+        if fba is None:
+            return False
+        answer["fallback"] = _parse_fallback_input(fba["fallback"])
 
         answer["type"] = "connection"
         if "tags" in answer and answer["tags"] and not str(answer["tags"]).startswith("@"):
             answer["tags"] = _parse_tags_input(answer["tags"])
-        if "fallback" in answer:
-            answer["fallback"] = _parse_fallback_input(answer["fallback"])
 
         return answer
 

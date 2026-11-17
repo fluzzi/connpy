@@ -610,7 +610,15 @@ class configfile:
 
     def _find_inherited_profile_fallback_unlocked(self, raw_user, raw_pw):
         """Inherit fallback from a primary @profile referenced by node user/password."""
-        for candidate_val, field in ((raw_user, "user"), (raw_pw, "password")):
+        candidates = []
+        for raw_val, field in ((raw_user, "user"), (raw_pw, "password")):
+            if isinstance(raw_val, (list, tuple)):
+                for item in raw_val:
+                    candidates.append((item, field))
+            else:
+                candidates.append((raw_val, field))
+
+        for candidate_val, field in candidates:
             if (
                 isinstance(candidate_val, str)
                 and not is_compose_expression(candidate_val)
@@ -630,7 +638,20 @@ class configfile:
                     if prof_fb not in (None, "", []):
                         return deepcopy(prof_fb)
                     next_val = prof.get(field)
-                    if (
+                    if isinstance(next_val, (list, tuple)):
+                        next_ref = next(
+                            (
+                                item
+                                for item in next_val
+                                if isinstance(item, str)
+                                and not is_compose_expression(item)
+                                and item.startswith("@")
+                                and "+" not in item
+                            ),
+                            None,
+                        )
+                        prof_name = next_ref[1:] if next_ref else ""
+                    elif (
                         isinstance(next_val, str)
                         and not is_compose_expression(next_val)
                         and next_val.startswith("@")
