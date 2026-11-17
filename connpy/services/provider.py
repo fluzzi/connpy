@@ -15,26 +15,41 @@ class RemoteStub:
 class ServiceProvider:
     """Dynamic service backend. Transparently provides local or remote services."""
 
-    def __init__(self, config, mode="local", remote_host=None):
+    def __init__(self, config, mode="local", remote_host=None, enforce_context: bool = True):
         from ..auth_utils import AuthAttemptTracker
 
         self.mode = mode
         self.config = config
         self.remote_host = remote_host
+        self.enforce_context = bool(enforce_context)
         self.auth_tracker = AuthAttemptTracker()
+        self.nodes = None
         self._system = None
         self._execution = None
         self._import_export = None
         self._sync = None
         self._users = None
         self._ai = None
-        
+        self.set_enforce_context(self.enforce_context)
+
         if mode == "local":
             self._init_local()
         elif mode == "remote":
             self._init_remote()
         else:
             raise ValueError(f"Unknown service mode: {mode}")
+
+    def set_enforce_context(self, enforce_context: bool) -> None:
+        self.enforce_context = bool(enforce_context)
+        if self.config is not None and not hasattr(self.config, "assert_called"):
+            self.config._enforce_context = self.enforce_context
+        for svc in (
+            getattr(self, "nodes", None),
+            self._execution,
+            self._import_export,
+        ):
+            if svc is not None and hasattr(svc, "enforce_context"):
+                svc.enforce_context = self.enforce_context
     
     def _init_local(self):
         from .config_service import ConfigService
@@ -43,7 +58,7 @@ class ServiceProvider:
         from .plugin_service import PluginService
         from .profile_service import ProfileService
 
-        self.nodes = NodeService(self.config)
+        self.nodes = NodeService(self.config, enforce_context=self.enforce_context)
         self.profiles = ProfileService(self.config)
         self.config_svc = ConfigService(self.config)
         self.plugins = PluginService(self.config)
@@ -101,7 +116,12 @@ class ServiceProvider:
         self.plugins = PluginStub(channel, remote_host=self.remote_host)
         self.ai = AIStub(channel, remote_host=self.remote_host)
         self.system = SystemStub(channel, remote_host=self.remote_host)
-        self.execution = ExecutionStub(channel, remote_host=self.remote_host)
+        self.execution = ExecutionStub(
+            channel,
+            remote_host=self.remote_host,
+            config=self.config,
+            node_stub=self.nodes,
+        )
         self.import_export = ImportExportStub(channel, remote_host=self.remote_host)
         self.auth = AuthStub(channel, remote_host=self.remote_host)
 
@@ -120,10 +140,13 @@ class ServiceProvider:
     def execution(self):
         if self._execution is None and self.mode == "local":
             from .execution_service import ExecutionService
-            if "attempt_tracker" in inspect.signature(ExecutionService.__init__).parameters:
-                self._execution = ExecutionService(self.config, attempt_tracker=self.auth_tracker)
-            else:
-                self._execution = ExecutionService(self.config)
+            params = inspect.signature(ExecutionService.__init__).parameters
+            kwargs = {}
+            if "attempt_tracker" in params:
+                kwargs["attempt_tracker"] = self.auth_tracker
+            if "enforce_context" in params:
+                kwargs["enforce_context"] = self.enforce_context
+            self._execution = ExecutionService(self.config, **kwargs)
         return self._execution
 
     @execution.setter
@@ -134,7 +157,13 @@ class ServiceProvider:
     def import_export(self):
         if self._import_export is None and self.mode == "local":
             from .import_export_service import ImportExportService
-            self._import_export = ImportExportService(self.config)
+            params = inspect.signature(ImportExportService.__init__).parameters
+            if "enforce_context" in params:
+                self._import_export = ImportExportService(
+                    self.config, enforce_context=self.enforce_context
+                )
+            else:
+                self._import_export = ImportExportService(self.config)
         return self._import_export
 
     @import_export.setter

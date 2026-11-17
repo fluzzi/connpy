@@ -1,16 +1,19 @@
-import grpc
 import queue
+import re
 import threading
 from functools import wraps
+
+import grpc
 from google.protobuf.empty_pb2 import Empty
 
-from . import connpy_pb2, connpy_pb2_grpc, remote_plugin_pb2, remote_plugin_pb2_grpc
-from .utils import to_value, from_value, to_struct, from_struct
-from ..services.exceptions import ConnpyError
-from ..hooks import MethodHook
 from .. import printer
-from ..cli.terminal_ui import CopilotInterface
+from ..auth_utils import MAX_REMOTE_FILTER_NODES
+from ..hooks import MethodHook
+from ..services.exceptions import ConnpyError, NodeNotFoundError
 from ..utils import log_cleaner
+from . import connpy_pb2, connpy_pb2_grpc, remote_plugin_pb2, remote_plugin_pb2_grpc
+from .utils import from_struct, from_value, to_struct, to_value
+
 
 def handle_errors(func):
     @wraps(func)
@@ -43,8 +46,48 @@ class NodeStub:
         self.remote_host = remote_host
         self.config = config
 
+    def _get_context_service(self):
+        if not getattr(self.config, "_enforce_context", True):
+            return None
+        if not isinstance(getattr(self.config, "config", None), dict):
+            return None
+        from ..services.context_service import ContextService
+
+        return ContextService(self.config)
+
+    def _ensure_in_active_context(
+        self, unique_id: str, *, is_folder: bool = False, not_found_msg: str | None = None
+    ) -> None:
+        ctx_svc = self._get_context_service()
+        if (
+            ctx_svc is not None
+            and not ctx_svc.is_default_all_context()
+            and not ctx_svc.matches_active_context(unique_id)
+        ):
+            if not_found_msg is not None:
+                raise NodeNotFoundError(not_found_msg)
+            label = "Folder" if is_folder else "Node"
+            raise NodeNotFoundError(f"{label} '{unique_id}' not found.")
+
+    @handle_errors
+    def _get_raw_nodes(self) -> list[str]:
+        req = connpy_pb2.FilterRequest(filter_str="", format_str="")
+        return from_value(self.stub.list_nodes(req).data) or []
+
+    @handle_errors
+    def _get_raw_folders(self) -> list[str]:
+        req = connpy_pb2.FilterRequest(filter_str="")
+        return from_value(self.stub.list_folders(req).data) or []
+
     def _handle_remote_copilot(self, res, request_queue, response_queue, client_buffer_bytes, pause_generator, resume_generator, old_tty):
-        import json, asyncio, termios, sys, tty, queue, os
+        import asyncio
+        import json
+        import os
+        import sys
+        import termios
+        import tty
+
+        from ..cli.terminal_ui import CopilotInterface
         from ..core import copilot_terminal_mode
         from . import connpy_pb2
 
@@ -138,6 +181,7 @@ class NodeStub:
 
     @handle_errors
     def connect_node(self, unique_id, sftp=False, debug=False, logger=None):
+        self._ensure_in_active_context(unique_id, is_folder=False)
         import sys
         import select
         import tty
@@ -439,6 +483,7 @@ class NodeStub:
 
     @handle_errors
     def get_node_details(self, unique_id):
+        self._ensure_in_active_context(unique_id, is_folder=False)
         return from_struct(self.stub.get_node_details(connpy_pb2.IdRequest(id=unique_id)).data)
 
     @handle_errors
@@ -446,8 +491,12 @@ class NodeStub:
         return from_value(self.stub.explode_unique(connpy_pb2.IdRequest(id=unique_id)).data)
 
     @handle_errors
-    def validate_parent_folder(self, unique_id):
-        self.stub.validate_parent_folder(connpy_pb2.IdRequest(id=unique_id))
+    def validate_parent_folder(self, unique_id, is_folder=False):
+        ctx_svc = self._get_context_service()
+        if ctx_svc is not None:
+            ctx_svc.validate_in_active_context(unique_id, is_folder=is_folder)
+        if not is_folder:
+            self.stub.validate_parent_folder(connpy_pb2.IdRequest(id=unique_id))
 
     @handle_errors
     def generate_cache(self, nodes=None, folders=None, profiles=None):
@@ -478,12 +527,16 @@ class NodeStub:
 
     @handle_errors
     def add_node(self, unique_id, data, is_folder=False):
+        ctx_svc = self._get_context_service()
+        if ctx_svc is not None:
+            ctx_svc.validate_in_active_context(unique_id, is_folder=is_folder)
         req = connpy_pb2.NodeRequest(id=unique_id, data=to_struct(data), is_folder=is_folder)
         self.stub.add_node(req)
         self._trigger_local_cache_sync()
 
     @handle_errors
     def update_node(self, unique_id, data, save=True):
+        self._ensure_in_active_context(unique_id, is_folder=False)
         req = connpy_pb2.NodeRequest(id=unique_id, data=to_struct(data), is_folder=False)
         self.stub.update_node(req)
         if save:
@@ -491,6 +544,7 @@ class NodeStub:
 
     @handle_errors
     def delete_node(self, unique_id, is_folder=False, save=True):
+        self._ensure_in_active_context(unique_id, is_folder=is_folder)
         req = connpy_pb2.DeleteRequest(id=unique_id, is_folder=is_folder)
         self.stub.delete_node(req)
         if save:
@@ -498,12 +552,22 @@ class NodeStub:
 
     @handle_errors
     def move_node(self, src_id, dst_id, copy=False):
+        self._ensure_in_active_context(
+            src_id, is_folder=False, not_found_msg=f"Source node '{src_id}' not found."
+        )
+        ctx_svc = self._get_context_service()
+        if ctx_svc is not None:
+            ctx_svc.validate_in_active_context(dst_id, is_folder=False)
         req = connpy_pb2.MoveRequest(src_id=src_id, dst_id=dst_id, copy=copy)
         self.stub.move_node(req)
         self._trigger_local_cache_sync()
 
     @handle_errors
     def bulk_add(self, ids, hosts, common_data):
+        ctx_svc = self._get_context_service()
+        if ctx_svc is not None:
+            for uid in ids:
+                ctx_svc.validate_in_active_context(uid, is_folder=False)
         req = connpy_pb2.BulkRequest(ids=ids, hosts=hosts, common_data=to_struct(common_data))
         self.stub.bulk_add(req)
         self._trigger_local_cache_sync()
@@ -649,68 +713,114 @@ class PluginStub:
             yield chunk.text
 
 class ExecutionStub:
-    def __init__(self, channel, remote_host):
+    def __init__(self, channel, remote_host, config=None, node_stub=None):
         self.stub = connpy_pb2_grpc.ExecutionServiceStub(channel)
         self.remote_host = remote_host
+        self.config = config
+        self.node_stub = node_stub
+
+    def _get_context_service(self):
+        if not getattr(self.config, "_enforce_context", True):
+            return None
+        if not isinstance(getattr(self.config, "config", None), dict):
+            return None
+        from ..services.context_service import ContextService
+
+        return ContextService(self.config)
+
+    def _resolve_remote_batches(self, nodes_filter):
+        ctx_svc = self._get_context_service()
+        if ctx_svc is not None and not ctx_svc.is_default_all_context():
+            if isinstance(nodes_filter, (list, tuple)):
+                permitted = ctx_svc.filter_node_list(result=list(nodes_filter))
+            else:
+                candidates = (
+                    self.node_stub.list_nodes(filter_str=nodes_filter)
+                    if self.node_stub is not None
+                    else []
+                )
+                permitted = ctx_svc.filter_node_list(result=candidates)
+            if not permitted:
+                raise ConnpyError(f"No nodes found matching filter: {nodes_filter}")
+            patterns = [f"^{re.escape(n)}$" for n in permitted]
+            return [
+                patterns[i : i + MAX_REMOTE_FILTER_NODES]
+                for i in range(0, len(patterns), MAX_REMOTE_FILTER_NODES)
+            ]
+        return [[nodes_filter] if isinstance(nodes_filter, str) else list(nodes_filter)]
 
     @handle_errors
     def run_commands(self, nodes_filter, commands, variables=None, parallel=10, timeout=10, folder=None, prompt=None, **kwargs):
-        nodes_list = [nodes_filter] if isinstance(nodes_filter, str) else list(nodes_filter)
-        req = connpy_pb2.RunRequest(
-            nodes=nodes_list,
-            commands=commands,
-            folder=folder or "",
-            prompt=prompt or "",
-            parallel=parallel,
-            timeout=timeout,
-            name=kwargs.get("name", "")
-        )
-        if variables is not None:
-            req.vars.CopyFrom(to_struct(variables))
-            
+        batches = self._resolve_remote_batches(nodes_filter)
         final_results = {}
         on_complete = kwargs.get("on_node_complete")
-        
-        for response in self.stub.run_commands(req):
-            if on_complete:
-                on_complete(response.unique_id, response.output, response.status)
-            final_results[response.unique_id] = {
-                "output": response.output,
-                "status": response.status
-            }
-                
+
+        for nodes_list in batches:
+            req = connpy_pb2.RunRequest(
+                nodes=nodes_list,
+                commands=commands,
+                folder=folder or "",
+                prompt=prompt or "",
+                parallel=parallel,
+                timeout=timeout,
+                name=kwargs.get("name", "")
+            )
+            if variables is not None:
+                req.vars.CopyFrom(to_struct(variables))
+
+            for response in self.stub.run_commands(req):
+                if on_complete:
+                    on_complete(response.unique_id, response.output, response.status)
+                final_results[response.unique_id] = {
+                    "output": response.output,
+                    "status": response.status
+                }
+
         return final_results
 
     @handle_errors
     def test_commands(self, nodes_filter, commands, expected, variables=None, parallel=10, timeout=10, prompt=None, **kwargs):
-        nodes_list = [nodes_filter] if isinstance(nodes_filter, str) else list(nodes_filter)
-        req = connpy_pb2.TestRequest(
-            nodes=nodes_list,
-            commands=commands,
-            expected=expected if isinstance(expected, list) else [expected],
-            folder=kwargs.get("folder", ""),
-            prompt=prompt or "",
-            parallel=parallel,
-            timeout=timeout,
-            name=kwargs.get("name", "")
-        )
-        if variables is not None:
-            req.vars.CopyFrom(to_struct(variables))
-            
+        batches = self._resolve_remote_batches(nodes_filter)
         final_results = {}
         on_complete = kwargs.get("on_node_complete")
-        
-        for response in self.stub.test_commands(req):
-            result_dict = from_struct(response.test_result) if response.HasField("test_result") else {}
-            if on_complete:
-                on_complete(response.unique_id, response.output, response.status, result_dict)
-            final_results[response.unique_id] = result_dict
-                
+
+        for nodes_list in batches:
+            req = connpy_pb2.TestRequest(
+                nodes=nodes_list,
+                commands=commands,
+                expected=expected if isinstance(expected, list) else [expected],
+                folder=kwargs.get("folder", ""),
+                prompt=prompt or "",
+                parallel=parallel,
+                timeout=timeout,
+                name=kwargs.get("name", "")
+            )
+            if variables is not None:
+                req.vars.CopyFrom(to_struct(variables))
+
+            for response in self.stub.test_commands(req):
+                result_dict = from_struct(response.test_result) if response.HasField("test_result") else {}
+                if on_complete:
+                    on_complete(response.unique_id, response.output, response.status, result_dict)
+                final_results[response.unique_id] = result_dict
+
         return final_results
 
     @handle_errors
     def run_cli_script(self, nodes_filter, script_path, parallel=10):
-        req = connpy_pb2.ScriptRequest(param1=nodes_filter, param2=script_path, parallel=parallel)
+        ctx_svc = self._get_context_service()
+        effective_filter = nodes_filter
+        if ctx_svc is not None and not ctx_svc.is_default_all_context():
+            candidates = (
+                self.node_stub.list_nodes(filter_str=nodes_filter)
+                if self.node_stub is not None
+                else []
+            )
+            permitted = ctx_svc.filter_node_list(result=candidates)
+            if not permitted:
+                raise ConnpyError(f"No nodes found matching filter: {nodes_filter}")
+            effective_filter = "|".join(f"^{re.escape(n)}$" for n in permitted)
+        req = connpy_pb2.ScriptRequest(param1=effective_filter, param2=script_path, parallel=parallel)
         return from_struct(self.stub.run_cli_script(req).data)
 
 class ImportExportStub:

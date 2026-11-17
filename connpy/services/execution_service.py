@@ -1,10 +1,16 @@
 import inspect
 import os
+import re
+import sys
 from collections.abc import Callable
 from contextlib import suppress
 from typing import Any
 
-from connpy.auth_utils import AuthAttemptTracker, raise_sanitized_auth_error
+from connpy.auth_utils import (
+    MAX_REMOTE_FILTER_NODES,
+    AuthAttemptTracker,
+    raise_sanitized_auth_error,
+)
 from connpy.core import nodes as Nodes
 
 from .base import BaseService
@@ -14,13 +20,32 @@ from .exceptions import ConnpyError
 class ExecutionService(BaseService):
     """Business logic for executing commands on nodes and running automation scripts."""
 
-    def __init__(self, config=None, remote_stub=None, attempt_tracker=None):
+    def __init__(
+        self,
+        config=None,
+        remote_stub=None,
+        attempt_tracker=None,
+        enforce_context: bool = True,
+    ):
         super().__init__(config)
         self.remote_stub = remote_stub
         self.attempt_tracker = (
             attempt_tracker if attempt_tracker is not None else AuthAttemptTracker()
         )
+        self.enforce_context = bool(enforce_context)
         self.last_fallback_used: dict[str, bool] = {}
+
+    def _get_context_service(self):
+        if (
+            not getattr(self, "enforce_context", True)
+            or not getattr(self.config, "_enforce_context", True)
+            or (len(sys.argv) > 1 and sys.argv[1] == "api")
+            or not isinstance(getattr(self.config, "config", None), dict)
+        ):
+            return None
+        from .context_service import ContextService
+
+        return ContextService(self.config)
 
     def _is_remote_backend(self) -> bool:
         """Return True when execution is configured to run against a remote gRPC backend."""
@@ -40,10 +65,7 @@ class ExecutionService(BaseService):
                 "connect_timeout and auth_timeout overrides are not supported in remote gRPC mode"
             )
 
-    def _get_remote_stub(self):
-        """Return the configured or lazily constructed ExecutionStub for remote gRPC mode."""
-        if getattr(self, "remote_stub", None) is not None:
-            return self.remote_stub
+    def _get_remote_channel(self):
         cfg = getattr(self.config, "config", None)
         remote_host = cfg.get("remote_host") if isinstance(cfg, dict) else None
         if not remote_host:
@@ -51,7 +73,7 @@ class ExecutionService(BaseService):
 
         import grpc
 
-        from connpy.grpc_layer.stubs import AuthClientInterceptor, ExecutionStub
+        from connpy.grpc_layer.stubs import AuthClientInterceptor
 
         def get_token():
             env_token = os.environ.get("CONNPY_TOKEN")
@@ -67,7 +89,75 @@ class ExecutionService(BaseService):
 
         channel = grpc.insecure_channel(remote_host)
         channel = grpc.intercept_channel(channel, AuthClientInterceptor(get_token))
+        return channel, remote_host
+
+    def _get_remote_stub(self):
+        """Return the configured or lazily constructed ExecutionStub for remote gRPC mode."""
+        if getattr(self, "remote_stub", None) is not None:
+            return self.remote_stub
+        from connpy.grpc_layer.stubs import ExecutionStub
+
+        channel, remote_host = self._get_remote_channel()
         return ExecutionStub(channel, remote_host=remote_host)
+
+    def _filter_remote_nodes_filter(self, nodes_filter):
+        ctx_svc = self._get_context_service()
+        if ctx_svc is None or ctx_svc.is_default_all_context():
+            return nodes_filter
+
+        if isinstance(nodes_filter, (list, tuple)):
+            permitted = ctx_svc.filter_node_list(result=list(nodes_filter))
+        else:
+            if self.remote_stub is not None and callable(
+                getattr(self.remote_stub, "list_nodes", None)
+            ):
+                candidates = self.remote_stub.list_nodes(filter_str=nodes_filter)
+            elif self.remote_stub is not None and callable(
+                getattr(getattr(self.remote_stub, "node_stub", None), "list_nodes", None)
+            ):
+                candidates = self.remote_stub.node_stub.list_nodes(filter_str=nodes_filter)
+            elif self.remote_stub is None:
+                from connpy.grpc_layer.stubs import NodeStub
+
+                channel, remote_host = self._get_remote_channel()
+                node_stub = NodeStub(channel, remote_host=remote_host, config=self.config)
+                candidates = node_stub.list_nodes(filter_str=nodes_filter)
+            else:
+                candidates = (
+                    self.config._getallnodes(nodes_filter)
+                    if hasattr(self.config, "_getallnodes")
+                    else []
+                )
+            permitted = ctx_svc.filter_node_list(result=candidates)
+
+        if not permitted:
+            raise ConnpyError(f"No nodes found matching filter: {nodes_filter}")
+        return [f"^{re.escape(n)}$" for n in permitted]
+
+    def _build_remote_filter_batches(self, nodes_filter):
+        filtered = self._filter_remote_nodes_filter(nodes_filter)
+        if isinstance(filtered, list):
+            return [
+                filtered[i : i + MAX_REMOTE_FILTER_NODES]
+                for i in range(0, len(filtered), MAX_REMOTE_FILTER_NODES)
+            ]
+        return [filtered]
+
+    @staticmethod
+    def _aggregate_remote_results(batch_results):
+        if len(batch_results) == 1:
+            return batch_results[0]
+        if all(isinstance(r, dict) for r in batch_results):
+            merged: dict[str, Any] = {}
+            for r in batch_results:
+                merged.update(r)
+            return merged
+        if all(isinstance(r, list) for r in batch_results):
+            merged_list: list[Any] = []
+            for r in batch_results:
+                merged_list.extend(r)
+            return merged_list
+        return batch_results[-1]
 
     def run_commands(
         self,
@@ -93,20 +183,28 @@ class ExecutionService(BaseService):
 
             if self._is_remote_backend():
                 stub = self._get_remote_stub()
-                return stub.run_commands(
-                    nodes_filter=nodes_filter,
-                    commands=commands,
-                    variables=variables,
-                    parallel=parallel,
-                    timeout=timeout if timeout is not None else 20,
-                    folder=folder,
-                    prompt=prompt,
-                    on_node_complete=on_node_complete,
-                    logger=logger,
-                    name=name or "",
-                )
+                batches = self._build_remote_filter_batches(nodes_filter)
+                batch_results = [
+                    stub.run_commands(
+                        nodes_filter=batch,
+                        commands=commands,
+                        variables=variables,
+                        parallel=parallel,
+                        timeout=timeout if timeout is not None else 20,
+                        folder=folder,
+                        prompt=prompt,
+                        on_node_complete=on_node_complete,
+                        logger=logger,
+                        name=name or "",
+                    )
+                    for batch in batches
+                ]
+                return self._aggregate_remote_results(batch_results)
 
             matched_names = self.config._getallnodes(nodes_filter)
+            ctx_svc = self._get_context_service()
+            if ctx_svc is not None and not ctx_svc.is_default_all_context():
+                matched_names = ctx_svc.filter_node_list(result=matched_names)
             if not matched_names:
                 raise ConnpyError(f"No nodes found matching filter: {nodes_filter}")
 
@@ -181,21 +279,29 @@ class ExecutionService(BaseService):
 
             if self._is_remote_backend():
                 stub = self._get_remote_stub()
-                return stub.test_commands(
-                    nodes_filter=nodes_filter,
-                    commands=commands,
-                    expected=expected,
-                    variables=variables,
-                    parallel=parallel,
-                    timeout=timeout if timeout is not None else 20,
-                    folder=folder or "",
-                    prompt=prompt,
-                    on_node_complete=on_node_complete,
-                    logger=logger,
-                    name=name or "",
-                )
+                batches = self._build_remote_filter_batches(nodes_filter)
+                batch_results = [
+                    stub.test_commands(
+                        nodes_filter=batch,
+                        commands=commands,
+                        expected=expected,
+                        variables=variables,
+                        parallel=parallel,
+                        timeout=timeout if timeout is not None else 20,
+                        folder=folder or "",
+                        prompt=prompt,
+                        on_node_complete=on_node_complete,
+                        logger=logger,
+                        name=name or "",
+                    )
+                    for batch in batches
+                ]
+                return self._aggregate_remote_results(batch_results)
 
             matched_names = self.config._getallnodes(nodes_filter)
+            ctx_svc = self._get_context_service()
+            if ctx_svc is not None and not ctx_svc.is_default_all_context():
+                matched_names = ctx_svc.filter_node_list(result=matched_names)
             if not matched_names:
                 raise ConnpyError(f"No nodes found matching filter: {nodes_filter}")
 

@@ -16,8 +16,11 @@ from . import printer
 from .auth_utils import (
     MAX_PROFILE_DEPTH,
     SanitizedAuthError,
+    compile_active_context_patterns_with_status,
     extract_profile_refs_from_value,
     is_compose_expression,
+    is_default_all_context_cfg,
+    match_active_context_patterns,
     resolve_fallback_entries,
     validate_auth_budget_tags,
     validate_compose_syntax,
@@ -60,6 +63,7 @@ class configfile:
     def __init__(self, conf = None, key = None, shared_config = None):
         self._mutation_lock = threading.RLock()
         self._cache_dirty = False
+        self._enforce_context = True
         self._shared_config = shared_config
         ''' 
             
@@ -406,8 +410,9 @@ class configfile:
         self._fsync_dir_nonfatal(conf)
         try:
             self._atomic_write_text_unlocked(self.cachefile, lambda f: json.dump(newconfig, f))
-            self._generate_nodes_cache_unlocked(_raise_on_error=True)
             self._cache_dirty = False
+            if self._is_context_filtering_enabled_unlocked():
+                self._generate_nodes_cache_unlocked(_raise_on_error=True)
         except (OSError, TypeError, ValueError):
             self._cache_dirty = True
         return 0, None
@@ -491,18 +496,33 @@ class configfile:
                 self._cache_dirty = True
                 return False
 
+    def _is_context_filtering_enabled_unlocked(self) -> bool:
+        if not getattr(self, "_enforce_context", True):
+            return False
+        return not (len(sys.argv) > 1 and sys.argv[1] == "api")
+
+    def _filter_by_active_context_unlocked(self, items: list[str]) -> tuple[list[str], bool]:
+        if not self._is_context_filtering_enabled_unlocked() or is_default_all_context_cfg(
+            self.config
+        ):
+            return (list(items), False)
+        patterns, had_err = compile_active_context_patterns_with_status(self.config)
+        return ([i for i in items if match_active_context_patterns(i, patterns)], had_err)
+
     def _generate_nodes_cache_unlocked(self, nodes=None, folders=None, profiles=None, *, _raise_on_error=False):
         try:
-            if nodes is None:
-                nodes = self._getallnodes_unlocked()
-            if folders is None:
-                folders = self._getallfolders_unlocked()
+            raw_nodes = self._getallnodes_unlocked() if nodes is None else list(nodes)
+            raw_folders = self._getallfolders_unlocked() if folders is None else list(folders)
+            nodes, err_n = self._filter_by_active_context_unlocked(raw_nodes)
+            folders, err_f = self._filter_by_active_context_unlocked(raw_folders)
             if profiles is None:
                 profiles = list(self.profiles.keys())
 
             self._atomic_write_text_unlocked(self.fzf_cachefile, lambda f: f.write("\n".join(nodes)))
             self._atomic_write_text_unlocked(self.folders_cachefile, lambda f: f.write("\n".join(folders)))
             self._atomic_write_text_unlocked(self.profiles_cachefile, lambda f: f.write("\n".join(profiles)))
+            if err_n or err_f:
+                self._cache_dirty = True
         except (OSError, TypeError, ValueError):
             if _raise_on_error:
                 raise

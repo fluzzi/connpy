@@ -2430,3 +2430,516 @@ def test_fallback_comma_separated_profiles_validation_parsing_resolution_and_pro
     assert seen_fb_msgs == [
         "Add fallback credentials (@profile, @p1,@p2, JSON list/dict, or compose:)"
     ]
+
+
+def test_context_derive_parent_folder_golden_cases(tmp_path: Path) -> None:
+    cfg = _make_config(tmp_path, {})
+    svc = NodeService(cfg)
+
+    assert svc._derive_parent_folder(cfg, "@dish", is_folder=True) is None
+    assert svc._derive_parent_folder(cfg, "@int@dish", is_folder=True) == "@dish"
+    with pytest.raises(InvalidConfigurationError):
+        svc._derive_parent_folder(cfg, "@a@b@c", is_folder=True)
+    with pytest.raises(InvalidConfigurationError):
+        svc._derive_parent_folder(cfg, "@", is_folder=True)
+    with pytest.raises(InvalidConfigurationError):
+        svc._derive_parent_folder(cfg, "@@dish", is_folder=True)
+
+    assert svc._derive_parent_folder(cfg, "router1", is_folder=False) is None
+    assert svc._derive_parent_folder(cfg, "router1@dish", is_folder=False) == "@dish"
+    assert svc._derive_parent_folder(cfg, "router1@int@dish", is_folder=False) == "@int@dish"
+    with pytest.raises(InvalidConfigurationError):
+        svc._derive_parent_folder(cfg, "@dish", is_folder=False)
+
+
+def test_context_enforcement_crud_move_bulk_and_jumphost_resolution(tmp_path: Path) -> None:
+    from types import SimpleNamespace
+
+    import inquirer
+
+    from connpy.services.context_service import ContextService
+    from connpy.services.exceptions import ConnpyError, NodeNotFoundError
+
+    cfg = _make_config(
+        tmp_path,
+        {
+            "config": {
+                "case": False,
+                "current_context": "awsdish",
+                "contexts": {
+                    "all": [".*"],
+                    "awsdish": [".*@aws@dish$"],
+                    "pedish": ["^pe-.*@dish$"],
+                },
+            },
+            "connections": {
+                "bastion": {
+                    "type": "connection",
+                    "host": "10.0.0.1",
+                    "protocol": "ssh",
+                    "port": "",
+                    "user": "b_u",
+                    "password": "",
+                    "options": "",
+                    "logs": "",
+                    "tags": "",
+                    "jumphost": "",
+                },
+                "dish": {
+                    "type": "folder",
+                    "jumpconnect": {
+                        "type": "connection",
+                        "host": "10.0.0.2",
+                        "protocol": "ssh",
+                        "port": "",
+                        "user": "j_u",
+                        "password": "",
+                        "options": "",
+                        "logs": "",
+                        "tags": "",
+                        "jumphost": "",
+                    },
+                    "pe-1": {
+                        "type": "connection",
+                        "host": "10.0.0.3",
+                        "protocol": "ssh",
+                        "port": "",
+                        "user": "u1",
+                        "password": "",
+                        "options": "",
+                        "logs": "",
+                        "tags": "",
+                        "jumphost": "",
+                    },
+                    "aws": {
+                        "type": "subfolder",
+                        "r1": {
+                            "type": "connection",
+                            "host": "10.1.0.1",
+                            "protocol": "ssh",
+                            "port": "",
+                            "user": "u_aws",
+                            "password": "",
+                            "options": "",
+                            "logs": "",
+                            "tags": "",
+                            "jumphost": "jumpconnect@dish",
+                        },
+                    },
+                },
+                "other": {
+                    "type": "folder",
+                    "r_out": {
+                        "type": "connection",
+                        "host": "10.2.0.1",
+                        "protocol": "ssh",
+                        "port": "",
+                        "user": "u_out",
+                        "password": "",
+                        "options": "",
+                        "logs": "",
+                        "tags": "",
+                        "jumphost": "",
+                    },
+                },
+            },
+        },
+    )
+    provider = ServiceProvider(cfg)
+    nodes_svc = provider.nodes
+
+    # list_nodes & list_folders filter by active context
+    assert nodes_svc.list_nodes() == ["r1@aws@dish"]
+    assert nodes_svc.list_folders() == ["@aws@dish"]
+
+    # Out-of-context CRUD is blocked
+    with pytest.raises(NodeNotFoundError):
+        nodes_svc.get_node_details("r_out@other")
+    with pytest.raises(NodeNotFoundError):
+        nodes_svc.update_node("r_out@other", {"host": "10.2.0.9"})
+    with pytest.raises(NodeNotFoundError):
+        nodes_svc.delete_node("r_out@other")
+    with pytest.raises(NodeNotFoundError):
+        nodes_svc.connect_node("r_out@other")
+    with pytest.raises(InvalidConfigurationError):
+        nodes_svc.add_node("root_bad", {"host": "1.1.1.1"})
+    with pytest.raises(InvalidConfigurationError):
+        nodes_svc.add_node("@badfolder", {}, is_folder=True)
+
+    # move_node blocks out-of-context src and dst
+    with pytest.raises(NodeNotFoundError):
+        nodes_svc.move_node("r_out@other", "r2@aws@dish")
+    with pytest.raises(InvalidConfigurationError):
+        nodes_svc.move_node("r1@aws@dish", "r2@other")
+
+    # bulk_add is atomic: if any node is outside context, zero nodes are inserted
+    with pytest.raises(InvalidConfigurationError):
+        nodes_svc.bulk_add(["ok@aws@dish", "bad_root"], ["10.1.0.2", "10.1.0.3"], {"protocol": "ssh"})
+    assert "ok@aws@dish" not in cfg._getallnodes()
+
+    # Prefix context allows creating pe-new@dish inside existing @dish
+    ctx_svc = ContextService(cfg)
+    ctx_svc.set_active_context("pedish")
+    nodes_svc.add_node(
+        "pe-new@dish", {"host": "10.0.0.9", "jumphost": "bastion", "folder": "dish"}
+    )
+    assert "pe-new@dish" in nodes_svc.list_nodes()
+    # Jumphost resolution via getitem remains unfiltered
+    assert cfg.getitem("r1@aws@dish", extract=True)["jumphost"] == "jumpconnect@dish"
+
+    # Validators.jumphost_validation & profile_jumphost_validation allow global/parent bastions
+    ctx_svc.set_active_context("awsdish")
+    app_val = SimpleNamespace(
+        case=False,
+        profiles=list(cfg.profiles.keys()),
+        nodes_list=nodes_svc.list_nodes(),
+        folders=nodes_svc.list_folders(),
+        services=provider,
+    )
+    vals = Validators(app_val)
+    assert vals.jumphost_validation({}, "bastion") is True
+    assert vals.jumphost_validation({}, "JUMPCONNECT@DISH") is True
+    assert vals.profile_jumphost_validation({}, "bastion") is True
+    with pytest.raises(inquirer.errors.ValidationError):
+        vals.jumphost_validation({}, "does_not_exist")
+    with pytest.raises(inquirer.errors.ValidationError):
+        vals.profile_jumphost_validation({}, "does_not_exist")
+
+    # Validators.bulk_folder_validation checks active context & case
+    assert vals.bulk_folder_validation({"ids": "r2"}, "@aws@dish") is True
+    with pytest.raises(inquirer.errors.ValidationError):
+        vals.bulk_folder_validation({"ids": "r2"}, "@other")
+    with pytest.raises(ConnpyError):
+        nodes_svc.validate_parent_folder("r2@other", is_folder=False)
+
+
+def test_context_import_export_roundtrip_and_atomicity(tmp_path: Path) -> None:
+    cfg = _make_config(
+        tmp_path,
+        {
+            "config": {
+                "case": False,
+                "current_context": "awsdish",
+                "contexts": {
+                    "all": [".*"],
+                    "awsdish": [".*@aws@dish$"],
+                    "peonly": [".*pe.*"],
+                },
+            },
+            "connections": {
+                "dish": {
+                    "type": "folder",
+                    "aws": {
+                        "type": "subfolder",
+                        "r1": {
+                            "type": "connection",
+                            "host": "10.1.0.1",
+                            "protocol": "ssh",
+                            "port": "",
+                            "user": "u1",
+                            "password": "",
+                            "options": "",
+                            "logs": "",
+                            "tags": "",
+                            "jumphost": "",
+                        },
+                    },
+                },
+                "other": {
+                    "type": "folder",
+                    "x1": {
+                        "type": "connection",
+                        "host": "10.2.0.1",
+                        "protocol": "ssh",
+                        "port": "",
+                        "user": "u2",
+                        "password": "",
+                        "options": "",
+                        "logs": "",
+                        "tags": "",
+                        "jumphost": "",
+                    },
+                },
+            },
+        },
+    )
+    provider = ServiceProvider(cfg)
+    ie = provider.import_export
+
+    exported = ie.export_to_dict(folders=None)
+    assert "dish" in exported
+    assert "aws" in exported["dish"]
+    assert "other" not in exported
+
+    # Round-trip export/import of @aws@dish succeeds when @dish exists
+    rt = ie.export_to_dict(folders=["@aws@dish"])
+    ie.import_from_dict(rt)
+
+    # Atomic rejection when container @office is new and outside context .*pe.*
+    provider.context.set_active_context("peonly")
+    with pytest.raises(InvalidConfigurationError):
+        ie.import_from_dict(
+            {
+                "office": {
+                    "type": "folder",
+                    "pe1": {
+                        "type": "connection",
+                        "host": "10.3.0.1",
+                        "protocol": "ssh",
+                    },
+                }
+            }
+        )
+    assert "office" not in cfg.connections
+
+    # Atomic rejection when any leaf is outside context (no partial mutation)
+    with pytest.raises(InvalidConfigurationError):
+        ie.import_from_dict(
+            {
+                "pe-good": {"type": "connection", "host": "10.3.0.2", "protocol": "ssh"},
+                "bad-node": {"type": "connection", "host": "10.3.0.3", "protocol": "ssh"},
+            }
+        )
+    assert "pe-good" not in cfg.connections
+
+
+def test_context_execution_remote_chunking_mcp_and_grpc_server_bypass(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from connpy.grpc_layer import connpy_pb2
+    from connpy.grpc_layer.server import (
+        ExecutionServicer,
+        ImportExportServicer,
+        NodeServicer,
+        serve,
+    )
+    from connpy.grpc_layer.stubs import ExecutionStub, NodeStub
+    from connpy.grpc_layer.user_registry import UserRegistry
+    from connpy.mcp_server import ConnpyMCPServer
+    from connpy.services.exceptions import ConnpyError, NodeNotFoundError
+
+    cfg = _make_config(
+        tmp_path,
+        {
+            "config": {
+                "case": True,
+                "current_context": "prod",
+                "contexts": {
+                    "all": [".*"],
+                    "prod": ["^prod-.*"],
+                },
+            },
+            "connections": {
+                "prod-1": {
+                    "type": "connection",
+                    "host": "10.0.0.1",
+                    "protocol": "ssh",
+                    "port": "",
+                    "user": "u1",
+                    "password": "",
+                    "options": "",
+                    "logs": "",
+                    "tags": "",
+                    "jumphost": "",
+                },
+                "dev-1": {
+                    "type": "connection",
+                    "host": "10.0.0.2",
+                    "protocol": "ssh",
+                    "port": "",
+                    "user": "u2",
+                    "password": "",
+                    "options": "",
+                    "logs": "",
+                    "tags": "",
+                    "jumphost": "",
+                },
+            },
+        },
+    )
+
+    # Local ExecutionService & run_cli_script enforce context
+    exec_svc = ExecutionService(cfg)
+    script_file = tmp_path / "cmds.txt"
+    script_file.write_text("show version\n", encoding="utf-8")
+    with pytest.raises(ConnpyError):
+        exec_svc.run_commands("dev-1", ["show version"])
+    with pytest.raises(ConnpyError):
+        exec_svc.test_commands("dev-1", ["show version"], ["ok"])
+    with pytest.raises(ConnpyError):
+        exec_svc.run_cli_script("dev-1", str(script_file))
+
+    # Remote ExecutionService with injected remote_stub + chunking > MAX_REMOTE_FILTER_NODES (500)
+    many_nodes = [f"prod-{i}" for i in range(505)] + ["dev-1"]
+    seen_batches: list[list[str]] = []
+
+    class _InjectedRemoteStub:
+        def list_nodes(self, filter_str=""):
+            import re as _re
+
+            if not filter_str:
+                return list(many_nodes)
+            return [n for n in many_nodes if _re.search(filter_str, n)]
+
+        def run_commands(self, nodes_filter, **_kw):
+            seen_batches.append(list(nodes_filter))
+            return {pat.strip("^$").replace("\\", ""): {"output": "ok", "status": 0} for pat in nodes_filter}
+
+        def test_commands(self, nodes_filter, **_kw):
+            seen_batches.append(list(nodes_filter))
+            return {pat.strip("^$").replace("\\", ""): {"passed": True} for pat in nodes_filter}
+
+    remote_dir = tmp_path / "remote"
+    remote_dir.mkdir()
+    remote_cfg = configfile(conf=str(remote_dir / "config.yaml"), key=cfg.key)
+    remote_cfg.transactional_update(
+        lambda c: c.config.update(
+            {
+                "service_mode": "remote",
+                "remote_host": "localhost:50051",
+                "current_context": "prod",
+                "contexts": {"all": [".*"], "prod": ["^prod-.*"]},
+            }
+        )
+    )
+    remote_exec = ExecutionService(remote_cfg, remote_stub=_InjectedRemoteStub())
+    res_chunk = remote_exec.run_commands(".*", ["show ver"])
+    assert len(seen_batches) == 2
+    assert len(seen_batches[0]) == 500
+    assert len(seen_batches[1]) == 5
+    assert len(res_chunk) == 505
+    assert "dev-1" not in res_chunk
+    with pytest.raises(ConnpyError):
+        remote_exec.run_cli_script("dev-1", str(script_file))
+
+    # NodeStub & ExecutionStub client-side guards + _get_raw_nodes
+    fake_grpc_stub = MagicMock()
+    fake_grpc_stub.list_nodes.return_value = MagicMock(data=None)
+    with patch("connpy.grpc_layer.stubs.from_value", return_value=["prod-1", "dev-1"]):
+        n_stub = NodeStub(MagicMock(), "localhost:50051", config=remote_cfg)
+        n_stub.stub = fake_grpc_stub
+        assert n_stub._get_raw_nodes() == ["prod-1", "dev-1"]
+        with pytest.raises(NodeNotFoundError):
+            n_stub.get_node_details("dev-1")
+        with pytest.raises(InvalidConfigurationError):
+            n_stub.add_node("dev-2", {"host": "1.2.3.4"})
+
+    e_stub = ExecutionStub(MagicMock(), "localhost:50051", config=remote_cfg, node_stub=n_stub)
+    e_stub.stub = MagicMock()
+    e_stub.stub.run_commands.return_value = [
+        connpy_pb2.NodeRunResult(unique_id="prod-1", output="ok", status=0)
+    ]
+    n_stub.list_nodes = MagicMock(return_value=["prod-1", "dev-1"])
+    out_stub = e_stub.run_commands(".*", ["show ver"])
+    assert list(out_stub.keys()) == ["prod-1"]
+
+    # ConnpyMCPServer inherits enforcement via ServiceProvider
+    mcp = ConnpyMCPServer(config=cfg)
+    assert mcp.list_nodes() == ["prod-1"]
+    mcp_res = mcp.run_commands("dev-1", ["show ver"])
+    assert mcp_res["success"] is False
+
+    # gRPC Server servicers & UserRegistry force enforce_context=False even when sys.argv != ['api']
+    monkeypatch.setattr(sys, "argv", ["pytest"])
+    cfg.fzf_cachefile = str(tmp_path / ".fzf_nodes_cache.txt")
+    cfg.folders_cachefile = str(tmp_path / ".folders_cache.txt")
+    Path(cfg.fzf_cachefile).write_text("client-cache-preserved", encoding="utf-8")
+
+    srv_provider = ServiceProvider(cfg, mode="local", enforce_context=True)
+    node_servicer = NodeServicer(srv_provider)
+    assert srv_provider.enforce_context is False
+    assert cfg._enforce_context is False
+    assert "dev-1" in node_servicer.service.list_nodes()
+    cfg._saveconfig(cfg.file)
+    assert Path(cfg.fzf_cachefile).read_text(encoding="utf-8") == "client-cache-preserved"
+
+    _ = ExecutionServicer(ServiceProvider(cfg, mode="local", enforce_context=True))
+    _ = ImportExportServicer(ServiceProvider(cfg, mode="local", enforce_context=True))
+
+    reg = UserRegistry(str(tmp_path))
+    reg.user_service.create_user("alice", "SecretPass123!")
+    alice_prov = reg.get_provider("alice")
+    assert alice_prov.enforce_context is False
+    assert alice_prov.config._enforce_context is False
+
+    # serve() sets enforce_context=False on fallback_provider
+    mock_grpc_srv = MagicMock()
+    with patch("grpc.server", return_value=mock_grpc_srv):
+        srv_dir = tmp_path / "srv"
+        srv_dir.mkdir()
+        serve_cfg = configfile(conf=str(srv_dir / "config.yaml"), key=cfg.key)
+        serve(serve_cfg, port=0)
+        assert serve_cfg._enforce_context is False
+
+
+def test_context_regex_parity_case_cache_and_dirty_recovery(tmp_path: Path) -> None:
+    from connpy.services.context_service import ContextService
+
+    cfg = _make_config(
+        tmp_path,
+        {
+            "config": {
+                "case": False,
+                "current_context": "upper",
+                "contexts": {
+                    "all": [".*"],
+                    "upper": [".*PROD.*"],
+                },
+            },
+            "connections": {
+                "prod-1": {
+                    "type": "connection",
+                    "host": "10.0.0.1",
+                    "protocol": "ssh",
+                    "port": "",
+                    "user": "u1",
+                    "password": "",
+                    "options": "",
+                    "logs": "",
+                    "tags": "",
+                    "jumphost": "",
+                },
+                "dev-1": {
+                    "type": "connection",
+                    "host": "10.0.0.2",
+                    "protocol": "ssh",
+                    "port": "",
+                    "user": "u2",
+                    "password": "",
+                    "options": "",
+                    "logs": "",
+                    "tags": "",
+                    "jumphost": "",
+                },
+                "ProdFolder": {"type": "folder"},
+            },
+        },
+    )
+    ctx_svc = ContextService(cfg)
+
+    # Validation limits in add_context / update_context
+    with pytest.raises(ValueError):
+        ctx_svc.add_context("bad", ["[unclosed"])
+    with pytest.raises(ValueError):
+        ctx_svc.add_context("empty", [])
+    with pytest.raises(ValueError):
+        ctx_svc.update_context("all", [".*"])
+
+    # case=False parity between ContextService and configfile cache filter
+    assert ctx_svc.matches_active_context("prod-1") is True
+    cfg._generate_nodes_cache(nodes=["prod-1", "dev-1"], folders=["@ProdFolder", "@Other"])
+    assert Path(cfg.fzf_cachefile).read_text(encoding="utf-8").splitlines() == ["prod-1"]
+    assert Path(cfg.folders_cachefile).read_text(encoding="utf-8").splitlines() == ["@ProdFolder"]
+
+    # case=True parity
+    cfg.config["case"] = True
+    assert ctx_svc.matches_active_context("prod-1") is False
+    cfg._generate_nodes_cache(nodes=["prod-1", "PROD-2"], folders=["@ProdFolder"])
+    assert Path(cfg.fzf_cachefile).read_text(encoding="utf-8").splitlines() == ["PROD-2"]
+
+    # Corrupt regex in config marks _cache_dirty=True safely without raising
+    cfg.config["contexts"]["broken"] = ["[invalid"]
+    cfg.config["current_context"] = "broken"
+    cfg._cache_dirty = False
+    cfg._generate_nodes_cache()
+    assert cfg._cache_dirty is True

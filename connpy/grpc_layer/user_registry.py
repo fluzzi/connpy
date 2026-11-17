@@ -62,7 +62,7 @@ class UserRegistry:
                 try:
                     # Attempt a fresh configuration load
                     config = configfile(conf=conf_file, shared_config=self._shared_config)
-                    new_provider = ServiceProvider(config, mode="local")
+                    new_provider = ServiceProvider(config, mode="local", enforce_context=False)
                     
                     # Successfully loaded, clean up the old provider
                     if old_provider:

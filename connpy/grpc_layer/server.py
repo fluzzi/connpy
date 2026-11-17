@@ -72,11 +72,19 @@ def handle_errors(func):
                 printer.clear_thread_state()
         return wrapper
 
+def _ensure_server_provider(provider):
+    if not hasattr(provider, "mode"):
+        from connpy.services.provider import ServiceProvider
+
+        return ServiceProvider(provider, mode="local", enforce_context=False)
+    if hasattr(provider, "set_enforce_context") and callable(provider.set_enforce_context):
+        provider.set_enforce_context(False)
+    return provider
+
+
 class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
     def __init__(self, provider, registry=None, debug=False):
-        if not hasattr(provider, "mode"):
-            from connpy.services.provider import ServiceProvider
-            provider = ServiceProvider(provider, mode="local")
+        provider = _ensure_server_provider(provider)
         self._fallback_provider = provider
         self._registry = registry
         self.server_debug = debug
@@ -689,9 +697,7 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
 
 class ProfileServicer(connpy_pb2_grpc.ProfileServiceServicer):
     def __init__(self, provider, registry=None):
-        if not hasattr(provider, "mode"):
-            from connpy.services.provider import ServiceProvider
-            provider = ServiceProvider(provider, mode="local")
+        provider = _ensure_server_provider(provider)
         self._fallback_provider = provider
         self._registry = registry
 
@@ -743,9 +749,7 @@ class ProfileServicer(connpy_pb2_grpc.ProfileServiceServicer):
 
 class ConfigServicer(connpy_pb2_grpc.ConfigServiceServicer):
     def __init__(self, provider, registry=None):
-        if not hasattr(provider, "mode"):
-            from connpy.services.provider import ServiceProvider
-            provider = ServiceProvider(provider, mode="local")
+        provider = _ensure_server_provider(provider)
         self._fallback_provider = provider
         self._registry = registry
 
@@ -788,9 +792,7 @@ class ConfigServicer(connpy_pb2_grpc.ConfigServiceServicer):
 
 class PluginServicer(connpy_pb2_grpc.PluginServiceServicer, remote_plugin_pb2_grpc.RemotePluginServiceServicer):
     def __init__(self, provider, registry=None):
-        if not hasattr(provider, "mode"):
-            from connpy.services.provider import ServiceProvider
-            provider = ServiceProvider(provider, mode="local")
+        provider = _ensure_server_provider(provider)
         self._fallback_provider = provider
         self._registry = registry
 
@@ -846,9 +848,7 @@ class PluginServicer(connpy_pb2_grpc.PluginServiceServicer, remote_plugin_pb2_gr
 
 class ExecutionServicer(connpy_pb2_grpc.ExecutionServiceServicer):
     def __init__(self, provider, registry=None):
-        if not hasattr(provider, "mode"):
-            from connpy.services.provider import ServiceProvider
-            provider = ServiceProvider(provider, mode="local")
+        provider = _ensure_server_provider(provider)
         self._fallback_provider = provider
         self._registry = registry
 
@@ -977,9 +977,7 @@ class ExecutionServicer(connpy_pb2_grpc.ExecutionServiceServicer):
 
 class ImportExportServicer(connpy_pb2_grpc.ImportExportServiceServicer):
     def __init__(self, provider, registry=None):
-        if not hasattr(provider, "mode"):
-            from connpy.services.provider import ServiceProvider
-            provider = ServiceProvider(provider, mode="local")
+        provider = _ensure_server_provider(provider)
         self._fallback_provider = provider
         self._registry = registry
 
@@ -1112,9 +1110,7 @@ class StatusBridge:
 
 class AIServicer(connpy_pb2_grpc.AIServiceServicer):
     def __init__(self, provider, registry=None, debug=False):
-        if not hasattr(provider, "mode"):
-            from connpy.services.provider import ServiceProvider
-            provider = ServiceProvider(provider, mode="local")
+        provider = _ensure_server_provider(provider)
         self._fallback_provider = provider
         self._registry = registry
         self.server_debug = debug
@@ -1399,9 +1395,7 @@ class AIServicer(connpy_pb2_grpc.AIServiceServicer):
 
 class SystemServicer(connpy_pb2_grpc.SystemServiceServicer):
     def __init__(self, provider, registry=None):
-        if not hasattr(provider, "mode"):
-            from connpy.services.provider import ServiceProvider
-            provider = ServiceProvider(provider, mode="local")
+        provider = _ensure_server_provider(provider)
         self._fallback_provider = provider
         self._registry = registry
 
@@ -1784,7 +1778,7 @@ def serve(config, port=8048, debug=False):
     from connpy.grpc_layer.user_registry import UserRegistry
     from connpy.services.provider import ServiceProvider
 
-    fallback_provider = ServiceProvider(config, mode="local")
+    fallback_provider = ServiceProvider(config, mode="local", enforce_context=False)
     registry = UserRegistry(config.defaultdir)
 
     # Check if trusted_gateway provider is configured if SSO Gateway Secret is present in env

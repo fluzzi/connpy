@@ -61,6 +61,9 @@ MIN_HOP_HOST_ATTEMPTS = 1
 MAX_HOP_HOST_ATTEMPTS_CAP = 10
 MAX_JSON_INPUT_BYTES = 8192
 MAX_JSON_INPUT_DEPTH = 4
+MAX_CONTEXT_REGEXES = 64
+MAX_CONTEXT_PATTERN_LEN = 512
+MAX_REMOTE_FILTER_NODES = 500
 
 SAFE_ERROR_TEMPLATES: dict[str, str] = {
     "AUTH_FAILED": "[AUTH_FAILED] Authentication failed",
@@ -1609,3 +1612,77 @@ class AuthAttemptTracker:
         with self._lock:
             self._unblocked.clear()
             self._blocked.clear()
+
+
+def is_default_all_context_cfg(cfg_dict: Any) -> bool:
+    """Return True when config uses the default unrestricted 'all' context."""
+    if not isinstance(cfg_dict, dict):
+        return True
+    current_ctx = cfg_dict.get("current_context", "all")
+    if current_ctx != "all":
+        return False
+    contexts = cfg_dict.get("contexts", {"all": [".*"]})
+    if not isinstance(contexts, dict):
+        return True
+    return contexts.get("all", [".*"]) == [".*"]
+
+
+def compile_active_context_patterns_with_status(
+    cfg_dict: Any,
+    *,
+    strict: bool = False,
+) -> tuple[list[re.Pattern[str]], bool]:
+    """Compile active context regexes purely, returning (patterns, had_error)."""
+    if is_default_all_context_cfg(cfg_dict):
+        return ([re.compile(".*")], False)
+
+    current_ctx = cfg_dict.get("current_context", "all")
+    contexts = cfg_dict.get("contexts", {"all": [".*"]})
+    raw_patterns = contexts.get(current_ctx, [".*"]) if isinstance(contexts, dict) else [".*"]
+    flags = 0 if cfg_dict.get("case", False) else re.IGNORECASE
+
+    if not isinstance(raw_patterns, list):
+        if strict:
+            raise ValueError("Context regexes must be a list")
+        return ([], True)
+
+    had_error = False
+    if len(raw_patterns) > MAX_CONTEXT_REGEXES:
+        if strict:
+            raise ValueError(f"Context exceeds maximum of {MAX_CONTEXT_REGEXES} regexes")
+        had_error = True
+        raw_patterns = raw_patterns[:MAX_CONTEXT_REGEXES]
+
+    patterns: list[re.Pattern[str]] = []
+    for pat in raw_patterns:
+        if not isinstance(pat, str) or not pat or len(pat) > MAX_CONTEXT_PATTERN_LEN:
+            if strict:
+                raise ValueError(
+                    f"Context pattern must be a non-empty string up to {MAX_CONTEXT_PATTERN_LEN} chars"
+                )
+            had_error = True
+            continue
+        try:
+            patterns.append(re.compile(pat, flags))
+        except re.error as exc:
+            if strict:
+                raise ValueError(f"Invalid context regex {pat!r}: {exc}") from None
+            had_error = True
+    return (patterns, had_error)
+
+
+def compile_active_context_patterns(
+    cfg_dict: Any,
+    *,
+    strict: bool = False,
+) -> list[re.Pattern[str]]:
+    """Compile active context regexes purely respecting cfg_dict['case']."""
+    patterns, _ = compile_active_context_patterns_with_status(cfg_dict, strict=strict)
+    return patterns
+
+
+def match_active_context_patterns(name: Any, patterns: Iterable[re.Pattern[str]]) -> bool:
+    """Return True if non-empty string name matches at least one compiled context regex."""
+    if not isinstance(name, str) or not name:
+        return False
+    return any(p.match(name) for p in patterns)

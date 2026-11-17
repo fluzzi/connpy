@@ -144,6 +144,7 @@ class NodeHandler:
                 uniques = self.app.services.nodes.explode_unique(args.data)
                 if not uniques:
                     raise InvalidConfigurationError(f"Invalid folder {args.data}")
+                self.app.services.nodes.validate_parent_folder(args.data, is_folder=True)
                 self.app.services.nodes.add_node(args.data, {}, is_folder=True)
                 printer.success(f"{args.data} added successfully")
             else:
