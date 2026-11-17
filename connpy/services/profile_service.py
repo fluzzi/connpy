@@ -141,18 +141,13 @@ class ProfileService(BaseService):
         resolved = deepcopy(node_data)
 
         auth_referenced_profiles = []
-        other_referenced_profiles = []
-        for key, value in resolved.items():
-            if key == "fallback":
-                continue
-            target_refs = (
-                auth_referenced_profiles if key in ("user", "password") else other_referenced_profiles
-            )
+        for key in ("user", "password"):
+            value = resolved.get(key)
             if isinstance(value, str):
                 if not is_compose_expression(value) and value.startswith("@"):
                     ref = value[1:]
                     if key != "password" or ref in profiles:
-                        target_refs.append(ref)
+                        auth_referenced_profiles.append(ref)
             elif isinstance(value, (list, tuple)):
                 for item in value:
                     if (
@@ -162,7 +157,7 @@ class ProfileService(BaseService):
                     ):
                         ref = item[1:]
                         if key != "password" or ref in profiles:
-                            target_refs.append(ref)
+                            auth_referenced_profiles.append(ref)
 
         def _get_resolved_ref(prof_name):
             if prof_name in _visited or _depth >= MAX_PROFILE_DEPTH:
@@ -227,15 +222,16 @@ class ProfileService(BaseService):
                         resolved_list.append(item)
                 resolved[key] = resolved_list
 
-        ordered_profiles = list(dict.fromkeys(auth_referenced_profiles + other_referenced_profiles))
-        for base_profile_name in ordered_profiles:
+        dedup_auth_profiles = list(dict.fromkeys(auth_referenced_profiles))
+        for base_profile_name in dedup_auth_profiles:
             with suppress(ProfileNotFoundError):
                 base_profile = _get_resolved_ref(base_profile_name)
-                for key, value in base_profile.items():
-                    if (key not in resolved or resolved[key] in ("", [], None)) and (
-                        value not in ("", [], None) or key not in resolved
-                    ):
-                        resolved[key] = deepcopy(value)
+                for key in ("user", "password", "fallback"):
+                    val = base_profile.get(key)
+                    if (
+                        key not in resolved or resolved[key] in ("", [], None)
+                    ) and val not in ("", [], None):
+                        resolved[key] = deepcopy(val)
 
         if resolved.get("protocol") in ("", None):
             try:

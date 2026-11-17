@@ -2141,3 +2141,142 @@ def test_interactive_mode_fallback_proxycommand_sshkey_and_no_password_ux(tmp_pa
     with patch("builtins.print") as m_print_sync:
         n_nopw._setup_interact_environment(async_mode=False)
     m_print_sync.assert_called_once()
+
+
+def test_profile_service_strict_auth_inheritance_no_options_leak_and_no_non_auth_fallback(
+    tmp_path: Path,
+) -> None:
+    cfg = _make_config(
+        tmp_path,
+        {
+            "profiles": {
+                "default": {
+                    "protocol": "ssh",
+                    "logs": "/tmp/conn.log",
+                    "options": "",
+                    "fallback": "",
+                },
+                "6wind": {"tags": {"os": "6wind"}, "options": "", "fallback": ""},
+                "dish": {
+                    "user": "federico.luzzi",
+                    "password": "dish_password",
+                    "options": "-J jumpconnect",
+                    "fallback": "@sdnc",
+                },
+                "sdnc": {
+                    "user": "sdnc_admin",
+                    "password": "sdnc_password",
+                    "options": "",
+                    "fallback": "",
+                },
+                "aws_with_fb": {
+                    "options": "-i ~/.ssh/id_rsa",
+                    "fallback": "@sdnc",
+                },
+            },
+            "connections": {
+                "dish": {
+                    "type": "folder",
+                    "jumpintconnect": {
+                        "type": "connection",
+                        "host": "10.10.0.1",
+                        "protocol": "ssh",
+                        "port": "",
+                        "user": "jump_u1",
+                        "password": "",
+                        "options": "",
+                        "logs": "",
+                        "tags": "",
+                        "jumphost": "",
+                    },
+                    "jumpintchy": {
+                        "type": "connection",
+                        "host": "10.10.0.2",
+                        "protocol": "ssh",
+                        "port": "",
+                        "user": "jump_u2",
+                        "password": "",
+                        "options": "",
+                        "logs": "",
+                        "tags": "",
+                        "jumphost": "jumpintconnect@dish",
+                    },
+                    "xw_int": {
+                        "type": "connection",
+                        "host": "172.31.10.12",
+                        "protocol": "ssh",
+                        "port": "",
+                        "options": "",
+                        "logs": "@default",
+                        "tags": "@6wind",
+                        "user": "@dish",
+                        "password": ["@dish"],
+                        "jumphost": "jumpintchy@dish",
+                        "fallback": "",
+                    },
+                },
+            },
+        },
+    )
+
+    p_svc = ProfileService(cfg)
+    raw_xw = cfg.getitem("xw_int@dish", extract=False)
+    resolved_xw = p_svc.resolve_node_data(raw_xw)
+
+    assert resolved_xw["options"] == ""
+    assert "-J jumpconnect" not in resolved_xw["options"]
+    assert resolved_xw["user"] == "federico.luzzi"
+    assert resolved_xw["password"] == ["dish_password"]
+    assert resolved_xw["fallback"] == "@sdnc"
+    assert resolved_xw["logs"] == "/tmp/conn.log"
+    assert resolved_xw["tags"] == {"os": "6wind"}
+
+    n_svc = NodeClass("xw_int@dish", **resolved_xw, config=cfg)
+    cmd_svc = n_svc._get_cmd()
+    assert "ProxyCommand=" in cmd_svc
+    assert "10.10.0.1" in cmd_svc
+    assert "10.10.0.2" in cmd_svc
+    assert "-J jumpconnect" not in cmd_svc
+
+    ext_xw = cfg.getitem("xw_int@dish", extract=True)
+    assert ext_xw["options"] == ""
+    assert ext_xw["user"] == "federico.luzzi"
+    assert ext_xw["password"] == ["dish_password"]
+    n_ext = NodeClass("xw_int@dish", **ext_xw, config=cfg)
+    assert n_ext._auth_candidates == n_svc._auth_candidates
+    assert n_ext._get_cmd() == cmd_svc
+
+    # Negative check: non-auth profile refs in jumphost/options/tags/logs never inherit fallback or creds
+    for non_auth_node in (
+        {
+            "host": "10.20.0.1",
+            "user": "local_user",
+            "password": "local_pw",
+            "jumphost": "@dish",
+            "fallback": "",
+        },
+        {
+            "host": "10.20.0.2",
+            "user": "local_user",
+            "password": "local_pw",
+            "options": "@aws_with_fb",
+            "fallback": "",
+        },
+        {
+            "host": "10.20.0.3",
+            "user": "",
+            "password": "",
+            "jumphost": "@dish",
+            "fallback": "",
+        },
+    ):
+        res_neg = p_svc.resolve_node_data(non_auth_node)
+        assert res_neg["fallback"] == ""
+        if non_auth_node["user"] == "local_user":
+            n_neg = NodeClass("n_neg", **res_neg, config=cfg)
+            assert [(c.user, c.is_fallback) for c in n_neg._auth_candidates] == [
+                ("local_user", False)
+            ]
+        else:
+            assert res_neg["user"] == ""
+            assert res_neg["password"] == ""
