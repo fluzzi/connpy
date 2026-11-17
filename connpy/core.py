@@ -3287,18 +3287,21 @@ class node:
                 return False, str(sanitize_exception(None, code="AUTH_FAILED", secrets=raw_secrets))
 
             eff_u = cur_cand.user or str(self.user or "")
-            if not tracker.try_acquire_user(eff_u, limit=max_global_user_attempts):
+            acquired, budget_err_code = tracker.try_acquire_target_attempt(
+                host=str(self.host),
+                port=str(self.port or ""),
+                protocol=effective_protocol,
+                user=eff_u,
+                host_limit=max_total_auth_attempts,
+                user_limit=max_global_user_attempts,
+            )
+            if not acquired:
                 return False, str(
-                    sanitize_exception(None, code="USER_BUDGET_EXHAUSTED", secrets=raw_secrets)
-                )
-            if not tracker.try_acquire_host(
-                str(self.host),
-                str(self.port or ""),
-                effective_protocol,
-                limit=max_total_auth_attempts,
-            ):
-                return False, str(
-                    sanitize_exception(None, code="HOST_BUDGET_EXHAUSTED", secrets=raw_secrets)
+                    sanitize_exception(
+                        None,
+                        code=budget_err_code or "HOST_BUDGET_EXHAUSTED",
+                        secrets=raw_secrets,
+                    )
                 )
 
             if cur_cand.is_fallback and not st["logged_fallback_this_cand"]:

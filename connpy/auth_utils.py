@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import json
+import math
 import re
 import threading
 import time
@@ -137,7 +138,15 @@ class SanitizedAuthError(ConnpyError):
         self.code = code
         self.__suppress_context__ = True
         self.__cause__ = None
-        self.__context__ = None
+
+    @property
+    def __context__(self) -> None:
+        """Never retain or expose an underlying exception context."""
+        return None
+
+    @__context__.setter
+    def __context__(self, _value: BaseException | None) -> None:
+        return
 
     def __reduce__(self) -> tuple[type[SanitizedAuthError], tuple[str, str]]:
         msg = str(self.args[0]) if self.args else ""
@@ -237,8 +246,8 @@ def sanitize_log_message(message: str, *, secrets: Iterable[str] = ()) -> str:
     text = str(message) if message is not None else ""
     text = _ANSI_OSC_RE.sub("", text)
     text = _ANSI_CSI_RE.sub("", text)
-    text = redact_known_secrets(text, secrets=secrets, min_len=4)
-    return _CONTROL_CHAR_RE.sub("", text)
+    text = _CONTROL_CHAR_RE.sub("", text)
+    return redact_known_secrets(text, secrets=secrets, min_len=1)
 
 
 def sanitize_exception(
@@ -278,7 +287,7 @@ def raise_sanitized_auth_error(
     secrets: Iterable[str] = (),
     context_label: str = "",
 ) -> NoReturn:
-    """Clear original frames and raise SanitizedAuthError with cause suppressed."""
+    """Clear original frames and raise SanitizedAuthError with cause and context suppressed."""
     err: SanitizedAuthError | None = None
     try:
         err = sanitize_exception(
@@ -293,6 +302,8 @@ def raise_sanitized_auth_error(
             clear_exception_frames(orig_exc)
         del orig_exc
         del secrets
+    err.__context__ = None
+    err.__cause__ = None
     raise err from None
 
 
@@ -311,19 +322,22 @@ def validate_strict_int_range(
 
 
 def _check_depth(obj: Any, max_depth: int, cur_depth: int = 0) -> None:
-    """Verify container nesting depth does not exceed max_depth."""
-    if isinstance(obj, (dict, list, tuple)):
-        next_depth = cur_depth + 1
-        if next_depth > max_depth:
-            raise ValueError(f"JSON nesting exceeds maximum depth of {max_depth}")
-        if isinstance(obj, dict):
-            for k, v in obj.items():
-                if not isinstance(k, str):
-                    raise TypeError("JSON object keys must be strings")
-                _check_depth(v, max_depth, next_depth)
-        else:
-            for item in obj:
-                _check_depth(item, max_depth, next_depth)
+    """Verify container nesting depth does not exceed max_depth iteratively."""
+    stack: list[tuple[Any, int]] = [(obj, cur_depth)]
+    while stack:
+        cur_obj, depth = stack.pop()
+        if isinstance(cur_obj, (dict, list, tuple)):
+            next_depth = depth + 1
+            if next_depth > max_depth:
+                raise ValueError(f"JSON nesting exceeds maximum depth of {max_depth}")
+            if isinstance(cur_obj, dict):
+                for k, v in cur_obj.items():
+                    if not isinstance(k, str):
+                        raise TypeError("JSON object keys must be strings")
+                    stack.append((v, next_depth))
+            else:
+                for item in cur_obj:
+                    stack.append((item, next_depth))
 
 
 def validate_json_depth_and_size(
@@ -334,9 +348,14 @@ def validate_json_depth_and_size(
 ) -> Any:
     """Parse (if str) and enforce byte length and nesting depth limits on JSON inputs."""
     if isinstance(raw_or_obj, str):
-        if len(raw_or_obj.encode("utf-8", errors="replace")) > max_bytes:
+        if len(raw_or_obj) > max_bytes or len(raw_or_obj.encode("utf-8", errors="replace")) > max_bytes:
             raise ValueError(f"JSON input exceeds maximum size of {max_bytes} bytes")
-        parsed = json.loads(raw_or_obj)
+        try:
+            parsed = json.loads(raw_or_obj)
+        except RecursionError:
+            raise ValueError(
+                f"JSON nesting exceeds maximum depth of {max_depth}"
+            ) from None
     else:
         parsed = raw_or_obj
     _check_depth(parsed, max_depth, 0)
@@ -550,18 +569,25 @@ def _resolve_compose_internal(
         if tok_type in ("escaped_lit", "quoted_lit", "bare_lit"):
             term_vals = [tok_val]
         elif tok_type == "rsa_blob":
-            if decrypt_fn is not None:
-                try:
-                    decrypted = decrypt_fn(tok_val)
-                except Exception as exc:  # noqa: BLE001
-                    raise_sanitized_auth_error(
-                        exc,
-                        code="AUTH_FAILED",
-                        context_label="failed to decrypt compose rsa_blob",
-                    )
-                term_vals = [str(decrypted)]
-            else:
-                term_vals = [tok_val]
+            if decrypt_fn is None:
+                raise_sanitized_auth_error(
+                    code="NO_CREDS",
+                    context_label="cannot decrypt compose rsa_blob without decrypt_fn",
+                )
+            san_err: SanitizedAuthError | None = None
+            decrypted: Any = None
+            try:
+                decrypted = decrypt_fn(tok_val)
+            except Exception as exc:  # noqa: BLE001
+                san_err = sanitize_exception(
+                    exc,
+                    code="AUTH_FAILED",
+                    context_label="failed to decrypt compose rsa_blob",
+                )
+            if san_err is not None:
+                san_err.__context__ = None
+                raise san_err from None
+            term_vals = [str(decrypted)]
         elif tok_type == "profile_ref":
             if tok_val in visited:
                 raise_sanitized_auth_error(
@@ -621,18 +647,25 @@ def _resolve_compose_internal(
                     )
                     term_vals.extend(sub_vals)
                 elif is_rsa_blob(item):
-                    if decrypt_fn is not None:
-                        try:
-                            dec_item = decrypt_fn(item)
-                        except Exception as exc:  # noqa: BLE001
-                            raise_sanitized_auth_error(
-                                exc,
-                                code="AUTH_FAILED",
-                                context_label="failed to decrypt profile password in compose",
-                            )
-                        term_vals.append(str(dec_item))
-                    else:
-                        term_vals.append(item)
+                    if decrypt_fn is None:
+                        raise_sanitized_auth_error(
+                            code="NO_CREDS",
+                            context_label="cannot decrypt profile password rsa_blob without decrypt_fn",
+                        )
+                    san_item_err: SanitizedAuthError | None = None
+                    dec_item: Any = None
+                    try:
+                        dec_item = decrypt_fn(item)
+                    except Exception as exc:  # noqa: BLE001
+                        san_item_err = sanitize_exception(
+                            exc,
+                            code="AUTH_FAILED",
+                            context_label="failed to decrypt profile password in compose",
+                        )
+                    if san_item_err is not None:
+                        san_item_err.__context__ = None
+                        raise san_item_err from None
+                    term_vals.append(str(dec_item))
                 else:
                     term_vals.append(item)
                 if len(term_vals) > max_variants:
@@ -737,7 +770,7 @@ def mask_node_secrets(obj: Any) -> Any:
                     k_lower = k.lower() if isinstance(k, str) else str(k).lower()
                     if _mask_secret_key(k_lower):
                         out[k] = "***"
-                    elif k_lower == "fallback":
+                    elif k_lower in ("fallback", "_fallback"):
                         if isinstance(v, (dict, list, tuple)):
                             out[k] = _recurse(v, in_fallback_list=True)
                         elif v in ("", None):
@@ -800,7 +833,17 @@ def validate_fallback_entries(
         if not stripped:
             return []
         if stripped.startswith(("[", "{")):
-            parsed = validate_json_depth_and_size(stripped)
+            if (
+                len(stripped) > MAX_JSON_INPUT_BYTES
+                or len(stripped.encode("utf-8", errors="replace")) > MAX_JSON_INPUT_BYTES
+            ):
+                raise ValueError(
+                    f"JSON input exceeds maximum size of {MAX_JSON_INPUT_BYTES} bytes"
+                )
+            try:
+                parsed = validate_json_depth_and_size(stripped)
+            except json.JSONDecodeError:
+                return [stripped]
         else:
             if stripped.startswith("compose:"):
                 validate_compose_syntax(stripped)
@@ -838,7 +881,7 @@ def validate_fallback_entries(
             if user_val is not None and not isinstance(user_val, str):
                 raise ValueError(f"Fallback entry {idx} 'user' must be a string")
             if isinstance(pw_val, (list, tuple)):
-                if not pw_val or not all(isinstance(p, str) for p in pw_val):
+                if not pw_val or not all(isinstance(p, str) and p != "" for p in pw_val):
                     raise ValueError(
                         f"Fallback entry {idx} 'password' list must contain non-empty strings"
                     )
@@ -861,6 +904,15 @@ def validate_fallback_entries(
     return normalized
 
 
+def _is_profile_ref(value: Any) -> bool:
+    """Return True if value matches @profile reference syntax (not compose or literal)."""
+    return (
+        isinstance(value, str)
+        and value.startswith("@")
+        and bool(_PROFILE_REF_BODY_RE.fullmatch(value[1:]))
+    )
+
+
 def _resolve_profile_field(
     profiles: dict[str, Any],
     prof_name: str,
@@ -870,21 +922,40 @@ def _resolve_profile_field(
     visited: frozenset[str] = frozenset(),
 ) -> Any:
     if prof_name in visited or depth >= MAX_PROFILE_DEPTH:
-        return ""
-    prof = profiles.get(prof_name)
+        raise ValueError(f"Circular or overly deep profile reference: {prof_name}")
+    if prof_name not in profiles or profiles[prof_name] is None:
+        raise ValueError(f"Referenced profile does not exist: {prof_name}")
+    prof = profiles[prof_name]
     if not isinstance(prof, dict):
-        return ""
+        raise TypeError(f"Invalid profile definition for {prof_name!r}: expected dict")
     val = prof.get(field, "")
-    if isinstance(val, str) and val.startswith("@") and "+" not in val:
-        ref = val[1:]
-        if ref in profiles:
-            return _resolve_profile_field(
-                profiles,
-                ref,
-                field,
-                depth=depth + 1,
-                visited=visited | {prof_name},
-            )
+    next_visited = visited | {prof_name}
+    if _is_profile_ref(val):
+        return _resolve_profile_field(
+            profiles,
+            val[1:],
+            field,
+            depth=depth + 1,
+            visited=next_visited,
+        )
+    if field == "password" and isinstance(val, (list, tuple)):
+        resolved_items: list[Any] = []
+        for item in val:
+            if _is_profile_ref(item):
+                sub = _resolve_profile_field(
+                    profiles,
+                    item[1:],
+                    field,
+                    depth=depth + 1,
+                    visited=next_visited,
+                )
+                if isinstance(sub, list):
+                    resolved_items.extend(deepcopy(sub))
+                elif sub is not None:
+                    resolved_items.append(deepcopy(sub))
+            else:
+                resolved_items.append(deepcopy(item))
+        return resolved_items
     return deepcopy(val)
 
 
@@ -906,71 +977,94 @@ def _resolve_fallback_entries_internal(
         if isinstance(entry, str):
             if entry.startswith("compose:"):
                 resolved.append({"user": "", "password": entry})
-            elif entry.startswith("@") and "+" not in entry:
+            elif _is_profile_ref(entry):
                 ref_name = entry[1:]
-                if ref_name not in prof_map:
-                    resolved.append({"user": "", "password": ""})
-                elif ref_name in _visited or _depth >= MAX_PROFILE_DEPTH:
+                if ref_name in _visited or _depth >= MAX_PROFILE_DEPTH:
                     raise ValueError(
                         f"Circular or overly deep fallback profile reference: {ref_name}"
                     )
+                if ref_name not in prof_map or prof_map[ref_name] is None:
+                    raise ValueError(f"Referenced fallback profile does not exist: {ref_name}")
+                if not isinstance(prof_map[ref_name], dict):
+                    raise TypeError(
+                        f"Invalid fallback profile definition for {ref_name!r}: expected dict"
+                    )
+
+                prof_obj = prof_map[ref_name]
+                u = _resolve_profile_field(
+                    prof_map, ref_name, "user", depth=_depth, visited=_visited
+                )
+                p = _resolve_profile_field(
+                    prof_map, ref_name, "password", depth=_depth, visited=_visited
+                )
+                own_user = str(u) if u not in (None, "") else ""
+                own_pw: Any = p if p not in (None, "", []) else ""
+                prof_fb = prof_obj.get("fallback")
+                if prof_fb not in (None, "", []):
+                    has_own = (
+                        bool(own_user)
+                        or (isinstance(own_pw, list) and bool(own_pw))
+                        or (isinstance(own_pw, str) and own_pw != "")
+                    )
+                    if has_own:
+                        if len(resolved) >= max_entries:
+                            raise ValueError(
+                                f"Fallback exceeds maximum of {max_entries} entries"
+                            )
+                        resolved.append({"user": own_user, "password": own_pw})
+                    sub_entries = _resolve_fallback_entries_internal(
+                        prof_fb,
+                        prof_map,
+                        max_entries=max_entries,
+                        _depth=_depth + 1,
+                        _visited=_visited | {ref_name},
+                    )
+                    for sub in sub_entries:
+                        if len(resolved) >= max_entries:
+                            raise ValueError(
+                                f"Fallback exceeds maximum of {max_entries} entries"
+                            )
+                        resolved.append(sub)
                 else:
-                    prof_obj = prof_map[ref_name]
-                    prof_fb = prof_obj.get("fallback") if isinstance(prof_obj, dict) else None
-                    if prof_fb not in (None, "", []):
-                        sub_entries = _resolve_fallback_entries_internal(
-                            prof_fb,
-                            prof_map,
-                            max_entries=max_entries,
-                            _depth=_depth + 1,
-                            _visited=_visited | {ref_name},
+                    if len(resolved) >= max_entries:
+                        raise ValueError(
+                            f"Fallback exceeds maximum of {max_entries} entries"
                         )
-                        for sub in sub_entries:
-                            if len(resolved) >= max_entries:
-                                raise ValueError(
-                                    f"Fallback exceeds maximum of {max_entries} entries"
-                                )
-                            resolved.append(sub)
-                    else:
-                        u = _resolve_profile_field(prof_map, ref_name, "user")
-                        p = _resolve_profile_field(prof_map, ref_name, "password")
-                        resolved.append({"user": u or "", "password": p if p is not None else ""})
+                    resolved.append({"user": own_user, "password": own_pw})
             else:
                 resolved.append({"user": "", "password": entry})
         elif isinstance(entry, dict):
             user_raw = entry.get("user", "")
             pw_raw = entry.get("password", "")
-            if isinstance(user_raw, str) and user_raw.startswith("@") and "+" not in user_raw:
-                user_res = _resolve_profile_field(prof_map, user_raw[1:], "user") or ""
+            if _is_profile_ref(user_raw):
+                u_val = _resolve_profile_field(
+                    prof_map, user_raw[1:], "user", depth=_depth, visited=_visited
+                )
+                user_res = str(u_val) if u_val not in (None, "") else ""
             else:
                 user_res = user_raw or ""
 
             if isinstance(pw_raw, (list, tuple)):
                 pw_res_list: list[str] = []
                 for p_item in pw_raw:
-                    if (
-                        isinstance(p_item, str)
-                        and p_item.startswith("@")
-                        and not p_item.startswith("compose:")
-                        and p_item[1:] in prof_map
-                    ):
-                        resolved_pw = _resolve_profile_field(prof_map, p_item[1:], "password")
+                    if _is_profile_ref(p_item):
+                        resolved_pw = _resolve_profile_field(
+                            prof_map, p_item[1:], "password", depth=_depth, visited=_visited
+                        )
                         if isinstance(resolved_pw, list):
-                            pw_res_list.extend(str(x) for x in resolved_pw)
-                        else:
-                            pw_res_list.append(str(resolved_pw or ""))
+                            pw_res_list.extend(str(x) for x in resolved_pw if x != "")
+                        elif resolved_pw not in (None, ""):
+                            pw_res_list.append(str(resolved_pw))
                     else:
                         pw_res_list.append(str(p_item))
+                if not pw_res_list:
+                    raise ValueError("Fallback entry password list resolved to empty")
                 pw_res: str | list[str] = pw_res_list
-            elif (
-                isinstance(pw_raw, str)
-                and pw_raw.startswith("@")
-                and not pw_raw.startswith("compose:")
-                and pw_raw[1:] in prof_map
-            ):
-                pw_res = _resolve_profile_field(prof_map, pw_raw[1:], "password")
-                if pw_res is None:
-                    pw_res = ""
+            elif _is_profile_ref(pw_raw):
+                resolved_pw = _resolve_profile_field(
+                    prof_map, pw_raw[1:], "password", depth=_depth, visited=_visited
+                )
+                pw_res = resolved_pw if resolved_pw is not None else ""
             else:
                 pw_res = pw_raw if pw_raw is not None else ""
 
@@ -996,8 +1090,7 @@ def resolve_fallback_entries(
     )
 
 
-def extract_profile_refs_from_value(value: Any) -> set[str]:
-    """Extract all @profile names referenced directly or via compose:/fallback in a value."""
+def _extract_profile_refs_internal(value: Any, seen: set[int]) -> set[str]:
     refs: set[str] = set()
     if isinstance(value, str):
         stripped = value.strip()
@@ -1005,17 +1098,32 @@ def extract_profile_refs_from_value(value: Any) -> set[str]:
             refs.update(extract_compose_profile_refs(stripped))
         elif stripped.startswith("@") and _PROFILE_REF_BODY_RE.fullmatch(stripped[1:]):
             refs.add(stripped[1:])
-        elif stripped.startswith(("[", "{")):
-            with suppress(ValueError, TypeError):
+        elif (
+            stripped.startswith(("[", "{"))
+            and len(stripped) <= MAX_JSON_INPUT_BYTES
+            and len(stripped.encode("utf-8", errors="replace")) <= MAX_JSON_INPUT_BYTES
+        ):
+            with suppress(ValueError, TypeError, RecursionError):
                 parsed = json.loads(stripped)
-                refs.update(extract_profile_refs_from_value(parsed))
-    elif isinstance(value, (list, tuple)):
-        for item in value:
-            refs.update(extract_profile_refs_from_value(item))
-    elif isinstance(value, dict):
-        for v in value.values():
-            refs.update(extract_profile_refs_from_value(v))
+                refs.update(_extract_profile_refs_internal(parsed, seen))
+    elif isinstance(value, (list, tuple, dict)):
+        obj_id = id(value)
+        if obj_id in seen:
+            return refs
+        seen.add(obj_id)
+        try:
+            items = value.values() if isinstance(value, dict) else value
+            for item in items:
+                with suppress(RecursionError):
+                    refs.update(_extract_profile_refs_internal(item, seen))
+        finally:
+            seen.discard(obj_id)
     return refs
+
+
+def extract_profile_refs_from_value(value: Any) -> set[str]:
+    """Extract all @profile names referenced directly or via compose:/fallback in a value."""
+    return _extract_profile_refs_internal(value, set())
 
 
 def validate_auth_budget_tags(tags: Any) -> None:
@@ -1164,8 +1272,17 @@ class AuthAttemptTracker:
         default_max_global_user_attempts: int | None = None,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
-        self._ttl_seconds = float(ttl_seconds)
-        self._max_entries = int(max_entries)
+        if isinstance(ttl_seconds, bool) or not isinstance(ttl_seconds, (int, float)):
+            raise TypeError(f"Invalid ttl_seconds: expected number > 0, got {ttl_seconds!r}")
+        ttl_val = float(ttl_seconds)
+        if not math.isfinite(ttl_val) or ttl_val <= 0:
+            raise ValueError(f"Invalid ttl_seconds: expected > 0, got {ttl_seconds!r}")
+        if isinstance(max_entries, bool) or not isinstance(max_entries, int):
+            raise TypeError(f"Invalid max_entries: expected int >= 1, got {max_entries!r}")
+        if max_entries < 1:
+            raise ValueError(f"Invalid max_entries: expected >= 1, got {max_entries!r}")
+        self._ttl_seconds = ttl_val
+        self._max_entries = max_entries
         self._default_max_host_attempts = int(default_max_host_attempts)
         self._default_max_hop_attempts = int(default_max_hop_attempts)
         self._default_max_global_user_attempts = default_max_global_user_attempts
@@ -1209,44 +1326,83 @@ class AuthAttemptTracker:
             return entry
         return None
 
+    def _can_acquire_unlocked(self, key: Any, limit: int, now: float) -> bool:
+        if limit <= 0:
+            return False
+        entry = self._get_live_entry_unlocked(key, now)
+        if entry is None:
+            return True
+        if entry.count >= limit:
+            entry.limit = limit
+            if key in self._unblocked:
+                del self._unblocked[key]
+                self._blocked[key] = entry
+            return False
+        return True
+
+    def _commit_acquire_unlocked(self, key: Any, limit: int, now: float) -> None:
+        entry = self._get_live_entry_unlocked(key, now)
+        if entry is None:
+            self._evict_if_full_unlocked(now)
+            new_entry = _BudgetEntry(count=1, limit=limit, last_ts=now)
+            if 1 >= limit:
+                self._blocked[key] = new_entry
+            else:
+                self._unblocked[key] = new_entry
+            return
+
+        entry.count += 1
+        entry.limit = limit
+        entry.last_ts = now
+        if entry.count >= limit:
+            if key in self._unblocked:
+                del self._unblocked[key]
+            self._blocked[key] = entry
+            self._blocked.move_to_end(key)
+        else:
+            if key in self._blocked:
+                del self._blocked[key]
+            self._unblocked[key] = entry
+            self._unblocked.move_to_end(key)
+
     def try_acquire(self, key: Any, *, limit: int) -> bool:
         """Attempt to consume 1 attempt slot for key within limit. Returns False if exhausted."""
         if limit <= 0:
             return False
         now = self._clock()
         with self._lock:
-            entry = self._get_live_entry_unlocked(key, now)
-            if entry is None:
-                self._evict_if_full_unlocked(now)
-                new_count = 1
-                new_entry = _BudgetEntry(count=new_count, limit=limit, last_ts=now)
-                if new_count >= limit:
-                    self._blocked[key] = new_entry
-                else:
-                    self._unblocked[key] = new_entry
-                return True
-
-            if entry.count >= limit:
-                entry.limit = limit
-                if key in self._unblocked:
-                    del self._unblocked[key]
-                    self._blocked[key] = entry
+            if not self._can_acquire_unlocked(key, limit, now):
                 return False
-
-            entry.count += 1
-            entry.limit = limit
-            entry.last_ts = now
-            if entry.count >= limit:
-                if key in self._unblocked:
-                    del self._unblocked[key]
-                self._blocked[key] = entry
-                self._blocked.move_to_end(key)
-            else:
-                if key in self._blocked:
-                    del self._blocked[key]
-                self._unblocked[key] = entry
-                self._unblocked.move_to_end(key)
+            self._commit_acquire_unlocked(key, limit, now)
             return True
+
+    def try_acquire_target_attempt(
+        self,
+        *,
+        host: str,
+        port: str = "",
+        protocol: str = "ssh",
+        user: str = "",
+        host_limit: int | None = None,
+        user_limit: int | None = None,
+    ) -> tuple[bool, str | None]:
+        """Atomically verify and consume both user and host attempt slots under one lock."""
+        eff_host_limit = self._default_max_host_attempts if host_limit is None else int(host_limit)
+        eff_user_limit = self._default_max_global_user_attempts if user_limit is None else user_limit
+        host_key = self._host_key(host, port, protocol)
+        user_key = self._user_key(user) if (user and eff_user_limit is not None) else None
+        now = self._clock()
+        with self._lock:
+            if user_key is not None and not self._can_acquire_unlocked(
+                user_key, int(eff_user_limit), now
+            ):
+                return False, "USER_BUDGET_EXHAUSTED"
+            if not self._can_acquire_unlocked(host_key, eff_host_limit, now):
+                return False, "HOST_BUDGET_EXHAUSTED"
+            if user_key is not None:
+                self._commit_acquire_unlocked(user_key, int(eff_user_limit), now)
+            self._commit_acquire_unlocked(host_key, eff_host_limit, now)
+            return True, None
 
     def remaining(self, key: Any, *, limit: int) -> int:
         """Return remaining attempt quota for key."""

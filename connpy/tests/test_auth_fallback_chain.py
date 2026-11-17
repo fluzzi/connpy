@@ -897,6 +897,7 @@ def test_sanitized_auth_error_pickle_and_dynamic_traceback_clearing() -> None:
 
     assert sanitized_err is not None
     assert sanitized_err.__cause__ is None
+    assert sanitized_err.__context__ is None
     assert sanitized_err.__suppress_context__ is True
     formatted = "".join(
         traceback.format_exception(type(sanitized_err), sanitized_err, sanitized_err.__traceback__)
@@ -907,6 +908,24 @@ def test_sanitized_auth_error_pickle_and_dynamic_traceback_clearing() -> None:
     # Original exception's frames were cleared cleanly
     assert orig_exc is not None
     assert orig_exc.__traceback__ is None
+
+    # Exiting except before raising also keeps __context__ None at VM level
+    pending_err: SanitizedAuthError | None = None
+    captured_outer: SanitizedAuthError | None = None
+    try:
+        try:
+            _boom()
+        except ValueError as exc:
+            pending_err = sanitize_exception(exc, code="AUTH_FAILED", secrets=[secret_token])
+        if pending_err is not None:
+            pending_err.__context__ = None
+            raise pending_err from None
+    except SanitizedAuthError as outer:
+        captured_outer = outer
+    assert captured_outer is not None
+    assert captured_outer.__context__ is None
+    assert captured_outer.__cause__ is None
+    assert captured_outer.__suppress_context__ is True
 
 
 def test_ast_allowlist_and_no_raw_traceback_or_stdin_in_auth_surfaces() -> None:
@@ -1414,3 +1433,249 @@ def test_nodes_group_fallback_tracking(tmp_path: Path, monkeypatch: pytest.Monke
         executor.run(["show version"], parallel=1)
     assert executor.status["n1"] == 0
     assert executor.fallback_used == {"n1": True}
+
+
+def test_signoff_fallback_inheritance_fail_closed_json_masking_and_atomic_budgets(
+    tmp_path: Path,
+) -> None:
+    # 1a. @profile in fallback with own credentials + sub-fallback emits own first then sub-entries
+    profiles_combo = {
+        "tac_combo": {"user": "tac_u", "password": "tac_p", "fallback": ["@bak1", "@bak2"]},
+        "bak1": {"user": "b1_u", "password": "b1_p"},
+        "bak2": {"user": "b2_u", "password": "b2_p"},
+        "empty_chain": {"user": "", "password": "", "fallback": ["@bak1"]},
+        "cyc_a": {"user": "@cyc_b", "password": "p"},
+        "cyc_b": {"user": "@cyc_a", "password": "p"},
+    }
+    res_combo = resolve_fallback_entries(["@tac_combo"], profiles_combo)
+    assert res_combo == [
+        {"user": "tac_u", "password": "tac_p"},
+        {"user": "b1_u", "password": "b1_p"},
+        {"user": "b2_u", "password": "b2_p"},
+    ]
+    assert resolve_fallback_entries(["@empty_chain"], profiles_combo) == [
+        {"user": "b1_u", "password": "b1_p"}
+    ]
+
+    # Combined own + sub-fallback > MAX_FALLBACK_ENTRIES (5) fails closed
+    profiles_cap = {
+        "own_plus_4": {
+            "user": "u0",
+            "password": "p0",
+            "fallback": [{"user": f"u{i}", "password": f"p{i}"} for i in range(1, 5)],
+        },
+        "own_plus_5": {
+            "user": "u0",
+            "password": "p0",
+            "fallback": [{"user": f"u{i}", "password": f"p{i}"} for i in range(1, 6)],
+        },
+    }
+    assert len(resolve_fallback_entries(["@own_plus_4"], profiles_cap)) == MAX_FALLBACK_ENTRIES
+    with pytest.raises(ValueError, match="exceeds maximum"):
+        resolve_fallback_entries(["@own_plus_5"], profiles_cap)
+
+    # 1b. configfile.getitem(extract=True) inherits fallback from primary @profile when node omits it
+    cfg = _make_config(
+        tmp_path,
+        {
+            "profiles": {
+                "default": {
+                    "host": "",
+                    "protocol": "ssh",
+                    "port": "",
+                    "user": "",
+                    "password": "",
+                    "options": "",
+                    "logs": "",
+                    "tags": "",
+                    "jumphost": "",
+                    "fallback": "",
+                },
+                "tacacs": {
+                    "host": "",
+                    "protocol": "ssh",
+                    "port": "",
+                    "user": "tac_u",
+                    "password": "tac_secret_password",
+                    "options": "",
+                    "logs": "",
+                    "tags": "",
+                    "jumphost": "",
+                    "fallback": ["@local_bak"],
+                },
+                "local_bak": {
+                    "host": "",
+                    "protocol": "ssh",
+                    "port": "",
+                    "user": "loc_u",
+                    "password": "loc_secret_password",
+                    "options": "",
+                    "logs": "",
+                    "tags": "",
+                    "jumphost": "",
+                    "fallback": "",
+                },
+            }
+        },
+    )
+    cfg._connections_add(id="r_inherit", host="10.0.0.10", user="@tacacs", password="@tacacs")
+    cfg._connections_add(
+        id="r_pw_inherit",
+        host="10.0.0.11",
+        user="custom_u",
+        password="@tacacs",
+    )
+    cfg._connections_add(
+        id="r_explicit_fb",
+        host="10.0.0.12",
+        user="@tacacs",
+        password="@tacacs",
+        fallback=[{"user": "override_u", "password": "override_pw"}],
+    )
+    cfg._saveconfig(cfg.file)
+
+    ext_inherit = cfg.getitem("r_inherit", extract=True)
+    assert ext_inherit["user"] == "tac_u"
+    assert ext_inherit["password"] == "tac_secret_password"
+    assert ext_inherit["tags"]["_fallback"] == [
+        {"user": "loc_u", "password": "loc_secret_password"}
+    ]
+    assert "tags" not in cfg.connections["r_inherit"] or "_fallback" not in str(
+        cfg.connections["r_inherit"].get("tags", "")
+    )
+    n_inherit = NodeClass("r_inherit", **ext_inherit, config=cfg)
+    assert [c.user for c in n_inherit._auth_candidates] == ["tac_u", "loc_u"]
+    assert [c.is_fallback for c in n_inherit._auth_candidates] == [False, True]
+
+    ext_pw = cfg.getitem("r_pw_inherit", extract=True)
+    assert ext_pw["tags"]["_fallback"] == [{"user": "loc_u", "password": "loc_secret_password"}]
+    ext_exp = cfg.getitem("r_explicit_fb", extract=True)
+    assert ext_exp["tags"]["_fallback"] == [{"user": "override_u", "password": "override_pw"}]
+
+    # 2. Fail-closed on missing refs, cycles, depth, rsa_blob without decrypt_fn, and empty list passwords
+    for bad_fb in (
+        ["@missing"],
+        [{"user": "@missing", "password": "pw"}],
+        [{"user": "u", "password": "@missing"}],
+        [{"user": "u", "password": ["@missing"]}],
+    ):
+        with pytest.raises(ValueError):
+            resolve_fallback_entries(bad_fb, profiles_combo)
+
+    with pytest.raises(ValueError, match="Circular"):
+        auth_utils._resolve_profile_field(profiles_combo, "cyc_a", "user")
+    with pytest.raises(ValueError, match="Circular"):
+        auth_utils._resolve_profile_field({"p": {"password": "x"}}, "p", "password", depth=MAX_PROFILE_DEPTH)
+
+    rsa_blob = _encrypt_with_config(cfg, "RSA_SECRET")
+    with pytest.raises(SanitizedAuthError) as exc_rsa:
+        parse_compose_expression(f"compose:{rsa_blob}+'1'", profiles=cfg.profiles, decrypt_fn=None)
+    assert exc_rsa.value.code == "NO_CREDS"
+
+    with pytest.raises(SanitizedAuthError) as exc_rsa_prof:
+        parse_compose_expression(
+            "compose:@rsa_prof",
+            profiles={"rsa_prof": {"password": rsa_blob}},
+            decrypt_fn=None,
+        )
+    assert exc_rsa_prof.value.code == "NO_CREDS"
+
+    with pytest.raises(ValueError, match="non-empty strings"):
+        validate_fallback_entries([{"user": "u", "password": ["ok", ""]}])
+
+    # Literal @foo+bar still allowed inside fallback entries
+    assert resolve_fallback_entries([{"user": "u", "password": "@foo+bar"}], {}) == [
+        {"user": "u", "password": "@foo+bar"}
+    ]
+
+    # 3. Control chars stripped BEFORE redacting (< 4 char + split secrets) & __context__ is None on compose decrypt error
+    assert sanitize_log_message("pw=p\x071\x1b[31m ok", secrets=["p1"]) == "pw=*** ok"
+    assert (
+        sanitize_log_message("pw=Sec\x00\nRet99\x1b[32m!", secrets=["SecRet99"]) == "pw=***!"
+    )
+
+    def _bad_decrypt(_blob: str) -> str:
+        secret = "InnerKeySecret#99"
+        raise RuntimeError(f"decrypt error {secret}")
+
+    with pytest.raises(SanitizedAuthError) as dec_err_info:
+        parse_compose_expression(f"compose:{rsa_blob}", profiles={}, decrypt_fn=_bad_decrypt)
+    assert dec_err_info.value.__context__ is None
+    assert dec_err_info.value.__cause__ is None
+    assert dec_err_info.value.__suppress_context__ is True
+    assert "InnerKeySecret" not in str(dec_err_info.value)
+
+    # 4. RecursionError protection on deep JSON & literal passwords starting with '[' or '{'
+    deep_json = "[" * 1500 + "1" + "]" * 1500
+    with pytest.raises(ValueError):
+        validate_json_depth_and_size(deep_json)
+
+    deep_ref_json = "[" * 1500 + '"@tacacs"' + "]" * 1500
+    assert extract_profile_refs_from_value(deep_ref_json) == set()
+
+    assert validate_fallback_entries("{Admin}123") == ["{Admin}123"]
+    assert validate_fallback_entries("[Pa$$") == ["[Pa$$"]
+    with pytest.raises(ValueError):
+        validate_fallback_entries("[[[[[1]]]]]")
+    with pytest.raises(ValueError):
+        validate_fallback_entries("[" + "a" * 9000)
+
+    # 5a. mask_node_secrets masks tags._fallback from fresh getitem(extract=True)
+    masked_extracted = mask_node_secrets(cfg.getitem("r_inherit", extract=True))
+    assert masked_extracted["password"] == "***"
+    assert masked_extracted["tags"]["_fallback"] == [{"user": "loc_u", "password": "***"}]
+
+    # 5b. AuthAttemptTracker parameter validation & atomic multi-budget acquisition
+    for bad_ttl in (0, -5, float("nan"), float("inf")):
+        with pytest.raises(ValueError):
+            AuthAttemptTracker(ttl_seconds=bad_ttl)
+    for bad_bool_ttl in (True, False, "10"):
+        with pytest.raises(TypeError):
+            AuthAttemptTracker(ttl_seconds=bad_bool_ttl)
+    for bad_entries in (0, -1):
+        with pytest.raises(ValueError):
+            AuthAttemptTracker(max_entries=bad_entries)
+    for bad_bool_entries in (True, False, "5"):
+        with pytest.raises(TypeError):
+            AuthAttemptTracker(max_entries=bad_bool_entries)
+
+    # Exhaust host budget first -> trying (user='shared_u', host='locked.host') must NOT consume user budget
+    t_atomic = AuthAttemptTracker(default_max_host_attempts=1, default_max_global_user_attempts=1)
+    assert t_atomic.try_acquire_host("locked.host", "22", "ssh", limit=1) is True
+    assert t_atomic.remaining_user("shared_u", limit=1) == 1
+
+    ok, code = t_atomic.try_acquire_target_attempt(
+        host="locked.host",
+        port="22",
+        protocol="ssh",
+        user="shared_u",
+        host_limit=1,
+        user_limit=1,
+    )
+    assert ok is False
+    assert code == "HOST_BUDGET_EXHAUSTED"
+    assert t_atomic.remaining_user("shared_u", limit=1) == 1
+
+    # Full _connect flow: host exhausted must return HOST_BUDGET_EXHAUSTED and leave shared_u intact
+    n_locked = NodeClass(
+        "r_locked",
+        host="locked.host",
+        port="22",
+        user="shared_u",
+        password="secret_pw",
+        tags={"max_total_auth_attempts": 1, "max_global_user_attempts": 1},
+    )
+
+    def _spawn_prompt(*_a, **_kw):
+        ch = _make_mock_child(
+            expect_fn=lambda _p, timeout=None: (
+                setattr(ch, "after", b"Password:"),
+                8,
+            )[-1]
+        )
+        return ch
+
+    with patch("connpy.core.pexpect.spawn", side_effect=_spawn_prompt):
+        res_locked = n_locked._connect(unattended=True, attempt_tracker=t_atomic)
+    assert "[HOST_BUDGET_EXHAUSTED]" in str(res_locked)
+    assert t_atomic.remaining_user("shared_u", limit=1) == 1

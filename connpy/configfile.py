@@ -14,6 +14,7 @@ import yaml
 
 from . import printer
 from .auth_utils import (
+    MAX_PROFILE_DEPTH,
     SanitizedAuthError,
     extract_profile_refs_from_value,
     is_compose_expression,
@@ -607,8 +608,43 @@ class configfile:
             return sub if sub is not None else ""
         return deepcopy(val)
 
+    def _find_inherited_profile_fallback_unlocked(self, raw_user, raw_pw):
+        """Inherit fallback from a primary @profile referenced by node user/password."""
+        for candidate_val, field in ((raw_user, "user"), (raw_pw, "password")):
+            if (
+                isinstance(candidate_val, str)
+                and not is_compose_expression(candidate_val)
+                and candidate_val.startswith("@")
+                and "+" not in candidate_val
+            ):
+                prof_name = candidate_val[1:]
+                visited = set()
+                while prof_name and prof_name not in visited and len(visited) < MAX_PROFILE_DEPTH:
+                    visited.add(prof_name)
+                    prof = self.profiles.get(prof_name)
+                    if not isinstance(prof, dict):
+                        break
+                    prof_fb = prof.get("fallback")
+                    if prof_fb in (None, "", []) and isinstance(prof.get("tags"), dict):
+                        prof_fb = prof["tags"].get("fallback")
+                    if prof_fb not in (None, "", []):
+                        return deepcopy(prof_fb)
+                    next_val = prof.get(field)
+                    if (
+                        isinstance(next_val, str)
+                        and not is_compose_expression(next_val)
+                        and next_val.startswith("@")
+                        and "+" not in next_val
+                    ):
+                        prof_name = next_val[1:]
+                    else:
+                        break
+        return None
+
     def _extract_node_fields_unlocked(self, node_dict):
         """Resolve @profile references on a copied node dict, keeping legacy core.node(**cfg) contract."""
+        raw_user = node_dict.get("user")
+        raw_pw = node_dict.get("password")
         raw_fb = node_dict.pop("fallback", None)
 
         for key, value in list(node_dict.items()):
@@ -650,6 +686,13 @@ class configfile:
             elif value == "" and key == "protocol":
                 default_proto = self.profiles.get("default", {}).get("protocol", "ssh")
                 node_dict[key] = default_proto if default_proto else "ssh"
+
+        tags_fb_present = (
+            isinstance(node_dict.get("tags"), dict)
+            and node_dict["tags"].get("fallback") not in (None, "", [])
+        )
+        if raw_fb in (None, "", []) and not tags_fb_present:
+            raw_fb = self._find_inherited_profile_fallback_unlocked(raw_user, raw_pw)
 
         resolved_fb = []
         if raw_fb not in (None, "", []):
