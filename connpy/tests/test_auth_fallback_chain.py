@@ -2927,6 +2927,12 @@ def test_context_regex_parity_case_cache_and_dirty_recovery(tmp_path: Path) -> N
 
     # case=False parity between ContextService and configfile cache filter
     assert ctx_svc.matches_active_context("prod-1") is True
+    ctx_svc.set_active_context("all")
+    assert Path(cfg.fzf_cachefile).read_text(encoding="utf-8").splitlines() == ["prod-1", "dev-1"]
+    ctx_svc.set_active_context("upper")
+    assert Path(cfg.fzf_cachefile).read_text(encoding="utf-8").splitlines() == ["prod-1"]
+    assert Path(cfg.folders_cachefile).read_text(encoding="utf-8").splitlines() == ["@ProdFolder"]
+
     cfg._generate_nodes_cache(nodes=["prod-1", "dev-1"], folders=["@ProdFolder", "@Other"])
     assert Path(cfg.fzf_cachefile).read_text(encoding="utf-8").splitlines() == ["prod-1"]
     assert Path(cfg.folders_cachefile).read_text(encoding="utf-8").splitlines() == ["@ProdFolder"]
