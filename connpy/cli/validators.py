@@ -1,5 +1,19 @@
-import re
 import ast
+import json
+import re
+
+from ..auth_utils import (
+    MAX_FALLBACK_ENTRIES,
+    MAX_JSON_INPUT_BYTES,
+    MAX_JSON_INPUT_DEPTH,
+    SanitizedAuthError,
+    is_compose_expression,
+    validate_auth_budget_tags,
+    validate_compose_syntax,
+    validate_fallback_entries,
+    validate_json_depth_and_size,
+)
+
 
 def _raise_val_err(reason):
     import inquirer
@@ -56,10 +70,40 @@ class Validators:
         return True
 
     def pass_validation(self, answers, current, regex = "(^@.+$)"):
+        if is_compose_expression(current):
+            try:
+                validate_compose_syntax(current)
+            except SanitizedAuthError as exc:
+                _raise_val_err(str(exc))
+            return True
         profiles = current.split(",")
         for i in profiles:
             if not re.match(regex, i) or i[1:] not in self.app.profiles:
                 _raise_val_err("Profile {} don't exist".format(i))
+        return True
+
+    def _validate_tags_dict(self, current: str):
+        if len(current.encode("utf-8", errors="replace")) > MAX_JSON_INPUT_BYTES:
+            _raise_val_err(f"Tags exceed maximum size of {MAX_JSON_INPUT_BYTES} bytes")
+        parsed = None
+        try:
+            parsed = json.loads(current)
+        except (ValueError, TypeError):
+            try:
+                parsed = ast.literal_eval(current)
+            except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):
+                parsed = None
+        if not isinstance(parsed, dict):
+            _raise_val_err("Tags should be a python dictionary.")
+        try:
+            validate_json_depth_and_size(
+                parsed,
+                max_bytes=MAX_JSON_INPUT_BYTES,
+                max_depth=MAX_JSON_INPUT_DEPTH,
+            )
+            validate_auth_budget_tags(parsed)
+        except (ValueError, TypeError, SanitizedAuthError) as exc:
+            _raise_val_err(str(exc))
         return True
 
     def tags_validation(self, answers, current):
@@ -67,24 +111,39 @@ class Validators:
             if current[1:] not in self.app.profiles:
                 _raise_val_err("Profile {} don't exist".format(current))
         elif current != "":
-            isdict = False
-            try:
-                isdict = ast.literal_eval(current)
-            except Exception:
-                pass
-            if not isinstance (isdict, dict):
-                _raise_val_err("Tags should be a python dictionary.".format(current))
+            return self._validate_tags_dict(current)
         return True
 
     def profile_tags_validation(self, answers, current):
         if current != "":
-            isdict = False
-            try:
-                isdict = ast.literal_eval(current)
-            except Exception:
-                pass
-            if not isinstance (isdict, dict):
-                _raise_val_err("Tags should be a python dictionary.".format(current))
+            return self._validate_tags_dict(current)
+        return True
+
+    def fallback_validation(self, answers, current):
+        if current in (None, ""):
+            return True
+        stripped = str(current).strip()
+        if not stripped:
+            return True
+        if len(stripped.encode("utf-8", errors="replace")) > MAX_JSON_INPUT_BYTES:
+            _raise_val_err(f"Fallback exceeds maximum size of {MAX_JSON_INPUT_BYTES} bytes")
+        if stripped.startswith("@") and "+" not in stripped:
+            if stripped[1:] not in self.app.profiles:
+                _raise_val_err(f"Profile {stripped} don't exist")
+            return True
+        try:
+            if is_compose_expression(stripped):
+                validate_compose_syntax(stripped)
+                return True
+            if stripped.startswith(("[", "{")):
+                validate_json_depth_and_size(
+                    stripped,
+                    max_bytes=MAX_JSON_INPUT_BYTES,
+                    max_depth=MAX_JSON_INPUT_DEPTH,
+                )
+            validate_fallback_entries(stripped, max_entries=MAX_FALLBACK_ENTRIES)
+        except (ValueError, TypeError, SanitizedAuthError) as exc:
+            _raise_val_err(str(exc))
         return True
 
     def jumphost_validation(self, answers, current):
