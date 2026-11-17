@@ -248,9 +248,26 @@ def _build_tree(nodes, folders, profiles, plugins, configdir):
         "--fzf-wrapper": ["bash", "zsh"],
         "--service-mode": ["local", "remote"],
         "--sync-remote": ["true", "false"],
+        "--disable-fallback-on-insecure-hostkey": ["true", "false"],
         "--help": None, "-h": None,
     }
-    for opt in ["--keepalive", "--engineer-model", "--engineer-api-key", "--architect-model", "--architect-api-key", "--theme", "--remote", "--trusted-commands", "--shell-command", "--shell-prompt", "--shell-os"]:
+    for opt in [
+        "--keepalive",
+        "--engineer-model",
+        "--engineer-api-key",
+        "--architect-model",
+        "--architect-api-key",
+        "--theme",
+        "--remote",
+        "--trusted-commands",
+        "--shell-command",
+        "--shell-prompt",
+        "--shell-os",
+        "--max-auth-prompts",
+        "--max-total-auth-attempts",
+        "--max-hop-host-attempts",
+        "--max-global-user-attempts",
+    ]:
         config_dict[opt] = {"*": config_dict}
     config_dict["--configfolder"] = {"__extra__": lambda w: get_cwd(w, "--configfolder", True), "*": config_dict}
     config_dict["--engineer-auth"] = {"__extra__": lambda w: get_cwd(w, "--engineer-auth"), "*": config_dict}
