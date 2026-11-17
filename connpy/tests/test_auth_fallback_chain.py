@@ -2322,6 +2322,9 @@ def test_fallback_comma_separated_profiles_validation_parsing_resolution_and_pro
         validators.fallback_validation({}, "@sdnc,")
 
     with pytest.raises(inquirer.errors.ValidationError):
+        validators.fallback_validation({}, "@sdnc, , @local")
+
+    with pytest.raises(inquirer.errors.ValidationError):
         validators.fallback_validation({}, "@sdnc, local")
 
     assert _parse_fallback_input("@sdnc, @local") == ["@sdnc", "@local"]
@@ -2333,6 +2336,8 @@ def test_fallback_comma_separated_profiles_validation_parsing_resolution_and_pro
     assert validate_fallback_entries("@@Pass,WithComma") == ["@@Pass,WithComma"]
     with pytest.raises(ValueError):
         validate_fallback_entries("@sdnc,")
+    with pytest.raises(ValueError):
+        validate_fallback_entries("@sdnc, , @local")
     with pytest.raises(ValueError):
         validate_fallback_entries("@sdnc, local")
     with pytest.raises(ValueError):
@@ -2348,6 +2353,7 @@ def test_fallback_comma_separated_profiles_validation_parsing_resolution_and_pro
     ]
 
     assert extract_profile_refs_from_value({"fallback": "@sdnc, @local"}) == {"sdnc", "local"}
+    assert extract_profile_refs_from_value({"fallback": "@@Pass,WithComma"}) == set()
 
     cfg = _make_config(
         tmp_path,
@@ -2372,7 +2378,55 @@ def test_fallback_comma_separated_profiles_validation_parsing_resolution_and_pro
             },
         },
     )
+    ext_comma = cfg.getitem("router1", extract=True)
+    assert ext_comma["tags"]["_fallback"] == [
+        {"user": "sdnc_u", "password": "sdnc_p"},
+        {"user": "local_u", "password": "local_p"},
+    ]
+    n_comma = NodeClass("router1", **ext_comma, config=cfg)
+    assert [(c.user, c.password_spec, c.is_fallback) for c in n_comma._auth_candidates] == [
+        ("tacacs_u", "tacacs_p", False),
+        ("sdnc_u", "sdnc_p", True),
+        ("local_u", "local_p", True),
+    ]
+
     p_svc = ProfileService(cfg)
     for used_name in ("sdnc", "local"):
         with pytest.raises(InvalidConfigurationError):
             p_svc.delete_profile(used_name)
+
+    forms_app = MagicMock()
+    forms_app.config = cfg
+    forms_app.profiles = list(cfg.profiles.keys())
+    forms_app.nodes_list = ["router1"]
+    forms_app.services = ServiceProvider(cfg)
+    forms_comma = Forms(forms_app)
+    seen_fb_msgs: list[str] = []
+    prompt_seq = iter([
+        {
+            "host": "10.0.0.2",
+            "protocol": "ssh",
+            "port": "22",
+            "options": "",
+            "logs": "",
+            "tags": "",
+            "jumphost": "",
+            "user": "tacacs_u",
+            "password": "No Password",
+        },
+        {"fallback": "@sdnc, @local"},
+    ])
+
+    def _cap_fb_prompt(qs, **_kw):
+        for q in qs:
+            if q.name == "fallback":
+                seen_fb_msgs.append(str(q.message))
+        return next(prompt_seq)
+
+    with patch("inquirer.prompt", side_effect=_cap_fb_prompt):
+        form_res = forms_comma.questions_nodes("r_comma", uniques={"type": "connection"})
+    assert isinstance(form_res, dict)
+    assert form_res["fallback"] == ["@sdnc", "@local"]
+    assert seen_fb_msgs == [
+        "Add fallback credentials (@profile, @p1,@p2, JSON list/dict, or compose:)"
+    ]
