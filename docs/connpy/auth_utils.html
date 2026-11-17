@@ -86,6 +86,78 @@ el.replaceWith(d);
 </details>
 <div class="desc"><p>Clear local variables on all frames in an exception's traceback chain.</p></div>
 </dd>
+<dt id="connpy.auth_utils.compile_active_context_patterns"><code class="name flex">
+<span>def <span class="ident">compile_active_context_patterns</span></span>(<span>cfg_dict: Any, *, strict: bool = False) ‑> list[re.Pattern[str]]</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def compile_active_context_patterns(
+    cfg_dict: Any,
+    *,
+    strict: bool = False,
+) -&gt; list[re.Pattern[str]]:
+    &#34;&#34;&#34;Compile active context regexes purely respecting cfg_dict[&#39;case&#39;].&#34;&#34;&#34;
+    patterns, _ = compile_active_context_patterns_with_status(cfg_dict, strict=strict)
+    return patterns</code></pre>
+</details>
+<div class="desc"><p>Compile active context regexes purely respecting cfg_dict['case'].</p></div>
+</dd>
+<dt id="connpy.auth_utils.compile_active_context_patterns_with_status"><code class="name flex">
+<span>def <span class="ident">compile_active_context_patterns_with_status</span></span>(<span>cfg_dict: Any, *, strict: bool = False) ‑> tuple[list[re.Pattern[str]], bool]</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def compile_active_context_patterns_with_status(
+    cfg_dict: Any,
+    *,
+    strict: bool = False,
+) -&gt; tuple[list[re.Pattern[str]], bool]:
+    &#34;&#34;&#34;Compile active context regexes purely, returning (patterns, had_error).&#34;&#34;&#34;
+    if is_default_all_context_cfg(cfg_dict):
+        return ([re.compile(&#34;.*&#34;)], False)
+
+    current_ctx = cfg_dict.get(&#34;current_context&#34;, &#34;all&#34;)
+    contexts = cfg_dict.get(&#34;contexts&#34;, {&#34;all&#34;: [&#34;.*&#34;]})
+    raw_patterns = contexts.get(current_ctx, [&#34;.*&#34;]) if isinstance(contexts, dict) else [&#34;.*&#34;]
+    flags = 0 if cfg_dict.get(&#34;case&#34;, False) else re.IGNORECASE
+
+    if not isinstance(raw_patterns, list):
+        if strict:
+            raise ValueError(&#34;Context regexes must be a list&#34;)
+        return ([], True)
+
+    had_error = False
+    if len(raw_patterns) &gt; MAX_CONTEXT_REGEXES:
+        if strict:
+            raise ValueError(f&#34;Context exceeds maximum of {MAX_CONTEXT_REGEXES} regexes&#34;)
+        had_error = True
+        raw_patterns = raw_patterns[:MAX_CONTEXT_REGEXES]
+
+    patterns: list[re.Pattern[str]] = []
+    for pat in raw_patterns:
+        if not isinstance(pat, str) or not pat or len(pat) &gt; MAX_CONTEXT_PATTERN_LEN:
+            if strict:
+                raise ValueError(
+                    f&#34;Context pattern must be a non-empty string up to {MAX_CONTEXT_PATTERN_LEN} chars&#34;
+                )
+            had_error = True
+            continue
+        try:
+            patterns.append(re.compile(pat, flags))
+        except re.error as exc:
+            if strict:
+                raise ValueError(f&#34;Invalid context regex {pat!r}: {exc}&#34;) from None
+            had_error = True
+    return (patterns, had_error)</code></pre>
+</details>
+<div class="desc"><p>Compile active context regexes purely, returning (patterns, had_error).</p></div>
+</dd>
 <dt id="connpy.auth_utils.extract_compose_profile_refs"><code class="name flex">
 <span>def <span class="ident">extract_compose_profile_refs</span></span>(<span>expr: str) ‑> set[str]</span>
 </code></dt>
@@ -194,6 +266,28 @@ el.replaceWith(d);
 </details>
 <div class="desc"><p>Return True if value is a string with the explicit compose: prefix.</p></div>
 </dd>
+<dt id="connpy.auth_utils.is_default_all_context_cfg"><code class="name flex">
+<span>def <span class="ident">is_default_all_context_cfg</span></span>(<span>cfg_dict: Any) ‑> bool</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def is_default_all_context_cfg(cfg_dict: Any) -&gt; bool:
+    &#34;&#34;&#34;Return True when config uses the default unrestricted &#39;all&#39; context.&#34;&#34;&#34;
+    if not isinstance(cfg_dict, dict):
+        return True
+    current_ctx = cfg_dict.get(&#34;current_context&#34;, &#34;all&#34;)
+    if current_ctx != &#34;all&#34;:
+        return False
+    contexts = cfg_dict.get(&#34;contexts&#34;, {&#34;all&#34;: [&#34;.*&#34;]})
+    if not isinstance(contexts, dict):
+        return True
+    return contexts.get(&#34;all&#34;, [&#34;.*&#34;]) == [&#34;.*&#34;]</code></pre>
+</details>
+<div class="desc"><p>Return True when config uses the default unrestricted 'all' context.</p></div>
+</dd>
 <dt id="connpy.auth_utils.is_rsa_blob"><code class="name flex">
 <span>def <span class="ident">is_rsa_blob</span></span>(<span>value: Any) ‑> bool</span>
 </code></dt>
@@ -280,6 +374,22 @@ el.replaceWith(d);
     return _recurse(obj)</code></pre>
 </details>
 <div class="desc"><p>Recursively mask sensitive node/profile credentials with '***' using a closed key list.</p></div>
+</dd>
+<dt id="connpy.auth_utils.match_active_context_patterns"><code class="name flex">
+<span>def <span class="ident">match_active_context_patterns</span></span>(<span>name: Any, patterns: Iterable[re.Pattern[str]]) ‑> bool</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def match_active_context_patterns(name: Any, patterns: Iterable[re.Pattern[str]]) -&gt; bool:
+    &#34;&#34;&#34;Return True if non-empty string name matches at least one compiled context regex.&#34;&#34;&#34;
+    if not isinstance(name, str) or not name:
+        return False
+    return any(p.match(name) for p in patterns)</code></pre>
+</details>
+<div class="desc"><p>Return True if non-empty string name matches at least one compiled context regex.</p></div>
 </dd>
 <dt id="connpy.auth_utils.normalize_prompt_line"><code class="name flex">
 <span>def <span class="ident">normalize_prompt_line</span></span>(<span>before_bytes: bytes, after_bytes: bytes) ‑> str</span>
@@ -628,9 +738,17 @@ el.replaceWith(d);
             return []
         if stripped.startswith((&#34;[&#34;, &#34;{&#34;)):
             parsed = validate_json_depth_and_size(stripped)
+        elif stripped.startswith(&#34;compose:&#34;):
+            validate_compose_syntax(stripped)
+            return [stripped]
+        elif stripped.startswith(&#34;@&#34;) and not stripped.startswith(&#34;@@&#34;) and &#34;,&#34; in stripped:
+            parts = [p.strip() for p in stripped.split(&#34;,&#34;)]
+            if not parts or any(not _is_profile_ref(p) for p in parts):
+                raise ValueError(
+                    &#34;Comma-separated fallback entries must be valid @profile references&#34;
+                )
+            parsed = parts
         else:
-            if stripped.startswith(&#34;compose:&#34;):
-                validate_compose_syntax(stripped)
             return [stripped]
 
     if isinstance(parsed, dict):
@@ -1439,13 +1557,17 @@ class RuntimeAuthCandidate:
 <li><h3><a href="#header-functions">Functions</a></h3>
 <ul class="">
 <li><code><a title="connpy.auth_utils.clear_exception_frames" href="#connpy.auth_utils.clear_exception_frames">clear_exception_frames</a></code></li>
+<li><code><a title="connpy.auth_utils.compile_active_context_patterns" href="#connpy.auth_utils.compile_active_context_patterns">compile_active_context_patterns</a></code></li>
+<li><code><a title="connpy.auth_utils.compile_active_context_patterns_with_status" href="#connpy.auth_utils.compile_active_context_patterns_with_status">compile_active_context_patterns_with_status</a></code></li>
 <li><code><a title="connpy.auth_utils.extract_compose_profile_refs" href="#connpy.auth_utils.extract_compose_profile_refs">extract_compose_profile_refs</a></code></li>
 <li><code><a title="connpy.auth_utils.extract_profile_refs_from_value" href="#connpy.auth_utils.extract_profile_refs_from_value">extract_profile_refs_from_value</a></code></li>
 <li><code><a title="connpy.auth_utils.has_insecure_hostkey_checking" href="#connpy.auth_utils.has_insecure_hostkey_checking">has_insecure_hostkey_checking</a></code></li>
 <li><code><a title="connpy.auth_utils.host_exact_re" href="#connpy.auth_utils.host_exact_re">host_exact_re</a></code></li>
 <li><code><a title="connpy.auth_utils.is_compose_expression" href="#connpy.auth_utils.is_compose_expression">is_compose_expression</a></code></li>
+<li><code><a title="connpy.auth_utils.is_default_all_context_cfg" href="#connpy.auth_utils.is_default_all_context_cfg">is_default_all_context_cfg</a></code></li>
 <li><code><a title="connpy.auth_utils.is_rsa_blob" href="#connpy.auth_utils.is_rsa_blob">is_rsa_blob</a></code></li>
 <li><code><a title="connpy.auth_utils.mask_node_secrets" href="#connpy.auth_utils.mask_node_secrets">mask_node_secrets</a></code></li>
+<li><code><a title="connpy.auth_utils.match_active_context_patterns" href="#connpy.auth_utils.match_active_context_patterns">match_active_context_patterns</a></code></li>
 <li><code><a title="connpy.auth_utils.normalize_prompt_line" href="#connpy.auth_utils.normalize_prompt_line">normalize_prompt_line</a></code></li>
 <li><code><a title="connpy.auth_utils.parse_compose_expression" href="#connpy.auth_utils.parse_compose_expression">parse_compose_expression</a></code></li>
 <li><code><a title="connpy.auth_utils.raise_sanitized_auth_error" href="#connpy.auth_utils.raise_sanitized_auth_error">raise_sanitized_auth_error</a></code></li>

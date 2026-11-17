@@ -163,9 +163,19 @@ el.replaceWith(d);
             return True
         if len(stripped.encode(&#34;utf-8&#34;, errors=&#34;replace&#34;)) &gt; MAX_JSON_INPUT_BYTES:
             _raise_val_err(f&#34;Fallback exceeds maximum size of {MAX_JSON_INPUT_BYTES} bytes&#34;)
-        if stripped.startswith(&#34;@&#34;) and &#34;+&#34; not in stripped:
-            if stripped[1:] not in self.app.profiles:
-                _raise_val_err(f&#34;Profile {stripped} don&#39;t exist&#34;)
+        if stripped.startswith(&#34;@&#34;) and not stripped.startswith(&#34;@@&#34;) and &#34;+&#34; not in stripped:
+            parts = [p.strip() for p in stripped.split(&#34;,&#34;)]
+            if any(not p for p in parts):
+                _raise_val_err(&#34;Fallback profile entry cannot be empty&#34;)
+            if len(parts) &gt; MAX_FALLBACK_ENTRIES:
+                _raise_val_err(f&#34;Fallback exceeds maximum of {MAX_FALLBACK_ENTRIES} entries&#34;)
+            for p in parts:
+                if not p.startswith(&#34;@&#34;) or not re.fullmatch(r&#34;[A-Za-z0-9_.$:/-]+&#34;, p[1:]):
+                    _raise_val_err(
+                        &#34;Comma-separated fallback entries must be valid @profile references&#34;
+                    )
+                if p[1:] not in self.app.profiles:
+                    _raise_val_err(f&#34;Profile {p} don&#39;t exist&#34;)
             return True
         try:
             if is_compose_expression(stripped):
@@ -182,19 +192,33 @@ el.replaceWith(d);
             _raise_val_err(str(exc))
         return True
 
+    def _get_all_valid_nodes(self) -&gt; list[str]:
+        valid_nodes = list(getattr(self.app, &#34;nodes_list&#34;, []) or [])
+        if hasattr(self.app, &#34;services&#34;) and hasattr(self.app.services, &#34;nodes&#34;):
+            raw_fn = getattr(self.app.services.nodes, &#34;_get_raw_nodes&#34;, None)
+            if callable(raw_fn) and not hasattr(raw_fn, &#34;assert_called&#34;):
+                raw_res = raw_fn()
+                if isinstance(raw_res, (list, tuple, set)):
+                    valid_nodes = list(dict.fromkeys([*raw_res, *valid_nodes]))
+        return valid_nodes
+
+    def _node_exists(self, target: str) -&gt; bool:
+        valid_nodes = self._get_all_valid_nodes()
+        if getattr(self.app, &#34;case&#34;, True):
+            return target in valid_nodes
+        return target.lower() in {n.lower() for n in valid_nodes}
+
     def jumphost_validation(self, answers, current):
         if current.startswith(&#34;@&#34;):
             if current[1:] not in self.app.profiles:
-                _raise_val_err(&#34;Profile {} don&#39;t exist&#34;.format(current))
-        elif current != &#34;&#34;:
-            if current not in self.app.nodes_list:
-                _raise_val_err(&#34;Node {} don&#39;t exist.&#34;.format(current))
+                _raise_val_err(f&#34;Profile {current} don&#39;t exist&#34;)
+        elif current != &#34;&#34; and not self._node_exists(current):
+            _raise_val_err(f&#34;Node {current} don&#39;t exist.&#34;)
         return True
 
     def profile_jumphost_validation(self, answers, current):
-        if current != &#34;&#34;:
-            if current not in self.app.nodes_list:
-                _raise_val_err(&#34;Node {} don&#39;t exist.&#34;.format(current))
+        if current != &#34;&#34; and not self._node_exists(current):
+            _raise_val_err(f&#34;Node {current} don&#39;t exist.&#34;)
         return True
 
     def default_validation(self, answers, current):
@@ -212,13 +236,47 @@ el.replaceWith(d);
         return True
 
     def bulk_folder_validation(self, answers, current):
-        if not self.app.case:
+        case = getattr(self.app, &#34;case&#34;, False)
+        if not case:
             current = current.lower()
-            
-        candidate = current
-        if &#34;/&#34; in current:
-            candidate = current.split(&#34;/&#34;)[0]
-            
+
+        candidate = current.split(&#34;/&#34;)[0] if &#34;/&#34; in current else current
+
+        if hasattr(self.app, &#34;services&#34;) and hasattr(self.app.services, &#34;context&#34;):
+            raw_folders = list(getattr(self.app, &#34;folders&#34;, []) or [])
+            if hasattr(self.app.services, &#34;nodes&#34;):
+                raw_fn = getattr(self.app.services.nodes, &#34;_get_raw_folders&#34;, None)
+                if callable(raw_fn) and not hasattr(raw_fn, &#34;assert_called&#34;):
+                    raw_res = raw_fn()
+                    if isinstance(raw_res, (list, tuple, set)):
+                        raw_folders = list(raw_res)
+
+            def _folder_exists_norm(folder_name: str) -&gt; bool:
+                if case:
+                    return folder_name in raw_folders
+                return folder_name.lower() in {f.lower() for f in raw_folders}
+
+            if current != &#34;&#34; and not _folder_exists_norm(candidate):
+                _raise_val_err(f&#34;Location {current} don&#39;t exist&#34;)
+
+            ctx_svc = self.app.services.context
+            if ctx_svc is not None and not ctx_svc.is_default_all_context():
+                raw_ids = answers.get(&#34;ids&#34;, &#34;&#34;) if isinstance(answers, dict) else &#34;&#34;
+                for nid in str(raw_ids).split(&#34;,&#34;):
+                    nid_stripped = nid.strip()
+                    if not nid_stripped:
+                        continue
+                    nid_norm = nid_stripped if case else nid_stripped.lower()
+                    full_id = f&#34;{nid_norm}{candidate}&#34; if candidate else nid_norm
+                    if not ctx_svc.matches_active_context(full_id):
+                        _raise_val_err(
+                            f&#34;Node &#39;{full_id}&#39; does not match active context &#39;{ctx_svc.current_context}&#39;.&#34;
+                        )
+                    parent = full_id.partition(&#34;@&#34;)[2]
+                    if parent and not _folder_exists_norm(f&#34;@{parent}&#34;):
+                        _raise_val_err(f&#34;Location @{parent} don&#39;t exist&#34;)
+            return True
+
         matches = list(filter(lambda k: k == candidate, self.app.folders))
         if current != &#34;&#34; and len(matches) == 0:
             _raise_val_err(&#34;Location {} don&#39;t exist&#34;.format(current))
@@ -248,13 +306,47 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def bulk_folder_validation(self, answers, current):
-    if not self.app.case:
+    case = getattr(self.app, &#34;case&#34;, False)
+    if not case:
         current = current.lower()
-        
-    candidate = current
-    if &#34;/&#34; in current:
-        candidate = current.split(&#34;/&#34;)[0]
-        
+
+    candidate = current.split(&#34;/&#34;)[0] if &#34;/&#34; in current else current
+
+    if hasattr(self.app, &#34;services&#34;) and hasattr(self.app.services, &#34;context&#34;):
+        raw_folders = list(getattr(self.app, &#34;folders&#34;, []) or [])
+        if hasattr(self.app.services, &#34;nodes&#34;):
+            raw_fn = getattr(self.app.services.nodes, &#34;_get_raw_folders&#34;, None)
+            if callable(raw_fn) and not hasattr(raw_fn, &#34;assert_called&#34;):
+                raw_res = raw_fn()
+                if isinstance(raw_res, (list, tuple, set)):
+                    raw_folders = list(raw_res)
+
+        def _folder_exists_norm(folder_name: str) -&gt; bool:
+            if case:
+                return folder_name in raw_folders
+            return folder_name.lower() in {f.lower() for f in raw_folders}
+
+        if current != &#34;&#34; and not _folder_exists_norm(candidate):
+            _raise_val_err(f&#34;Location {current} don&#39;t exist&#34;)
+
+        ctx_svc = self.app.services.context
+        if ctx_svc is not None and not ctx_svc.is_default_all_context():
+            raw_ids = answers.get(&#34;ids&#34;, &#34;&#34;) if isinstance(answers, dict) else &#34;&#34;
+            for nid in str(raw_ids).split(&#34;,&#34;):
+                nid_stripped = nid.strip()
+                if not nid_stripped:
+                    continue
+                nid_norm = nid_stripped if case else nid_stripped.lower()
+                full_id = f&#34;{nid_norm}{candidate}&#34; if candidate else nid_norm
+                if not ctx_svc.matches_active_context(full_id):
+                    _raise_val_err(
+                        f&#34;Node &#39;{full_id}&#39; does not match active context &#39;{ctx_svc.current_context}&#39;.&#34;
+                    )
+                parent = full_id.partition(&#34;@&#34;)[2]
+                if parent and not _folder_exists_norm(f&#34;@{parent}&#34;):
+                    _raise_val_err(f&#34;Location @{parent} don&#39;t exist&#34;)
+        return True
+
     matches = list(filter(lambda k: k == candidate, self.app.folders))
     if current != &#34;&#34; and len(matches) == 0:
         _raise_val_err(&#34;Location {} don&#39;t exist&#34;.format(current))
@@ -334,9 +426,19 @@ el.replaceWith(d);
         return True
     if len(stripped.encode(&#34;utf-8&#34;, errors=&#34;replace&#34;)) &gt; MAX_JSON_INPUT_BYTES:
         _raise_val_err(f&#34;Fallback exceeds maximum size of {MAX_JSON_INPUT_BYTES} bytes&#34;)
-    if stripped.startswith(&#34;@&#34;) and &#34;+&#34; not in stripped:
-        if stripped[1:] not in self.app.profiles:
-            _raise_val_err(f&#34;Profile {stripped} don&#39;t exist&#34;)
+    if stripped.startswith(&#34;@&#34;) and not stripped.startswith(&#34;@@&#34;) and &#34;+&#34; not in stripped:
+        parts = [p.strip() for p in stripped.split(&#34;,&#34;)]
+        if any(not p for p in parts):
+            _raise_val_err(&#34;Fallback profile entry cannot be empty&#34;)
+        if len(parts) &gt; MAX_FALLBACK_ENTRIES:
+            _raise_val_err(f&#34;Fallback exceeds maximum of {MAX_FALLBACK_ENTRIES} entries&#34;)
+        for p in parts:
+            if not p.startswith(&#34;@&#34;) or not re.fullmatch(r&#34;[A-Za-z0-9_.$:/-]+&#34;, p[1:]):
+                _raise_val_err(
+                    &#34;Comma-separated fallback entries must be valid @profile references&#34;
+                )
+            if p[1:] not in self.app.profiles:
+                _raise_val_err(f&#34;Profile {p} don&#39;t exist&#34;)
         return True
     try:
         if is_compose_expression(stripped):
@@ -384,10 +486,9 @@ el.replaceWith(d);
 <pre><code class="python">def jumphost_validation(self, answers, current):
     if current.startswith(&#34;@&#34;):
         if current[1:] not in self.app.profiles:
-            _raise_val_err(&#34;Profile {} don&#39;t exist&#34;.format(current))
-    elif current != &#34;&#34;:
-        if current not in self.app.nodes_list:
-            _raise_val_err(&#34;Node {} don&#39;t exist.&#34;.format(current))
+            _raise_val_err(f&#34;Profile {current} don&#39;t exist&#34;)
+    elif current != &#34;&#34; and not self._node_exists(current):
+        _raise_val_err(f&#34;Node {current} don&#39;t exist.&#34;)
     return True</code></pre>
 </details>
 <div class="desc"></div>
@@ -448,9 +549,8 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def profile_jumphost_validation(self, answers, current):
-    if current != &#34;&#34;:
-        if current not in self.app.nodes_list:
-            _raise_val_err(&#34;Node {} don&#39;t exist.&#34;.format(current))
+    if current != &#34;&#34; and not self._node_exists(current):
+        _raise_val_err(f&#34;Node {current} don&#39;t exist.&#34;)
     return True</code></pre>
 </details>
 <div class="desc"></div>

@@ -156,7 +156,7 @@ el.replaceWith(d);
             fbq = [
                 inquirer.Text(
                     &#34;fallback&#34;,
-                    message=&#34;Add fallback credentials (JSON list/dict, @profile, or compose:)&#34;,
+                    message=&#34;Add fallback credentials (@profile, @p1,@p2, JSON list/dict, or compose:)&#34;,
                     validate=self.validators.fallback_validation,
                     default=def_fb_str.replace(&#34;{&#34;, &#34;{{&#34;).replace(&#34;}&#34;, &#34;}}&#34;),
                 )
@@ -228,7 +228,7 @@ el.replaceWith(d);
         if edit.get(&#34;fallback&#34;):
             raw_def_fb = defaults.get(&#34;fallback&#34;, &#34;&#34;)
             def_fb_str = json.dumps(raw_def_fb) if isinstance(raw_def_fb, (list, dict)) else str(raw_def_fb or &#34;&#34;)
-            questions.append(inquirer.Text(&#34;fallback&#34;, message=&#34;Add fallback credentials (JSON list/dict, @profile, or compose:)&#34;, validate=self.validators.fallback_validation, default=def_fb_str.replace(&#34;{&#34;, &#34;{{&#34;).replace(&#34;}&#34;, &#34;}}&#34;)))
+            questions.append(inquirer.Text(&#34;fallback&#34;, message=&#34;Add fallback credentials (@profile, @p1,@p2, JSON list/dict, or compose:)&#34;, validate=self.validators.fallback_validation, default=def_fb_str.replace(&#34;{&#34;, &#34;{{&#34;).replace(&#34;}&#34;, &#34;}}&#34;)))
         else:
             profile[&#34;fallback&#34;] = defaults.get(&#34;fallback&#34;, &#34;&#34;)
 
@@ -286,7 +286,7 @@ el.replaceWith(d);
         fbq = [
             inquirer.Text(
                 &#34;fallback&#34;,
-                message=&#34;Add fallback credentials (JSON list/dict, @profile, or compose:)&#34;,
+                message=&#34;Add fallback credentials (@profile, @p1,@p2, JSON list/dict, or compose:)&#34;,
                 validate=self.validators.fallback_validation,
             )
         ]
@@ -524,7 +524,7 @@ el.replaceWith(d);
     fbq = [
         inquirer.Text(
             &#34;fallback&#34;,
-            message=&#34;Add fallback credentials (JSON list/dict, @profile, or compose:)&#34;,
+            message=&#34;Add fallback credentials (@profile, @p1,@p2, JSON list/dict, or compose:)&#34;,
             validate=self.validators.fallback_validation,
         )
     ]
@@ -655,7 +655,7 @@ el.replaceWith(d);
         fbq = [
             inquirer.Text(
                 &#34;fallback&#34;,
-                message=&#34;Add fallback credentials (JSON list/dict, @profile, or compose:)&#34;,
+                message=&#34;Add fallback credentials (@profile, @p1,@p2, JSON list/dict, or compose:)&#34;,
                 validate=self.validators.fallback_validation,
                 default=def_fb_str.replace(&#34;{&#34;, &#34;{{&#34;).replace(&#34;}&#34;, &#34;}}&#34;),
             )
@@ -737,7 +737,7 @@ el.replaceWith(d);
     if edit.get(&#34;fallback&#34;):
         raw_def_fb = defaults.get(&#34;fallback&#34;, &#34;&#34;)
         def_fb_str = json.dumps(raw_def_fb) if isinstance(raw_def_fb, (list, dict)) else str(raw_def_fb or &#34;&#34;)
-        questions.append(inquirer.Text(&#34;fallback&#34;, message=&#34;Add fallback credentials (JSON list/dict, @profile, or compose:)&#34;, validate=self.validators.fallback_validation, default=def_fb_str.replace(&#34;{&#34;, &#34;{{&#34;).replace(&#34;}&#34;, &#34;}}&#34;)))
+        questions.append(inquirer.Text(&#34;fallback&#34;, message=&#34;Add fallback credentials (@profile, @p1,@p2, JSON list/dict, or compose:)&#34;, validate=self.validators.fallback_validation, default=def_fb_str.replace(&#34;{&#34;, &#34;{{&#34;).replace(&#34;}&#34;, &#34;}}&#34;)))
     else:
         profile[&#34;fallback&#34;] = defaults.get(&#34;fallback&#34;, &#34;&#34;)
 

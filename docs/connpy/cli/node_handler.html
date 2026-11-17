@@ -193,6 +193,7 @@ el.replaceWith(d);
                 uniques = self.app.services.nodes.explode_unique(args.data)
                 if not uniques:
                     raise InvalidConfigurationError(f&#34;Invalid folder {args.data}&#34;)
+                self.app.services.nodes.validate_parent_folder(args.data, is_folder=True)
                 self.app.services.nodes.add_node(args.data, {}, is_folder=True)
                 printer.success(f&#34;{args.data} added successfully&#34;)
             else:
@@ -364,6 +365,7 @@ def forms(self):
             uniques = self.app.services.nodes.explode_unique(args.data)
             if not uniques:
                 raise InvalidConfigurationError(f&#34;Invalid folder {args.data}&#34;)
+            self.app.services.nodes.validate_parent_folder(args.data, is_folder=True)
             self.app.services.nodes.add_node(args.data, {}, is_folder=True)
             printer.success(f&#34;{args.data} added successfully&#34;)
         else:

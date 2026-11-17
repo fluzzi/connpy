@@ -176,18 +176,13 @@ el.replaceWith(d);
         resolved = deepcopy(node_data)
 
         auth_referenced_profiles = []
-        other_referenced_profiles = []
-        for key, value in resolved.items():
-            if key == &#34;fallback&#34;:
-                continue
-            target_refs = (
-                auth_referenced_profiles if key in (&#34;user&#34;, &#34;password&#34;) else other_referenced_profiles
-            )
+        for key in (&#34;user&#34;, &#34;password&#34;):
+            value = resolved.get(key)
             if isinstance(value, str):
                 if not is_compose_expression(value) and value.startswith(&#34;@&#34;):
                     ref = value[1:]
                     if key != &#34;password&#34; or ref in profiles:
-                        target_refs.append(ref)
+                        auth_referenced_profiles.append(ref)
             elif isinstance(value, (list, tuple)):
                 for item in value:
                     if (
@@ -197,7 +192,7 @@ el.replaceWith(d);
                     ):
                         ref = item[1:]
                         if key != &#34;password&#34; or ref in profiles:
-                            target_refs.append(ref)
+                            auth_referenced_profiles.append(ref)
 
         def _get_resolved_ref(prof_name):
             if prof_name in _visited or _depth &gt;= MAX_PROFILE_DEPTH:
@@ -262,15 +257,16 @@ el.replaceWith(d);
                         resolved_list.append(item)
                 resolved[key] = resolved_list
 
-        ordered_profiles = list(dict.fromkeys(auth_referenced_profiles + other_referenced_profiles))
-        for base_profile_name in ordered_profiles:
+        dedup_auth_profiles = list(dict.fromkeys(auth_referenced_profiles))
+        for base_profile_name in dedup_auth_profiles:
             with suppress(ProfileNotFoundError):
                 base_profile = _get_resolved_ref(base_profile_name)
-                for key, value in base_profile.items():
-                    if (key not in resolved or resolved[key] in (&#34;&#34;, [], None)) and (
-                        value not in (&#34;&#34;, [], None) or key not in resolved
-                    ):
-                        resolved[key] = deepcopy(value)
+                for key in (&#34;user&#34;, &#34;password&#34;, &#34;fallback&#34;):
+                    val = base_profile.get(key)
+                    if (
+                        key not in resolved or resolved[key] in (&#34;&#34;, [], None)
+                    ) and val not in (&#34;&#34;, [], None):
+                        resolved[key] = deepcopy(val)
 
         if resolved.get(&#34;protocol&#34;) in (&#34;&#34;, None):
             try:
@@ -503,18 +499,13 @@ el.replaceWith(d);
     resolved = deepcopy(node_data)
 
     auth_referenced_profiles = []
-    other_referenced_profiles = []
-    for key, value in resolved.items():
-        if key == &#34;fallback&#34;:
-            continue
-        target_refs = (
-            auth_referenced_profiles if key in (&#34;user&#34;, &#34;password&#34;) else other_referenced_profiles
-        )
+    for key in (&#34;user&#34;, &#34;password&#34;):
+        value = resolved.get(key)
         if isinstance(value, str):
             if not is_compose_expression(value) and value.startswith(&#34;@&#34;):
                 ref = value[1:]
                 if key != &#34;password&#34; or ref in profiles:
-                    target_refs.append(ref)
+                    auth_referenced_profiles.append(ref)
         elif isinstance(value, (list, tuple)):
             for item in value:
                 if (
@@ -524,7 +515,7 @@ el.replaceWith(d);
                 ):
                     ref = item[1:]
                     if key != &#34;password&#34; or ref in profiles:
-                        target_refs.append(ref)
+                        auth_referenced_profiles.append(ref)
 
     def _get_resolved_ref(prof_name):
         if prof_name in _visited or _depth &gt;= MAX_PROFILE_DEPTH:
@@ -589,15 +580,16 @@ el.replaceWith(d);
                     resolved_list.append(item)
             resolved[key] = resolved_list
 
-    ordered_profiles = list(dict.fromkeys(auth_referenced_profiles + other_referenced_profiles))
-    for base_profile_name in ordered_profiles:
+    dedup_auth_profiles = list(dict.fromkeys(auth_referenced_profiles))
+    for base_profile_name in dedup_auth_profiles:
         with suppress(ProfileNotFoundError):
             base_profile = _get_resolved_ref(base_profile_name)
-            for key, value in base_profile.items():
-                if (key not in resolved or resolved[key] in (&#34;&#34;, [], None)) and (
-                    value not in (&#34;&#34;, [], None) or key not in resolved
-                ):
-                    resolved[key] = deepcopy(value)
+            for key in (&#34;user&#34;, &#34;password&#34;, &#34;fallback&#34;):
+                val = base_profile.get(key)
+                if (
+                    key not in resolved or resolved[key] in (&#34;&#34;, [], None)
+                ) and val not in (&#34;&#34;, [], None):
+                    resolved[key] = deepcopy(val)
 
     if resolved.get(&#34;protocol&#34;) in (&#34;&#34;, None):
         try:

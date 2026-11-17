@@ -113,7 +113,7 @@ el.replaceWith(d);
                 try:
                     # Attempt a fresh configuration load
                     config = configfile(conf=conf_file, shared_config=self._shared_config)
-                    new_provider = ServiceProvider(config, mode=&#34;local&#34;)
+                    new_provider = ServiceProvider(config, mode=&#34;local&#34;, enforce_context=False)
                     
                     # Successfully loaded, clean up the old provider
                     if old_provider:
@@ -221,7 +221,7 @@ el.replaceWith(d);
             try:
                 # Attempt a fresh configuration load
                 config = configfile(conf=conf_file, shared_config=self._shared_config)
-                new_provider = ServiceProvider(config, mode=&#34;local&#34;)
+                new_provider = ServiceProvider(config, mode=&#34;local&#34;, enforce_context=False)
                 
                 # Successfully loaded, clean up the old provider
                 if old_provider:

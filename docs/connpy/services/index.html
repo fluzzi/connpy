@@ -1288,7 +1288,7 @@ el.replaceWith(d);
 </dd>
 <dt id="connpy.services.ExecutionService"><code class="flex name class">
 <span>class <span class="ident">ExecutionService</span></span>
-<span>(</span><span>config=None, remote_stub=None, attempt_tracker=None)</span>
+<span>(</span><span>config=None, remote_stub=None, attempt_tracker=None, enforce_context: bool = True)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -1298,13 +1298,32 @@ el.replaceWith(d);
 <pre><code class="python">class ExecutionService(BaseService):
     &#34;&#34;&#34;Business logic for executing commands on nodes and running automation scripts.&#34;&#34;&#34;
 
-    def __init__(self, config=None, remote_stub=None, attempt_tracker=None):
+    def __init__(
+        self,
+        config=None,
+        remote_stub=None,
+        attempt_tracker=None,
+        enforce_context: bool = True,
+    ):
         super().__init__(config)
         self.remote_stub = remote_stub
         self.attempt_tracker = (
             attempt_tracker if attempt_tracker is not None else AuthAttemptTracker()
         )
+        self.enforce_context = bool(enforce_context)
         self.last_fallback_used: dict[str, bool] = {}
+
+    def _get_context_service(self):
+        if (
+            not getattr(self, &#34;enforce_context&#34;, True)
+            or not getattr(self.config, &#34;_enforce_context&#34;, True)
+            or (len(sys.argv) &gt; 1 and sys.argv[1] == &#34;api&#34;)
+            or not isinstance(getattr(self.config, &#34;config&#34;, None), dict)
+        ):
+            return None
+        from .context_service import ContextService
+
+        return ContextService(self.config)
 
     def _is_remote_backend(self) -&gt; bool:
         &#34;&#34;&#34;Return True when execution is configured to run against a remote gRPC backend.&#34;&#34;&#34;
@@ -1324,10 +1343,7 @@ el.replaceWith(d);
                 &#34;connect_timeout and auth_timeout overrides are not supported in remote gRPC mode&#34;
             )
 
-    def _get_remote_stub(self):
-        &#34;&#34;&#34;Return the configured or lazily constructed ExecutionStub for remote gRPC mode.&#34;&#34;&#34;
-        if getattr(self, &#34;remote_stub&#34;, None) is not None:
-            return self.remote_stub
+    def _get_remote_channel(self):
         cfg = getattr(self.config, &#34;config&#34;, None)
         remote_host = cfg.get(&#34;remote_host&#34;) if isinstance(cfg, dict) else None
         if not remote_host:
@@ -1335,7 +1351,7 @@ el.replaceWith(d);
 
         import grpc
 
-        from connpy.grpc_layer.stubs import AuthClientInterceptor, ExecutionStub
+        from connpy.grpc_layer.stubs import AuthClientInterceptor
 
         def get_token():
             env_token = os.environ.get(&#34;CONNPY_TOKEN&#34;)
@@ -1351,7 +1367,80 @@ el.replaceWith(d);
 
         channel = grpc.insecure_channel(remote_host)
         channel = grpc.intercept_channel(channel, AuthClientInterceptor(get_token))
+        return channel, remote_host
+
+    def _get_remote_stub(self):
+        &#34;&#34;&#34;Return the configured or lazily constructed ExecutionStub for remote gRPC mode.&#34;&#34;&#34;
+        if getattr(self, &#34;remote_stub&#34;, None) is not None:
+            return self.remote_stub
+        from connpy.grpc_layer.stubs import ExecutionStub
+
+        channel, remote_host = self._get_remote_channel()
         return ExecutionStub(channel, remote_host=remote_host)
+
+    def _filter_remote_nodes_filter(self, nodes_filter):
+        ctx_svc = self._get_context_service()
+        if ctx_svc is None or ctx_svc.is_default_all_context():
+            return nodes_filter
+
+        if isinstance(nodes_filter, (list, tuple)):
+            permitted = ctx_svc.filter_node_list(result=list(nodes_filter))
+        else:
+            if self.remote_stub is not None and callable(
+                getattr(self.remote_stub, &#34;list_nodes&#34;, None)
+            ):
+                candidates = self.remote_stub.list_nodes(filter_str=nodes_filter)
+            elif self.remote_stub is not None and callable(
+                getattr(getattr(self.remote_stub, &#34;node_stub&#34;, None), &#34;list_nodes&#34;, None)
+            ):
+                candidates = self.remote_stub.node_stub.list_nodes(filter_str=nodes_filter)
+            elif self.remote_stub is None:
+                from connpy.grpc_layer.stubs import NodeStub
+
+                channel, remote_host = self._get_remote_channel()
+                node_stub = NodeStub(channel, remote_host=remote_host, config=self.config)
+                candidates = node_stub.list_nodes(filter_str=nodes_filter)
+            else:
+                candidates = (
+                    self.config._getallnodes(nodes_filter)
+                    if hasattr(self.config, &#34;_getallnodes&#34;)
+                    else []
+                )
+            if nodes_filter:
+                cfg_dict = getattr(self.config, &#34;config&#34;, None)
+                case = cfg_dict.get(&#34;case&#34;, False) if isinstance(cfg_dict, dict) else False
+                flags = 0 if case else re.IGNORECASE
+                candidates = [c for c in candidates if re.search(nodes_filter, c, flags)]
+            permitted = ctx_svc.filter_node_list(result=candidates)
+
+        if not permitted:
+            raise ConnpyError(f&#34;No nodes found matching filter: {nodes_filter}&#34;)
+        return [f&#34;^{re.escape(n)}$&#34; for n in permitted]
+
+    def _build_remote_filter_batches(self, nodes_filter):
+        filtered = self._filter_remote_nodes_filter(nodes_filter)
+        if isinstance(filtered, list):
+            return [
+                filtered[i : i + MAX_REMOTE_FILTER_NODES]
+                for i in range(0, len(filtered), MAX_REMOTE_FILTER_NODES)
+            ]
+        return [filtered]
+
+    @staticmethod
+    def _aggregate_remote_results(batch_results):
+        if len(batch_results) == 1:
+            return batch_results[0]
+        if all(isinstance(r, dict) for r in batch_results):
+            merged: dict[str, Any] = {}
+            for r in batch_results:
+                merged.update(r)
+            return merged
+        if all(isinstance(r, list) for r in batch_results):
+            merged_list: list[Any] = []
+            for r in batch_results:
+                merged_list.extend(r)
+            return merged_list
+        return batch_results[-1]
 
     def run_commands(
         self,
@@ -1376,21 +1465,29 @@ el.replaceWith(d);
             )
 
             if self._is_remote_backend():
+                batches = self._build_remote_filter_batches(nodes_filter)
                 stub = self._get_remote_stub()
-                return stub.run_commands(
-                    nodes_filter=nodes_filter,
-                    commands=commands,
-                    variables=variables,
-                    parallel=parallel,
-                    timeout=timeout if timeout is not None else 20,
-                    folder=folder,
-                    prompt=prompt,
-                    on_node_complete=on_node_complete,
-                    logger=logger,
-                    name=name or &#34;&#34;,
-                )
+                batch_results = [
+                    stub.run_commands(
+                        nodes_filter=batch,
+                        commands=commands,
+                        variables=variables,
+                        parallel=parallel,
+                        timeout=timeout if timeout is not None else 20,
+                        folder=folder,
+                        prompt=prompt,
+                        on_node_complete=on_node_complete,
+                        logger=logger,
+                        name=name or &#34;&#34;,
+                    )
+                    for batch in batches
+                ]
+                return self._aggregate_remote_results(batch_results)
 
             matched_names = self.config._getallnodes(nodes_filter)
+            ctx_svc = self._get_context_service()
+            if ctx_svc is not None and not ctx_svc.is_default_all_context():
+                matched_names = ctx_svc.filter_node_list(result=matched_names)
             if not matched_names:
                 raise ConnpyError(f&#34;No nodes found matching filter: {nodes_filter}&#34;)
 
@@ -1464,22 +1561,30 @@ el.replaceWith(d);
             )
 
             if self._is_remote_backend():
+                batches = self._build_remote_filter_batches(nodes_filter)
                 stub = self._get_remote_stub()
-                return stub.test_commands(
-                    nodes_filter=nodes_filter,
-                    commands=commands,
-                    expected=expected,
-                    variables=variables,
-                    parallel=parallel,
-                    timeout=timeout if timeout is not None else 20,
-                    folder=folder or &#34;&#34;,
-                    prompt=prompt,
-                    on_node_complete=on_node_complete,
-                    logger=logger,
-                    name=name or &#34;&#34;,
-                )
+                batch_results = [
+                    stub.test_commands(
+                        nodes_filter=batch,
+                        commands=commands,
+                        expected=expected,
+                        variables=variables,
+                        parallel=parallel,
+                        timeout=timeout if timeout is not None else 20,
+                        folder=folder or &#34;&#34;,
+                        prompt=prompt,
+                        on_node_complete=on_node_complete,
+                        logger=logger,
+                        name=name or &#34;&#34;,
+                    )
+                    for batch in batches
+                ]
+                return self._aggregate_remote_results(batch_results)
 
             matched_names = self.config._getallnodes(nodes_filter)
+            ctx_svc = self._get_context_service()
+            if ctx_svc is not None and not ctx_svc.is_default_all_context():
+                matched_names = ctx_svc.filter_node_list(result=matched_names)
             if not matched_names:
                 raise ConnpyError(f&#34;No nodes found matching filter: {nodes_filter}&#34;)
 
@@ -1601,21 +1706,29 @@ el.replaceWith(d);
         )
 
         if self._is_remote_backend():
+            batches = self._build_remote_filter_batches(nodes_filter)
             stub = self._get_remote_stub()
-            return stub.run_commands(
-                nodes_filter=nodes_filter,
-                commands=commands,
-                variables=variables,
-                parallel=parallel,
-                timeout=timeout if timeout is not None else 20,
-                folder=folder,
-                prompt=prompt,
-                on_node_complete=on_node_complete,
-                logger=logger,
-                name=name or &#34;&#34;,
-            )
+            batch_results = [
+                stub.run_commands(
+                    nodes_filter=batch,
+                    commands=commands,
+                    variables=variables,
+                    parallel=parallel,
+                    timeout=timeout if timeout is not None else 20,
+                    folder=folder,
+                    prompt=prompt,
+                    on_node_complete=on_node_complete,
+                    logger=logger,
+                    name=name or &#34;&#34;,
+                )
+                for batch in batches
+            ]
+            return self._aggregate_remote_results(batch_results)
 
         matched_names = self.config._getallnodes(nodes_filter)
+        ctx_svc = self._get_context_service()
+        if ctx_svc is not None and not ctx_svc.is_default_all_context():
+            matched_names = ctx_svc.filter_node_list(result=matched_names)
         if not matched_names:
             raise ConnpyError(f&#34;No nodes found matching filter: {nodes_filter}&#34;)
 
@@ -1699,22 +1812,30 @@ el.replaceWith(d);
         )
 
         if self._is_remote_backend():
+            batches = self._build_remote_filter_batches(nodes_filter)
             stub = self._get_remote_stub()
-            return stub.test_commands(
-                nodes_filter=nodes_filter,
-                commands=commands,
-                expected=expected,
-                variables=variables,
-                parallel=parallel,
-                timeout=timeout if timeout is not None else 20,
-                folder=folder or &#34;&#34;,
-                prompt=prompt,
-                on_node_complete=on_node_complete,
-                logger=logger,
-                name=name or &#34;&#34;,
-            )
+            batch_results = [
+                stub.test_commands(
+                    nodes_filter=batch,
+                    commands=commands,
+                    expected=expected,
+                    variables=variables,
+                    parallel=parallel,
+                    timeout=timeout if timeout is not None else 20,
+                    folder=folder or &#34;&#34;,
+                    prompt=prompt,
+                    on_node_complete=on_node_complete,
+                    logger=logger,
+                    name=name or &#34;&#34;,
+                )
+                for batch in batches
+            ]
+            return self._aggregate_remote_results(batch_results)
 
         matched_names = self.config._getallnodes(nodes_filter)
+        ctx_svc = self._get_context_service()
+        if ctx_svc is not None and not ctx_svc.is_default_all_context():
+            matched_names = ctx_svc.filter_node_list(result=matched_names)
         if not matched_names:
             raise ConnpyError(f&#34;No nodes found matching filter: {nodes_filter}&#34;)
 
@@ -1769,7 +1890,7 @@ el.replaceWith(d);
 </dd>
 <dt id="connpy.services.ImportExportService"><code class="flex name class">
 <span>class <span class="ident">ImportExportService</span></span>
-<span>(</span><span>config=None)</span>
+<span>(</span><span>config=None, enforce_context: bool = True)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -1778,6 +1899,44 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">class ImportExportService(BaseService):
     &#34;&#34;&#34;Business logic for YAML/JSON inventory import and export.&#34;&#34;&#34;
+
+    def __init__(self, config=None, enforce_context: bool = True):
+        super().__init__(config)
+        self.enforce_context = bool(enforce_context)
+
+    def _get_context_service(self, cfg=None):
+        target_cfg = cfg or self.config
+        if (
+            not getattr(self, &#34;enforce_context&#34;, True)
+            or not getattr(target_cfg, &#34;_enforce_context&#34;, True)
+            or (len(sys.argv) &gt; 1 and sys.argv[1] == &#34;api&#34;)
+            or not isinstance(getattr(target_cfg, &#34;config&#34;, None), dict)
+        ):
+            return None
+        from .context_service import ContextService
+
+        return ContextService(target_cfg)
+
+    def _get_raw_folders(self, cfg=None) -&gt; list[str]:
+        target_cfg = cfg or self.config
+        if target_cfg is None:
+            return []
+        if (
+            not hasattr(target_cfg, &#34;assert_called&#34;)
+            and callable(getattr(target_cfg, &#34;_getallfolders_unlocked&#34;, None))
+            and hasattr(target_cfg, &#34;_mutation_lock&#34;)
+        ):
+            with target_cfg._mutation_lock:
+                return target_cfg._getallfolders_unlocked()
+        return target_cfg._getallfolders()
+
+    def _folder_exists(self, folder_id: str, raw_folders: list[str], cfg=None) -&gt; bool:
+        target_cfg = cfg or self.config
+        cfg_dict = getattr(target_cfg, &#34;config&#34;, None)
+        case = cfg_dict.get(&#34;case&#34;, False) if isinstance(cfg_dict, dict) else False
+        if case:
+            return folder_id in raw_folders
+        return folder_id.lower() in {f.lower() for f in raw_folders}
 
     def export_to_file(self, file_path, folders=None):
         &#34;&#34;&#34;Export nodes/folders to a YAML file.&#34;&#34;&#34;
@@ -1793,46 +1952,72 @@ el.replaceWith(d);
 
     def export_to_dict(self, folders=None):
         &#34;&#34;&#34;Export nodes/folders to a dictionary.&#34;&#34;&#34;
-        if not folders:
+        ctx_svc = self._get_context_service()
+        ctx_active = ctx_svc is not None and not ctx_svc.is_default_all_context()
+
+        if not folders and not ctx_active:
             return deepcopy(self.config.connections)
-        else:
-            # Validate folders exist
+
+        raw_folders = self._get_raw_folders()
+        if folders:
             for f in folders:
-                if f != &#34;@&#34; and f not in self.config._getallfolders():
+                if f != &#34;@&#34; and (
+                    not self._folder_exists(f, raw_folders)
+                    or (ctx_active and not ctx_svc.matches_active_context(f))
+                ):
                     raise NodeNotFoundError(f&#34;Folder &#39;{f}&#39; not found.&#34;)
-            
             flat = self.config._getallnodesfull(folders, extract=False)
-            nested = {}
-            for k, v in flat.items():
-                uniques = self.config._explode_unique(k)
-                if not uniques:
-                    continue
-                
-                if &#34;folder&#34; in uniques and &#34;subfolder&#34; in uniques:
-                    f_name = uniques[&#34;folder&#34;]
-                    s_name = uniques[&#34;subfolder&#34;]
-                    i_name = uniques[&#34;id&#34;]
-                    
-                    if f_name not in nested:
-                        nested[f_name] = {&#34;type&#34;: &#34;folder&#34;}
-                    if s_name not in nested[f_name]:
-                        nested[f_name][s_name] = {&#34;type&#34;: &#34;subfolder&#34;}
-                        
-                    nested[f_name][s_name][i_name] = v
-                    
-                elif &#34;folder&#34; in uniques:
-                    f_name = uniques[&#34;folder&#34;]
-                    i_name = uniques[&#34;id&#34;]
-                    
-                    if f_name not in nested:
-                        nested[f_name] = {&#34;type&#34;: &#34;folder&#34;}
-                        
-                    nested[f_name][i_name] = v
-                else:
-                    i_name = uniques[&#34;id&#34;]
-                    nested[i_name] = v
-                    
-            return nested
+            allowed_folders = []
+        else:
+            allowed_folders = ctx_svc.filter_node_list(result=raw_folders)
+            flat = self.config._getallnodesfull(extract=False)
+
+        if ctx_active:
+            flat = ctx_svc.filter_node_dict(result=flat)
+
+        nested = {}
+        for folder_id in allowed_folders:
+            uniques = self.config._explode_unique(folder_id)
+            if not uniques or &#34;folder&#34; not in uniques:
+                continue
+            f_name = uniques[&#34;folder&#34;]
+            if f_name not in nested:
+                nested[f_name] = {&#34;type&#34;: &#34;folder&#34;}
+            if &#34;subfolder&#34; in uniques:
+                s_name = uniques[&#34;subfolder&#34;]
+                if s_name not in nested[f_name]:
+                    nested[f_name][s_name] = {&#34;type&#34;: &#34;subfolder&#34;}
+
+        for k, v in flat.items():
+            uniques = self.config._explode_unique(k)
+            if not uniques:
+                continue
+
+            if &#34;folder&#34; in uniques and &#34;subfolder&#34; in uniques:
+                f_name = uniques[&#34;folder&#34;]
+                s_name = uniques[&#34;subfolder&#34;]
+                i_name = uniques[&#34;id&#34;]
+
+                if f_name not in nested:
+                    nested[f_name] = {&#34;type&#34;: &#34;folder&#34;}
+                if s_name not in nested[f_name]:
+                    nested[f_name][s_name] = {&#34;type&#34;: &#34;subfolder&#34;}
+
+                nested[f_name][s_name][i_name] = v
+
+            elif &#34;folder&#34; in uniques:
+                f_name = uniques[&#34;folder&#34;]
+                i_name = uniques[&#34;id&#34;]
+
+                if f_name not in nested:
+                    nested[f_name] = {&#34;type&#34;: &#34;folder&#34;}
+
+                nested[f_name][i_name] = v
+            else:
+                i_name = uniques[&#34;id&#34;]
+                nested[i_name] = v
+
+        return nested
 
     def import_from_file(self, file_path):
         &#34;&#34;&#34;Import nodes/folders from a YAML file.&#34;&#34;&#34;
@@ -1847,42 +2032,94 @@ el.replaceWith(d);
             raise InvalidConfigurationError(f&#34;Failed to read/parse import file: {e}&#34;)
 
     def import_from_dict(self, data):
-        &#34;&#34;&#34;Import nodes/folders from a dictionary.&#34;&#34;&#34;
+        &#34;&#34;&#34;Import nodes/folders from a dictionary atomically with context pre-validation.&#34;&#34;&#34;
         if not isinstance(data, dict):
-            raise InvalidConfigurationError(&#34;Invalid import data format: expected a dictionary of nodes.&#34;)
+            raise InvalidConfigurationError(
+                &#34;Invalid import data format: expected a dictionary of nodes.&#34;
+            )
 
-        def _traverse_import(node_data, current_folder=&#39;&#39;, current_subfolder=&#39;&#39;):
+        ctx_svc = self._get_context_service()
+        ctx_active = ctx_svc is not None and not ctx_svc.is_default_all_context()
+        raw_folders = self._get_raw_folders() if ctx_active else []
+        planned_ops = []
+
+        def _plan_import(node_data, current_folder=&#34;&#34;, current_subfolder=&#34;&#34;):
             for k, v in node_data.items():
-                if k == &#34;type&#34;:
+                if k == &#34;type&#34; or not isinstance(v, dict):
                     continue
-                if isinstance(v, dict):
-                    node_type = v.get(&#34;type&#34;, &#34;connection&#34;)
-                    if node_type == &#34;folder&#34;:
-                        self.config._folder_add(folder=k)
-                        _traverse_import(v, current_folder=k, current_subfolder=&#39;&#39;)
-                    elif node_type == &#34;subfolder&#34;:
-                        self.config._folder_add(folder=current_folder, subfolder=k)
-                        _traverse_import(v, current_folder=current_folder, current_subfolder=k)
-                    elif node_type == &#34;connection&#34;:
-                        unique_id = k
-                        if current_subfolder:
-                            unique_id = f&#34;{k}@{current_subfolder}@{current_folder}&#34;
-                        elif current_folder:
-                            unique_id = f&#34;{k}@{current_folder}&#34;
-                        self._validate_node_name(unique_id)
-                        
-                        kwargs = deepcopy(v)
-                        kwargs[&#39;id&#39;] = k
-                        kwargs[&#39;folder&#39;] = current_folder
-                        kwargs[&#39;subfolder&#39;] = current_subfolder
-                        
-                        self.config._connections_add(**kwargs)
-                else:
-                    # Invalid format skip
-                    pass
+                node_type = v.get(&#34;type&#34;, &#34;connection&#34;)
+                if node_type == &#34;folder&#34;:
+                    folder_id = f&#34;@{k}&#34;
+                    has_children = any(
+                        isinstance(cv, dict) for ck, cv in v.items() if ck != &#34;type&#34;
+                    )
+                    if ctx_active and (
+                        not has_children
+                        or (
+                            not ctx_svc.matches_active_context(folder_id)
+                            and not self._folder_exists(folder_id, raw_folders)
+                        )
+                    ):
+                        ctx_svc.validate_in_active_context(folder_id, is_folder=True)
+                    planned_ops.append((&#34;folder&#34;, k, &#34;&#34;))
+                    _plan_import(v, current_folder=k, current_subfolder=&#34;&#34;)
+                elif node_type == &#34;subfolder&#34;:
+                    folder_id = f&#34;@{k}@{current_folder}&#34;
+                    has_children = any(
+                        isinstance(cv, dict) for ck, cv in v.items() if ck != &#34;type&#34;
+                    )
+                    if ctx_active and (
+                        not has_children
+                        or (
+                            not ctx_svc.matches_active_context(folder_id)
+                            and not self._folder_exists(folder_id, raw_folders)
+                        )
+                    ):
+                        ctx_svc.validate_in_active_context(folder_id, is_folder=True)
+                    planned_ops.append((&#34;folder&#34;, current_folder, k))
+                    _plan_import(v, current_folder=current_folder, current_subfolder=k)
+                elif node_type == &#34;connection&#34;:
+                    unique_id = k
+                    if current_subfolder:
+                        unique_id = f&#34;{k}@{current_subfolder}@{current_folder}&#34;
+                    elif current_folder:
+                        unique_id = f&#34;{k}@{current_folder}&#34;
+                    self._validate_node_name(unique_id)
+                    NodeService._validate_node_payload(v)
+                    if ctx_svc is not None:
+                        ctx_svc.validate_in_active_context(unique_id, is_folder=False)
 
-        _traverse_import(data)
-        self.config._saveconfig(self.config.file)</code></pre>
+                    kwargs = deepcopy(v)
+                    kwargs[&#34;id&#34;] = k
+                    kwargs[&#34;folder&#34;] = current_folder
+                    kwargs[&#34;subfolder&#34;] = current_subfolder
+                    planned_ops.append((&#34;connection&#34;, kwargs))
+
+        _plan_import(data)
+
+        if _supports_transactional_update(self.config):
+            def _mut(cfg):
+                for op in planned_ops:
+                    if op[0] == &#34;folder&#34;:
+                        cfg._folder_add_unlocked(folder=op[1], subfolder=op[2])
+                    else:
+                        cfg._connections_add_unlocked(**op[1])
+
+            self.config.transactional_update(_mut)
+            return
+
+        snap_connections = deepcopy(self.config.connections)
+        try:
+            for op in planned_ops:
+                if op[0] == &#34;folder&#34;:
+                    self.config._folder_add(folder=op[1], subfolder=op[2])
+                else:
+                    self.config._connections_add(**op[1])
+            self.config._saveconfig(self.config.file)
+        except BaseException:
+            self.config.connections.clear()
+            self.config.connections.update(snap_connections)
+            raise</code></pre>
 </details>
 <div class="desc"><p>Business logic for YAML/JSON inventory import and export.</p>
 <p>Initialize the service.</p>
@@ -1908,46 +2145,72 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def export_to_dict(self, folders=None):
     &#34;&#34;&#34;Export nodes/folders to a dictionary.&#34;&#34;&#34;
-    if not folders:
+    ctx_svc = self._get_context_service()
+    ctx_active = ctx_svc is not None and not ctx_svc.is_default_all_context()
+
+    if not folders and not ctx_active:
         return deepcopy(self.config.connections)
-    else:
-        # Validate folders exist
+
+    raw_folders = self._get_raw_folders()
+    if folders:
         for f in folders:
-            if f != &#34;@&#34; and f not in self.config._getallfolders():
+            if f != &#34;@&#34; and (
+                not self._folder_exists(f, raw_folders)
+                or (ctx_active and not ctx_svc.matches_active_context(f))
+            ):
                 raise NodeNotFoundError(f&#34;Folder &#39;{f}&#39; not found.&#34;)
-        
         flat = self.config._getallnodesfull(folders, extract=False)
-        nested = {}
-        for k, v in flat.items():
-            uniques = self.config._explode_unique(k)
-            if not uniques:
-                continue
-            
-            if &#34;folder&#34; in uniques and &#34;subfolder&#34; in uniques:
-                f_name = uniques[&#34;folder&#34;]
-                s_name = uniques[&#34;subfolder&#34;]
-                i_name = uniques[&#34;id&#34;]
-                
-                if f_name not in nested:
-                    nested[f_name] = {&#34;type&#34;: &#34;folder&#34;}
-                if s_name not in nested[f_name]:
-                    nested[f_name][s_name] = {&#34;type&#34;: &#34;subfolder&#34;}
-                    
-                nested[f_name][s_name][i_name] = v
-                
-            elif &#34;folder&#34; in uniques:
-                f_name = uniques[&#34;folder&#34;]
-                i_name = uniques[&#34;id&#34;]
-                
-                if f_name not in nested:
-                    nested[f_name] = {&#34;type&#34;: &#34;folder&#34;}
-                    
-                nested[f_name][i_name] = v
-            else:
-                i_name = uniques[&#34;id&#34;]
-                nested[i_name] = v
-                
-        return nested</code></pre>
+        allowed_folders = []
+    else:
+        allowed_folders = ctx_svc.filter_node_list(result=raw_folders)
+        flat = self.config._getallnodesfull(extract=False)
+
+    if ctx_active:
+        flat = ctx_svc.filter_node_dict(result=flat)
+
+    nested = {}
+    for folder_id in allowed_folders:
+        uniques = self.config._explode_unique(folder_id)
+        if not uniques or &#34;folder&#34; not in uniques:
+            continue
+        f_name = uniques[&#34;folder&#34;]
+        if f_name not in nested:
+            nested[f_name] = {&#34;type&#34;: &#34;folder&#34;}
+        if &#34;subfolder&#34; in uniques:
+            s_name = uniques[&#34;subfolder&#34;]
+            if s_name not in nested[f_name]:
+                nested[f_name][s_name] = {&#34;type&#34;: &#34;subfolder&#34;}
+
+    for k, v in flat.items():
+        uniques = self.config._explode_unique(k)
+        if not uniques:
+            continue
+
+        if &#34;folder&#34; in uniques and &#34;subfolder&#34; in uniques:
+            f_name = uniques[&#34;folder&#34;]
+            s_name = uniques[&#34;subfolder&#34;]
+            i_name = uniques[&#34;id&#34;]
+
+            if f_name not in nested:
+                nested[f_name] = {&#34;type&#34;: &#34;folder&#34;}
+            if s_name not in nested[f_name]:
+                nested[f_name][s_name] = {&#34;type&#34;: &#34;subfolder&#34;}
+
+            nested[f_name][s_name][i_name] = v
+
+        elif &#34;folder&#34; in uniques:
+            f_name = uniques[&#34;folder&#34;]
+            i_name = uniques[&#34;id&#34;]
+
+            if f_name not in nested:
+                nested[f_name] = {&#34;type&#34;: &#34;folder&#34;}
+
+            nested[f_name][i_name] = v
+        else:
+            i_name = uniques[&#34;id&#34;]
+            nested[i_name] = v
+
+    return nested</code></pre>
 </details>
 <div class="desc"><p>Export nodes/folders to a dictionary.</p></div>
 </dd>
@@ -1982,44 +2245,96 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def import_from_dict(self, data):
-    &#34;&#34;&#34;Import nodes/folders from a dictionary.&#34;&#34;&#34;
+    &#34;&#34;&#34;Import nodes/folders from a dictionary atomically with context pre-validation.&#34;&#34;&#34;
     if not isinstance(data, dict):
-        raise InvalidConfigurationError(&#34;Invalid import data format: expected a dictionary of nodes.&#34;)
+        raise InvalidConfigurationError(
+            &#34;Invalid import data format: expected a dictionary of nodes.&#34;
+        )
 
-    def _traverse_import(node_data, current_folder=&#39;&#39;, current_subfolder=&#39;&#39;):
+    ctx_svc = self._get_context_service()
+    ctx_active = ctx_svc is not None and not ctx_svc.is_default_all_context()
+    raw_folders = self._get_raw_folders() if ctx_active else []
+    planned_ops = []
+
+    def _plan_import(node_data, current_folder=&#34;&#34;, current_subfolder=&#34;&#34;):
         for k, v in node_data.items():
-            if k == &#34;type&#34;:
+            if k == &#34;type&#34; or not isinstance(v, dict):
                 continue
-            if isinstance(v, dict):
-                node_type = v.get(&#34;type&#34;, &#34;connection&#34;)
-                if node_type == &#34;folder&#34;:
-                    self.config._folder_add(folder=k)
-                    _traverse_import(v, current_folder=k, current_subfolder=&#39;&#39;)
-                elif node_type == &#34;subfolder&#34;:
-                    self.config._folder_add(folder=current_folder, subfolder=k)
-                    _traverse_import(v, current_folder=current_folder, current_subfolder=k)
-                elif node_type == &#34;connection&#34;:
-                    unique_id = k
-                    if current_subfolder:
-                        unique_id = f&#34;{k}@{current_subfolder}@{current_folder}&#34;
-                    elif current_folder:
-                        unique_id = f&#34;{k}@{current_folder}&#34;
-                    self._validate_node_name(unique_id)
-                    
-                    kwargs = deepcopy(v)
-                    kwargs[&#39;id&#39;] = k
-                    kwargs[&#39;folder&#39;] = current_folder
-                    kwargs[&#39;subfolder&#39;] = current_subfolder
-                    
-                    self.config._connections_add(**kwargs)
-            else:
-                # Invalid format skip
-                pass
+            node_type = v.get(&#34;type&#34;, &#34;connection&#34;)
+            if node_type == &#34;folder&#34;:
+                folder_id = f&#34;@{k}&#34;
+                has_children = any(
+                    isinstance(cv, dict) for ck, cv in v.items() if ck != &#34;type&#34;
+                )
+                if ctx_active and (
+                    not has_children
+                    or (
+                        not ctx_svc.matches_active_context(folder_id)
+                        and not self._folder_exists(folder_id, raw_folders)
+                    )
+                ):
+                    ctx_svc.validate_in_active_context(folder_id, is_folder=True)
+                planned_ops.append((&#34;folder&#34;, k, &#34;&#34;))
+                _plan_import(v, current_folder=k, current_subfolder=&#34;&#34;)
+            elif node_type == &#34;subfolder&#34;:
+                folder_id = f&#34;@{k}@{current_folder}&#34;
+                has_children = any(
+                    isinstance(cv, dict) for ck, cv in v.items() if ck != &#34;type&#34;
+                )
+                if ctx_active and (
+                    not has_children
+                    or (
+                        not ctx_svc.matches_active_context(folder_id)
+                        and not self._folder_exists(folder_id, raw_folders)
+                    )
+                ):
+                    ctx_svc.validate_in_active_context(folder_id, is_folder=True)
+                planned_ops.append((&#34;folder&#34;, current_folder, k))
+                _plan_import(v, current_folder=current_folder, current_subfolder=k)
+            elif node_type == &#34;connection&#34;:
+                unique_id = k
+                if current_subfolder:
+                    unique_id = f&#34;{k}@{current_subfolder}@{current_folder}&#34;
+                elif current_folder:
+                    unique_id = f&#34;{k}@{current_folder}&#34;
+                self._validate_node_name(unique_id)
+                NodeService._validate_node_payload(v)
+                if ctx_svc is not None:
+                    ctx_svc.validate_in_active_context(unique_id, is_folder=False)
 
-    _traverse_import(data)
-    self.config._saveconfig(self.config.file)</code></pre>
+                kwargs = deepcopy(v)
+                kwargs[&#34;id&#34;] = k
+                kwargs[&#34;folder&#34;] = current_folder
+                kwargs[&#34;subfolder&#34;] = current_subfolder
+                planned_ops.append((&#34;connection&#34;, kwargs))
+
+    _plan_import(data)
+
+    if _supports_transactional_update(self.config):
+        def _mut(cfg):
+            for op in planned_ops:
+                if op[0] == &#34;folder&#34;:
+                    cfg._folder_add_unlocked(folder=op[1], subfolder=op[2])
+                else:
+                    cfg._connections_add_unlocked(**op[1])
+
+        self.config.transactional_update(_mut)
+        return
+
+    snap_connections = deepcopy(self.config.connections)
+    try:
+        for op in planned_ops:
+            if op[0] == &#34;folder&#34;:
+                self.config._folder_add(folder=op[1], subfolder=op[2])
+            else:
+                self.config._connections_add(**op[1])
+        self.config._saveconfig(self.config.file)
+    except BaseException:
+        self.config.connections.clear()
+        self.config.connections.update(snap_connections)
+        raise</code></pre>
 </details>
-<div class="desc"><p>Import nodes/folders from a dictionary.</p></div>
+<div class="desc"><p>Import nodes/folders from a dictionary atomically with context pre-validation.</p></div>
 </dd>
 <dt id="connpy.services.ImportExportService.import_from_file"><code class="name flex">
 <span>def <span class="ident">import_from_file</span></span>(<span>self, file_path)</span>
@@ -2118,7 +2433,7 @@ el.replaceWith(d);
 </dd>
 <dt id="connpy.services.NodeService"><code class="flex name class">
 <span>class <span class="ident">NodeService</span></span>
-<span>(</span><span>config=None)</span>
+<span>(</span><span>config=None, enforce_context: bool = True)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -2143,8 +2458,104 @@ el.replaceWith(d);
         &#34;type&#34;,
     })
 
-    def __init__(self, config=None):
+    def __init__(self, config=None, enforce_context: bool = True):
         super().__init__(config)
+        self.enforce_context = bool(enforce_context)
+
+    def _get_context_service(self, cfg=None):
+        target_cfg = cfg or self.config
+        if (
+            not getattr(self, &#34;enforce_context&#34;, True)
+            or not getattr(target_cfg, &#34;_enforce_context&#34;, True)
+            or (len(sys.argv) &gt; 1 and sys.argv[1] == &#34;api&#34;)
+            or not isinstance(getattr(target_cfg, &#34;config&#34;, None), dict)
+        ):
+            return None
+        from .context_service import ContextService
+
+        return ContextService(target_cfg)
+
+    def _get_raw_folders(self, cfg=None) -&gt; list[str]:
+        target_cfg = cfg or self.config
+        if target_cfg is None:
+            return []
+        if (
+            not hasattr(target_cfg, &#34;assert_called&#34;)
+            and callable(getattr(target_cfg, &#34;_getallfolders_unlocked&#34;, None))
+            and hasattr(target_cfg, &#34;_mutation_lock&#34;)
+        ):
+            with target_cfg._mutation_lock:
+                return target_cfg._getallfolders_unlocked()
+        return target_cfg._getallfolders()
+
+    def _get_raw_nodes(self, cfg=None) -&gt; list[str]:
+        target_cfg = cfg or self.config
+        if target_cfg is None:
+            return []
+        if (
+            not hasattr(target_cfg, &#34;assert_called&#34;)
+            and callable(getattr(target_cfg, &#34;_getallnodes_unlocked&#34;, None))
+            and hasattr(target_cfg, &#34;_mutation_lock&#34;)
+        ):
+            with target_cfg._mutation_lock:
+                return target_cfg._getallnodes_unlocked()
+        return target_cfg._getallnodes()
+
+    def _derive_parent_folder(self, cfg, unique_id: str, is_folder: bool) -&gt; str | None:
+        explode_fn = (
+            cfg._explode_unique_unlocked
+            if (
+                not hasattr(cfg, &#34;assert_called&#34;)
+                and callable(getattr(cfg, &#34;_explode_unique_unlocked&#34;, None))
+            )
+            else cfg._explode_unique
+        )
+        uniques = explode_fn(unique_id)
+        if is_folder:
+            if (
+                not isinstance(unique_id, str)
+                or not unique_id.startswith(&#34;@&#34;)
+                or not isinstance(uniques, dict)
+                or &#34;folder&#34; not in uniques
+            ):
+                raise InvalidConfigurationError(f&#34;Invalid folder name &#39;{unique_id}&#39;.&#34;)
+            if &#34;subfolder&#34; in uniques:
+                return f&#34;@{uniques[&#39;folder&#39;]}&#34;
+            return None
+        if (
+            not isinstance(unique_id, str)
+            or unique_id.startswith(&#34;@&#34;)
+            or not isinstance(uniques, dict)
+            or not uniques.get(&#34;id&#34;)
+        ):
+            raise InvalidConfigurationError(f&#34;Invalid node name &#39;{unique_id}&#39;.&#34;)
+        if &#34;subfolder&#34; in uniques and &#34;folder&#34; in uniques:
+            return f&#34;@{uniques[&#39;subfolder&#39;]}@{uniques[&#39;folder&#39;]}&#34;
+        if &#34;folder&#34; in uniques:
+            return f&#34;@{uniques[&#39;folder&#39;]}&#34;
+        return None
+
+    def _folder_exists(self, parent_folder: str, raw_folders: list[str], cfg=None) -&gt; bool:
+        target_cfg = cfg or self.config
+        cfg_dict = getattr(target_cfg, &#34;config&#34;, None)
+        case = cfg_dict.get(&#34;case&#34;, False) if isinstance(cfg_dict, dict) else False
+        if case:
+            return parent_folder in raw_folders
+        return parent_folder.lower() in {f.lower() for f in raw_folders}
+
+    def _ensure_in_active_context(
+        self, unique_id: str, *, is_folder: bool = False, not_found_msg: str | None = None
+    ) -&gt; None:
+        ctx_svc = self._get_context_service()
+        if (
+            ctx_svc is not None
+            and not ctx_svc.is_default_all_context()
+            and not ctx_svc.matches_active_context(unique_id)
+        ):
+            if not_found_msg is not None:
+                raise NodeNotFoundError(not_found_msg)
+            label = &#34;Folder&#34; if is_folder else &#34;Node&#34;
+            raise NodeNotFoundError(f&#34;{label} &#39;{unique_id}&#39; not found.&#34;)
 
     @staticmethod
     def _validate_node_payload(data):
@@ -2182,7 +2593,11 @@ el.replaceWith(d);
         if filter_str:
             flags = re.IGNORECASE if not case_sensitive else 0
             nodes = [n for n in nodes if re.search(filter_str, n, flags)]
-            
+
+        ctx_svc = self._get_context_service()
+        if ctx_svc is not None and not ctx_svc.is_default_all_context():
+            nodes = ctx_svc.filter_node_list(result=nodes)
+
         if not format_str:
             return nodes
             
@@ -2239,10 +2654,14 @@ el.replaceWith(d);
             else:
                 flags = re.IGNORECASE if not case_sensitive else 0
                 folders = [f for f in folders if re.search(filter_str, f, flags)]
+        ctx_svc = self._get_context_service()
+        if ctx_svc is not None and not ctx_svc.is_default_all_context():
+            folders = ctx_svc.filter_node_list(result=folders)
         return folders
 
     def get_node_details(self, unique_id):
         &#34;&#34;&#34;Return full configuration dictionary for a specific node.&#34;&#34;&#34;
+        self._ensure_in_active_context(unique_id, is_folder=False)
         try:
             details = self.config.getitem(unique_id)
             if not details:
@@ -2260,50 +2679,45 @@ el.replaceWith(d);
         self.config._generate_nodes_cache(nodes=nodes, folders=folders, profiles=profiles)
 
     def validate_parent_folder(self, unique_id, is_folder=False):
-        &#34;&#34;&#34;Check if parent folder exists for a given node unique ID.&#34;&#34;&#34;
-        if is_folder:
-            uniques = self.config._explode_unique(unique_id)
-            if uniques and &#34;subfolder&#34; in uniques and &#34;folder&#34; in uniques:
-                parent_folder = f&#34;@{uniques[&#39;folder&#39;]}&#34;
-                if parent_folder not in self.config._getallfolders():
-                    raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
-        else:
-            node_folder = unique_id.partition(&#34;@&#34;)[2]
-            if node_folder:
-                parent_folder = f&#34;@{node_folder}&#34;
-                if parent_folder not in self.config._getallfolders():
-                    raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
-
+        &#34;&#34;&#34;Check if unique_id is in active context and its parent folder exists.&#34;&#34;&#34;
+        parent_folder = self._derive_parent_folder(self.config, unique_id, is_folder=is_folder)
+        ctx_svc = self._get_context_service()
+        if ctx_svc is not None:
+            ctx_svc.validate_in_active_context(unique_id, is_folder=is_folder)
+        if parent_folder is not None and not self._folder_exists(
+            parent_folder, self._get_raw_folders(), self.config
+        ):
+            raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
 
     def add_node(self, unique_id, data, is_folder=False):
         &#34;&#34;&#34;Logic for adding a new node or folder to configuration.&#34;&#34;&#34;
         if not is_folder:
             self._validate_node_name(unique_id)
             self._validate_node_payload(data)
+        self.validate_parent_folder(unique_id, is_folder=is_folder)
 
         if _supports_transactional_update(self.config):
             def _mut(cfg):
                 all_nodes = cfg._getallnodes_unlocked()
                 all_folders = cfg._getallfolders_unlocked()
+                parent_folder = self._derive_parent_folder(cfg, unique_id, is_folder=is_folder)
+                ctx_svc = self._get_context_service(cfg)
+                if ctx_svc is not None:
+                    ctx_svc.validate_in_active_context(unique_id, is_folder=is_folder)
+                if parent_folder is not None and not self._folder_exists(
+                    parent_folder, all_folders, cfg
+                ):
+                    raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
                 if is_folder:
                     if unique_id in all_folders:
                         raise NodeAlreadyExistsError(f&#34;Folder &#39;{unique_id}&#39; already exists.&#34;)
                     uniques = cfg._explode_unique_unlocked(unique_id)
                     if not uniques:
                         raise InvalidConfigurationError(f&#34;Invalid folder name &#39;{unique_id}&#39;.&#34;)
-                    if &#34;subfolder&#34; in uniques:
-                        parent_folder = f&#34;@{uniques[&#39;folder&#39;]}&#34;
-                        if parent_folder not in all_folders:
-                            raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
                     cfg._folder_add_unlocked(**uniques)
                 else:
                     if unique_id in all_nodes:
                         raise NodeAlreadyExistsError(f&#34;Node &#39;{unique_id}&#39; already exists.&#34;)
-                    node_folder = unique_id.partition(&#34;@&#34;)[2]
-                    if node_folder:
-                        parent_folder = f&#34;@{node_folder}&#34;
-                        if parent_folder not in all_folders:
-                            raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
                     payload = deepcopy(data)
                     if &#34;id&#34; not in payload:
                         uniques = cfg._explode_unique_unlocked(unique_id)
@@ -2360,6 +2774,7 @@ el.replaceWith(d);
 
     def update_node(self, unique_id, data, save=True):
         &#34;&#34;&#34;Explicitly update an existing node.&#34;&#34;&#34;
+        self._ensure_in_active_context(unique_id, is_folder=False)
         if _supports_transactional_update(self.config) and save:
             def _mut(cfg):
                 all_nodes = cfg._getallnodes_unlocked()
@@ -2386,6 +2801,7 @@ el.replaceWith(d);
 
     def delete_node(self, unique_id, is_folder=False, save=True):
         &#34;&#34;&#34;Logic for deleting a node or folder.&#34;&#34;&#34;
+        self._ensure_in_active_context(unique_id, is_folder=is_folder)
         if _supports_transactional_update(self.config) and save:
             def _mut(cfg):
                 uniques = cfg._explode_unique_unlocked(unique_id)
@@ -2416,6 +2832,7 @@ el.replaceWith(d);
 
     def connect_node(self, unique_id, sftp=False, debug=False, logger=None):
         &#34;&#34;&#34;Interact with a node directly.&#34;&#34;&#34;
+        self._ensure_in_active_context(unique_id, is_folder=False)
         from connpy.core import node
 
         from ..auth_utils import resolve_fallback_entries
@@ -2452,10 +2869,28 @@ el.replaceWith(d);
 
     def move_node(self, src_id, dst_id, copy=False):
         &#34;&#34;&#34;Move or copy a node.&#34;&#34;&#34;
+        self._ensure_in_active_context(
+            src_id, is_folder=False, not_found_msg=f&#34;Source node &#39;{src_id}&#39; not found.&#34;
+        )
         self._validate_node_name(dst_id)
+        self.validate_parent_folder(dst_id, is_folder=False)
 
         if _supports_transactional_update(self.config):
             def _mut(cfg):
+                ctx_svc = self._get_context_service(cfg)
+                if (
+                    ctx_svc is not None
+                    and not ctx_svc.is_default_all_context()
+                    and not ctx_svc.matches_active_context(src_id)
+                ):
+                    raise NodeNotFoundError(f&#34;Source node &#39;{src_id}&#39; not found.&#34;)
+                parent_folder = self._derive_parent_folder(cfg, dst_id, is_folder=False)
+                if ctx_svc is not None:
+                    ctx_svc.validate_in_active_context(dst_id, is_folder=False)
+                if parent_folder is not None and not self._folder_exists(
+                    parent_folder, cfg._getallfolders_unlocked(), cfg
+                ):
+                    raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
                 try:
                     node_data = cfg.getitem_unlocked(src_id)
                 except (KeyError, TypeError):
@@ -2502,12 +2937,23 @@ el.replaceWith(d);
     def bulk_add(self, ids, hosts, common_data):
         &#34;&#34;&#34;Add multiple nodes with shared common configuration.&#34;&#34;&#34;
         self._validate_node_payload(common_data)
+        for uid in ids:
+            self.validate_parent_folder(uid, is_folder=False)
 
         if _supports_transactional_update(self.config):
             def _build_entries(cfg):
                 all_nodes = cfg._getallnodes_unlocked()
+                all_folders = cfg._getallfolders_unlocked()
+                ctx_svc = self._get_context_service(cfg)
                 planned = []
                 for i, uid in enumerate(ids):
+                    parent_folder = self._derive_parent_folder(cfg, uid, is_folder=False)
+                    if ctx_svc is not None:
+                        ctx_svc.validate_in_active_context(uid, is_folder=False)
+                    if parent_folder is not None and not self._folder_exists(
+                        parent_folder, all_folders, cfg
+                    ):
+                        raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
                     if uid in all_nodes:
                         continue
                     try:
@@ -2625,30 +3071,30 @@ el.replaceWith(d);
     if not is_folder:
         self._validate_node_name(unique_id)
         self._validate_node_payload(data)
+    self.validate_parent_folder(unique_id, is_folder=is_folder)
 
     if _supports_transactional_update(self.config):
         def _mut(cfg):
             all_nodes = cfg._getallnodes_unlocked()
             all_folders = cfg._getallfolders_unlocked()
+            parent_folder = self._derive_parent_folder(cfg, unique_id, is_folder=is_folder)
+            ctx_svc = self._get_context_service(cfg)
+            if ctx_svc is not None:
+                ctx_svc.validate_in_active_context(unique_id, is_folder=is_folder)
+            if parent_folder is not None and not self._folder_exists(
+                parent_folder, all_folders, cfg
+            ):
+                raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
             if is_folder:
                 if unique_id in all_folders:
                     raise NodeAlreadyExistsError(f&#34;Folder &#39;{unique_id}&#39; already exists.&#34;)
                 uniques = cfg._explode_unique_unlocked(unique_id)
                 if not uniques:
                     raise InvalidConfigurationError(f&#34;Invalid folder name &#39;{unique_id}&#39;.&#34;)
-                if &#34;subfolder&#34; in uniques:
-                    parent_folder = f&#34;@{uniques[&#39;folder&#39;]}&#34;
-                    if parent_folder not in all_folders:
-                        raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
                 cfg._folder_add_unlocked(**uniques)
             else:
                 if unique_id in all_nodes:
                     raise NodeAlreadyExistsError(f&#34;Node &#39;{unique_id}&#39; already exists.&#34;)
-                node_folder = unique_id.partition(&#34;@&#34;)[2]
-                if node_folder:
-                    parent_folder = f&#34;@{node_folder}&#34;
-                    if parent_folder not in all_folders:
-                        raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
                 payload = deepcopy(data)
                 if &#34;id&#34; not in payload:
                     uniques = cfg._explode_unique_unlocked(unique_id)
@@ -2702,12 +3148,23 @@ el.replaceWith(d);
 <pre><code class="python">def bulk_add(self, ids, hosts, common_data):
     &#34;&#34;&#34;Add multiple nodes with shared common configuration.&#34;&#34;&#34;
     self._validate_node_payload(common_data)
+    for uid in ids:
+        self.validate_parent_folder(uid, is_folder=False)
 
     if _supports_transactional_update(self.config):
         def _build_entries(cfg):
             all_nodes = cfg._getallnodes_unlocked()
+            all_folders = cfg._getallfolders_unlocked()
+            ctx_svc = self._get_context_service(cfg)
             planned = []
             for i, uid in enumerate(ids):
+                parent_folder = self._derive_parent_folder(cfg, uid, is_folder=False)
+                if ctx_svc is not None:
+                    ctx_svc.validate_in_active_context(uid, is_folder=False)
+                if parent_folder is not None and not self._folder_exists(
+                    parent_folder, all_folders, cfg
+                ):
+                    raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
                 if uid in all_nodes:
                     continue
                 try:
@@ -2782,6 +3239,7 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def connect_node(self, unique_id, sftp=False, debug=False, logger=None):
     &#34;&#34;&#34;Interact with a node directly.&#34;&#34;&#34;
+    self._ensure_in_active_context(unique_id, is_folder=False)
     from connpy.core import node
 
     from ..auth_utils import resolve_fallback_entries
@@ -2828,6 +3286,7 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def delete_node(self, unique_id, is_folder=False, save=True):
     &#34;&#34;&#34;Logic for deleting a node or folder.&#34;&#34;&#34;
+    self._ensure_in_active_context(unique_id, is_folder=is_folder)
     if _supports_transactional_update(self.config) and save:
         def _mut(cfg):
             uniques = cfg._explode_unique_unlocked(unique_id)
@@ -2944,6 +3403,7 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def get_node_details(self, unique_id):
     &#34;&#34;&#34;Return full configuration dictionary for a specific node.&#34;&#34;&#34;
+    self._ensure_in_active_context(unique_id, is_folder=False)
     try:
         details = self.config.getitem(unique_id)
         if not details:
@@ -2976,6 +3436,9 @@ el.replaceWith(d);
         else:
             flags = re.IGNORECASE if not case_sensitive else 0
             folders = [f for f in folders if re.search(filter_str, f, flags)]
+    ctx_svc = self._get_context_service()
+    if ctx_svc is not None and not ctx_svc.is_default_all_context():
+        folders = ctx_svc.filter_node_list(result=folders)
     return folders</code></pre>
 </details>
 <div class="desc"><p>Return all unique folders, optionally filtered by regex.</p></div>
@@ -2996,7 +3459,11 @@ el.replaceWith(d);
     if filter_str:
         flags = re.IGNORECASE if not case_sensitive else 0
         nodes = [n for n in nodes if re.search(filter_str, n, flags)]
-        
+
+    ctx_svc = self._get_context_service()
+    if ctx_svc is not None and not ctx_svc.is_default_all_context():
+        nodes = ctx_svc.filter_node_list(result=nodes)
+
     if not format_str:
         return nodes
         
@@ -3051,10 +3518,28 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def move_node(self, src_id, dst_id, copy=False):
     &#34;&#34;&#34;Move or copy a node.&#34;&#34;&#34;
+    self._ensure_in_active_context(
+        src_id, is_folder=False, not_found_msg=f&#34;Source node &#39;{src_id}&#39; not found.&#34;
+    )
     self._validate_node_name(dst_id)
+    self.validate_parent_folder(dst_id, is_folder=False)
 
     if _supports_transactional_update(self.config):
         def _mut(cfg):
+            ctx_svc = self._get_context_service(cfg)
+            if (
+                ctx_svc is not None
+                and not ctx_svc.is_default_all_context()
+                and not ctx_svc.matches_active_context(src_id)
+            ):
+                raise NodeNotFoundError(f&#34;Source node &#39;{src_id}&#39; not found.&#34;)
+            parent_folder = self._derive_parent_folder(cfg, dst_id, is_folder=False)
+            if ctx_svc is not None:
+                ctx_svc.validate_in_active_context(dst_id, is_folder=False)
+            if parent_folder is not None and not self._folder_exists(
+                parent_folder, cfg._getallfolders_unlocked(), cfg
+            ):
+                raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
             try:
                 node_data = cfg.getitem_unlocked(src_id)
             except (KeyError, TypeError):
@@ -3110,6 +3595,7 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def update_node(self, unique_id, data, save=True):
     &#34;&#34;&#34;Explicitly update an existing node.&#34;&#34;&#34;
+    self._ensure_in_active_context(unique_id, is_folder=False)
     if _supports_transactional_update(self.config) and save:
         def _mut(cfg):
             all_nodes = cfg._getallnodes_unlocked()
@@ -3145,21 +3631,17 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def validate_parent_folder(self, unique_id, is_folder=False):
-    &#34;&#34;&#34;Check if parent folder exists for a given node unique ID.&#34;&#34;&#34;
-    if is_folder:
-        uniques = self.config._explode_unique(unique_id)
-        if uniques and &#34;subfolder&#34; in uniques and &#34;folder&#34; in uniques:
-            parent_folder = f&#34;@{uniques[&#39;folder&#39;]}&#34;
-            if parent_folder not in self.config._getallfolders():
-                raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
-    else:
-        node_folder = unique_id.partition(&#34;@&#34;)[2]
-        if node_folder:
-            parent_folder = f&#34;@{node_folder}&#34;
-            if parent_folder not in self.config._getallfolders():
-                raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)</code></pre>
+    &#34;&#34;&#34;Check if unique_id is in active context and its parent folder exists.&#34;&#34;&#34;
+    parent_folder = self._derive_parent_folder(self.config, unique_id, is_folder=is_folder)
+    ctx_svc = self._get_context_service()
+    if ctx_svc is not None:
+        ctx_svc.validate_in_active_context(unique_id, is_folder=is_folder)
+    if parent_folder is not None and not self._folder_exists(
+        parent_folder, self._get_raw_folders(), self.config
+    ):
+        raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)</code></pre>
 </details>
-<div class="desc"><p>Check if parent folder exists for a given node unique ID.</p></div>
+<div class="desc"><p>Check if unique_id is in active context and its parent folder exists.</p></div>
 </dd>
 </dl>
 <h3>Inherited members</h3>
@@ -4102,18 +4584,13 @@ el.replaceWith(d);
         resolved = deepcopy(node_data)
 
         auth_referenced_profiles = []
-        other_referenced_profiles = []
-        for key, value in resolved.items():
-            if key == &#34;fallback&#34;:
-                continue
-            target_refs = (
-                auth_referenced_profiles if key in (&#34;user&#34;, &#34;password&#34;) else other_referenced_profiles
-            )
+        for key in (&#34;user&#34;, &#34;password&#34;):
+            value = resolved.get(key)
             if isinstance(value, str):
                 if not is_compose_expression(value) and value.startswith(&#34;@&#34;):
                     ref = value[1:]
                     if key != &#34;password&#34; or ref in profiles:
-                        target_refs.append(ref)
+                        auth_referenced_profiles.append(ref)
             elif isinstance(value, (list, tuple)):
                 for item in value:
                     if (
@@ -4123,7 +4600,7 @@ el.replaceWith(d);
                     ):
                         ref = item[1:]
                         if key != &#34;password&#34; or ref in profiles:
-                            target_refs.append(ref)
+                            auth_referenced_profiles.append(ref)
 
         def _get_resolved_ref(prof_name):
             if prof_name in _visited or _depth &gt;= MAX_PROFILE_DEPTH:
@@ -4188,15 +4665,16 @@ el.replaceWith(d);
                         resolved_list.append(item)
                 resolved[key] = resolved_list
 
-        ordered_profiles = list(dict.fromkeys(auth_referenced_profiles + other_referenced_profiles))
-        for base_profile_name in ordered_profiles:
+        dedup_auth_profiles = list(dict.fromkeys(auth_referenced_profiles))
+        for base_profile_name in dedup_auth_profiles:
             with suppress(ProfileNotFoundError):
                 base_profile = _get_resolved_ref(base_profile_name)
-                for key, value in base_profile.items():
-                    if (key not in resolved or resolved[key] in (&#34;&#34;, [], None)) and (
-                        value not in (&#34;&#34;, [], None) or key not in resolved
-                    ):
-                        resolved[key] = deepcopy(value)
+                for key in (&#34;user&#34;, &#34;password&#34;, &#34;fallback&#34;):
+                    val = base_profile.get(key)
+                    if (
+                        key not in resolved or resolved[key] in (&#34;&#34;, [], None)
+                    ) and val not in (&#34;&#34;, [], None):
+                        resolved[key] = deepcopy(val)
 
         if resolved.get(&#34;protocol&#34;) in (&#34;&#34;, None):
             try:
@@ -4429,18 +4907,13 @@ el.replaceWith(d);
     resolved = deepcopy(node_data)
 
     auth_referenced_profiles = []
-    other_referenced_profiles = []
-    for key, value in resolved.items():
-        if key == &#34;fallback&#34;:
-            continue
-        target_refs = (
-            auth_referenced_profiles if key in (&#34;user&#34;, &#34;password&#34;) else other_referenced_profiles
-        )
+    for key in (&#34;user&#34;, &#34;password&#34;):
+        value = resolved.get(key)
         if isinstance(value, str):
             if not is_compose_expression(value) and value.startswith(&#34;@&#34;):
                 ref = value[1:]
                 if key != &#34;password&#34; or ref in profiles:
-                    target_refs.append(ref)
+                    auth_referenced_profiles.append(ref)
         elif isinstance(value, (list, tuple)):
             for item in value:
                 if (
@@ -4450,7 +4923,7 @@ el.replaceWith(d);
                 ):
                     ref = item[1:]
                     if key != &#34;password&#34; or ref in profiles:
-                        target_refs.append(ref)
+                        auth_referenced_profiles.append(ref)
 
     def _get_resolved_ref(prof_name):
         if prof_name in _visited or _depth &gt;= MAX_PROFILE_DEPTH:
@@ -4515,15 +4988,16 @@ el.replaceWith(d);
                     resolved_list.append(item)
             resolved[key] = resolved_list
 
-    ordered_profiles = list(dict.fromkeys(auth_referenced_profiles + other_referenced_profiles))
-    for base_profile_name in ordered_profiles:
+    dedup_auth_profiles = list(dict.fromkeys(auth_referenced_profiles))
+    for base_profile_name in dedup_auth_profiles:
         with suppress(ProfileNotFoundError):
             base_profile = _get_resolved_ref(base_profile_name)
-            for key, value in base_profile.items():
-                if (key not in resolved or resolved[key] in (&#34;&#34;, [], None)) and (
-                    value not in (&#34;&#34;, [], None) or key not in resolved
-                ):
-                    resolved[key] = deepcopy(value)
+            for key in (&#34;user&#34;, &#34;password&#34;, &#34;fallback&#34;):
+                val = base_profile.get(key)
+                if (
+                    key not in resolved or resolved[key] in (&#34;&#34;, [], None)
+                ) and val not in (&#34;&#34;, [], None):
+                    resolved[key] = deepcopy(val)
 
     if resolved.get(&#34;protocol&#34;) in (&#34;&#34;, None):
         try:

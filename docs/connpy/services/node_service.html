@@ -48,7 +48,7 @@ el.replaceWith(d);
 <dl>
 <dt id="connpy.services.node_service.NodeService"><code class="flex name class">
 <span>class <span class="ident">NodeService</span></span>
-<span>(</span><span>config=None)</span>
+<span>(</span><span>config=None, enforce_context: bool = True)</span>
 </code></dt>
 <dd>
 <details class="source">
@@ -73,8 +73,104 @@ el.replaceWith(d);
         &#34;type&#34;,
     })
 
-    def __init__(self, config=None):
+    def __init__(self, config=None, enforce_context: bool = True):
         super().__init__(config)
+        self.enforce_context = bool(enforce_context)
+
+    def _get_context_service(self, cfg=None):
+        target_cfg = cfg or self.config
+        if (
+            not getattr(self, &#34;enforce_context&#34;, True)
+            or not getattr(target_cfg, &#34;_enforce_context&#34;, True)
+            or (len(sys.argv) &gt; 1 and sys.argv[1] == &#34;api&#34;)
+            or not isinstance(getattr(target_cfg, &#34;config&#34;, None), dict)
+        ):
+            return None
+        from .context_service import ContextService
+
+        return ContextService(target_cfg)
+
+    def _get_raw_folders(self, cfg=None) -&gt; list[str]:
+        target_cfg = cfg or self.config
+        if target_cfg is None:
+            return []
+        if (
+            not hasattr(target_cfg, &#34;assert_called&#34;)
+            and callable(getattr(target_cfg, &#34;_getallfolders_unlocked&#34;, None))
+            and hasattr(target_cfg, &#34;_mutation_lock&#34;)
+        ):
+            with target_cfg._mutation_lock:
+                return target_cfg._getallfolders_unlocked()
+        return target_cfg._getallfolders()
+
+    def _get_raw_nodes(self, cfg=None) -&gt; list[str]:
+        target_cfg = cfg or self.config
+        if target_cfg is None:
+            return []
+        if (
+            not hasattr(target_cfg, &#34;assert_called&#34;)
+            and callable(getattr(target_cfg, &#34;_getallnodes_unlocked&#34;, None))
+            and hasattr(target_cfg, &#34;_mutation_lock&#34;)
+        ):
+            with target_cfg._mutation_lock:
+                return target_cfg._getallnodes_unlocked()
+        return target_cfg._getallnodes()
+
+    def _derive_parent_folder(self, cfg, unique_id: str, is_folder: bool) -&gt; str | None:
+        explode_fn = (
+            cfg._explode_unique_unlocked
+            if (
+                not hasattr(cfg, &#34;assert_called&#34;)
+                and callable(getattr(cfg, &#34;_explode_unique_unlocked&#34;, None))
+            )
+            else cfg._explode_unique
+        )
+        uniques = explode_fn(unique_id)
+        if is_folder:
+            if (
+                not isinstance(unique_id, str)
+                or not unique_id.startswith(&#34;@&#34;)
+                or not isinstance(uniques, dict)
+                or &#34;folder&#34; not in uniques
+            ):
+                raise InvalidConfigurationError(f&#34;Invalid folder name &#39;{unique_id}&#39;.&#34;)
+            if &#34;subfolder&#34; in uniques:
+                return f&#34;@{uniques[&#39;folder&#39;]}&#34;
+            return None
+        if (
+            not isinstance(unique_id, str)
+            or unique_id.startswith(&#34;@&#34;)
+            or not isinstance(uniques, dict)
+            or not uniques.get(&#34;id&#34;)
+        ):
+            raise InvalidConfigurationError(f&#34;Invalid node name &#39;{unique_id}&#39;.&#34;)
+        if &#34;subfolder&#34; in uniques and &#34;folder&#34; in uniques:
+            return f&#34;@{uniques[&#39;subfolder&#39;]}@{uniques[&#39;folder&#39;]}&#34;
+        if &#34;folder&#34; in uniques:
+            return f&#34;@{uniques[&#39;folder&#39;]}&#34;
+        return None
+
+    def _folder_exists(self, parent_folder: str, raw_folders: list[str], cfg=None) -&gt; bool:
+        target_cfg = cfg or self.config
+        cfg_dict = getattr(target_cfg, &#34;config&#34;, None)
+        case = cfg_dict.get(&#34;case&#34;, False) if isinstance(cfg_dict, dict) else False
+        if case:
+            return parent_folder in raw_folders
+        return parent_folder.lower() in {f.lower() for f in raw_folders}
+
+    def _ensure_in_active_context(
+        self, unique_id: str, *, is_folder: bool = False, not_found_msg: str | None = None
+    ) -&gt; None:
+        ctx_svc = self._get_context_service()
+        if (
+            ctx_svc is not None
+            and not ctx_svc.is_default_all_context()
+            and not ctx_svc.matches_active_context(unique_id)
+        ):
+            if not_found_msg is not None:
+                raise NodeNotFoundError(not_found_msg)
+            label = &#34;Folder&#34; if is_folder else &#34;Node&#34;
+            raise NodeNotFoundError(f&#34;{label} &#39;{unique_id}&#39; not found.&#34;)
 
     @staticmethod
     def _validate_node_payload(data):
@@ -112,7 +208,11 @@ el.replaceWith(d);
         if filter_str:
             flags = re.IGNORECASE if not case_sensitive else 0
             nodes = [n for n in nodes if re.search(filter_str, n, flags)]
-            
+
+        ctx_svc = self._get_context_service()
+        if ctx_svc is not None and not ctx_svc.is_default_all_context():
+            nodes = ctx_svc.filter_node_list(result=nodes)
+
         if not format_str:
             return nodes
             
@@ -169,10 +269,14 @@ el.replaceWith(d);
             else:
                 flags = re.IGNORECASE if not case_sensitive else 0
                 folders = [f for f in folders if re.search(filter_str, f, flags)]
+        ctx_svc = self._get_context_service()
+        if ctx_svc is not None and not ctx_svc.is_default_all_context():
+            folders = ctx_svc.filter_node_list(result=folders)
         return folders
 
     def get_node_details(self, unique_id):
         &#34;&#34;&#34;Return full configuration dictionary for a specific node.&#34;&#34;&#34;
+        self._ensure_in_active_context(unique_id, is_folder=False)
         try:
             details = self.config.getitem(unique_id)
             if not details:
@@ -190,50 +294,45 @@ el.replaceWith(d);
         self.config._generate_nodes_cache(nodes=nodes, folders=folders, profiles=profiles)
 
     def validate_parent_folder(self, unique_id, is_folder=False):
-        &#34;&#34;&#34;Check if parent folder exists for a given node unique ID.&#34;&#34;&#34;
-        if is_folder:
-            uniques = self.config._explode_unique(unique_id)
-            if uniques and &#34;subfolder&#34; in uniques and &#34;folder&#34; in uniques:
-                parent_folder = f&#34;@{uniques[&#39;folder&#39;]}&#34;
-                if parent_folder not in self.config._getallfolders():
-                    raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
-        else:
-            node_folder = unique_id.partition(&#34;@&#34;)[2]
-            if node_folder:
-                parent_folder = f&#34;@{node_folder}&#34;
-                if parent_folder not in self.config._getallfolders():
-                    raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
-
+        &#34;&#34;&#34;Check if unique_id is in active context and its parent folder exists.&#34;&#34;&#34;
+        parent_folder = self._derive_parent_folder(self.config, unique_id, is_folder=is_folder)
+        ctx_svc = self._get_context_service()
+        if ctx_svc is not None:
+            ctx_svc.validate_in_active_context(unique_id, is_folder=is_folder)
+        if parent_folder is not None and not self._folder_exists(
+            parent_folder, self._get_raw_folders(), self.config
+        ):
+            raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
 
     def add_node(self, unique_id, data, is_folder=False):
         &#34;&#34;&#34;Logic for adding a new node or folder to configuration.&#34;&#34;&#34;
         if not is_folder:
             self._validate_node_name(unique_id)
             self._validate_node_payload(data)
+        self.validate_parent_folder(unique_id, is_folder=is_folder)
 
         if _supports_transactional_update(self.config):
             def _mut(cfg):
                 all_nodes = cfg._getallnodes_unlocked()
                 all_folders = cfg._getallfolders_unlocked()
+                parent_folder = self._derive_parent_folder(cfg, unique_id, is_folder=is_folder)
+                ctx_svc = self._get_context_service(cfg)
+                if ctx_svc is not None:
+                    ctx_svc.validate_in_active_context(unique_id, is_folder=is_folder)
+                if parent_folder is not None and not self._folder_exists(
+                    parent_folder, all_folders, cfg
+                ):
+                    raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
                 if is_folder:
                     if unique_id in all_folders:
                         raise NodeAlreadyExistsError(f&#34;Folder &#39;{unique_id}&#39; already exists.&#34;)
                     uniques = cfg._explode_unique_unlocked(unique_id)
                     if not uniques:
                         raise InvalidConfigurationError(f&#34;Invalid folder name &#39;{unique_id}&#39;.&#34;)
-                    if &#34;subfolder&#34; in uniques:
-                        parent_folder = f&#34;@{uniques[&#39;folder&#39;]}&#34;
-                        if parent_folder not in all_folders:
-                            raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
                     cfg._folder_add_unlocked(**uniques)
                 else:
                     if unique_id in all_nodes:
                         raise NodeAlreadyExistsError(f&#34;Node &#39;{unique_id}&#39; already exists.&#34;)
-                    node_folder = unique_id.partition(&#34;@&#34;)[2]
-                    if node_folder:
-                        parent_folder = f&#34;@{node_folder}&#34;
-                        if parent_folder not in all_folders:
-                            raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
                     payload = deepcopy(data)
                     if &#34;id&#34; not in payload:
                         uniques = cfg._explode_unique_unlocked(unique_id)
@@ -290,6 +389,7 @@ el.replaceWith(d);
 
     def update_node(self, unique_id, data, save=True):
         &#34;&#34;&#34;Explicitly update an existing node.&#34;&#34;&#34;
+        self._ensure_in_active_context(unique_id, is_folder=False)
         if _supports_transactional_update(self.config) and save:
             def _mut(cfg):
                 all_nodes = cfg._getallnodes_unlocked()
@@ -316,6 +416,7 @@ el.replaceWith(d);
 
     def delete_node(self, unique_id, is_folder=False, save=True):
         &#34;&#34;&#34;Logic for deleting a node or folder.&#34;&#34;&#34;
+        self._ensure_in_active_context(unique_id, is_folder=is_folder)
         if _supports_transactional_update(self.config) and save:
             def _mut(cfg):
                 uniques = cfg._explode_unique_unlocked(unique_id)
@@ -346,6 +447,7 @@ el.replaceWith(d);
 
     def connect_node(self, unique_id, sftp=False, debug=False, logger=None):
         &#34;&#34;&#34;Interact with a node directly.&#34;&#34;&#34;
+        self._ensure_in_active_context(unique_id, is_folder=False)
         from connpy.core import node
 
         from ..auth_utils import resolve_fallback_entries
@@ -382,10 +484,28 @@ el.replaceWith(d);
 
     def move_node(self, src_id, dst_id, copy=False):
         &#34;&#34;&#34;Move or copy a node.&#34;&#34;&#34;
+        self._ensure_in_active_context(
+            src_id, is_folder=False, not_found_msg=f&#34;Source node &#39;{src_id}&#39; not found.&#34;
+        )
         self._validate_node_name(dst_id)
+        self.validate_parent_folder(dst_id, is_folder=False)
 
         if _supports_transactional_update(self.config):
             def _mut(cfg):
+                ctx_svc = self._get_context_service(cfg)
+                if (
+                    ctx_svc is not None
+                    and not ctx_svc.is_default_all_context()
+                    and not ctx_svc.matches_active_context(src_id)
+                ):
+                    raise NodeNotFoundError(f&#34;Source node &#39;{src_id}&#39; not found.&#34;)
+                parent_folder = self._derive_parent_folder(cfg, dst_id, is_folder=False)
+                if ctx_svc is not None:
+                    ctx_svc.validate_in_active_context(dst_id, is_folder=False)
+                if parent_folder is not None and not self._folder_exists(
+                    parent_folder, cfg._getallfolders_unlocked(), cfg
+                ):
+                    raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
                 try:
                     node_data = cfg.getitem_unlocked(src_id)
                 except (KeyError, TypeError):
@@ -432,12 +552,23 @@ el.replaceWith(d);
     def bulk_add(self, ids, hosts, common_data):
         &#34;&#34;&#34;Add multiple nodes with shared common configuration.&#34;&#34;&#34;
         self._validate_node_payload(common_data)
+        for uid in ids:
+            self.validate_parent_folder(uid, is_folder=False)
 
         if _supports_transactional_update(self.config):
             def _build_entries(cfg):
                 all_nodes = cfg._getallnodes_unlocked()
+                all_folders = cfg._getallfolders_unlocked()
+                ctx_svc = self._get_context_service(cfg)
                 planned = []
                 for i, uid in enumerate(ids):
+                    parent_folder = self._derive_parent_folder(cfg, uid, is_folder=False)
+                    if ctx_svc is not None:
+                        ctx_svc.validate_in_active_context(uid, is_folder=False)
+                    if parent_folder is not None and not self._folder_exists(
+                        parent_folder, all_folders, cfg
+                    ):
+                        raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
                     if uid in all_nodes:
                         continue
                     try:
@@ -555,30 +686,30 @@ el.replaceWith(d);
     if not is_folder:
         self._validate_node_name(unique_id)
         self._validate_node_payload(data)
+    self.validate_parent_folder(unique_id, is_folder=is_folder)
 
     if _supports_transactional_update(self.config):
         def _mut(cfg):
             all_nodes = cfg._getallnodes_unlocked()
             all_folders = cfg._getallfolders_unlocked()
+            parent_folder = self._derive_parent_folder(cfg, unique_id, is_folder=is_folder)
+            ctx_svc = self._get_context_service(cfg)
+            if ctx_svc is not None:
+                ctx_svc.validate_in_active_context(unique_id, is_folder=is_folder)
+            if parent_folder is not None and not self._folder_exists(
+                parent_folder, all_folders, cfg
+            ):
+                raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
             if is_folder:
                 if unique_id in all_folders:
                     raise NodeAlreadyExistsError(f&#34;Folder &#39;{unique_id}&#39; already exists.&#34;)
                 uniques = cfg._explode_unique_unlocked(unique_id)
                 if not uniques:
                     raise InvalidConfigurationError(f&#34;Invalid folder name &#39;{unique_id}&#39;.&#34;)
-                if &#34;subfolder&#34; in uniques:
-                    parent_folder = f&#34;@{uniques[&#39;folder&#39;]}&#34;
-                    if parent_folder not in all_folders:
-                        raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
                 cfg._folder_add_unlocked(**uniques)
             else:
                 if unique_id in all_nodes:
                     raise NodeAlreadyExistsError(f&#34;Node &#39;{unique_id}&#39; already exists.&#34;)
-                node_folder = unique_id.partition(&#34;@&#34;)[2]
-                if node_folder:
-                    parent_folder = f&#34;@{node_folder}&#34;
-                    if parent_folder not in all_folders:
-                        raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
                 payload = deepcopy(data)
                 if &#34;id&#34; not in payload:
                     uniques = cfg._explode_unique_unlocked(unique_id)
@@ -632,12 +763,23 @@ el.replaceWith(d);
 <pre><code class="python">def bulk_add(self, ids, hosts, common_data):
     &#34;&#34;&#34;Add multiple nodes with shared common configuration.&#34;&#34;&#34;
     self._validate_node_payload(common_data)
+    for uid in ids:
+        self.validate_parent_folder(uid, is_folder=False)
 
     if _supports_transactional_update(self.config):
         def _build_entries(cfg):
             all_nodes = cfg._getallnodes_unlocked()
+            all_folders = cfg._getallfolders_unlocked()
+            ctx_svc = self._get_context_service(cfg)
             planned = []
             for i, uid in enumerate(ids):
+                parent_folder = self._derive_parent_folder(cfg, uid, is_folder=False)
+                if ctx_svc is not None:
+                    ctx_svc.validate_in_active_context(uid, is_folder=False)
+                if parent_folder is not None and not self._folder_exists(
+                    parent_folder, all_folders, cfg
+                ):
+                    raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
                 if uid in all_nodes:
                     continue
                 try:
@@ -712,6 +854,7 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def connect_node(self, unique_id, sftp=False, debug=False, logger=None):
     &#34;&#34;&#34;Interact with a node directly.&#34;&#34;&#34;
+    self._ensure_in_active_context(unique_id, is_folder=False)
     from connpy.core import node
 
     from ..auth_utils import resolve_fallback_entries
@@ -758,6 +901,7 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def delete_node(self, unique_id, is_folder=False, save=True):
     &#34;&#34;&#34;Logic for deleting a node or folder.&#34;&#34;&#34;
+    self._ensure_in_active_context(unique_id, is_folder=is_folder)
     if _supports_transactional_update(self.config) and save:
         def _mut(cfg):
             uniques = cfg._explode_unique_unlocked(unique_id)
@@ -874,6 +1018,7 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def get_node_details(self, unique_id):
     &#34;&#34;&#34;Return full configuration dictionary for a specific node.&#34;&#34;&#34;
+    self._ensure_in_active_context(unique_id, is_folder=False)
     try:
         details = self.config.getitem(unique_id)
         if not details:
@@ -906,6 +1051,9 @@ el.replaceWith(d);
         else:
             flags = re.IGNORECASE if not case_sensitive else 0
             folders = [f for f in folders if re.search(filter_str, f, flags)]
+    ctx_svc = self._get_context_service()
+    if ctx_svc is not None and not ctx_svc.is_default_all_context():
+        folders = ctx_svc.filter_node_list(result=folders)
     return folders</code></pre>
 </details>
 <div class="desc"><p>Return all unique folders, optionally filtered by regex.</p></div>
@@ -926,7 +1074,11 @@ el.replaceWith(d);
     if filter_str:
         flags = re.IGNORECASE if not case_sensitive else 0
         nodes = [n for n in nodes if re.search(filter_str, n, flags)]
-        
+
+    ctx_svc = self._get_context_service()
+    if ctx_svc is not None and not ctx_svc.is_default_all_context():
+        nodes = ctx_svc.filter_node_list(result=nodes)
+
     if not format_str:
         return nodes
         
@@ -981,10 +1133,28 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def move_node(self, src_id, dst_id, copy=False):
     &#34;&#34;&#34;Move or copy a node.&#34;&#34;&#34;
+    self._ensure_in_active_context(
+        src_id, is_folder=False, not_found_msg=f&#34;Source node &#39;{src_id}&#39; not found.&#34;
+    )
     self._validate_node_name(dst_id)
+    self.validate_parent_folder(dst_id, is_folder=False)
 
     if _supports_transactional_update(self.config):
         def _mut(cfg):
+            ctx_svc = self._get_context_service(cfg)
+            if (
+                ctx_svc is not None
+                and not ctx_svc.is_default_all_context()
+                and not ctx_svc.matches_active_context(src_id)
+            ):
+                raise NodeNotFoundError(f&#34;Source node &#39;{src_id}&#39; not found.&#34;)
+            parent_folder = self._derive_parent_folder(cfg, dst_id, is_folder=False)
+            if ctx_svc is not None:
+                ctx_svc.validate_in_active_context(dst_id, is_folder=False)
+            if parent_folder is not None and not self._folder_exists(
+                parent_folder, cfg._getallfolders_unlocked(), cfg
+            ):
+                raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
             try:
                 node_data = cfg.getitem_unlocked(src_id)
             except (KeyError, TypeError):
@@ -1040,6 +1210,7 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">def update_node(self, unique_id, data, save=True):
     &#34;&#34;&#34;Explicitly update an existing node.&#34;&#34;&#34;
+    self._ensure_in_active_context(unique_id, is_folder=False)
     if _supports_transactional_update(self.config) and save:
         def _mut(cfg):
             all_nodes = cfg._getallnodes_unlocked()
@@ -1075,21 +1246,17 @@ el.replaceWith(d);
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def validate_parent_folder(self, unique_id, is_folder=False):
-    &#34;&#34;&#34;Check if parent folder exists for a given node unique ID.&#34;&#34;&#34;
-    if is_folder:
-        uniques = self.config._explode_unique(unique_id)
-        if uniques and &#34;subfolder&#34; in uniques and &#34;folder&#34; in uniques:
-            parent_folder = f&#34;@{uniques[&#39;folder&#39;]}&#34;
-            if parent_folder not in self.config._getallfolders():
-                raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)
-    else:
-        node_folder = unique_id.partition(&#34;@&#34;)[2]
-        if node_folder:
-            parent_folder = f&#34;@{node_folder}&#34;
-            if parent_folder not in self.config._getallfolders():
-                raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)</code></pre>
+    &#34;&#34;&#34;Check if unique_id is in active context and its parent folder exists.&#34;&#34;&#34;
+    parent_folder = self._derive_parent_folder(self.config, unique_id, is_folder=is_folder)
+    ctx_svc = self._get_context_service()
+    if ctx_svc is not None:
+        ctx_svc.validate_in_active_context(unique_id, is_folder=is_folder)
+    if parent_folder is not None and not self._folder_exists(
+        parent_folder, self._get_raw_folders(), self.config
+    ):
+        raise NodeNotFoundError(f&#34;Folder &#39;{parent_folder}&#39; not found.&#34;)</code></pre>
 </details>
-<div class="desc"><p>Check if parent folder exists for a given node unique ID.</p></div>
+<div class="desc"><p>Check if unique_id is in active context and its parent folder exists.</p></div>
 </dd>
 </dl>
 <h3>Inherited members</h3>

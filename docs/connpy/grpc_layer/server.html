@@ -110,7 +110,7 @@ el.replaceWith(d);
     from connpy.grpc_layer.user_registry import UserRegistry
     from connpy.services.provider import ServiceProvider
 
-    fallback_provider = ServiceProvider(config, mode=&#34;local&#34;)
+    fallback_provider = ServiceProvider(config, mode=&#34;local&#34;, enforce_context=False)
     registry = UserRegistry(config.defaultdir)
 
     # Check if trusted_gateway provider is configured if SSO Gateway Secret is present in env
@@ -163,9 +163,7 @@ el.replaceWith(d);
 </summary>
 <pre><code class="python">class AIServicer(connpy_pb2_grpc.AIServiceServicer):
     def __init__(self, provider, registry=None, debug=False):
-        if not hasattr(provider, &#34;mode&#34;):
-            from connpy.services.provider import ServiceProvider
-            provider = ServiceProvider(provider, mode=&#34;local&#34;)
+        provider = _ensure_server_provider(provider)
         self._fallback_provider = provider
         self._registry = registry
         self.server_debug = debug
@@ -927,9 +925,7 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
 </summary>
 <pre><code class="python">class ConfigServicer(connpy_pb2_grpc.ConfigServiceServicer):
     def __init__(self, provider, registry=None):
-        if not hasattr(provider, &#34;mode&#34;):
-            from connpy.services.provider import ServiceProvider
-            provider = ServiceProvider(provider, mode=&#34;local&#34;)
+        provider = _ensure_server_provider(provider)
         self._fallback_provider = provider
         self._registry = registry
 
@@ -1015,9 +1011,7 @@ def service(self):
 </summary>
 <pre><code class="python">class ExecutionServicer(connpy_pb2_grpc.ExecutionServiceServicer):
     def __init__(self, provider, registry=None):
-        if not hasattr(provider, &#34;mode&#34;):
-            from connpy.services.provider import ServiceProvider
-            provider = ServiceProvider(provider, mode=&#34;local&#34;)
+        provider = _ensure_server_provider(provider)
         self._fallback_provider = provider
         self._registry = registry
 
@@ -1186,9 +1180,7 @@ def service(self):
 </summary>
 <pre><code class="python">class ImportExportServicer(connpy_pb2_grpc.ImportExportServiceServicer):
     def __init__(self, provider, registry=None):
-        if not hasattr(provider, &#34;mode&#34;):
-            from connpy.services.provider import ServiceProvider
-            provider = ServiceProvider(provider, mode=&#34;local&#34;)
+        provider = _ensure_server_provider(provider)
         self._fallback_provider = provider
         self._registry = registry
 
@@ -1374,9 +1366,7 @@ interceptor chooses to service this RPC, or None otherwise.</p></div>
 </summary>
 <pre><code class="python">class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
     def __init__(self, provider, registry=None, debug=False):
-        if not hasattr(provider, &#34;mode&#34;):
-            from connpy.services.provider import ServiceProvider
-            provider = ServiceProvider(provider, mode=&#34;local&#34;)
+        provider = _ensure_server_provider(provider)
         self._fallback_provider = provider
         self._registry = registry
         self.server_debug = debug
@@ -2041,9 +2031,7 @@ def service(self):
 </summary>
 <pre><code class="python">class PluginServicer(connpy_pb2_grpc.PluginServiceServicer, remote_plugin_pb2_grpc.RemotePluginServiceServicer):
     def __init__(self, provider, registry=None):
-        if not hasattr(provider, &#34;mode&#34;):
-            from connpy.services.provider import ServiceProvider
-            provider = ServiceProvider(provider, mode=&#34;local&#34;)
+        provider = _ensure_server_provider(provider)
         self._fallback_provider = provider
         self._registry = registry
 
@@ -2148,9 +2136,7 @@ def service(self):
 </summary>
 <pre><code class="python">class ProfileServicer(connpy_pb2_grpc.ProfileServiceServicer):
     def __init__(self, provider, registry=None):
-        if not hasattr(provider, &#34;mode&#34;):
-            from connpy.services.provider import ServiceProvider
-            provider = ServiceProvider(provider, mode=&#34;local&#34;)
+        provider = _ensure_server_provider(provider)
         self._fallback_provider = provider
         self._registry = registry
 
@@ -2451,9 +2437,7 @@ def service(self):
 </summary>
 <pre><code class="python">class SystemServicer(connpy_pb2_grpc.SystemServiceServicer):
     def __init__(self, provider, registry=None):
-        if not hasattr(provider, &#34;mode&#34;):
-            from connpy.services.provider import ServiceProvider
-            provider = ServiceProvider(provider, mode=&#34;local&#34;)
+        provider = _ensure_server_provider(provider)
         self._fallback_provider = provider
         self._registry = registry
 

@@ -58,15 +58,31 @@ el.replaceWith(d);
 <pre><code class="python">class ContextService(BaseService):
     &#34;&#34;&#34;Business logic for managing and applying regex-based contexts locally.&#34;&#34;&#34;
 
+    @staticmethod
+    def _validate_regexes(regexes: Any) -&gt; None:
+        if not isinstance(regexes, list) or not (1 &lt;= len(regexes) &lt;= MAX_CONTEXT_REGEXES):
+            raise ValueError(
+                f&#34;Context regexes must be a list of 1 to {MAX_CONTEXT_REGEXES} patterns&#34;
+            )
+        for pat in regexes:
+            if not isinstance(pat, str) or not (1 &lt;= len(pat) &lt;= MAX_CONTEXT_PATTERN_LEN):
+                raise ValueError(
+                    f&#34;Each context regex must be a non-empty string up to {MAX_CONTEXT_PATTERN_LEN} characters&#34;
+                )
+            try:
+                re.compile(pat)
+            except re.error as exc:
+                raise ValueError(f&#34;Invalid context regex {pat!r}: {exc}&#34;) from None
+
     @property
-    def contexts(self) -&gt; Dict[str, List[str]]:
+    def contexts(self) -&gt; dict[str, list[str]]:
         return self.config.config.get(&#34;contexts&#34;, {&#34;all&#34;: [&#34;.*&#34;]})
 
     @property
     def current_context(self) -&gt; str:
         return self.config.config.get(&#34;current_context&#34;, &#34;all&#34;)
 
-    def list_contexts(self) -&gt; List[Dict[str, Any]]:
+    def list_contexts(self) -&gt; list[dict[str, Any]]:
         result = []
         for name in self.contexts.keys():
             result.append({
@@ -76,27 +92,29 @@ el.replaceWith(d);
             })
         return result
 
-    def add_context(self, name: str, regexes: List[str]):
+    def add_context(self, name: str, regexes: list[str]):
         if not name.isalnum():
             raise ValueError(&#34;Context name must be alphanumeric&#34;)
-        
+        self._validate_regexes(regexes)
+
         ctxs = self.contexts
         if name in ctxs:
             raise ValueError(f&#34;Context &#39;{name}&#39; already exists&#34;)
-        
-        ctxs[name] = regexes
+
+        ctxs[name] = list(regexes)
         self.config.config[&#34;contexts&#34;] = ctxs
         self.config._saveconfig(self.config.file)
 
-    def update_context(self, name: str, regexes: List[str]):
+    def update_context(self, name: str, regexes: list[str]):
         if name == &#34;all&#34;:
             raise ValueError(&#34;Cannot modify default context &#39;all&#39;&#34;)
-        
+        self._validate_regexes(regexes)
+
         ctxs = self.contexts
         if name not in ctxs:
             raise ValueError(f&#34;Context &#39;{name}&#39; does not exist&#34;)
-        
-        ctxs[name] = regexes
+
+        ctxs[name] = list(regexes)
         self.config.config[&#34;contexts&#34;] = ctxs
         self.config._saveconfig(self.config.file)
 
@@ -117,16 +135,48 @@ el.replaceWith(d);
     def set_active_context(self, name: str):
         if name not in self.contexts:
             raise ValueError(f&#34;Context &#39;{name}&#39; does not exist&#34;)
-        
+
+        prev_context = self.current_context
         self.config.config[&#34;current_context&#34;] = name
         self.config._saveconfig(self.config.file)
+        can_refresh = (
+            self.config._is_context_filtering_enabled_unlocked()
+            if (
+                not hasattr(self.config, &#34;assert_called&#34;)
+                and callable(getattr(self.config, &#34;_is_context_filtering_enabled_unlocked&#34;, None))
+            )
+            else getattr(self.config, &#34;_enforce_context&#34;, True)
+        )
+        if (
+            name == &#34;all&#34;
+            and prev_context != &#34;all&#34;
+            and can_refresh
+            and hasattr(self.config, &#34;_generate_nodes_cache&#34;)
+        ):
+            self.config._generate_nodes_cache()
 
-    def get_active_regexes(self) -&gt; List[re.Pattern]:
-        patterns = self.contexts.get(self.current_context, [&#34;.*&#34;])
-        return [re.compile(p) for p in patterns]
+    def get_active_regexes(self) -&gt; list[re.Pattern]:
+        return compile_active_context_patterns(getattr(self.config, &#34;config&#34;, None))
 
-    def _match_any(self, node_name: str, patterns: List[re.Pattern]) -&gt; bool:
-        return any(p.match(node_name) for p in patterns)
+    def _match_any(self, node_name: str, patterns: list[re.Pattern]) -&gt; bool:
+        return match_active_context_patterns(node_name, patterns)
+
+    def is_default_all_context(self) -&gt; bool:
+        return is_default_all_context_cfg(getattr(self.config, &#34;config&#34;, None))
+
+    def matches_active_context(self, name: str) -&gt; bool:
+        if self.is_default_all_context():
+            return isinstance(name, str) and bool(name)
+        if not isinstance(name, str) or not name:
+            return False
+        return match_active_context_patterns(name, self.get_active_regexes())
+
+    def validate_in_active_context(self, unique_id: str, is_folder: bool = False) -&gt; None:
+        if not self.is_default_all_context() and not self.matches_active_context(unique_id):
+            label = &#34;Folder&#34; if is_folder else &#34;Node&#34;
+            raise InvalidConfigurationError(
+                f&#34;{label} &#39;{unique_id}&#39; does not match active context &#39;{self.current_context}&#39;.&#34;
+            )
 
     # Hook handlers for filtering
     def filter_node_list(self, *args, **kwargs):
@@ -151,14 +201,14 @@ el.replaceWith(d);
 </ul>
 <h3>Instance variables</h3>
 <dl>
-<dt id="connpy.services.context_service.ContextService.contexts"><code class="name">prop <span class="ident">contexts</span> : Dict[str, List[str]]</code></dt>
+<dt id="connpy.services.context_service.ContextService.contexts"><code class="name">prop <span class="ident">contexts</span> : dict[str, list[str]]</code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@property
-def contexts(self) -&gt; Dict[str, List[str]]:
+def contexts(self) -&gt; dict[str, list[str]]:
     return self.config.config.get(&#34;contexts&#34;, {&#34;all&#34;: [&#34;.*&#34;]})</code></pre>
 </details>
 <div class="desc"></div>
@@ -179,22 +229,23 @@ def current_context(self) -&gt; str:
 <h3>Methods</h3>
 <dl>
 <dt id="connpy.services.context_service.ContextService.add_context"><code class="name flex">
-<span>def <span class="ident">add_context</span></span>(<span>self, name: str, regexes: List[str])</span>
+<span>def <span class="ident">add_context</span></span>(<span>self, name: str, regexes: list[str])</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def add_context(self, name: str, regexes: List[str]):
+<pre><code class="python">def add_context(self, name: str, regexes: list[str]):
     if not name.isalnum():
         raise ValueError(&#34;Context name must be alphanumeric&#34;)
-    
+    self._validate_regexes(regexes)
+
     ctxs = self.contexts
     if name in ctxs:
         raise ValueError(f&#34;Context &#39;{name}&#39; already exists&#34;)
-    
-    ctxs[name] = regexes
+
+    ctxs[name] = list(regexes)
     self.config.config[&#34;contexts&#34;] = ctxs
     self.config._saveconfig(self.config.file)</code></pre>
 </details>
@@ -253,28 +304,40 @@ def current_context(self) -&gt; str:
 <div class="desc"></div>
 </dd>
 <dt id="connpy.services.context_service.ContextService.get_active_regexes"><code class="name flex">
-<span>def <span class="ident">get_active_regexes</span></span>(<span>self) ‑> List[re.Pattern]</span>
+<span>def <span class="ident">get_active_regexes</span></span>(<span>self) ‑> list[re.Pattern]</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_active_regexes(self) -&gt; List[re.Pattern]:
-    patterns = self.contexts.get(self.current_context, [&#34;.*&#34;])
-    return [re.compile(p) for p in patterns]</code></pre>
+<pre><code class="python">def get_active_regexes(self) -&gt; list[re.Pattern]:
+    return compile_active_context_patterns(getattr(self.config, &#34;config&#34;, None))</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.services.context_service.ContextService.is_default_all_context"><code class="name flex">
+<span>def <span class="ident">is_default_all_context</span></span>(<span>self) ‑> bool</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def is_default_all_context(self) -&gt; bool:
+    return is_default_all_context_cfg(getattr(self.config, &#34;config&#34;, None))</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
 <dt id="connpy.services.context_service.ContextService.list_contexts"><code class="name flex">
-<span>def <span class="ident">list_contexts</span></span>(<span>self) ‑> List[Dict[str, Any]]</span>
+<span>def <span class="ident">list_contexts</span></span>(<span>self) ‑> list[dict[str, typing.Any]]</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def list_contexts(self) -&gt; List[Dict[str, Any]]:
+<pre><code class="python">def list_contexts(self) -&gt; list[dict[str, Any]]:
     result = []
     for name in self.contexts.keys():
         result.append({
@@ -283,6 +346,23 @@ def current_context(self) -&gt; str:
             &#34;regexes&#34;: self.contexts[name]
         })
     return result</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.services.context_service.ContextService.matches_active_context"><code class="name flex">
+<span>def <span class="ident">matches_active_context</span></span>(<span>self, name: str) ‑> bool</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def matches_active_context(self, name: str) -&gt; bool:
+    if self.is_default_all_context():
+        return isinstance(name, str) and bool(name)
+    if not isinstance(name, str) or not name:
+        return False
+    return match_active_context_patterns(name, self.get_active_regexes())</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -297,31 +377,65 @@ def current_context(self) -&gt; str:
 <pre><code class="python">def set_active_context(self, name: str):
     if name not in self.contexts:
         raise ValueError(f&#34;Context &#39;{name}&#39; does not exist&#34;)
-    
+
+    prev_context = self.current_context
     self.config.config[&#34;current_context&#34;] = name
-    self.config._saveconfig(self.config.file)</code></pre>
+    self.config._saveconfig(self.config.file)
+    can_refresh = (
+        self.config._is_context_filtering_enabled_unlocked()
+        if (
+            not hasattr(self.config, &#34;assert_called&#34;)
+            and callable(getattr(self.config, &#34;_is_context_filtering_enabled_unlocked&#34;, None))
+        )
+        else getattr(self.config, &#34;_enforce_context&#34;, True)
+    )
+    if (
+        name == &#34;all&#34;
+        and prev_context != &#34;all&#34;
+        and can_refresh
+        and hasattr(self.config, &#34;_generate_nodes_cache&#34;)
+    ):
+        self.config._generate_nodes_cache()</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
 <dt id="connpy.services.context_service.ContextService.update_context"><code class="name flex">
-<span>def <span class="ident">update_context</span></span>(<span>self, name: str, regexes: List[str])</span>
+<span>def <span class="ident">update_context</span></span>(<span>self, name: str, regexes: list[str])</span>
 </code></dt>
 <dd>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def update_context(self, name: str, regexes: List[str]):
+<pre><code class="python">def update_context(self, name: str, regexes: list[str]):
     if name == &#34;all&#34;:
         raise ValueError(&#34;Cannot modify default context &#39;all&#39;&#34;)
-    
+    self._validate_regexes(regexes)
+
     ctxs = self.contexts
     if name not in ctxs:
         raise ValueError(f&#34;Context &#39;{name}&#39; does not exist&#34;)
-    
-    ctxs[name] = regexes
+
+    ctxs[name] = list(regexes)
     self.config.config[&#34;contexts&#34;] = ctxs
     self.config._saveconfig(self.config.file)</code></pre>
+</details>
+<div class="desc"></div>
+</dd>
+<dt id="connpy.services.context_service.ContextService.validate_in_active_context"><code class="name flex">
+<span>def <span class="ident">validate_in_active_context</span></span>(<span>self, unique_id: str, is_folder: bool = False) ‑> None</span>
+</code></dt>
+<dd>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def validate_in_active_context(self, unique_id: str, is_folder: bool = False) -&gt; None:
+    if not self.is_default_all_context() and not self.matches_active_context(unique_id):
+        label = &#34;Folder&#34; if is_folder else &#34;Node&#34;
+        raise InvalidConfigurationError(
+            f&#34;{label} &#39;{unique_id}&#39; does not match active context &#39;{self.current_context}&#39;.&#34;
+        )</code></pre>
 </details>
 <div class="desc"></div>
 </dd>
@@ -352,7 +466,7 @@ def current_context(self) -&gt; str:
 <ul>
 <li>
 <h4><code><a title="connpy.services.context_service.ContextService" href="#connpy.services.context_service.ContextService">ContextService</a></code></h4>
-<ul class="two-column">
+<ul class="">
 <li><code><a title="connpy.services.context_service.ContextService.add_context" href="#connpy.services.context_service.ContextService.add_context">add_context</a></code></li>
 <li><code><a title="connpy.services.context_service.ContextService.contexts" href="#connpy.services.context_service.ContextService.contexts">contexts</a></code></li>
 <li><code><a title="connpy.services.context_service.ContextService.current_context" href="#connpy.services.context_service.ContextService.current_context">current_context</a></code></li>
@@ -360,9 +474,12 @@ def current_context(self) -&gt; str:
 <li><code><a title="connpy.services.context_service.ContextService.filter_node_dict" href="#connpy.services.context_service.ContextService.filter_node_dict">filter_node_dict</a></code></li>
 <li><code><a title="connpy.services.context_service.ContextService.filter_node_list" href="#connpy.services.context_service.ContextService.filter_node_list">filter_node_list</a></code></li>
 <li><code><a title="connpy.services.context_service.ContextService.get_active_regexes" href="#connpy.services.context_service.ContextService.get_active_regexes">get_active_regexes</a></code></li>
+<li><code><a title="connpy.services.context_service.ContextService.is_default_all_context" href="#connpy.services.context_service.ContextService.is_default_all_context">is_default_all_context</a></code></li>
 <li><code><a title="connpy.services.context_service.ContextService.list_contexts" href="#connpy.services.context_service.ContextService.list_contexts">list_contexts</a></code></li>
+<li><code><a title="connpy.services.context_service.ContextService.matches_active_context" href="#connpy.services.context_service.ContextService.matches_active_context">matches_active_context</a></code></li>
 <li><code><a title="connpy.services.context_service.ContextService.set_active_context" href="#connpy.services.context_service.ContextService.set_active_context">set_active_context</a></code></li>
 <li><code><a title="connpy.services.context_service.ContextService.update_context" href="#connpy.services.context_service.ContextService.update_context">update_context</a></code></li>
+<li><code><a title="connpy.services.context_service.ContextService.validate_in_active_context" href="#connpy.services.context_service.ContextService.validate_in_active_context">validate_in_active_context</a></code></li>
 </ul>
 </li>
 </ul>
