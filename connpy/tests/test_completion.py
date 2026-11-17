@@ -80,10 +80,21 @@ class TestTreeCompletions:
         assert "--shell-command" in config_completions
         assert "--shell-prompt" in config_completions
         assert "--shell-os" in config_completions
+        assert "--max-auth-prompts" in config_completions
+        assert "--max-total-auth-attempts" in config_completions
+        assert "--max-hop-host-attempts" in config_completions
+        assert "--max-global-user-attempts" in config_completions
+        assert "--disable-fallback-on-insecure-hostkey" in config_completions
 
         # Resolve when --engineer-auth is chosen in config
         auth_comp = resolve_completion(["config", "--engineer-auth", ""], tree)
         assert isinstance(auth_comp, list)
+
+        # Resolve boolean values for --disable-fallback-on-insecure-hostkey
+        assert resolve_completion(
+            ["config", "--disable-fallback-on-insecure-hostkey", ""],
+            tree,
+        ) == ["true", "false"]
 
         # Loop back check:
         # e.g., connpy config --engineer-auth some_val
@@ -92,6 +103,10 @@ class TestTreeCompletions:
         assert "--architect-auth" in loop_back_comp
         assert "--engineer-auth" in loop_back_comp
         assert "--shell-command" in loop_back_comp
+
+        auth_budget_loop_back = resolve_completion(["config", "--max-auth-prompts", "3", ""], tree)
+        assert "--max-total-auth-attempts" in auth_budget_loop_back
+        assert "--disable-fallback-on-insecure-hostkey" in auth_budget_loop_back
 
     def test_shell_completions(self):
         from connpy.completion import _build_tree, resolve_completion
