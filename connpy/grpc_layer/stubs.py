@@ -473,13 +473,22 @@ class NodeStub:
     @handle_errors
     def list_nodes(self, filter_str=None, format_str=None):
         req = connpy_pb2.FilterRequest(filter_str=filter_str or "", format_str=format_str or "")
-        return from_value(self.stub.list_nodes(req).data) or []
+        nodes = from_value(self.stub.list_nodes(req).data) or []
+        if not format_str:
+            ctx_svc = self._get_context_service()
+            if ctx_svc is not None and not ctx_svc.is_default_all_context():
+                nodes = ctx_svc.filter_node_list(result=nodes)
+        return nodes
 
     @MethodHook
     @handle_errors
     def list_folders(self, filter_str=None):
         req = connpy_pb2.FilterRequest(filter_str=filter_str or "")
-        return from_value(self.stub.list_folders(req).data) or []
+        folders = from_value(self.stub.list_folders(req).data) or []
+        ctx_svc = self._get_context_service()
+        if ctx_svc is not None and not ctx_svc.is_default_all_context():
+            folders = ctx_svc.filter_node_list(result=folders)
+        return folders
 
     @handle_errors
     def get_node_details(self, unique_id):
@@ -512,7 +521,7 @@ class NodeStub:
             # node cache is what matters for fzf. We'll fetch profiles if we can.
             # For now, let's sync what we have.
             
-        if nodes is not None or folders is not None or profiles is not None:
+        if self.config is not None and (nodes is not None or folders is not None or profiles is not None):
             self.config._generate_nodes_cache(nodes=nodes, folders=folders, profiles=profiles)
 
     def _trigger_local_cache_sync(self):

@@ -2949,3 +2949,239 @@ def test_context_regex_parity_case_cache_and_dirty_recovery(tmp_path: Path) -> N
     cfg._cache_dirty = False
     cfg._generate_nodes_cache()
     assert cfg._cache_dirty is True
+
+
+def test_context_stubs_remote_cli_caches_and_all_servicers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from types import SimpleNamespace
+
+    from connpy.cli.node_handler import NodeHandler
+    from connpy.grpc_layer.server import (
+        AIServicer,
+        ConfigServicer,
+        ExecutionServicer,
+        ImportExportServicer,
+        PluginServicer,
+        ProfileServicer,
+        SystemServicer,
+    )
+    from connpy.grpc_layer.stubs import ExecutionStub, NodeStub
+    from connpy.grpc_layer.utils import to_struct
+    from connpy.services.context_service import ContextService
+    from connpy.services.exceptions import ConnpyError, NodeNotFoundError
+
+    monkeypatch.setattr(sys, "argv", ["connpy", "nodes"])
+    cfg = _make_config(
+        tmp_path,
+        {
+            "config": {
+                "case": False,
+                "current_context": "prod",
+                "contexts": {
+                    "all": [".*"],
+                    "prod": ["^prod-.*", "^@ProdFolder"],
+                },
+            },
+            "connections": {
+                "prod-1": {
+                    "type": "connection",
+                    "host": "10.0.0.1",
+                    "protocol": "ssh",
+                    "port": "",
+                    "user": "u1",
+                    "password": "",
+                    "options": "",
+                    "logs": "",
+                    "tags": "",
+                    "jumphost": "",
+                },
+                "dev-1": {
+                    "type": "connection",
+                    "host": "10.0.0.2",
+                    "protocol": "ssh",
+                    "port": "",
+                    "user": "u2",
+                    "password": "",
+                    "options": "",
+                    "logs": "",
+                    "tags": "",
+                    "jumphost": "",
+                },
+                "ProdFolder": {"type": "folder"},
+                "OtherFolder": {"type": "folder"},
+            },
+        },
+    )
+    cfg.fzf_cachefile = str(tmp_path / ".fzf_nodes_cache.txt")
+    cfg.folders_cachefile = str(tmp_path / ".folders_cache.txt")
+
+    # 1. ContextService.set_active_context refreshes FZF & folders caches both ways
+    cfg._generate_nodes_cache()
+    assert Path(cfg.fzf_cachefile).read_text(encoding="utf-8").splitlines() == ["prod-1"]
+    assert Path(cfg.folders_cachefile).read_text(encoding="utf-8").splitlines() == ["@ProdFolder"]
+
+    ctx_svc = ContextService(cfg)
+    ctx_svc.set_active_context("all")
+    assert sorted(Path(cfg.fzf_cachefile).read_text(encoding="utf-8").splitlines()) == [
+        "dev-1",
+        "prod-1",
+    ]
+    assert sorted(Path(cfg.folders_cachefile).read_text(encoding="utf-8").splitlines()) == [
+        "@OtherFolder",
+        "@ProdFolder",
+    ]
+    ctx_svc.set_active_context("prod")
+    assert Path(cfg.fzf_cachefile).read_text(encoding="utf-8").splitlines() == ["prod-1"]
+    assert Path(cfg.folders_cachefile).read_text(encoding="utf-8").splitlines() == ["@ProdFolder"]
+
+    # 2. NodeHandler.add(is_folder=True) enforces validate_parent_folder(..., is_folder=True)
+    node_svc = NodeService(cfg)
+    fake_app = SimpleNamespace(
+        case=False,
+        _type_node=lambda v: v,
+        nodes_list=node_svc.list_nodes(),
+        services=ServiceProvider(cfg, mode="local"),
+    )
+    handler = NodeHandler(fake_app)
+    with pytest.raises(SystemExit):
+        handler.add(SimpleNamespace(data="@OtherFolderSub"))
+    assert "OtherFolderSub" not in cfg.connections
+    handler.add(SimpleNamespace(data="@ProdFolderSub"))
+    assert "@ProdFolderSub" in node_svc.list_folders()
+
+    # 3. NodeStub config=None guard, list filtering vs _get_raw_*, and mutation guards
+    n_stub_no_cfg = NodeStub(MagicMock(), "localhost:50051")
+    n_stub_no_cfg.stub = MagicMock()
+    n_stub_no_cfg.stub.list_nodes.return_value = MagicMock(data=None)
+    n_stub_no_cfg.stub.list_folders.return_value = MagicMock(data=None)
+    with patch("connpy.grpc_layer.stubs.from_value", return_value=["prod-1"]):
+        n_stub_no_cfg.generate_cache()
+
+    n_stub = NodeStub(MagicMock(), "localhost:50051", config=cfg)
+    n_stub.stub = MagicMock()
+    n_stub.stub.list_nodes.return_value = MagicMock(data=None)
+    n_stub.stub.list_folders.return_value = MagicMock(data=None)
+    with patch("connpy.grpc_layer.stubs.from_value", return_value=["prod-1", "dev-1"]):
+        assert n_stub.list_nodes() == ["prod-1"]
+        assert n_stub._get_raw_nodes() == ["prod-1", "dev-1"]
+        with pytest.raises(InvalidConfigurationError):
+            n_stub.validate_parent_folder("dev-1", is_folder=False)
+        with pytest.raises(InvalidConfigurationError):
+            n_stub.validate_parent_folder("@Other", is_folder=True)
+        assert n_stub.stub.validate_parent_folder.call_count == 0
+
+        with pytest.raises(NodeNotFoundError):
+            n_stub.delete_node("dev-1")
+        assert n_stub.stub.delete_node.call_count == 0
+
+        with pytest.raises(NodeNotFoundError):
+            n_stub.connect_node("dev-1")
+
+        with pytest.raises(NodeNotFoundError):
+            n_stub.move_node("dev-1", "prod-2")
+        with pytest.raises(InvalidConfigurationError):
+            n_stub.move_node("prod-1", "dev-2")
+        assert n_stub.stub.move_node.call_count == 0
+
+        with pytest.raises(InvalidConfigurationError):
+            n_stub.bulk_add(["prod-2", "dev-2"], ["1.1.1.1", "1.1.1.2"], {})
+        assert n_stub.stub.bulk_add.call_count == 0
+
+    with patch("connpy.grpc_layer.stubs.from_value", return_value=["@ProdFolder", "@OtherFolder"]):
+        assert n_stub.list_folders() == ["@ProdFolder"]
+        assert n_stub._get_raw_folders() == ["@ProdFolder", "@OtherFolder"]
+
+    # 4. ExecutionStub.test_commands and ExecutionStub.run_cli_script context guards
+    n_stub.list_nodes = MagicMock(return_value=["prod-1", "dev-1"])
+    e_stub = ExecutionStub(MagicMock(), "localhost:50051", config=cfg, node_stub=n_stub)
+    e_stub.stub = MagicMock()
+    e_stub.stub.test_commands.return_value = [
+        connpy_pb2.NodeRunResult(
+            unique_id="prod-1",
+            output="ok",
+            status=0,
+            test_result=to_struct({"passed": True}),
+        )
+    ]
+    t_res = e_stub.test_commands(["prod-1", "dev-1"], ["show ver"], ["1.0"])
+    assert t_res == {"prod-1": {"passed": True}}
+    assert list(e_stub.stub.test_commands.call_args[0][0].nodes) == ["^prod\\-1$"]
+
+    e_stub.stub.run_cli_script.return_value = MagicMock(data=to_struct({"prod-1": "done"}))
+    s_res = e_stub.run_cli_script(".*", "/tmp/s.txt")
+    assert s_res == {"prod-1": "done"}
+    assert e_stub.stub.run_cli_script.call_args[0][0].param1 == "^prod\\-1$"
+    with pytest.raises(ConnpyError):
+        e_stub.run_cli_script("dev-.*", "/tmp/s.txt")
+
+    # 5. ExecutionService remote _get_remote_stub() path + >500 chunking on test_commands
+    remote_dir = tmp_path / "remote_no_stub"
+    remote_dir.mkdir()
+    remote_cfg = configfile(conf=str(remote_dir / "config.yaml"), key=cfg.key)
+    remote_cfg.transactional_update(
+        lambda c: c.config.update(
+            {
+                "service_mode": "remote",
+                "remote_host": "localhost:50051",
+                "current_context": "prod",
+                "contexts": {"all": [".*"], "prod": ["^prod-.*"]},
+            }
+        )
+    )
+    all_remote_nodes = [f"prod-{i}" for i in range(505)] + ["dev-1"]
+    seen_test_batches: list[list[str]] = []
+
+    class _FakeLazyNodeStub:
+        def __init__(self, _ch, remote_host=None, config=None):
+            self.remote_host = remote_host
+            self.config = config
+
+        def list_nodes(self, filter_str=None):
+            return list(all_remote_nodes)
+
+    class _FakeLazyExecutionStub:
+        def __init__(self, _ch, remote_host=None):
+            self.remote_host = remote_host
+
+        def test_commands(self, nodes_filter, **_kw):
+            seen_test_batches.append(list(nodes_filter))
+            return {
+                pat.strip("^$").replace("\\", ""): {"passed": True} for pat in nodes_filter
+            }
+
+    remote_svc = ExecutionService(remote_cfg)
+    with (
+        patch.object(remote_svc, "_get_remote_channel", return_value=(MagicMock(), "localhost:50051")),
+        patch("connpy.grpc_layer.stubs.NodeStub", _FakeLazyNodeStub),
+        patch("connpy.grpc_layer.stubs.ExecutionStub", _FakeLazyExecutionStub),
+    ):
+        remote_test_res = remote_svc.test_commands(".*", ["show ver"], ["ok"])
+
+    assert len(seen_test_batches) == 2
+    assert len(seen_test_batches[0]) == 500
+    assert len(seen_test_batches[1]) == 5
+    assert len(remote_test_res) == 505
+    assert "dev-1" not in remote_test_res
+    assert ExecutionService._aggregate_remote_results([["prod-1"], ["prod-2"]]) == [
+        "prod-1",
+        "prod-2",
+    ]
+
+    # 6. All 8 gRPC servicers force enforce_context=False on provider
+    for servicer_cls in (
+        NodeServicer,
+        ProfileServicer,
+        ConfigServicer,
+        PluginServicer,
+        ExecutionServicer,
+        ImportExportServicer,
+        AIServicer,
+        SystemServicer,
+    ):
+        cfg._enforce_context = True
+        prov = ServiceProvider(cfg, mode="local", enforce_context=True)
+        servicer = servicer_cls(prov)
+        assert prov.enforce_context is False
+        assert prov.config._enforce_context is False
+        assert servicer._get_provider().enforce_context is False

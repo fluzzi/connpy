@@ -187,8 +187,8 @@ class ExecutionService(BaseService):
             )
 
             if self._is_remote_backend():
-                stub = self._get_remote_stub()
                 batches = self._build_remote_filter_batches(nodes_filter)
+                stub = self._get_remote_stub()
                 batch_results = [
                     stub.run_commands(
                         nodes_filter=batch,
@@ -283,8 +283,8 @@ class ExecutionService(BaseService):
             )
 
             if self._is_remote_backend():
-                stub = self._get_remote_stub()
                 batches = self._build_remote_filter_batches(nodes_filter)
+                stub = self._get_remote_stub()
                 batch_results = [
                     stub.test_commands(
                         nodes_filter=batch,

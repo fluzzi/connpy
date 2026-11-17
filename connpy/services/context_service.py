@@ -92,9 +92,25 @@ class ContextService(BaseService):
     def set_active_context(self, name: str):
         if name not in self.contexts:
             raise ValueError(f"Context '{name}' does not exist")
-        
+
+        prev_context = self.current_context
         self.config.config["current_context"] = name
         self.config._saveconfig(self.config.file)
+        can_refresh = (
+            self.config._is_context_filtering_enabled_unlocked()
+            if (
+                not hasattr(self.config, "assert_called")
+                and callable(getattr(self.config, "_is_context_filtering_enabled_unlocked", None))
+            )
+            else getattr(self.config, "_enforce_context", True)
+        )
+        if (
+            name == "all"
+            and prev_context != "all"
+            and can_refresh
+            and hasattr(self.config, "_generate_nodes_cache")
+        ):
+            self.config._generate_nodes_cache()
 
     def get_active_regexes(self) -> list[re.Pattern]:
         return compile_active_context_patterns(getattr(self.config, "config", None))
