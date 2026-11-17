@@ -1,28 +1,232 @@
 #!/usr/bin/env python3
 #Imports
+import ast
+import asyncio
+import datetime
+import fcntl
+import io
+import ipaddress
+import logging
 import os
 import re
-import ipaddress
-import pexpect
 import shlex
-import ast
-from time import sleep,time
-import datetime
 import sys
 import threading
-from pathlib import Path
-from copy import deepcopy
-from .hooks import ClassHook, MethodHook
-import io
-import asyncio
-import fcntl
-from . import printer
-from .tunnels import LocalStream
+import time as _time_mod
 from contextlib import contextmanager
+from copy import deepcopy
+from pathlib import Path
+from time import sleep, time
+
+import pexpect
+
+from . import printer
+from .hooks import ClassHook, MethodHook
+from .tunnels import LocalStream
+
+_LOGGER = logging.getLogger(__name__)
+
+DEFAULT_DIRECT_CONNECT_TIMEOUT = 10
+DEFAULT_MOSH_CONNECT_TIMEOUT = 15
+DEFAULT_ADAPTIVE_BASE_TIMEOUT = 15
+DEFAULT_SSM_DIRECT_COST = 20
+DEFAULT_SSM_HOP_COST = 25
+DEFAULT_OTHER_HOP_COST = 10
+DEFAULT_AUTH_TIMEOUT = 25
+DEFAULT_MAX_PROGRESS_EXTENSIONS = 3
+MAX_STAGE_TIMEOUT_CAP = 600
+DEFAULT_MAX_TOTAL_CONNECT_SECONDS = 180
+MAX_PRE_AUTH_BUFFER_BYTES = 65536
+
+_CONTROL_CHAR_RE = re.compile(r"[\x00-\x1f\x7f]")
+_SSM_TARGET_RE = re.compile(
+    r"\A(?:(?:i|mi)-[0-9a-f]{4,17}|arn:aws[a-z-]*:ssm:[a-z0-9-]+:\d{12}:[A-Za-z0-9._/-]{1,256})\Z",
+    re.ASCII,
+)
+_SSM_TAG_RE = re.compile(r"\A[A-Za-z0-9._-]{1,128}\Z", re.ASCII)
+_SSM_UNSAFE_OPTIONS_RE = re.compile(r'[;|&$`><"\'\\\x00-\x1f\x7f]')
+
+
+def validate_strict_timeout_int(
+    value,
+    name: str,
+    min_val: int = 1,
+    max_val: int = MAX_STAGE_TIMEOUT_CAP,
+) -> int:
+    """Strictly validate that value is a plain int within [min_val, max_val]."""
+    if type(value) is not int or value < min_val or value > max_val:
+        raise ValueError(
+            f"Invalid {name}: expected integer in [{min_val}, {max_val}], got {value!r}"
+        )
+    return value
+
+
+def resolve_timeouts(
+    protocol,
+    tags,
+    hop_chain_meta,
+    timeout=None,
+    connect_timeout=None,
+    auth_timeout=None,
+    *,
+    _default_cmd_timeout=10,
+    _default_max_total_seconds=None,
+) -> tuple[int, int, int, int, int]:
+    """Resolve effective connect, auth, command, extension, and total deadline budgets."""
+    default_cmd = validate_strict_timeout_int(_default_cmd_timeout, "_default_cmd_timeout")
+    tags_dict = tags if isinstance(tags, dict) else {}
+
+    if timeout is not None:
+        validate_strict_timeout_int(timeout, "timeout")
+    if connect_timeout is not None:
+        validate_strict_timeout_int(connect_timeout, "connect_timeout")
+    if auth_timeout is not None:
+        validate_strict_timeout_int(auth_timeout, "auth_timeout")
+
+    tag_ct = tags_dict.get("connect_timeout")
+    tag_at = tags_dict.get("auth_timeout")
+    tag_cmd = tags_dict.get("command_timeout")
+    if tag_ct is not None:
+        validate_strict_timeout_int(tag_ct, "tags.connect_timeout")
+    if tag_at is not None:
+        validate_strict_timeout_int(tag_at, "tags.auth_timeout")
+    if tag_cmd is not None:
+        validate_strict_timeout_int(tag_cmd, "tags.command_timeout")
+
+    hops = hop_chain_meta or []
+    if hops:
+        adaptive_ct = DEFAULT_ADAPTIVE_BASE_TIMEOUT
+        for hop in hops:
+            hop_proto = hop.get("protocol", "ssh") if isinstance(hop, dict) else str(hop)
+            if hop_proto == "ssm":
+                adaptive_ct += DEFAULT_SSM_HOP_COST
+            else:
+                adaptive_ct += DEFAULT_OTHER_HOP_COST
+        if protocol == "mosh":
+            adaptive_ct = max(adaptive_ct, DEFAULT_MOSH_CONNECT_TIMEOUT)
+    elif protocol == "ssm":
+        adaptive_ct = DEFAULT_SSM_DIRECT_COST
+    elif protocol == "mosh":
+        adaptive_ct = DEFAULT_MOSH_CONNECT_TIMEOUT
+    else:
+        adaptive_ct = DEFAULT_DIRECT_CONNECT_TIMEOUT
+
+    adaptive_ct = min(adaptive_ct, MAX_STAGE_TIMEOUT_CAP)
+
+    if timeout is not None:
+        eff_cmd = timeout
+    elif tag_cmd is not None:
+        eff_cmd = tag_cmd
+    else:
+        eff_cmd = default_cmd
+
+    if auth_timeout is not None:
+        eff_at = auth_timeout
+    elif timeout is not None:
+        eff_at = timeout
+    elif tag_at is not None:
+        eff_at = tag_at
+    else:
+        eff_at = DEFAULT_AUTH_TIMEOUT
+
+    if connect_timeout is not None:
+        eff_ct = connect_timeout
+    elif timeout is not None:
+        eff_ct = max(timeout, DEFAULT_MOSH_CONNECT_TIMEOUT) if protocol == "mosh" else timeout
+    elif tag_ct is not None:
+        eff_ct = max(tag_ct, DEFAULT_MOSH_CONNECT_TIMEOUT) if protocol == "mosh" else tag_ct
+    else:
+        eff_ct = adaptive_ct
+
+    tag_max_ext = tags_dict.get("max_progress_extensions")
+    if tag_max_ext is not None:
+        max_ext = validate_strict_timeout_int(
+            tag_max_ext,
+            "tags.max_progress_extensions",
+            min_val=0,
+            max_val=MAX_STAGE_TIMEOUT_CAP,
+        )
+    else:
+        max_ext = DEFAULT_MAX_PROGRESS_EXTENSIONS
+
+    max_total = DEFAULT_MAX_TOTAL_CONNECT_SECONDS
+    if _default_max_total_seconds is not None:
+        ceiling = validate_strict_timeout_int(
+            _default_max_total_seconds,
+            "_default_max_total_seconds",
+            min_val=1,
+            max_val=MAX_STAGE_TIMEOUT_CAP,
+        )
+        max_total = min(max_total, ceiling)
+
+    return eff_ct, eff_at, eff_cmd, max_ext, max_total
+
+
+def compile_expects(expects_map):
+    """Compile ASCII expect regex strings into bytes patterns with re.DOTALL."""
+    def _compile_list(items):
+        compiled = []
+        for pat in items:
+            if isinstance(pat, str):
+                compiled.append(re.compile(pat.encode("ascii"), re.DOTALL))
+            elif isinstance(pat, bytes):
+                compiled.append(re.compile(pat, re.DOTALL))
+            elif isinstance(pat, re.Pattern):
+                if isinstance(pat.pattern, str):
+                    compiled.append(
+                        re.compile(pat.pattern.encode("ascii"), pat.flags | re.DOTALL)
+                    )
+                else:
+                    compiled.append(pat)
+            else:
+                compiled.append(pat)
+        return compiled
+
+    if isinstance(expects_map, dict):
+        return {proto: _compile_list(pats) for proto, pats in expects_map.items()}
+    return _compile_list(expects_map)
+
+
+def _extract_ssh_o_keys(tokens: list[str]) -> set[str]:
+    """Return lowercased -o directive keys present in tokenized SSH options."""
+    keys: set[str] = set()
+    idx = 0
+    while idx < len(tokens):
+        tok = tokens[idx]
+        if tok == "-o" and idx + 1 < len(tokens):
+            spec = tokens[idx + 1]
+            if "=" in spec:
+                keys.add(spec.split("=", 1)[0].strip().lower())
+            idx += 2
+        elif tok.startswith("-o") and len(tok) > 2:
+            spec = tok.removeprefix("-o")
+            if "=" in spec:
+                keys.add(spec.split("=", 1)[0].strip().lower())
+            idx += 1
+        else:
+            idx += 1
+    return keys
+
+
+def _redact_known_secrets(text: str, secrets: list[str]) -> str:
+    """Replace any non-trivial known secret strings with '***'."""
+    if not text or not secrets:
+        return text
+    out = text
+    unique_secrets = sorted(
+        {s for s in secrets if isinstance(s, str) and len(s) >= 4},
+        key=len,
+        reverse=True,
+    )
+    for sec in unique_secrets:
+        out = out.replace(sec, "***")
+    return out
 
 @contextmanager
 def copilot_terminal_mode():
-    import sys, tty, termios
+    import termios
+    import tty
+
     fd = sys.stdin.fileno()
     try:
         old_settings = termios.tcgetattr(fd)
@@ -39,8 +243,8 @@ def copilot_terminal_mode():
     finally:
         try:
             termios.tcsetattr(fd, termios.TCSANOW, old_settings)
-        except Exception:
-            pass
+        except Exception as exc:  # noqa: BLE001
+            _LOGGER.debug("Failed to restore terminal attributes: %s", exc)
 
 _ALLOWED_SSH_NOARG_FLAGS = frozenset({
     "-4", "-6", "-A", "-C", "-X", "-Y", "-a", "-q", "-t", "-v", "-vv", "-vvv", "-x",
@@ -156,33 +360,40 @@ class node:
             self.allow_unsafe_options = False
         self.unique = unique
         attr = {"host": host, "logs": logs, "options":options, "port": port, "protocol": protocol, "user": user, "tags": tags, "jumphost": jumphost}
-        for key in attr:
-            profile = re.search("^@(.*)", str(attr[key]))
+        for key, attr_val in attr.items():
+            profile = re.search("^@(.*)", str(attr_val))
             if profile and config != '':
                 try:
-                    setattr(self,key,deepcopy(config.profiles[profile.group(1)][key]))
+                    setattr(self, key, deepcopy(config.profiles[profile.group(1)][key]))
                 except KeyError:
-                    setattr(self,key,"")
-            elif attr[key] == '' and key == "protocol":
+                    setattr(self, key, "")
+            elif attr_val == '' and key == "protocol":
                 try:
-                    setattr(self,key,config.profiles["default"][key])
+                    setattr(self, key, config.profiles["default"][key])
                 except (KeyError, AttributeError):
-                    setattr(self,key,"ssh")
-            else: 
-                setattr(self,key,attr[key])
+                    setattr(self, key, "ssh")
+            else:
+                setattr(self, key, attr_val)
         self._orig_protocol = self.protocol
-        if isinstance(password,list):
+        if isinstance(password, list):
             self.password = []
-            for i, s in enumerate(password):
-                profile = re.search("^@(.*)", password[i])
+            for item in password:
+                profile = re.search("^@(.*)", item)
                 if profile and config != '':
                     self.password.append(config.profiles[profile.group(1)]["password"])
                 else:
-                    self.password.append(password[i])
+                    self.password.append(item)
         else:
             self.password = [password]
+        self._jumphost_name = self.jumphost if (self.jumphost != "" and config != '') else ""
+        self._hop_chain_meta = []
         if self.jumphost != "" and config != '':
-            raw_cmd, jh_passwords = self._build_jumphost_chain(self.jumphost, config)
+            chain_res = self._build_jumphost_chain(self.jumphost, config, include_meta=True)
+            if len(chain_res) == 3:
+                raw_cmd, jh_passwords, self._hop_chain_meta = chain_res
+            else:
+                raw_cmd, jh_passwords = chain_res
+                self._hop_chain_meta = []
             if jh_passwords:
                 self.password = jh_passwords + self.password
             if raw_cmd:
@@ -199,14 +410,14 @@ class node:
     @staticmethod
     def _resolve_jumphost_data(jh_dict, config):
         '''Resolve @profile references and normalize passwords in a jumphost dict.'''
-        for key in jh_dict:
-            profile = re.search("^@(.*)", str(jh_dict[key]))
+        for key, jh_val in jh_dict.items():
+            profile = re.search("^@(.*)", str(jh_val))
             if profile:
                 try:
                     jh_dict[key] = deepcopy(config.profiles[profile.group(1)][key])
                 except KeyError:
                     jh_dict[key] = ""
-            elif jh_dict[key] == '' and key == "protocol":
+            elif jh_val == '' and key == "protocol":
                 try:
                     jh_dict[key] = config.profiles["default"][key]
                 except KeyError:
@@ -259,13 +470,12 @@ class node:
             if isinstance(self.port, (bool, float)):
                 raise ValueError(f"Invalid TCP SSH port '{self.port}'")
             port_s = str(self.port).strip()
-            if port_s:
-                if (
-                    not port_s.isascii()
-                    or not re.fullmatch(r"[0-9]+", port_s, re.ASCII)
-                    or not (1 <= int(port_s) <= 65535)
-                ):
-                    raise ValueError(f"Invalid TCP SSH port '{self.port}'")
+            if port_s and (
+                not port_s.isascii()
+                or not re.fullmatch(r"[0-9]+", port_s, re.ASCII)
+                or not (1 <= int(port_s) <= 65535)
+            ):
+                raise ValueError(f"Invalid TCP SSH port '{self.port}'")
 
     def _validate_options_and_safety(self):
         """Validate options string for unbalanced quotes and dangerous control characters."""
@@ -533,17 +743,151 @@ class node:
 
         return host_bare, port_out, opts_out
 
-    def _build_jumphost_chain(self, jumphost_name, config, visited=None, depth=0, target_host="%h", target_port="%p"):
-        '''Recursively build ProxyCommand for chained jumphosts.
+    @staticmethod
+    def _validate_and_prepare_ssh_options(
+        raw_opts,
+        *,
+        field_name: str = "options",
+        strip_non_tunnel_flags: bool = False,
+        allow_unsafe: bool = False,
+        connect_timeout: int | None = None,
+    ) -> str:
+        """Validate SSH options against _ALLOWED_SSH_O_KEYS and optionally inject ConnectTimeout/ServerAliveInterval."""
+        out_tokens: list[str] = []
+        if raw_opts:
+            ssh_opts = str(raw_opts).strip()
+            if _CONTROL_CHAR_RE.search(ssh_opts):
+                raise ValueError(f"Disallowed control characters in {field_name}")
+            if ssh_opts:
+                try:
+                    tokens = shlex.split(ssh_opts)
+                except ValueError as exc:
+                    raise ValueError(f"Invalid {field_name}: unbalanced quotes") from exc
+                if allow_unsafe:
+                    out_tokens = list(tokens)
+                else:
+                    idx = 0
+                    while idx < len(tokens):
+                        tok = tokens[idx]
+                        if tok in _ALLOWED_SSH_NOARG_FLAGS:
+                            if not (strip_non_tunnel_flags and tok in _NON_TUNNEL_SSH_FLAGS):
+                                out_tokens.append(tok)
+                            idx += 1
+                        elif tok in _ALLOWED_SSH_ARG_FLAGS:
+                            if idx + 1 >= len(tokens) or not tokens[idx + 1].strip():
+                                raise ValueError(
+                                    f"Missing argument for ssh option '{tok}' in {field_name}"
+                                )
+                            arg_val = tokens[idx + 1]
+                            val_re = _SAFE_SSH_PATH_RE if tok == "-i" else _SAFE_SSH_O_VALUE_RE
+                            if arg_val.startswith("-") or not val_re.fullmatch(arg_val):
+                                raise ValueError(
+                                    f"Invalid argument for ssh option '{tok}' in {field_name}"
+                                )
+                            out_tokens.extend([tok, arg_val])
+                            idx += 2
+                        elif tok[:2] in _ALLOWED_SSH_ARG_FLAGS and len(tok) > 2:
+                            flag_prefix = tok[:2]
+                            arg_val = tok[2:]
+                            val_re = _SAFE_SSH_PATH_RE if flag_prefix == "-i" else _SAFE_SSH_O_VALUE_RE
+                            if (
+                                not arg_val.strip()
+                                or arg_val.startswith("-")
+                                or not val_re.fullmatch(arg_val)
+                            ):
+                                raise ValueError(
+                                    f"Invalid argument for ssh option '{flag_prefix}' in {field_name}"
+                                )
+                            out_tokens.append(tok)
+                            idx += 1
+                        elif tok == "-o" or tok.startswith("-o"):
+                            if tok == "-o":
+                                if idx + 1 >= len(tokens) or not tokens[idx + 1].strip():
+                                    raise ValueError(
+                                        f"Missing argument for ssh option '-o' in {field_name}"
+                                    )
+                                opt_spec = tokens[idx + 1]
+                                step = 2
+                            else:
+                                opt_spec = tok[2:]
+                                step = 1
+                            if re.search(
+                                r"(?:localcommand|proxycommand|permitlocalcommand|knownhostscommand)",
+                                opt_spec,
+                                re.IGNORECASE,
+                            ):
+                                raise ValueError(
+                                    f"{field_name} cannot contain LocalCommand or ProxyCommand"
+                                )
+                            m = re.fullmatch(r"([A-Za-z0-9]+)=(.+)", opt_spec, re.ASCII)
+                            if (
+                                not m
+                                or not m.group(2).strip()
+                                or not _SAFE_SSH_O_VALUE_RE.fullmatch(m.group(2).strip())
+                            ):
+                                raise ValueError(
+                                    f"Disallowed -o directive in {field_name}: '{opt_spec}'"
+                                )
+                            key_raw = m.group(1)
+                            key_lower = key_raw.lower()
+                            val_str = m.group(2).strip()
+                            if key_lower not in _ALLOWED_SSH_O_KEYS:
+                                raise ValueError(
+                                    f"Disallowed -o directive in {field_name}: '{opt_spec}'"
+                                )
+                            if not (strip_non_tunnel_flags and key_lower == "forwardagent"):
+                                if tok == "-o":
+                                    out_tokens.extend(["-o", f"{key_raw}={val_str}"])
+                                else:
+                                    out_tokens.append(f"-o{key_raw}={val_str}")
+                            idx += step
+                        else:
+                            if re.search(
+                                r"(?:localcommand|proxycommand|permitlocalcommand|knownhostscommand)",
+                                tok,
+                                re.IGNORECASE,
+                            ):
+                                raise ValueError(
+                                    f"{field_name} cannot contain LocalCommand or ProxyCommand"
+                                )
+                            raise ValueError(
+                                f"Disallowed ssh option in {field_name}: '{tok}'"
+                            )
+
+        if connect_timeout is not None:
+            ct_val = validate_strict_timeout_int(connect_timeout, "connect_timeout")
+            existing_keys = _extract_ssh_o_keys(out_tokens)
+            if "connecttimeout" not in existing_keys and "connecttimeout" in _ALLOWED_SSH_O_KEYS:
+                out_tokens.extend(["-o", f"ConnectTimeout={ct_val}"])
+            if (
+                "serveraliveinterval" not in existing_keys
+                and "serveraliveinterval" in _ALLOWED_SSH_O_KEYS
+            ):
+                out_tokens.extend(["-o", "ServerAliveInterval=15"])
+
+        return shlex.join(out_tokens) if out_tokens else ""
+
+    def _build_jumphost_chain(
+        self,
+        jumphost_name,
+        config,
+        visited=None,
+        depth=0,
+        target_host="%h",
+        target_port="%p",
+        *,
+        include_meta=False,
+        connect_timeout=None,
+    ):
+        """Recursively build ProxyCommand for chained jumphosts.
 
         Returns:
-            tuple: (raw_proxy_command, passwords_list)
-                - raw_proxy_command: Command string to embed in ProxyCommand
-                - passwords_list: Ordered passwords (innermost first)
+            tuple: (raw_proxy_command, passwords_list) when include_meta=False, or
+                   (raw_proxy_command, passwords_list, hop_meta) when include_meta=True.
 
         Raises:
-            ValueError: On circular references or exceeding max depth (5).
-        '''
+            ValueError: On circular references, invalid hop fields, or exceeding max depth (5).
+        """
         if depth >= 5:
             raise ValueError("Jumphost chain exceeds maximum depth of 5 hops")
         if visited is None:
@@ -556,7 +900,23 @@ class node:
         jh = config.getitem(jumphost_name)
         jh = self._resolve_jumphost_data(jh, config)
 
-        if jh["protocol"] == "mosh":
+        # Unconditional control-character guard on all hop metadata fields
+        for fld_name in ("host", "user", "port"):
+            fld_val = jh.get(fld_name)
+            if fld_val not in (None, "") and _CONTROL_CHAR_RE.search(str(fld_val)):
+                raise ValueError(f"Control characters disallowed in jumphost {fld_name}")
+        jh_tags = jh.get("tags")
+        if isinstance(jh_tags, dict):
+            for tag_fld in ("profile", "region"):
+                tag_val = jh_tags.get(tag_fld)
+                if tag_val not in (None, "") and _CONTROL_CHAR_RE.search(str(tag_val)):
+                    raise ValueError(f"Control characters disallowed in jumphost {tag_fld}")
+
+        if connect_timeout is not None:
+            connect_timeout = validate_strict_timeout_int(connect_timeout, "connect_timeout")
+
+        jh_proto = jh.get("protocol", "ssh")
+        if jh_proto == "mosh":
             jh_host, jh_port, jh_opts = self._validate_mosh_ssh_fields(
                 jh.get("host", ""),
                 jh.get("user", ""),
@@ -564,43 +924,70 @@ class node:
                 jh.get("tags", ""),
                 strip_non_tunnel_flags=True,
             )
-        elif jh["protocol"] == "ssh":
+            if connect_timeout is not None:
+                jh_opts = self._validate_and_prepare_ssh_options(
+                    jh_opts,
+                    field_name="mosh_ssh_options",
+                    strip_non_tunnel_flags=True,
+                    connect_timeout=connect_timeout,
+                )
+        elif jh_proto == "ssh":
             jh_host, jh_port = self._validate_legacy_ssh_hop_fields(
                 jh.get("host", ""),
                 jh.get("user", ""),
                 jh.get("port", ""),
             )
-            jh_opts = jh.get("options", "")
+            jh_opts = self._validate_and_prepare_ssh_options(
+                jh.get("options", ""),
+                field_name="jumphost options",
+                allow_unsafe=self._is_unsafe_allowed(),
+                connect_timeout=connect_timeout,
+            )
         else:
-            jh_host = jh.get("host", "")
+            jh_host = str(jh.get("host", "") or "")
             jh_port = str(jh["port"]).strip() if jh.get("port") not in ("", None) else ""
             jh_opts = jh.get("options", "")
 
         passwords = []
         inner_proxy_opt = ""
+        inner_meta: list[dict[str, str]] = []
 
         # Recursively resolve inner jumphost
         if jh.get("jumphost", "") != "":
-            if jh["protocol"] not in ["ssh", "mosh"]:
+            if jh_proto not in ["ssh", "mosh"]:
                 raise ValueError(
-                    f"Jumphost '{jumphost_name}' uses protocol '{jh['protocol']}' "
-                    f"which does not support chained jumphosts. "
-                    f"Only SSH or Mosh jumphosts can have their own jumphosts."
+                    f"Jumphost '{jumphost_name}' uses protocol '{jh_proto}' "
+                    "which does not support chained jumphosts. "
+                    "Only SSH or Mosh jumphosts can have their own jumphosts."
                 )
             parent_port = jh_port if jh_port != "" else "22"
-            inner_raw_cmd, inner_passwords = self._build_jumphost_chain(
-                jh["jumphost"], config, visited, depth + 1, target_host=jh_host, target_port=parent_port
+            inner_res = self._build_jumphost_chain(
+                jh["jumphost"],
+                config,
+                visited,
+                depth + 1,
+                target_host=jh_host,
+                target_port=parent_port,
+                include_meta=True,
+                connect_timeout=connect_timeout,
             )
+            if len(inner_res) == 3:
+                inner_raw_cmd, inner_passwords, inner_meta = inner_res
+            else:
+                inner_raw_cmd, inner_passwords = inner_res
+                inner_meta = []
             passwords = inner_passwords
-            escaped = inner_raw_cmd.replace('\\', '\\\\').replace('"', '\\"')
+            escaped = inner_raw_cmd.replace("\\", "\\\\").replace('"', '\\"')
             inner_proxy_opt = f'-o ProxyCommand="{escaped}"'
 
         # Collect this hop's passwords
         if jh["password"] != [""]:
             passwords = passwords + jh["password"]
 
+        hop_meta = [*inner_meta, {"name": jumphost_name, "protocol": jh_proto}]
+
         t_port = target_port if target_port != "" else "22"
-        if jh["protocol"] in ["ssh", "mosh"]:
+        if jh_proto in ["ssh", "mosh", "ssm"]:
             if target_host == "%h" and t_port == "%p":
                 w_target = "%h"
                 w_port = "%p"
@@ -615,7 +1002,7 @@ class node:
             w_port = t_port
 
         # Build raw command based on protocol
-        if jh["protocol"] in ["ssh", "mosh"]:
+        if jh_proto in ["ssh", "mosh"]:
             cmd = f"ssh -W {w_target}:{w_port}"
             if inner_proxy_opt:
                 cmd += f" {inner_proxy_opt}"
@@ -626,38 +1013,107 @@ class node:
             jh_user = str(jh.get("user", "") or "")
             user_host = f"{jh_user}@{jh_host}" if jh_user else jh_host
             cmd += f" {user_host}"
-        elif jh["protocol"] == "ssm":
-            ssm_target = jh["host"]
-            ssm_cmd = f"aws ssm start-session --target {ssm_target} --document-name AWS-StartSSHSession --parameters 'portNumber=22'"
-            if isinstance(jh.get("tags"), dict):
-                if "profile" in jh["tags"]:
-                    ssm_cmd += f" --profile {jh['tags']['profile']}"
-                if "region" in jh["tags"]:
-                    ssm_cmd += f" --region {jh['tags']['region']}"
-            if jh["options"] != '':
-                ssm_cmd += f" {jh['options']}"
-            bastion_user_part = f"{jh['user']}@{ssm_target}" if jh['user'] else ssm_target
-            ssh_opts = ""
-            if isinstance(jh.get("tags"), dict) and "ssh_options" in jh["tags"]:
-                ssh_opts = f" {jh['tags']['ssh_options']}"
-            cmd = f"ssh{ssh_opts} -o ProxyCommand='{ssm_cmd}' -W {target_host}:{t_port} {bastion_user_part}"
-        elif jh["protocol"] in ["kubectl", "docker"]:
+        elif jh_proto == "ssm":
+            ssm_target = str(jh.get("host", "") or "")
+            if (
+                ".." in ssm_target
+                or ssm_target.startswith("-")
+                or not _SSM_TARGET_RE.fullmatch(ssm_target)
+            ):
+                raise ValueError(f"Invalid SSM jumphost target: '{ssm_target}'")
+
+            ssm_user = str(jh.get("user", "") or "")
+            if ssm_user and (ssm_user.startswith("-") or _LEGACY_SSH_UNSAFE_RE.search(ssm_user)):
+                raise ValueError(f"Invalid characters in SSM jumphost user: '{ssm_user}'")
+
+            ssm_parts = [
+                "aws",
+                "ssm",
+                "start-session",
+                "--target",
+                ssm_target,
+                "--document-name",
+                "AWS-StartSSHSession",
+                "--parameters",
+                "portNumber=22",
+            ]
+            if isinstance(jh_tags, dict):
+                for tag_key in ("profile", "region"):
+                    raw_val = jh_tags.get(tag_key)
+                    if raw_val not in (None, ""):
+                        tag_str = str(raw_val)
+                        if (
+                            ".." in tag_str
+                            or tag_str.startswith("-")
+                            or not _SSM_TAG_RE.fullmatch(tag_str)
+                        ):
+                            raise ValueError(f"Invalid SSM jumphost {tag_key}: '{tag_str}'")
+                        ssm_parts.extend([f"--{tag_key}", tag_str])
+
+            ssm_opts_raw = str(jh.get("options", "") or "").strip()
+            if ssm_opts_raw:
+                if _CONTROL_CHAR_RE.search(ssm_opts_raw) or (
+                    not self._is_unsafe_allowed() and _SSM_UNSAFE_OPTIONS_RE.search(ssm_opts_raw)
+                ):
+                    raise ValueError("Invalid characters in SSM jumphost options")
+                try:
+                    ssm_opt_tokens = shlex.split(ssm_opts_raw)
+                except ValueError as exc:
+                    raise ValueError("Invalid SSM jumphost options: unbalanced quotes") from exc
+                ssm_parts.extend(ssm_opt_tokens)
+
+            ssm_cmd = shlex.join(ssm_parts)
+            raw_ssh_opts = jh_tags.get("ssh_options", "") if isinstance(jh_tags, dict) else ""
+            ssh_opts = self._validate_and_prepare_ssh_options(
+                raw_ssh_opts,
+                field_name="ssm ssh_options",
+                strip_non_tunnel_flags=True,
+                allow_unsafe=self._is_unsafe_allowed(),
+                connect_timeout=connect_timeout,
+            )
+            bastion_user_part = f"{ssm_user}@{ssm_target}" if ssm_user else ssm_target
+            outer_parts = ["ssh"]
+            if ssh_opts:
+                outer_parts.extend(shlex.split(ssh_opts))
+            outer_parts.extend(
+                ["-o", f"ProxyCommand={ssm_cmd}", "-W", f"{w_target}:{w_port}", bastion_user_part]
+            )
+            cmd = shlex.join(outer_parts)
+        elif jh_proto in ["kubectl", "docker"]:
+            if not jh_host or jh_host.startswith("-") or _LEGACY_SSH_UNSAFE_RE.search(jh_host):
+                raise ValueError(f"Invalid characters in {jh_proto} jumphost host: '{jh_host}'")
             nc_cmd = "nc"
-            if isinstance(jh.get("tags"), dict) and "nc_command" in jh["tags"]:
-                nc_cmd = jh["tags"]["nc_command"]
-            if jh["protocol"] == "kubectl":
+            if isinstance(jh_tags, dict) and "nc_command" in jh_tags:
+                nc_cmd = str(jh_tags["nc_command"])
+                if _CONTROL_CHAR_RE.search(nc_cmd) or (
+                    not self._is_unsafe_allowed() and _SSM_UNSAFE_OPTIONS_RE.search(nc_cmd)
+                ):
+                    raise ValueError(f"Invalid nc_command in {jh_proto} jumphost")
+            jh_opt_str = str(jh.get("options", "") or "").strip()
+            if jh_opt_str:
+                if _CONTROL_CHAR_RE.search(jh_opt_str):
+                    raise ValueError(f"Control characters disallowed in {jh_proto} options")
+                try:
+                    shlex.split(jh_opt_str)
+                except ValueError as exc:
+                    raise ValueError(f"Invalid {jh_proto} options: unbalanced quotes") from exc
+            if jh_proto == "kubectl":
                 cmd = "kubectl exec "
-                if jh["options"] != '':
-                    cmd += f"{jh['options']} "
-                cmd += f"{jh['host']} -i -- {nc_cmd} {target_host} {t_port}"
+                if jh_opt_str:
+                    cmd += f"{jh_opt_str} "
+                cmd += f"{jh_host} -i -- {nc_cmd} {w_target} {w_port}"
             else:
                 cmd = "docker "
-                if jh["options"] != '':
-                    cmd += f"{jh['options']} "
-                cmd += f"exec -i {jh['host']} {nc_cmd} {target_host} {t_port}"
+                if jh_opt_str:
+                    cmd += f"{jh_opt_str} "
+                cmd += f"exec -i {jh_host} {nc_cmd} {w_target} {w_port}"
         else:
+            if include_meta:
+                return "", passwords, inner_meta
             return "", passwords
 
+        if include_meta:
+            return cmd, passwords, hop_meta
         return cmd, passwords
 
     @MethodHook
@@ -667,8 +1123,8 @@ class node:
         if keyfile is None:
             keyfile = self.key
         if keyfile is not None:
-            from Crypto.PublicKey import RSA
             from Crypto.Cipher import PKCS1_OAEP
+            from Crypto.PublicKey import RSA
             with open(keyfile) as f:
                 key = RSA.import_key(f.read())
             decryptor = PKCS1_OAEP.new(key)
@@ -679,7 +1135,7 @@ class node:
                 try:
                     decrypted = decryptor.decrypt(ast.literal_eval(passwd)).decode("utf-8")
                     dpass.append(decrypted)
-                except Exception:
+                except Exception:  # noqa: BLE001
                     printer.error("Decryption failed: Missing or corrupted key.")
                     printer.info("Verify your RSA key and configuration settings.")
                     sys.exit(1)
@@ -690,7 +1146,7 @@ class node:
     @MethodHook
     def _logfile(self, logfile = None):
         # translate logs variables and generate logs path.
-        if logfile == None:
+        if logfile is None:
             logfile = self.logs
         logfile = logfile.replace("${unique}", self.unique)
         logfile = logfile.replace("${host}", self.host)
@@ -708,23 +1164,23 @@ class node:
         """Remove special ascii characters and process terminal cursor movements to clean logs."""
         from .utils import log_cleaner
         
-        if var == False:
+        if not var:
             try:
-                with open(logfile, "r") as f:
+                with open(logfile) as f:
                     t = f.read()
-            except:
+            except Exception:  # noqa: BLE001
                 return
         else:
             t = logfile
             
         result = log_cleaner(t)
 
-        if var == False:
+        if not var:
             try:
                 with open(logfile, "w") as f:
                     f.write(result)
-            except:
-                pass
+            except Exception as exc:  # noqa: BLE001
+                _LOGGER.debug("Failed writing cleaned log %s: %s", logfile, exc)
             return
         else:
             return result
@@ -755,7 +1211,6 @@ class node:
     def _keepalive(self):
         #Send keepalive ctrl+e when idletime passed without new inputs on interact
         self.lastinput = time()
-        t = threading.current_thread()
         while True:
             if time() - self.lastinput >= self.idletime:
                 self.child.sendcontrol("e")
@@ -781,27 +1236,30 @@ class node:
             self.child.logfile_read = self.mylog
             
         # Only start disk-logging tasks if logfile is configured
-        if 'logfile' in dir(self):
-            if not async_mode:
-                # Start the _savelog thread (sync mode)
-                log_thread = threading.Thread(target=self._savelog)
-                log_thread.daemon = True
-                log_thread.start()
+        if hasattr(self, "logfile") and not async_mode:
+            # Start the _savelog thread (sync mode)
+            log_thread = threading.Thread(target=self._savelog)
+            log_thread.daemon = True
+            log_thread.start()
         if 'missingtext' in dir(self):
             print(self.child.after.decode(), end='')
         if self.idletime > 0 and not async_mode:
             x = threading.Thread(target=self._keepalive)
             x.daemon = True
             x.start()
-        if debug:
-            if 'mylog' in dir(self):
-                if not async_mode:
-                    print(self.mylog.getvalue().decode())
+        if debug and hasattr(self, "mylog") and not async_mode:
+            print(self.mylog.getvalue().decode())
 
     def _teardown_interact_environment(self):
         if 'logfile' in dir(self) and hasattr(self, 'mylog'):
             with open(self.logfile, "w") as f:
                 f.write(self._logclean(self.mylog.getvalue().decode(), True))
+
+    def _write_clean_logfile(self, raw_log: str) -> None:
+        """Clean and synchronously write raw log output to self.logfile."""
+        cleaned_log = self._logclean(raw_log, True)
+        with open(self.logfile, "w") as f:
+            f.write(cleaned_log)
 
     def _is_child_connpy_active(self, child_fd: int) -> bool:
         if self.protocol != "local":
@@ -814,8 +1272,6 @@ class node:
             if os.path.exists(cmdline_path):
                 with open(cmdline_path, "rb") as f:
                     raw_args = f.read().split(b"\x00")
-                    cmdline_str = " ".join([arg.decode(errors="ignore") for arg in raw_args if arg])
-                    
                     is_active = False
                     for raw_arg in raw_args:
                         arg_str = raw_arg.decode(errors="ignore")
@@ -827,8 +1283,8 @@ class node:
                             break
 
                     return is_active
-        except Exception:
-            pass
+        except Exception as exc:  # noqa: BLE001
+            _LOGGER.debug("Failed checking active connpy process: %s", exc)
         return False
 
     async def _async_interact_loop(self, local_stream, resize_callback, copilot_handler=None):
@@ -932,8 +1388,8 @@ class node:
                             if hasattr(self, 'current_local_stream') and self.current_local_stream is not None:
                                 try:
                                     await self.current_local_stream.write(f'\x1b]133;B;{pos}\x07'.encode())
-                                except Exception:
-                                    pass
+                                except Exception as exc:  # noqa: BLE001
+                                    _LOGGER.debug("Failed writing OSC 133 marker: %s", exc)
 
                         try:
                             os.write(child_fd, clean_data)
@@ -974,7 +1430,8 @@ class node:
                                 skip_newlines = False
                                 combined_data = stripped
                             else:
-                                if has_eof: break
+                                if has_eof:
+                                    break
                                 continue
                                 
                         await local_stream.write(combined_data)
@@ -991,8 +1448,8 @@ class node:
                         try:
                             self.child.sendcontrol("e")
                             self.lastinput = time()
-                        except Exception:
-                            pass
+                        except Exception as exc:  # noqa: BLE001
+                            _LOGGER.debug("Keepalive sendcontrol failed: %s", exc)
                             
             async def savelog_task():
                 prev_size = 0
@@ -1001,14 +1458,12 @@ class node:
                     current_size = self.mylog.tell()
                     if current_size != prev_size:
                         try:
-                            # Move heavy log cleaning to a thread to avoid freezing the interaction loop
+                            # Move heavy log cleaning & file I/O to a thread to avoid freezing the interaction loop
                             raw_log = self.mylog.getvalue().decode(errors='replace')
-                            cleaned_log = await asyncio.to_thread(self._logclean, raw_log, True)
-                            with open(self.logfile, "w") as f:
-                                f.write(cleaned_log)
+                            await asyncio.to_thread(self._write_clean_logfile, raw_log)
                             prev_size = current_size
-                        except Exception:
-                            pass
+                        except Exception as exc:  # noqa: BLE001
+                            _LOGGER.debug("Periodic savelog sync failed: %s", exc)
 
             async def pwd_tracker_task():
                 import socket
@@ -1024,16 +1479,16 @@ class node:
                                 last_cwd = new_cwd
                                 try:
                                     os.chdir(new_cwd)
-                                except Exception:
-                                    pass
+                                except Exception as exc:  # noqa: BLE001
+                                    _LOGGER.debug("Failed syncing cwd: %s", exc)
                                 try:
                                     await local_stream.write(f"\033]7;file://{hostname}{new_cwd}\007".encode())
-                                except Exception:
-                                    pass
+                                except Exception as exc:  # noqa: BLE001
+                                    _LOGGER.debug("Failed writing OSC 7 update: %s", exc)
                                 if isinstance(self.tags, dict):
                                     self.tags["cwd"] = new_cwd
-                    except Exception:
-                        pass
+                    except Exception as exc:  # noqa: BLE001
+                        _LOGGER.debug("pwd_tracker_task iteration failed: %s", exc)
 
             try:
                 # We wait for either the user (ingress) or the child (egress) to finish
@@ -1048,7 +1503,7 @@ class node:
                 if hasattr(self, 'logfile') and hasattr(self, 'mylog'):
                     tasks.append(asyncio.create_task(savelog_task()))
                 
-                done, pending = await asyncio.wait(
+                done, _pending = await asyncio.wait(
                     [tasks[0], tasks[1]], 
                     return_when=asyncio.FIRST_COMPLETED
                 )
@@ -1058,7 +1513,7 @@ class node:
                 if tasks[0] in done and tasks[1] not in done:
                     try:
                         await asyncio.wait_for(tasks[1], timeout=0.2)
-                    except (asyncio.TimeoutError, asyncio.CancelledError):
+                    except (TimeoutError, asyncio.CancelledError):
                         pass
                 
                 for t in tasks:
@@ -1069,19 +1524,17 @@ class node:
                 if hasattr(self, 'logfile') and hasattr(self, 'mylog'):
                     try:
                         raw_log = self.mylog.getvalue().decode(errors='replace')
-                        cleaned_log = await asyncio.to_thread(self._logclean, raw_log, True)
-                        with open(self.logfile, "w") as f:
-                            f.write(cleaned_log)
-                    except Exception:
-                        pass
+                        await asyncio.to_thread(self._write_clean_logfile, raw_log)
+                    except Exception as exc:  # noqa: BLE001
+                        _LOGGER.debug("Final savelog sync failed: %s", exc)
 
             finally:
                 loop.remove_reader(child_fd)
                 try:
                     flags = fcntl.fcntl(child_fd, fcntl.F_GETFL)
                     fcntl.fcntl(child_fd, fcntl.F_SETFL, flags & ~os.O_NONBLOCK)
-                except Exception:
-                    pass
+                except Exception as exc:  # noqa: BLE001
+                    _LOGGER.debug("Failed restoring blocking mode on child_fd: %s", exc)
         finally:
             self.current_local_stream = None
             local_stream.teardown()
@@ -1103,8 +1556,8 @@ class node:
         slc = self.tags.get("screen_length_command") if hasattr(self, 'tags') and isinstance(self.tags, dict) else None
         
         to_send = list(commands)
-        if slc and slc not in to_send: # avoid duplicates if already there
-             to_send.insert(0, slc)
+        if slc and slc not in to_send:  # avoid duplicates if already there
+            to_send.insert(0, slc)
 
         # 2. Inject one by one
         for cmd in to_send:
@@ -1115,8 +1568,8 @@ class node:
                 if hasattr(self, 'current_local_stream') and self.current_local_stream is not None:
                     try:
                         await self.current_local_stream.write(f'\x1b]133;B;{log_pos}\x07'.encode())
-                    except Exception:
-                        pass
+                    except Exception as exc:  # noqa: BLE001
+                        _LOGGER.debug("Failed writing command boundary marker: %s", exc)
             
             # Write physically to PTY
             os.write(child_fd, (cmd + "\n").encode())
@@ -1138,7 +1591,7 @@ class node:
         Allows multiplexing I/O and handling SIGWINCH events locally without blocking.
         '''
         connect = self._connect(debug=debug, logger=logger)
-        if connect == True:
+        if connect is True:
             try:
                 self._setup_interact_environment(debug=debug, logger=logger, async_mode=True)
                 
@@ -1147,8 +1600,8 @@ class node:
                 def resize_callback(rows, cols):
                     try:
                         self.child.setwinsize(rows, cols)
-                    except Exception:
-                        pass
+                    except Exception as exc:  # noqa: BLE001
+                        _LOGGER.debug("Failed resizing child window: %s", exc)
                 
                 # Build local copilot handler
                 copilot_handler = self._build_local_copilot_handler()
@@ -1160,7 +1613,7 @@ class node:
             if logger:
                 logger("error", str(connect))
             else:
-                printer.error(f"Connection failed: {str(connect)}")
+                printer.error(f"Connection failed: {connect!s}")
             sys.exit(1)
 
     def _build_local_copilot_handler(self):
@@ -1170,8 +1623,6 @@ class node:
 
     def _copilot_handler(self, config):
         """Unified copilot handler for local session."""
-        import asyncio
-        import os
 
         async def handler(buffer, node_info, stream, child_fd, cmd_byte_positions=None):
             try:
@@ -1236,7 +1687,7 @@ class node:
                                         last_len = len(cur_bytes)
                                     
                                     clean_txt = self._logclean(cur_bytes.decode(errors='replace'), True).strip()
-                                    lines = [l.strip() for l in clean_txt.split('\n') if l.strip()]
+                                    lines = [line.strip() for line in clean_txt.split('\n') if line.strip()]
                                     last_line = lines[-1] if lines else ""
                                     if quiet_count >= 2 and re.search(prompt_pattern, last_line):
                                         break
@@ -1255,7 +1706,7 @@ class node:
                         stream._loop.add_reader(stream.stdin_fd, stream._read_ready)
                 
                 os.write(child_fd, b'\x15\r')
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 import traceback
                 print(f"\n[ERROR in Copilot Handler] {e}", flush=True)
                 traceback.print_exc()
@@ -1264,7 +1715,20 @@ class node:
         return handler
 
     @MethodHook
-    def run(self, commands, vars = None,*, folder = '', prompt = r'>$|#$|\$$|>.$|#.$|\$.$', stdout = False, timeout = 10, logger = None):
+    def run(
+        self,
+        commands,
+        vars=None,
+        *,
+        folder='',
+        prompt=r'>$|#$|\$$|>.$|#.$|\$.$',
+        stdout=False,
+        timeout=None,
+        logger=None,
+        connect_timeout=None,
+        auth_timeout=None,
+        _default_cmd_timeout=10,
+    ):
         '''
         Run a command or list of commands on the node and return the output.
 
@@ -1305,23 +1769,49 @@ class node:
             str: Output of the commands you ran on the node.
 
         '''
-        force_ssh = (self.protocol == "mosh")
-        connect = self._connect(timeout=timeout, logger=logger, force_ssh=force_ssh)
-        now = datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S')
-        if connect == True:
+        force_ssh = self.protocol == "mosh"
+        effective_protocol = "ssh" if force_ssh else self.protocol
+        try:
+            _, _, eff_cmd, _, _ = resolve_timeouts(
+                effective_protocol,
+                self.tags,
+                getattr(self, "_hop_chain_meta", None) or [],
+                timeout=timeout,
+                connect_timeout=connect_timeout,
+                auth_timeout=auth_timeout,
+                _default_cmd_timeout=_default_cmd_timeout,
+            )
+        except ValueError as e:
+            err = f"Connection failed code: 12\nInvalid timeout configuration: {e}"
+            self.output = err
+            self.status = 1
             if logger:
-                effective_protocol = "ssh" if force_ssh else self.protocol
+                logger("error", f"Connection failed: {err}")
+            return err
+
+        connect = self._connect(
+            timeout=timeout,
+            logger=logger,
+            force_ssh=force_ssh,
+            connect_timeout=connect_timeout,
+            auth_timeout=auth_timeout,
+            _default_cmd_timeout=_default_cmd_timeout,
+        )
+        now = datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S')
+        if connect is True:
+            if logger:
                 port_str = f":{self.port}" if self.port and effective_protocol not in ["ssm", "kubectl", "docker"] else ""
                 logger("success", f"Connected to {self.unique} at {self.host}{port_str} via: {effective_protocol}")
 
-            if "prompt" in self.tags:
+            if isinstance(self.tags, dict) and "prompt" in self.tags:
                 prompt = self.tags["prompt"]
-            expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
+            prompt_pat = re.compile(prompt.encode("utf-8"), re.DOTALL)
+            expects = [prompt_pat, pexpect.EOF, pexpect.TIMEOUT]
             output = ''
-            status = ''
+            result = 0
             if not isinstance(commands, list):
                 commands = [commands]
-            if "screen_length_command" in self.tags:
+            if isinstance(self.tags, dict) and "screen_length_command" in self.tags:
                 commands.insert(0, self.tags["screen_length_command"])
             self.mylog = io.BytesIO()
             self.child.logfile_read = self.mylog
@@ -1333,34 +1823,33 @@ class node:
                         self.output = f"Error: Variable {e} not defined in task or inventory"
                         self.status = 1
                         return self.output
-                result = self.child.expect(expects, timeout = timeout)
+                result = self.child.expect(expects, timeout=eff_cmd)
                 # Only set terminal size on devices without a
                 # screen_length_command (e.g. Linux/bash servers).
                 # Routers already disable pagination via that command.
                 # After setwinsize, consume any SIGWINCH re-render
                 # prompt (~40ms on bash) with a short timeout.
-                if c == commands[0] and "screen_length_command" not in self.tags:
+                if c == commands[0] and (not isinstance(self.tags, dict) or "screen_length_command" not in self.tags):
                     try:
                         self.child.setwinsize(65535, 65535)
-                    except Exception:
+                    except Exception:  # noqa: BLE001
                         try:
                             self.child.setwinsize(10000, 10000)
-                        except Exception:
-                            pass
-                    self.child.expect(expects, timeout = 1)
+                        except Exception as exc:  # noqa: BLE001
+                            _LOGGER.debug("Fallback setwinsize failed in run: %s", exc)
+                    self.child.expect(expects, timeout=1)
                 self.child.sendline(c)
                 if result == 2:
                     break
-            if not result == 2:
-                result = self.child.expect(expects, timeout = timeout)
+            if result != 2:
+                result = self.child.expect(expects, timeout=eff_cmd)
             self.child.close()
-            output = self._logclean(self.mylog.getvalue().decode(), True)
+            output = self._logclean(self.mylog.getvalue().decode("utf-8", errors="replace"), True)
             if logger:
                 logger("output", output)
             if folder != '':
                 with open(folder + "/" + self.unique + "_" + now + ".txt", "w") as f:
                     f.write(output)
-                    f.close()
             self.output = output
             if result == 2:
                 self.status = 2
@@ -1375,12 +1864,23 @@ class node:
             if folder != '':
                 with open(folder + "/" + self.unique + "_" + now + ".txt", "w") as f:
                     f.write(connect)
-
-                    f.close()
             return connect
 
     @MethodHook
-    def test(self, commands, expected, vars = None,*, folder = '', prompt = r'>$|#$|\$$|>.$|#.$|\$.$', timeout = 10, logger = None):
+    def test(
+        self,
+        commands,
+        expected,
+        vars=None,
+        *,
+        folder='',
+        prompt=r'>$|#$|\$$|>.$|#.$|\$.$',
+        timeout=None,
+        logger=None,
+        connect_timeout=None,
+        auth_timeout=None,
+        _default_cmd_timeout=10,
+    ):
         '''
         Run a command or list of commands on the node, then check if expected value appears on the output after the last command.
 
@@ -1424,23 +1924,51 @@ class node:
 
         '''
         now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        force_ssh = (self.protocol == "mosh")
-        connect = self._connect(timeout=timeout, logger=logger, force_ssh=force_ssh)
-        if connect == True:
+        force_ssh = self.protocol == "mosh"
+        effective_protocol = "ssh" if force_ssh else self.protocol
+        try:
+            _, _, eff_cmd, _, _ = resolve_timeouts(
+                effective_protocol,
+                self.tags,
+                getattr(self, "_hop_chain_meta", None) or [],
+                timeout=timeout,
+                connect_timeout=connect_timeout,
+                auth_timeout=auth_timeout,
+                _default_cmd_timeout=_default_cmd_timeout,
+            )
+        except ValueError as e:
+            err = f"Connection failed code: 12\nInvalid timeout configuration: {e}"
+            self.result = None
+            self.output = err
+            self.status = 1
             if logger:
-                effective_protocol = "ssh" if force_ssh else self.protocol
+                logger("error", f"Connection failed: {err}")
+            return err
+
+        connect = self._connect(
+            timeout=timeout,
+            logger=logger,
+            force_ssh=force_ssh,
+            connect_timeout=connect_timeout,
+            auth_timeout=auth_timeout,
+            _default_cmd_timeout=_default_cmd_timeout,
+        )
+        if connect is True:
+            if logger:
                 port_str = f":{self.port}" if self.port and effective_protocol not in ["ssm", "kubectl", "docker"] else ""
                 logger("success", f"Connected to {self.unique} at {self.host}{port_str} via: {effective_protocol}")
 
-            if "prompt" in self.tags:
+            if isinstance(self.tags, dict) and "prompt" in self.tags:
                 prompt = self.tags["prompt"]
-            expects = [prompt, pexpect.EOF, pexpect.TIMEOUT]
+            prompt_pat = re.compile(prompt.encode("utf-8"), re.DOTALL)
+            expects = [prompt_pat, pexpect.EOF, pexpect.TIMEOUT]
             output = ''
+            result = 0
             if not isinstance(commands, list):
                 commands = [commands]
             if not isinstance(expected, list):
                 expected = [expected]
-            if "screen_length_command" in self.tags:
+            if isinstance(self.tags, dict) and "screen_length_command" in self.tags:
                 commands.insert(0, self.tags["screen_length_command"])
             self.mylog = io.BytesIO()
             self.child.logfile_read = self.mylog
@@ -1452,29 +1980,28 @@ class node:
                         self.output = f"Error: Variable {e} not defined in task or inventory"
                         self.status = 1
                         return self.output
-                result = self.child.expect(expects, timeout = timeout)
-                if c == commands[0] and "screen_length_command" not in self.tags:
+                result = self.child.expect(expects, timeout=eff_cmd)
+                if c == commands[0] and (not isinstance(self.tags, dict) or "screen_length_command" not in self.tags):
                     try:
                         self.child.setwinsize(65535, 65535)
-                    except Exception:
+                    except Exception:  # noqa: BLE001
                         try:
                             self.child.setwinsize(10000, 10000)
-                        except Exception:
-                            pass
-                    self.child.expect(expects, timeout = 1)
+                        except Exception as exc:  # noqa: BLE001
+                            _LOGGER.debug("Fallback setwinsize failed in test: %s", exc)
+                    self.child.expect(expects, timeout=1)
                 self.child.sendline(c)
                 if result == 2:
                     break
-            if not result == 2:
-                result = self.child.expect(expects, timeout = timeout)
+            if result != 2:
+                result = self.child.expect(expects, timeout=eff_cmd)
             self.child.close()
-            output = self._logclean(self.mylog.getvalue().decode(), True)
+            output = self._logclean(self.mylog.getvalue().decode("utf-8", errors="replace"), True)
             if logger:
                 logger("output", output)
             if folder != '':
                 with open(folder + "/" + self.unique + "_" + now + ".txt", "w") as f:
                     f.write(output)
-                    f.close()
             self.output = output
             if result in [0, 1]:
                 # lastcommand = commands[-1]
@@ -1521,8 +2048,52 @@ class node:
             self.status = 1
             return connect
 
+    @staticmethod
+    def _inject_ssh_timeouts(raw_opts: str, connect_timeout: int | None) -> str:
+        """Append -o ConnectTimeout and -o ServerAliveInterval=15 unless already present."""
+        opts_str = str(raw_opts).strip() if raw_opts else ""
+        if connect_timeout is None:
+            return opts_str
+        ct_val = validate_strict_timeout_int(connect_timeout, "connect_timeout")
+        tokens = shlex.split(opts_str) if opts_str else []
+        existing_keys = _extract_ssh_o_keys(tokens)
+        if "connecttimeout" not in existing_keys and "connecttimeout" in _ALLOWED_SSH_O_KEYS:
+            tokens.extend(["-o", f"ConnectTimeout={ct_val}"])
+        if (
+            "serveraliveinterval" not in existing_keys
+            and "serveraliveinterval" in _ALLOWED_SSH_O_KEYS
+        ):
+            tokens.extend(["-o", "ServerAliveInterval=15"])
+        return shlex.join(tokens)
+
+    def _effective_jumphost_opt(self, connect_timeout: int | None = None) -> str:
+        """Return ProxyCommand option, rebuilding hop chain with connect_timeout when set."""
+        if (
+            connect_timeout is not None
+            and getattr(self, "_jumphost_name", "")
+            and getattr(self, "config", "") != ""
+        ):
+            chain_res = self._build_jumphost_chain(
+                self._jumphost_name,
+                self.config,
+                include_meta=True,
+                connect_timeout=connect_timeout,
+            )
+            raw_cmd = chain_res[0]
+            if raw_cmd:
+                escaped = raw_cmd.replace("\\", "\\\\").replace('"', '\\"')
+                return f'-o ProxyCommand="{escaped}"'
+            return ""
+        return self.jumphost
+
     @MethodHook
-    def _generate_ssh_sftp_cmd(self, force_ssh=False, allow_reverse_tunnel_port=None):
+    def _generate_ssh_sftp_cmd(
+        self,
+        force_ssh=False,
+        allow_reverse_tunnel_port=None,
+        *,
+        connect_timeout=None,
+    ):
         self._validate_base_fields(check_port=True)
         is_from_mosh = (
             self.protocol == "mosh"
@@ -1560,6 +2131,7 @@ class node:
                 opts = shlex.join(sftp_tokens)
             else:
                 opts = str(raw_opts).strip() if raw_opts else ""
+            opts = self._inject_ssh_timeouts(opts, connect_timeout)
             if opts:
                 cmd += " " + opts
             target_h = f"[{host_bare}]" if (proto == "sftp" and ":" in host_bare) else host_bare
@@ -1570,22 +2142,25 @@ class node:
                 elif proto == "sftp":
                     cmd += " -P " + str(self.port)
             raw_opts = self.options
+            opts = ""
             if raw_opts:
                 opts = str(raw_opts).strip()
                 if proto == "sftp":
                     opts = re.sub(r'(?<!\S)-[XxtTAaNf]\b', '', opts).strip()
-                if opts:
-                    cmd += " " + opts
+            opts = self._inject_ssh_timeouts(opts, connect_timeout)
+            if opts:
+                cmd += " " + opts
             target_h = self.host
 
-        if self.jumphost:
-            cmd += " " + self.jumphost
+        jh_opt = self._effective_jumphost_opt(connect_timeout=connect_timeout)
+        if jh_opt:
+            cmd += " " + jh_opt
         user_host = f"{self.user}@{target_h}" if self.user else target_h
         cmd += f" {user_host}"
         return cmd
 
     @MethodHook
-    def _generate_mosh_cmd(self):
+    def _generate_mosh_cmd(self, *, connect_timeout=None):
         if str(self.host).startswith("-"):
             raise ValueError("Host cannot start with '-'")
         if self.user and str(self.user).startswith("-"):
@@ -1617,19 +2192,27 @@ class node:
                 if not re.fullmatch(r"^\d+$", port_s) or not (1 <= int(port_s) <= 65535):
                     raise ValueError(f"Invalid TCP SSH port '{self.port}'")
                 ssh_parts.append(f"-p {port_s}")
+        ssh_opts = ""
         if isinstance(self.tags, dict) and self.tags.get("mosh_ssh_options"):
             ssh_opts = str(self.tags["mosh_ssh_options"]).strip()
             if ssh_opts:
-                if not self._is_unsafe_allowed():
-                    if re.search(r'(?:LocalCommand|ProxyCommand|PermitLocalCommand|KnownHostsCommand)', ssh_opts, re.IGNORECASE):
-                        raise ValueError("mosh_ssh_options cannot contain LocalCommand or ProxyCommand")
+                if not self._is_unsafe_allowed() and re.search(
+                    r'(?:LocalCommand|ProxyCommand|PermitLocalCommand|KnownHostsCommand)',
+                    ssh_opts,
+                    re.IGNORECASE,
+                ):
+                    raise ValueError("mosh_ssh_options cannot contain LocalCommand or ProxyCommand")
                 try:
                     shlex.split(ssh_opts)
                 except ValueError as exc:
                     raise ValueError("Invalid mosh_ssh_options: unbalanced quotes") from exc
-                ssh_parts.append(ssh_opts)
-        if self.jumphost:
-            ssh_parts.append(self.jumphost)
+        if connect_timeout is not None:
+            ssh_opts = self._inject_ssh_timeouts(ssh_opts, connect_timeout)
+        if ssh_opts:
+            ssh_parts.append(ssh_opts)
+        jh_opt = self._effective_jumphost_opt(connect_timeout=connect_timeout)
+        if jh_opt:
+            ssh_parts.append(jh_opt)
 
         if len(ssh_parts) > 1:
             raw_ssh = " ".join(ssh_parts)
@@ -1640,9 +2223,12 @@ class node:
             if opts:
                 if re.search(r'--(?:ssh|server|client)(?:=|\s|$)', opts):
                     raise ValueError("Options cannot override --ssh, --server or --client for mosh")
-                if not self._is_unsafe_allowed():
-                    if re.search(r'(?:LocalCommand|ProxyCommand|PermitLocalCommand|KnownHostsCommand)', opts, re.IGNORECASE):
-                        raise ValueError("Options cannot contain LocalCommand or ProxyCommand")
+                if not self._is_unsafe_allowed() and re.search(
+                    r'(?:LocalCommand|ProxyCommand|PermitLocalCommand|KnownHostsCommand)',
+                    opts,
+                    re.IGNORECASE,
+                ):
+                    raise ValueError("Options cannot contain LocalCommand or ProxyCommand")
                 try:
                     shlex.split(opts)
                 except ValueError as exc:
@@ -1723,14 +2309,15 @@ class node:
 
 
     @MethodHook
-    def _get_cmd(self, force_ssh=False, allow_reverse_tunnel_port=None):
+    def _get_cmd(self, force_ssh=False, allow_reverse_tunnel_port=None, *, connect_timeout=None):
         if force_ssh or self.protocol in ["ssh", "sftp"]:
             return self._generate_ssh_sftp_cmd(
                 force_ssh=force_ssh,
                 allow_reverse_tunnel_port=allow_reverse_tunnel_port,
+                connect_timeout=connect_timeout,
             )
         elif self.protocol == "mosh":
-            return self._generate_mosh_cmd()
+            return self._generate_mosh_cmd(connect_timeout=connect_timeout)
         elif self.protocol == "telnet":
             return self._generate_telnet_cmd()
         elif self.protocol == "kubectl":
@@ -1745,7 +2332,7 @@ class node:
             printer.error(f"Invalid protocol: {self.protocol}")
             sys.exit(1)
 
-    def _spawn_child(self, args, protocol=None):
+    def _spawn_child(self, args, protocol=None, encoding=None):
         if protocol is None:
             protocol = getattr(self, "protocol", "")
         env = None
@@ -1757,10 +2344,13 @@ class node:
             ):
                 env["LC_ALL"] = "C.UTF-8"
             env.setdefault("TERM", "xterm-256color")
+        spawn_kwargs = {}
+        if env is not None:
+            spawn_kwargs["env"] = env
+        if encoding is not None:
+            spawn_kwargs["encoding"] = encoding
         try:
-            if env is not None:
-                return pexpect.spawn(args[0], args[1:], env=env), None
-            return pexpect.spawn(args[0], args[1:]), None
+            return pexpect.spawn(args[0], args[1:], **spawn_kwargs), None
         except pexpect.exceptions.ExceptionPexpect as e:
             return None, f"Connection failed: {e}"
 
@@ -1768,18 +2358,45 @@ class node:
     def _connect(
         self,
         debug=False,
-        timeout=10,
+        timeout=None,
         max_attempts=3,
         logger=None,
         force_ssh=False,
         allow_reverse_tunnel_port=None,
+        *,
+        connect_timeout=None,
+        auth_timeout=None,
+        _default_cmd_timeout=10,
+        _default_max_total_seconds=None,
+        clock=_time_mod.monotonic,
     ):
         effective_protocol = "ssh" if force_ssh else self.protocol
         if effective_protocol == "mosh":
             import shutil
+
             if shutil.which("mosh") is None:
                 return "Connection failed: mosh binary not found in PATH"
-            timeout = max(timeout, 15)
+
+        hop_meta = getattr(self, "_hop_chain_meta", None) or []
+        try:
+            validate_strict_timeout_int(
+                max_attempts,
+                "max_attempts",
+                min_val=1,
+                max_val=MAX_STAGE_TIMEOUT_CAP,
+            )
+            eff_ct, eff_at, _eff_cmd, max_ext, max_total = resolve_timeouts(
+                effective_protocol,
+                self.tags,
+                hop_meta,
+                timeout=timeout,
+                connect_timeout=connect_timeout,
+                auth_timeout=auth_timeout,
+                _default_cmd_timeout=_default_cmd_timeout,
+                _default_max_total_seconds=_default_max_total_seconds,
+            )
+        except ValueError as e:
+            return f"Connection failed code: 12\nInvalid timeout configuration: {e}"
 
         if effective_protocol == "local":
             cmd = self._get_cmd()
@@ -1789,6 +2406,7 @@ class node:
                 return err
             self.child = child
             from pexpect import fdpexpect
+
             self.raw_child = fdpexpect.fdspawn(self.child.child_fd)
             if self.logs != '':
                 self.logfile = self._logfile()
@@ -1797,178 +2415,414 @@ class node:
         cmd = self._get_cmd(
             force_ssh=force_ssh,
             allow_reverse_tunnel_port=allow_reverse_tunnel_port,
+            connect_timeout=eff_ct,
         )
         passwords = self._passtx(self.password) if self.password and any(self.password) else []
+        raw_secrets = [
+            s
+            for s in (
+                list(passwords)
+                + (list(self.password) if isinstance(self.password, list) else [])
+            )
+            if isinstance(s, str) and s
+        ]
         if self.logs != '':
             self.logfile = self._logfile()
         default_prompt = r'>$|#$|\$$|>.$|#.$|\$.$'
         prompt = self.tags.get("prompt", default_prompt) if isinstance(self.tags, dict) else default_prompt
-        password_prompt = '[p|P]assword:|[u|U]sername:' if effective_protocol != 'telnet' else '[p|P]assword:'
-        prompt_unanchored = "|".join([t[:-1] if t.endswith("$") else t for t in prompt.split("|")])
-        mosh_prompt = r"(?:" + prompt_unanchored + r")\s*(?:\[[0-9;?]*[a-zA-Z])*$"
+        password_prompt = r'[pP]assword:|[uU]sername:' if effective_protocol != 'telnet' else r'[pP]assword:'
+        prompt_unanchored = "|".join(t.removesuffix("$") for t in prompt.split("|"))
+        mosh_prompt = r"(?:" + prompt_unanchored + r")\s*(?:\x1b\[[0-9;?]*[a-zA-Z])*$"
+
+        def _precompile_user_pat(pat_str: str):
+            try:
+                pat_str.encode("ascii")
+            except UnicodeEncodeError:
+                return re.compile(pat_str.encode("utf-8"), re.DOTALL)
+            return pat_str
+
+        user_prompt_pat = _precompile_user_pat(prompt)
+        mosh_prompt_pat = _precompile_user_pat(mosh_prompt)
 
         expects = {
-            "ssh": ['yes/no', 'refused', 'supported', 'Invalid|[u|U]sage: ssh', 'ssh-keygen.*\"', 'timeout|timed.out', 'unavailable', 'closed', password_prompt, prompt, 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching", "[b|B]ad (owner|permissions)"],
-            "sftp": ['yes/no', 'refused', 'supported', 'Invalid|[u|U]sage: sftp', 'ssh-keygen.*\"', 'timeout|timed.out', 'unavailable', 'closed', password_prompt, prompt, 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching", "[b|B]ad (owner|permissions)"],
-            "telnet": ['[u|U]sername:', 'refused', 'supported', 'invalid|unrecognized option', 'ssh-keygen.*\"', 'timeout|timed.out', 'unavailable', 'closed', password_prompt, prompt, 'suspend', pexpect.EOF, pexpect.TIMEOUT, "No route to host", "resolve hostname", "no matching", "[b|B]ad (owner|permissions)"],
-            "kubectl": ['[u|U]sername:', '[r|R]efused', '[E|e]rror', 'DEPRECATED', pexpect.TIMEOUT, password_prompt, prompt, pexpect.EOF, "expired|invalid"],
-            "docker": ['[u|U]sername:', 'Cannot', '[E|e]rror', 'failed', 'not a docker command', 'unknown', 'unable to resolve', pexpect.TIMEOUT, password_prompt, prompt, pexpect.EOF],
-            "ssm": ['[u|U]sername:', 'Cannot', '[E|e]rror', 'failed', 'SessionManagerPlugin', '[u|U]nknown', 'unable to resolve', pexpect.TIMEOUT, password_prompt, prompt, pexpect.EOF]
+            "ssh": [
+                'yes/no',
+                r'(?m:^(?:(?:ssh|sftp):[^\r\n]{1,256} )?Connection refused(?:\r?\n))',
+                r'(?im:^(?:(?:ssh|sftp|debug\d+):[^\r\n]{1,256}not supported|Permission denied \([^)\r\n]{1,256}\)\.)(?:\r?\n))',
+                r'(?im:^(?:(?:ssh|sftp):[^\r\n]{1,256}Invalid|usage:\s*(?:ssh|sftp)\b[^\r\n]{0,256})(?:\r?\n))',
+                'ssh-keygen.*"',
+                r'(?im:^(?:(?:ssh|sftp):[^\r\n]{1,256}(?:Operation timed out|Connection timed out)|kex_exchange_identification:[^\r\n]{1,256}timed out|Connection timed out during banner exchange)(?:\r?\n))',
+                r'(?im:^(?:ssh|sftp|ssh_exchange_identification):[^\r\n]{1,256}(?:Resource temporarily unavailable|Name or service not known|Temporary failure in name resolution|No address associated with hostname|unavailable)(?:\r?\n))',
+                r'(?im:^(?:Connection to [^\r\n]{1,256} closed(?: by remote host)?\.?|Connection closed by (?:remote host|foreign host|authenticating user [^\r\n]{1,128}|[^\r\n]{1,256} port \d{1,5})|(?:kex|ssh)_exchange_identification: Connection closed[^\r\n]{0,256})(?:\r?\n))',
+                password_prompt,
+                user_prompt_pat,
+                'suspend',
+                pexpect.EOF,
+                pexpect.TIMEOUT,
+                r'(?im:^(?:(?:ssh|sftp):[^\r\n]{1,256})?No route to host(?:\r?\n))',
+                r'(?im:^(?:ssh|sftp):[^\r\n]{1,256}resolve hostname[^\r\n]{0,256}(?:\r?\n))',
+                r'(?im:^(?:(?:ssh|sftp):|Unable to negotiate with )[^\r\n]{1,256}no matching[^\r\n]{0,256}(?:\r?\n))',
+                r'(?im:^Bad (?:owner|permissions)[^\r\n]{0,256}(?:\r?\n))',
+            ],
+            "sftp": [
+                'yes/no',
+                r'(?m:^(?:(?:ssh|sftp):[^\r\n]{1,256} )?Connection refused(?:\r?\n))',
+                r'(?im:^(?:(?:ssh|sftp|debug\d+):[^\r\n]{1,256}not supported|Permission denied \([^)\r\n]{1,256}\)\.)(?:\r?\n))',
+                r'(?im:^(?:(?:ssh|sftp):[^\r\n]{1,256}Invalid|usage:\s*(?:ssh|sftp)\b[^\r\n]{0,256})(?:\r?\n))',
+                'ssh-keygen.*"',
+                r'(?im:^(?:(?:ssh|sftp):[^\r\n]{1,256}(?:Operation timed out|Connection timed out)|kex_exchange_identification:[^\r\n]{1,256}timed out|Connection timed out during banner exchange)(?:\r?\n))',
+                r'(?im:^(?:ssh|sftp|ssh_exchange_identification):[^\r\n]{1,256}(?:Resource temporarily unavailable|Name or service not known|Temporary failure in name resolution|No address associated with hostname|unavailable)(?:\r?\n))',
+                r'(?im:^(?:Connection to [^\r\n]{1,256} closed(?: by remote host)?\.?|Connection closed by (?:remote host|foreign host|authenticating user [^\r\n]{1,128}|[^\r\n]{1,256} port \d{1,5})|(?:kex|ssh)_exchange_identification: Connection closed[^\r\n]{0,256})(?:\r?\n))',
+                password_prompt,
+                user_prompt_pat,
+                'suspend',
+                pexpect.EOF,
+                pexpect.TIMEOUT,
+                r'(?im:^(?:(?:ssh|sftp):[^\r\n]{1,256})?No route to host(?:\r?\n))',
+                r'(?im:^(?:ssh|sftp):[^\r\n]{1,256}resolve hostname[^\r\n]{0,256}(?:\r?\n))',
+                r'(?im:^(?:(?:ssh|sftp):|Unable to negotiate with )[^\r\n]{1,256}no matching[^\r\n]{0,256}(?:\r?\n))',
+                r'(?im:^Bad (?:owner|permissions)[^\r\n]{0,256}(?:\r?\n))',
+            ],
+            "telnet": [
+                r'[uU]sername:',
+                r'(?im:^(?:telnet:[^\r\n]{1,256} )?(?:Unable to connect to remote host: )?Connection refused(?:\r?\n))',
+                r'(?im:^(?:telnet:[^\r\n]{1,256}not supported|[^\r\n]{0,64}Authentication not supported)(?:\r?\n))',
+                r'(?im:^(?:telnet:|usage:\s*telnet\b)[^\r\n]{0,256}(?:invalid|unrecognized option)[^\r\n]{0,256}(?:\r?\n))',
+                'ssh-keygen.*"',
+                r'(?im:^(?:telnet:[^\r\n]{1,256}(?:Operation timed out|Connection timed out)|Connection timed out)(?:\r?\n))',
+                r'(?im:^(?:telnet:[^\r\n]{1,256}(?:Name or service not known|Temporary failure in name resolution|unavailable)|[^\r\n]{0,128}: Name or service not known)(?:\r?\n))',
+                r'(?im:^(?:Connection closed by (?:foreign host|remote host)|telnet:[^\r\n]{1,256}closed)(?:\r?\n))',
+                password_prompt,
+                user_prompt_pat,
+                'suspend',
+                pexpect.EOF,
+                pexpect.TIMEOUT,
+                r'(?im:^(?:telnet:[^\r\n]{1,256})?No route to host(?:\r?\n))',
+                r'(?im:^telnet:[^\r\n]{1,256}resolve hostname[^\r\n]{0,256}(?:\r?\n))',
+                r'(?im:^telnet:[^\r\n]{1,256}no matching[^\r\n]{0,256}(?:\r?\n))',
+                r'(?im:^Bad (?:owner|permissions)[^\r\n]{0,256}(?:\r?\n))',
+            ],
+            "kubectl": [
+                r'[uU]sername:',
+                r'[rR]efused',
+                r'[Ee]rror',
+                'DEPRECATED',
+                pexpect.TIMEOUT,
+                password_prompt,
+                user_prompt_pat,
+                pexpect.EOF,
+                "expired|invalid",
+            ],
+            "docker": [
+                r'[uU]sername:',
+                'Cannot',
+                r'[Ee]rror',
+                'failed',
+                'not a docker command',
+                'unknown',
+                'unable to resolve',
+                pexpect.TIMEOUT,
+                password_prompt,
+                user_prompt_pat,
+                pexpect.EOF,
+            ],
+            "ssm": [
+                r'[uU]sername:',
+                r'(?im:^(?:Cannot (?:perform start-session|connect to instance|start session)[^\r\n]{0,256})(?:\r?\n))',
+                r'(?im:^(?:An error occurred \([^)\r\n]{1,128}\)[^\r\n]{0,256}|aws: error:[^\r\n]{1,512}|Error: (?:Target|An error|Unable|The security token|Invalid|AccessDenied|SessionManager)[^\r\n]{1,256})(?:\r?\n))',
+                r'(?im:^(?:TargetNotConnected[^\r\n]{0,256}|(?:SessionManagerPlugin|Starting session|An error occurred)[^\r\n]{0,256}failed[^\r\n]{0,256})(?:\r?\n))',
+                'SessionManagerPlugin',
+                r'(?im:^(?:Unknown(?:Error|ClientException)[^\r\n]{0,256}|An error occurred \([^)\r\n]{0,128}Unknown[^)\r\n]{0,128}\)[^\r\n]{0,256}|aws: [^\r\n]{1,256}invalid choice[^\r\n]{0,256})(?:\r?\n))',
+                r'(?im:^(?:Could not resolve host|Unable to locate credentials|Unable to resolve [^\r\n]{1,256})(?:\r?\n))',
+                pexpect.TIMEOUT,
+                password_prompt,
+                user_prompt_pat,
+                pexpect.EOF,
+            ],
         }
         expects["mosh"] = [
             'yes/no',                                                                              # 0  (initial)
             r'(?:ssh: connect to host .* port .*: Connection refused|Connection refused)',         # 1  (error)
             r'(?:ssh|mosh): .*supported',                                                          # 2  (error)
             r'(?:(?:ssh|mosh): (?:Invalid|usage)|Unknown option:)',                                # 3  (error)
-            'ssh-keygen.*\"',                                                                      # 4  (error)
+            'ssh-keygen.*"',                                                                      # 4  (error)
             r'(?:ssh: connect to host .* port .*: Connection timed out|mosh: .* timed out)',       # 5  (error)
             r'(?:ssh|mosh): .*unavailable',                                                        # 6  (error)
             r'(?:Connection to .* closed|Connection closed by remote host)',                       # 7  (error)
             password_prompt,                                                                       # 8  (eof)
-            mosh_prompt,                                                                           # 9  (eof)
+            mosh_prompt_pat,                                                                       # 9  (eof)
             'suspend',                                                                             # 10 (eof)
             pexpect.EOF,                                                                           # 11 (eof)
             pexpect.TIMEOUT,                                                                       # 12 (error)
             "No route to host",                                                                    # 13 (error)
             "resolve hostname",                                                                    # 14 (error)
             r'(?:ssh|mosh): .*no matching',                                                        # 15 (error)
-            "[b|B]ad (owner|permissions)",                                                         # 16 (error)
+            r"[bB]ad (owner|permissions)",                                                         # 16 (error)
             "mosh-server:.*not found|command not found",                                           # 17 (error)
-            r"(?:Did not find mosh server startup message|(?:mosh: )?Nothing received from server on UDP port \d+\.?|Nothing received from server)", # 18 (error)
+            r"(?:Did not find mosh server startup message|(?:mosh: )?Nothing received from server on UDP port \d+\.?|Nothing received from server)",  # 18 (error)
             "needs a UTF-8 native locale to run|requires a UTF-8 locale|locale.*not available",    # 19 (error)
         ]
+
+        compiled_expects = compile_expects(expects)
 
         error_indices = {
             "ssh": [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15, 16],
             "sftp": [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15, 16],
             "telnet": [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15, 16],
-            "kubectl": [1, 2, 3, 4, 8],  # Define error indices for kube
-            "docker": [1, 2, 3, 4, 5, 6, 7],  # Define error indices for docker
+            "kubectl": [1, 2, 3, 4, 8],
+            "docker": [1, 2, 3, 4, 5, 6, 7],
             "ssm": [1, 2, 3, 4, 5, 6, 7],
-            "mosh": [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15, 16, 17, 18, 19]
+            "mosh": [1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15, 16, 17, 18, 19],
         }
 
         eof_indices = {
             "ssh": [8, 9, 10, 11],
             "sftp": [8, 9, 10, 11],
             "telnet": [8, 9, 10, 11],
-            "kubectl": [5, 6, 7],  # Define eof indices for kube
-            "docker": [8, 9, 10],  # Define eof indices for docker
+            "kubectl": [5, 6, 7],
+            "docker": [8, 9, 10],
             "ssm": [8, 9, 10],
-            "mosh": [8, 9, 10, 11]
+            "mosh": [8, 9, 10, 11],
         }
 
         initial_indices = {
             "ssh": [0],
             "sftp": [0],
             "telnet": [0],
-            "kubectl": [0],  # Define special indices for kube
-            "docker": [0],  # Define special indices for docker
+            "kubectl": [0],
+            "docker": [0],
             "ssm": [0],
-            "mosh": [0]
+            "mosh": [0],
         }
 
-        attempts = 1
-        handshake_progressed = False
-        while attempts <= max_attempts:
+        def _to_bytes(val) -> bytes:
+            if val is None:
+                return b""
+            if isinstance(val, bytes):
+                return val
+            return str(val).encode("utf-8", errors="replace")
+
+        def _to_str(val) -> str:
+            if val is None:
+                return ""
+            if isinstance(val, bytes):
+                return val.decode("utf-8", errors="replace")
+            return str(val)
+
+        deadline = clock() + max_total
+        budget_warned = False
+        proto_expects = compiled_expects[effective_protocol]
+        pw_prompt_idx = 5 if effective_protocol == "kubectl" else 8
+        suspend_idx = 10 if effective_protocol in ("ssh", "sftp", "telnet", "mosh") else None
+
+        for attempts in range(1, max_attempts + 1):
+            remaining = deadline - clock()
+            if remaining <= 0:
+                return _redact_known_secrets(
+                    f"Connection failed code: 12\nConnection timeout (global deadline {max_total}s exceeded)",
+                    raw_secrets,
+                )
+
+            handshake_progressed = False
             args = shlex.split(cmd)
             child, err = self._spawn_child(args, protocol=effective_protocol)
             if err:
-                return err
-            if isinstance(self.tags, dict) and self.tags.get("console"):
-                child.sendline()
-            if debug:
-                if logger:
-                    logger("debug", f"Command:\n{cmd}")
-                self.mylog = io.BytesIO()
-                self.mylog.write(f"[i] [DEBUG] Command:\r\n    {cmd}\r\n".encode())
-                child.logfile_read = self.mylog
+                return _redact_known_secrets(err, raw_secrets)
 
+            connected_ok = False
+            local_mylog = None
+            retry_attempt = False
+            try:
+                if isinstance(self.tags, dict) and self.tags.get("console"):
+                    child.sendline()
+                if debug:
+                    if logger:
+                        logger("debug", f"Command:\n{_redact_known_secrets(cmd, raw_secrets)}")
+                    local_mylog = io.BytesIO()
+                    self.mylog = local_mylog
+                    local_mylog.write(f"[i] [DEBUG] Command:\r\n    {cmd}\r\n".encode())
+                    child.logfile_read = local_mylog
 
-            endloop = False
-            for i in range(len(passwords) if passwords else 1):
+                pw_idx = 0
+                stage = "connect"
+                progress_extensions = 0
+                last_observed_bytes_len = 0
+
                 while True:
-                    results = child.expect(expects[effective_protocol], timeout=timeout)
-                    results_value = expects[effective_protocol][results]
-                    
+                    remaining = deadline - clock()
+                    if remaining <= 0:
+                        return _redact_known_secrets(
+                            f"Connection failed code: 12\nConnection timeout (global deadline {max_total}s exceeded)",
+                            raw_secrets,
+                        )
+                    stage_timeout = eff_ct if stage == "connect" else eff_at
+                    expect_timeout = max(0.001, min(stage_timeout, remaining))
+                    results = child.expect(proto_expects, timeout=expect_timeout)
+                    results_value = proto_expects[results]
+                    before_bytes = _to_bytes(getattr(child, "before", b""))
+
+                    if len(before_bytes) > MAX_PRE_AUTH_BUFFER_BYTES:
+                        return _redact_known_secrets(
+                            f"Connection failed code: 12\nPre-auth buffer exceeded maximum size ({MAX_PRE_AUTH_BUFFER_BYTES} bytes)",
+                            raw_secrets,
+                        )
+
                     if results in initial_indices[effective_protocol]:
                         if effective_protocol in ["ssh", "sftp", "mosh"]:
                             child.sendline('yes')
                             handshake_progressed = True
+                            last_observed_bytes_len = 0
                         elif effective_protocol in ["telnet", "kubectl", "docker", "ssm"]:
                             if self.user:
                                 child.sendline(self.user)
+                                last_observed_bytes_len = 0
                             else:
                                 self.missingtext = True
                                 break
-                    
+
                     elif results in error_indices[effective_protocol]:
-                        try:
-                            child.terminate()
-                        except Exception:
-                            pass
-                        can_retry = (
-                            results_value == pexpect.TIMEOUT
-                            and attempts != max_attempts
-                            and not (effective_protocol == "mosh" and handshake_progressed)
-                        )
-                        if can_retry:
-                            attempts += 1
-                            endloop = True
-                            break
-                        else:
-                            def _to_str(val):
-                                if val is None:
-                                    return ""
-                                if hasattr(val, "decode"):
-                                    return val.decode()
-                                return str(val)
-                            after = "Connection timeout" if results_value == pexpect.TIMEOUT else _to_str(child.after)
-                            before = _to_str(child.before)
-                            readline_val = _to_str(child.readline())
+                        if results_value == pexpect.TIMEOUT:
+                            cur_len = len(before_bytes)
+                            bytes_grew = cur_len > last_observed_bytes_len
+                            last_observed_bytes_len = cur_len
+                            remaining = deadline - clock()
+                            can_extend = (
+                                bytes_grew
+                                and progress_extensions < max_ext
+                                and remaining > 0
+                                and not (effective_protocol == "mosh" and handshake_progressed)
+                            )
+                            if can_extend:
+                                progress_extensions += 1
+                                if not budget_warned:
+                                    budget_warned = True
+                                    if logger:
+                                        logger(
+                                            "warning",
+                                            f"Slow {effective_protocol} handshake making progress; extending connect wait (deadline {max_total}s)",
+                                        )
+                                continue
+
+                            can_retry = (
+                                attempts < max_attempts
+                                and remaining > 0
+                                and not (effective_protocol == "mosh" and handshake_progressed)
+                            )
+                            if can_retry:
+                                retry_attempt = True
+                                break
+
+                            before_str = _to_str(before_bytes)
                             if effective_protocol == "mosh":
-                                after = self._logclean(after, True)
-                                before = self._logclean(before, True)
-                                readline_val = self._logclean(readline_val, True)
-                            if effective_protocol == "mosh" and results == 18 and ("Nothing received from server" in after or "Nothing received from server" in before):
-                                err_msg = after.strip() if "Nothing received from server" in after else before.strip()
-                                return f"Connection failed code: {results}\n{err_msg} — UDP traffic is blocked or unreachable. Verify firewall rules for UDP ports (60000-61000 or mosh_udp_port)."
-                            return f"Connection failed code: {results}\n{before.lstrip()}{after}{readline_val}".rstrip()
-                    
+                                before_str = self._logclean(before_str, True)
+                            if remaining <= 0:
+                                after_str = f"Connection timeout (global deadline {max_total}s exceeded)"
+                            else:
+                                after_str = "Connection timeout"
+                            return _redact_known_secrets(
+                                f"Connection failed code: {results}\n{before_str.lstrip()}{after_str}".rstrip(),
+                                raw_secrets,
+                            )
+
+                        after = _to_str(getattr(child, "after", b""))
+                        before = _to_str(before_bytes)
+                        readline_val = _to_str(child.readline())
+                        if effective_protocol == "mosh":
+                            after = self._logclean(after, True)
+                            before = self._logclean(before, True)
+                            readline_val = self._logclean(readline_val, True)
+                        if (
+                            effective_protocol == "mosh"
+                            and results == 18
+                            and ("Nothing received from server" in after or "Nothing received from server" in before)
+                        ):
+                            err_msg = (
+                                after.strip()
+                                if "Nothing received from server" in after
+                                else before.strip()
+                            )
+                            return _redact_known_secrets(
+                                f"Connection failed code: {results}\n{err_msg} — UDP traffic is blocked or unreachable. Verify firewall rules for UDP ports (60000-61000 or mosh_udp_port).",
+                                raw_secrets,
+                            )
+                        return _redact_known_secrets(
+                            f"Connection failed code: {results}\n{before.lstrip()}{after}{readline_val}".rstrip(),
+                            raw_secrets,
+                        )
+
                     elif results in eof_indices[effective_protocol]:
-                        if results_value == password_prompt:
-                            if passwords:
-                                child.sendline(passwords[i])
+                        if results == pw_prompt_idx:
+                            if passwords and pw_idx < len(passwords):
+                                child.sendline(passwords[pw_idx])
+                                pw_idx += 1
                                 handshake_progressed = True
+                                stage = "auth"
+                                last_observed_bytes_len = 0
                             else:
                                 self.missingtext = True
-                            break
-                        elif results_value == "suspend":
+                                break
+                        elif suspend_idx is not None and results == suspend_idx:
                             child.sendline("\r")
                             sleep(2)
+                            last_observed_bytes_len = 0
+                        elif results_value == pexpect.EOF:
+                            norm_buf = (
+                                before_bytes.replace(b"\r\n", b"\n").replace(b"\r", b"\n") + b"\n"
+                            )
+                            for err_idx in error_indices[effective_protocol]:
+                                err_pat = proto_expects[err_idx]
+                                if isinstance(err_pat, re.Pattern):
+                                    m = err_pat.search(norm_buf)
+                                    if m:
+                                        b_str = _to_str(norm_buf[: m.start()])
+                                        a_str = _to_str(m.group(0))
+                                        if effective_protocol == "mosh":
+                                            b_str = self._logclean(b_str, True)
+                                            a_str = self._logclean(a_str, True)
+                                        return _redact_known_secrets(
+                                            f"Connection failed code: {err_idx}\n{b_str.lstrip()}{a_str}".rstrip(),
+                                            raw_secrets,
+                                        )
+                            try:
+                                child.sendline()
+                            except Exception as exc:  # noqa: BLE001
+                                _LOGGER.debug("EOF fallback sendline ignored: %s", type(exc).__name__)
+                            break
                         else:
-                            endloop = True
                             child.sendline()
                             break
-                    
-                if endloop:
-                    break
-            if results_value == pexpect.TIMEOUT:
-                continue
-            else:
-                break
 
-        if isinstance(self.tags, dict) and self.tags.get("post_connect_commands"):
-            cmds = self.tags.get("post_connect_commands")
-            commands = [cmds] if isinstance(cmds, str) else cmds
-            for command in commands:
-                child.sendline(command)
-                sleep(1)
-        child.readline(0)
-        self.child = child
-        from pexpect import fdpexpect
-        self.raw_child = fdpexpect.fdspawn(self.child.child_fd)
-        return True
+                if retry_attempt:
+                    continue
+
+                if isinstance(self.tags, dict) and self.tags.get("post_connect_commands"):
+                    cmds = self.tags.get("post_connect_commands")
+                    post_commands = [cmds] if isinstance(cmds, str) else cmds
+                    for command in post_commands:
+                        child.sendline(command)
+                        sleep(1)
+                child.readline(0)
+                self.child = child
+                from pexpect import fdpexpect
+
+                self.raw_child = fdpexpect.fdspawn(self.child.child_fd)
+                connected_ok = True
+                return True
+            finally:
+                if not connected_ok:
+                    try:
+                        child.logfile_read = None
+                    except Exception as exc:  # noqa: BLE001
+                        _LOGGER.debug("Cleanup logfile_read reset failed: %s", type(exc).__name__)
+                    try:
+                        child.terminate(force=True)
+                    except Exception as exc:  # noqa: BLE001
+                        _LOGGER.debug("Cleanup terminate failed: %s", type(exc).__name__)
+                    if local_mylog is not None and not getattr(local_mylog, "closed", False):
+                        try:
+                            local_mylog.close()
+                        except Exception as exc:  # noqa: BLE001
+                            _LOGGER.debug("Cleanup local_mylog close failed: %s", type(exc).__name__)
 
 @ClassHook
 class nodes:
@@ -2016,10 +2870,10 @@ class nodes:
         '''
         self.nodelist = []
         self.config = config
-        for n in nodes:
-            this = node(n, **nodes[n], config = config)
+        for n, node_cfg in nodes.items():
+            this = node(n, **node_cfg, config=config)
             self.nodelist.append(this)
-            setattr(self,n,this)
+            setattr(self, n, this)
 
     
     @MethodHook
@@ -2030,7 +2884,22 @@ class nodes:
 
 
     @MethodHook
-    def run(self, commands, vars = None,*, folder = None, prompt = None, stdout = None, parallel = 10, timeout = None, on_complete = None, logger = None):
+    def run(
+        self,
+        commands,
+        vars=None,
+        *,
+        folder=None,
+        prompt=None,
+        stdout=None,
+        parallel=10,
+        timeout=None,
+        on_complete=None,
+        logger=None,
+        connect_timeout=None,
+        auth_timeout=None,
+        _default_cmd_timeout=10,
+    ):
         '''
         Run a command or list of commands on all the nodes in nodelist.
 
@@ -2086,15 +2955,21 @@ class nodes:
         args = {}
         nodesargs = {}
         args["commands"] = commands
-        if folder != None:
+        if folder is not None:
             args["folder"] = folder
             Path(folder).mkdir(parents=True, exist_ok=True)
-        if prompt != None:
+        if prompt is not None:
             args["prompt"] = prompt
-        if stdout != None and on_complete is None:
+        if stdout is not None and on_complete is None:
             args["stdout"] = stdout
-        if timeout != None:
+        if timeout is not None:
             args["timeout"] = timeout
+        if connect_timeout is not None:
+            args["connect_timeout"] = connect_timeout
+        if auth_timeout is not None:
+            args["auth_timeout"] = auth_timeout
+        if _default_cmd_timeout != 10:
+            args["_default_cmd_timeout"] = _default_cmd_timeout
         output = {}
         status = {}
         tasks = []
@@ -2107,9 +2982,9 @@ class nodes:
 
         for n in self.nodelist:
             nodesargs[n.unique] = deepcopy(args)
-            if vars != None:
+            if vars is not None:
                 nodesargs[n.unique]["vars"] = {}
-                if "__global__" in vars.keys():
+                if "__global__" in vars:
                     nodesargs[n.unique]["vars"].update(vars["__global__"])
                 for var_key, var_val in vars.items():
                     if var_key == "__global__":
@@ -2144,7 +3019,22 @@ class nodes:
         return output
 
     @MethodHook
-    def test(self, commands, expected, vars = None,*, folder = None, prompt = None, parallel = 10, timeout = None, on_complete = None, logger = None):
+    def test(
+        self,
+        commands,
+        expected,
+        vars=None,
+        *,
+        folder=None,
+        prompt=None,
+        parallel=10,
+        timeout=None,
+        on_complete=None,
+        logger=None,
+        connect_timeout=None,
+        auth_timeout=None,
+        _default_cmd_timeout=10,
+    ):
         '''
         Run a command or list of commands on all the nodes in nodelist, then check if expected value appears on the output after the last command.
 
@@ -2199,13 +3089,19 @@ class nodes:
         nodesargs = {}
         args["commands"] = commands
         args["expected"] = expected
-        if folder != None:
+        if folder is not None:
             args["folder"] = folder
             Path(folder).mkdir(parents=True, exist_ok=True)
-        if prompt != None:
+        if prompt is not None:
             args["prompt"] = prompt
-        if timeout != None:
+        if timeout is not None:
             args["timeout"] = timeout
+        if connect_timeout is not None:
+            args["connect_timeout"] = connect_timeout
+        if auth_timeout is not None:
+            args["auth_timeout"] = auth_timeout
+        if _default_cmd_timeout != 10:
+            args["_default_cmd_timeout"] = _default_cmd_timeout
         output = {}
         result = {}
         status = {}
@@ -2219,9 +3115,9 @@ class nodes:
 
         for n in self.nodelist:
             nodesargs[n.unique] = deepcopy(args)
-            if vars != None:
+            if vars is not None:
                 nodesargs[n.unique]["vars"] = {}
-                if "__global__" in vars.keys():
+                if "__global__" in vars:
                     nodesargs[n.unique]["vars"].update(vars["__global__"])
                 for var_key, var_val in vars.items():
                     if var_key == "__global__":
