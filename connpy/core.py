@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-#Imports
 import ast
 import asyncio
 import datetime
@@ -10,10 +9,11 @@ import logging
 import os
 import re
 import shlex
+import shutil
 import sys
 import threading
 import time as _time_mod
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from copy import deepcopy
 from pathlib import Path
 from time import sleep, time
@@ -21,6 +21,34 @@ from time import sleep, time
 import pexpect
 
 from . import printer
+from .auth_utils import (
+    DEFAULT_MAX_AUTH_PROMPTS,
+    DEFAULT_MAX_HOP_HOST_ATTEMPTS,
+    DEFAULT_MAX_TOTAL_AUTH_ATTEMPTS,
+    MAX_AUTH_PROMPTS_CAP,
+    MAX_AUTH_STREAM_BYTES,
+    MAX_COMPOSE_VARIANTS,
+    MAX_EOF_FALLBACK_ADVANCES,
+    MAX_HOP_HOST_ATTEMPTS_CAP,
+    MAX_PROFILE_DEPTH,
+    MAX_TOTAL_AUTH_ATTEMPTS_CAP,
+    MIN_AUTH_PROMPTS,
+    MIN_HOP_HOST_ATTEMPTS,
+    MIN_TOTAL_AUTH_ATTEMPTS,
+    AuthAttemptTracker,
+    AuthCandidate,
+    RuntimeAuthCandidate,
+    SanitizedAuthError,
+    has_insecure_hostkey_checking,
+    host_exact_re,
+    is_compose_expression,
+    normalize_prompt_line,
+    parse_compose_expression,
+    resolve_fallback_entries,
+    sanitize_exception,
+    sanitize_log_message,
+    validate_strict_int_range,
+)
 from .hooks import ClassHook, MethodHook
 from .tunnels import LocalStream
 
@@ -310,7 +338,23 @@ class node:
 
         '''
     
-    def __init__(self, unique, host, options='', logs='', password='', port='', protocol='', user='', config='', tags='', jumphost='', allow_unsafe_options=None):
+    def __init__(
+        self,
+        unique,
+        host,
+        options='',
+        logs='',
+        password='',
+        port='',
+        protocol='',
+        user='',
+        config='',
+        tags='',
+        jumphost='',
+        allow_unsafe_options=None,
+        fallback=None,
+        disable_fallback_on_insecure_hostkey=None,
+    ):
         ''' 
             
         ### Parameters:  
@@ -362,17 +406,18 @@ class node:
         else:
             self.allow_unsafe_options = False
         self.unique = unique
+        profiles_map = getattr(config, "profiles", {}) if (config != '' and config is not None) else {}
         attr = {"host": host, "logs": logs, "options":options, "port": port, "protocol": protocol, "user": user, "tags": tags, "jumphost": jumphost}
         for key, attr_val in attr.items():
             profile = re.search("^@(.*)", str(attr_val))
             if profile and config != '':
                 try:
-                    setattr(self, key, deepcopy(config.profiles[profile.group(1)][key]))
+                    setattr(self, key, deepcopy(profiles_map[profile.group(1)][key]))
                 except KeyError:
                     setattr(self, key, "")
             elif attr_val == '' and key == "protocol":
                 try:
-                    setattr(self, key, config.profiles["default"][key])
+                    setattr(self, key, profiles_map["default"][key])
                 except (KeyError, AttributeError):
                     setattr(self, key, "ssh")
             else:
@@ -381,15 +426,104 @@ class node:
         if isinstance(password, list):
             self.password = []
             for item in password:
-                profile = re.search("^@(.*)", item)
-                if profile and config != '':
-                    self.password.append(config.profiles[profile.group(1)]["password"])
+                if (
+                    isinstance(item, str)
+                    and not is_compose_expression(item)
+                    and item.startswith("@")
+                    and config != ''
+                    and item[1:] in profiles_map
+                ):
+                    self.password.append(deepcopy(profiles_map[item[1:]].get("password", "")))
                 else:
                     self.password.append(item)
         else:
-            self.password = [password]
+            if (
+                isinstance(password, str)
+                and not is_compose_expression(password)
+                and password.startswith("@")
+                and config != ''
+                and password[1:] in profiles_map
+            ):
+                resolved_pw = profiles_map[password[1:]].get("password", "")
+                self.password = deepcopy(resolved_pw) if isinstance(resolved_pw, list) else [resolved_pw]
+            else:
+                self.password = [password]
+
+        target_passwords_snapshot = list(self.password)
+
+        raw_fallback = fallback
+        if raw_fallback in (None, "", []) and isinstance(self.tags, dict):
+            if "_fallback" in self.tags:
+                raw_fallback = self.tags.pop("_fallback", None)
+            elif "fallback" in self.tags:
+                raw_fallback = self.tags.get("fallback")
+
+        if raw_fallback not in (None, "", []):
+            resolved_fb_entries = resolve_fallback_entries(raw_fallback, profiles_map)
+        else:
+            resolved_fb_entries = []
+
+        candidates: list[AuthCandidate] = []
+        primary_specs = tuple(
+            p for p in target_passwords_snapshot if isinstance(p, str) and p != ""
+        )
+        if primary_specs:
+            candidates.append(
+                AuthCandidate(
+                    user=str(self.user or ""),
+                    password_spec=primary_specs if len(primary_specs) > 1 else primary_specs[0],
+                    is_fallback=False,
+                    label="primary",
+                )
+            )
+        elif self.user:
+            candidates.append(
+                AuthCandidate(
+                    user=str(self.user or ""),
+                    password_spec="",
+                    is_fallback=False,
+                    label="primary",
+                )
+            )
+
+        for fb_idx, entry in enumerate(resolved_fb_entries, start=1):
+            fb_user = str(entry.get("user") or self.user or "")
+            fb_pw = entry.get("password", "")
+            if isinstance(fb_pw, list):
+                pw_spec: str | tuple[str, ...] = tuple(str(x) for x in fb_pw if x != "")
+            else:
+                pw_spec = str(fb_pw or "")
+            candidates.append(
+                AuthCandidate(
+                    user=fb_user,
+                    password_spec=pw_spec,
+                    is_fallback=True,
+                    label=f"fallback#{fb_idx}",
+                )
+            )
+        self._auth_candidates: tuple[AuthCandidate, ...] = tuple(candidates)
+
+        if disable_fallback_on_insecure_hostkey is not None:
+            self.disable_fallback_on_insecure_hostkey = bool(disable_fallback_on_insecure_hostkey)
+        elif isinstance(self.tags, dict) and "disable_fallback_on_insecure_hostkey" in self.tags:
+            self.disable_fallback_on_insecure_hostkey = bool(
+                self.tags["disable_fallback_on_insecure_hostkey"]
+            )
+        elif (
+            config != ''
+            and config is not None
+            and hasattr(config, "config")
+            and isinstance(config.config, dict)
+        ):
+            self.disable_fallback_on_insecure_hostkey = bool(
+                config.config.get("disable_fallback_on_insecure_hostkey", False)
+            )
+        else:
+            self.disable_fallback_on_insecure_hostkey = False
+
         self._jumphost_name = self.jumphost if (self.jumphost != "" and config != '') else ""
         self._hop_chain_meta = []
+        self._jumphost_hops: tuple[dict, ...] = ()
         if self.jumphost != "" and config != '':
             chain_res = self._build_jumphost_chain(self.jumphost, config, include_meta=True)
             if len(chain_res) == 3:
@@ -397,6 +531,7 @@ class node:
             else:
                 raw_cmd, jh_passwords = chain_res
                 self._hop_chain_meta = []
+            self._jumphost_hops = tuple(self._collect_jumphost_hops(self._jumphost_name, config))
             if jh_passwords:
                 self.password = jh_passwords + self.password
             if raw_cmd:
@@ -404,38 +539,99 @@ class node:
                 self.jumphost = f'-o ProxyCommand="{escaped}"'
             else:
                 self.jumphost = ""
-        
+
+        self.last_fallback_used = False
         self.output = ""
         self.status = 1
         self.result = {}
         self.cmd_byte_positions = [(0, None)]
 
+    def _collect_jumphost_hops(self, jumphost_name, config, visited=None, depth=0):
+        """Collect structured hop metadata in SSH ProxyCommand prompt order."""
+        if depth >= 5:
+            return []
+        if visited is None:
+            visited = []
+        if jumphost_name in visited:
+            return []
+        visited = [*visited, jumphost_name]
+        try:
+            jh = config.getitem(jumphost_name)
+        except Exception:  # noqa: BLE001
+            return []
+        jh = self._resolve_jumphost_data(deepcopy(jh), config)
+        hops = []
+        if jh.get("jumphost", "") != "":
+            hops.extend(
+                self._collect_jumphost_hops(
+                    jh["jumphost"],
+                    config,
+                    visited,
+                    depth + 1,
+                )
+            )
+        jh_tags = jh.get("tags")
+        resolved_fqdn = ""
+        if isinstance(jh_tags, dict) and jh_tags.get("fqdn"):
+            resolved_fqdn = str(jh_tags["fqdn"])
+        hops.append(
+            {
+                "name": jumphost_name,
+                "host": str(jh.get("host", "") or ""),
+                "port": str(jh.get("port", "") or ""),
+                "protocol": str(jh.get("protocol", "ssh") or "ssh"),
+                "user": str(jh.get("user", "") or ""),
+                "options": str(jh.get("options", "") or ""),
+                "tags": deepcopy(jh_tags) if isinstance(jh_tags, dict) else jh_tags,
+                "resolved_fqdn": resolved_fqdn,
+                "passwords": tuple(p for p in (jh.get("password") or []) if p != ""),
+            }
+        )
+        return hops
+
     @staticmethod
     def _resolve_jumphost_data(jh_dict, config):
         '''Resolve @profile references and normalize passwords in a jumphost dict.'''
-        for key, jh_val in jh_dict.items():
+        profiles_map = getattr(config, "profiles", {}) if config else {}
+        for key, jh_val in list(jh_dict.items()):
+            if key == "password":
+                continue
             profile = re.search("^@(.*)", str(jh_val))
             if profile:
                 try:
-                    jh_dict[key] = deepcopy(config.profiles[profile.group(1)][key])
+                    jh_dict[key] = deepcopy(profiles_map[profile.group(1)][key])
                 except KeyError:
                     jh_dict[key] = ""
             elif jh_val == '' and key == "protocol":
                 try:
-                    jh_dict[key] = config.profiles["default"][key]
+                    jh_dict[key] = profiles_map["default"][key]
                 except KeyError:
                     jh_dict[key] = "ssh"
-        if isinstance(jh_dict["password"], list):
+        raw_pw = jh_dict.get("password", "")
+        if isinstance(raw_pw, list):
             resolved = []
-            for p in jh_dict["password"]:
-                profile = re.search("^@(.*)", p)
-                if profile:
-                    resolved.append(config.profiles[profile.group(1)]["password"])
+            for p in raw_pw:
+                if (
+                    isinstance(p, str)
+                    and not is_compose_expression(p)
+                    and p.startswith("@")
+                    and p[1:] in profiles_map
+                ):
+                    resolved.append(deepcopy(profiles_map[p[1:]].get("password", "")))
                 else:
                     resolved.append(p)
             jh_dict["password"] = resolved
         else:
-            jh_dict["password"] = [jh_dict["password"]]
+            if (
+                isinstance(raw_pw, str)
+                and not is_compose_expression(raw_pw)
+                and raw_pw.startswith("@")
+                and raw_pw[1:] in profiles_map
+            ):
+                res = profiles_map[raw_pw[1:]].get("password", "")
+                jh_dict["password"] = deepcopy(res) if isinstance(res, list) else [res]
+            else:
+                jh_dict["password"] = [raw_pw]
         return jh_dict
 
     def _is_unsafe_allowed(self) -> bool:
@@ -1735,6 +1931,8 @@ class node:
         connect_timeout=None,
         auth_timeout=None,
         _default_cmd_timeout=10,
+        unattended=True,
+        attempt_tracker=None,
     ):
         '''
         Run a command or list of commands on the node and return the output.
@@ -1803,6 +2001,8 @@ class node:
             connect_timeout=connect_timeout,
             auth_timeout=auth_timeout,
             _default_cmd_timeout=_default_cmd_timeout,
+            unattended=unattended,
+            attempt_tracker=attempt_tracker,
         )
         now = datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S')
         if connect is True:
@@ -1887,6 +2087,8 @@ class node:
         connect_timeout=None,
         auth_timeout=None,
         _default_cmd_timeout=10,
+        unattended=True,
+        attempt_tracker=None,
     ):
         '''
         Run a command or list of commands on the node, then check if expected value appears on the output after the last command.
@@ -1959,6 +2161,8 @@ class node:
             connect_timeout=connect_timeout,
             auth_timeout=auth_timeout,
             _default_cmd_timeout=_default_cmd_timeout,
+            unattended=unattended,
+            attempt_tracker=attempt_tracker,
         )
         if connect is True:
             if logger:
@@ -2100,6 +2304,7 @@ class node:
         allow_reverse_tunnel_port=None,
         *,
         connect_timeout=None,
+        user_override=None,
     ):
         self._validate_base_fields(check_port=True)
         is_from_mosh = (
@@ -2109,11 +2314,16 @@ class node:
         if not is_from_mosh:
             self._validate_ssh_options()
         proto = "ssh" if force_ssh else self.protocol
+        eff_user = self.user if user_override is None else user_override
+        if eff_user:
+            u_s = str(eff_user)
+            if u_s.startswith("-") or _LEGACY_SSH_UNSAFE_RE.search(u_s):
+                raise ValueError(f"Invalid characters in user: '{u_s}'")
         cmd = proto
         if is_from_mosh:
             host_bare, port_s, raw_opts = self._validate_mosh_ssh_fields(
                 self.host,
-                self.user,
+                eff_user,
                 self.port,
                 self.tags,
                 allow_reverse_tunnel_port=allow_reverse_tunnel_port,
@@ -2162,20 +2372,21 @@ class node:
         jh_opt = self._effective_jumphost_opt(connect_timeout=connect_timeout)
         if jh_opt:
             cmd += " " + jh_opt
-        user_host = f"{self.user}@{target_h}" if self.user else target_h
+        user_host = f"{eff_user}@{target_h}" if eff_user else target_h
         cmd += f" {user_host}"
         return cmd
 
     @MethodHook
-    def _generate_mosh_cmd(self, *, connect_timeout=None):
+    def _generate_mosh_cmd(self, *, connect_timeout=None, user_override=None):
+        eff_user = self.user if user_override is None else user_override
         if str(self.host).startswith("-"):
             raise ValueError("Host cannot start with '-'")
-        if self.user and str(self.user).startswith("-"):
+        if eff_user and str(eff_user).startswith("-"):
             raise ValueError("User cannot start with '-'")
         if not self.host or re.search(r'[\s;|&$`><"\'\\]', str(self.host)):
             raise ValueError(f"Invalid characters in host: '{self.host}'")
-        if self.user and re.search(r'[\s;|&$`><"\'\\]', str(self.user)):
-            raise ValueError(f"Invalid characters in user: '{self.user}'")
+        if eff_user and re.search(r'[\s;|&$`><"\'\\]', str(eff_user)):
+            raise ValueError(f"Invalid characters in user: '{eff_user}'")
 
         cmd_parts = ["mosh"]
         if isinstance(self.tags, dict):
@@ -2242,7 +2453,7 @@ class node:
                     raise ValueError("Invalid options: unbalanced quotes") from exc
                 cmd_parts.append(opts)
 
-        user_host = f"{self.user}@{self.host}" if self.user else self.host
+        user_host = f"{eff_user}@{self.host}" if eff_user else self.host
         cmd_parts.extend(["--", user_host])
         return " ".join(cmd_parts)
 
@@ -2316,15 +2527,26 @@ class node:
 
 
     @MethodHook
-    def _get_cmd(self, force_ssh=False, allow_reverse_tunnel_port=None, *, connect_timeout=None):
+    def _get_cmd(
+        self,
+        force_ssh=False,
+        allow_reverse_tunnel_port=None,
+        *,
+        connect_timeout=None,
+        user_override=None,
+    ):
         if force_ssh or self.protocol in ["ssh", "sftp"]:
             return self._generate_ssh_sftp_cmd(
                 force_ssh=force_ssh,
                 allow_reverse_tunnel_port=allow_reverse_tunnel_port,
                 connect_timeout=connect_timeout,
+                user_override=user_override,
             )
         elif self.protocol == "mosh":
-            return self._generate_mosh_cmd(connect_timeout=connect_timeout)
+            return self._generate_mosh_cmd(
+                connect_timeout=connect_timeout,
+                user_override=user_override,
+            )
         elif self.protocol == "telnet":
             return self._generate_telnet_cmd()
         elif self.protocol == "kubectl":
@@ -2339,7 +2561,7 @@ class node:
             printer.error(f"Invalid protocol: {self.protocol}")
             sys.exit(1)
 
-    def _spawn_child(self, args, protocol=None, encoding=None):
+    def _spawn_child(self, args, protocol=None, encoding=None, *, _secrets=()):
         if protocol is None:
             protocol = getattr(self, "protocol", "")
         env = None
@@ -2358,8 +2580,248 @@ class node:
             spawn_kwargs["encoding"] = encoding
         try:
             return pexpect.spawn(args[0], args[1:], **spawn_kwargs), None
-        except pexpect.exceptions.ExceptionPexpect as e:
-            return None, f"Connection failed: {e}"
+        except Exception as exc:  # noqa: BLE001
+            sanitized = sanitize_exception(
+                exc,
+                code="SPAWN_ERROR",
+                secrets=_secrets,
+                context_label="Connection failed",
+            )
+            return None, str(sanitized)
+
+    def _extract_auth_budgets(self) -> tuple[int, int | None, int | None, int | None]:
+        cfg_dict = (
+            self.config.config
+            if (self.config and hasattr(self.config, "config") and isinstance(self.config.config, dict))
+            else {}
+        )
+        tags_dict = self.tags if isinstance(self.tags, dict) else {}
+
+        def _pick(key: str, default_val):
+            if key in tags_dict and tags_dict[key] is not None:
+                return tags_dict[key]
+            if key in cfg_dict and cfg_dict[key] is not None:
+                return cfg_dict[key]
+            return default_val
+
+        max_auth_prompts = validate_strict_int_range(
+            _pick("max_auth_prompts", DEFAULT_MAX_AUTH_PROMPTS),
+            "max_auth_prompts",
+            MIN_AUTH_PROMPTS,
+            MAX_AUTH_PROMPTS_CAP,
+        )
+        raw_total = _pick("max_total_auth_attempts", None)
+        max_total_auth_attempts = (
+            None
+            if raw_total is None
+            else validate_strict_int_range(
+                raw_total,
+                "max_total_auth_attempts",
+                MIN_TOTAL_AUTH_ATTEMPTS,
+                MAX_TOTAL_AUTH_ATTEMPTS_CAP,
+            )
+        )
+        raw_hop = _pick("max_hop_host_attempts", None)
+        max_hop_host_attempts = (
+            None
+            if raw_hop is None
+            else validate_strict_int_range(
+                raw_hop,
+                "max_hop_host_attempts",
+                MIN_HOP_HOST_ATTEMPTS,
+                MAX_HOP_HOST_ATTEMPTS_CAP,
+            )
+        )
+        raw_global_user = _pick("max_global_user_attempts", None)
+        max_global_user_attempts = (
+            None
+            if raw_global_user is None
+            else validate_strict_int_range(
+                raw_global_user,
+                "max_global_user_attempts",
+                1,
+                1000,
+            )
+        )
+        return (
+            max_auth_prompts,
+            max_total_auth_attempts,
+            max_hop_host_attempts,
+            max_global_user_attempts,
+        )
+
+    @staticmethod
+    def _emit_aaa_fallback_log(
+        logger,
+        *,
+        unique: str,
+        host: str,
+        protocol: str,
+        user: str,
+        label: str,
+        secrets: list[str],
+    ) -> None:
+        raw_msg = (
+            f"[AAA-FALLBACK] Activating backup credentials ({label}) "
+            f"for node={unique} host={host} proto={protocol} user={user or '<default>'}"
+        )
+        safe_msg = sanitize_log_message(raw_msg, secrets=secrets)
+        if logger:
+            try:
+                logger("warning", safe_msg)
+                return
+            except Exception:  # noqa: BLE001
+                _LOGGER.debug("Fallback logger failed; falling back to stderr")
+        with suppress(Exception):
+            sys.stderr.write(safe_msg + "\n")
+            sys.stderr.flush()
+
+    def _build_local_decryptor(self):
+        decryptor_cache = {}
+
+        def _decrypt_one(cipher_text: str) -> str:
+            if not re.match(r'^b["\'].+["\']$', cipher_text, re.DOTALL):
+                return cipher_text
+            if "fn" not in decryptor_cache:
+                keyfile = getattr(self, "key", None)
+                if not keyfile:
+                    raise SanitizedAuthError("No RSA key configured", code="AUTH_FAILED")
+                from Crypto.Cipher import PKCS1_OAEP
+                from Crypto.PublicKey import RSA
+
+                with open(keyfile) as kf:
+                    rsa_key = RSA.import_key(kf.read())
+                decryptor_cache["fn"] = PKCS1_OAEP.new(rsa_key)
+            raw_bytes = ast.literal_eval(cipher_text)
+            return decryptor_cache["fn"].decrypt(raw_bytes).decode("utf-8")
+
+        return _decrypt_one
+
+    def _resolve_runtime_credentials(
+        self,
+        *,
+        allow_fallback: bool,
+        unattended: bool,
+    ) -> tuple[list[RuntimeAuthCandidate], list[list[str]], list[str]]:
+        profiles_map = (
+            getattr(self.config, "profiles", {})
+            if (getattr(self, "config", "") != "" and self.config is not None)
+            else {}
+        )
+        local_decrypt = self._build_local_decryptor()
+        passtx_desc = type(self).__dict__.get("_passtx")
+        passtx_mocked = "_passtx" in self.__dict__ or not isinstance(passtx_desc, MethodHook)
+
+        def _decrypt_plain_list(specs: list[str]) -> list[str]:
+            if not specs:
+                return []
+            if passtx_mocked or not unattended:
+                return list(self._passtx(specs))
+            return [local_decrypt(s) for s in specs]
+
+        def _expand_spec(spec: str | tuple[str, ...]) -> list[str]:
+            items = list(spec) if isinstance(spec, (tuple, list)) else ([spec] if spec != "" else [])
+            out: list[str] = []
+            for item in items:
+                if not isinstance(item, str) or item == "":
+                    continue
+                if is_compose_expression(item):
+                    variants = parse_compose_expression(
+                        item,
+                        profiles=profiles_map,
+                        decrypt_fn=local_decrypt,
+                        max_depth=MAX_PROFILE_DEPTH,
+                        max_variants=MAX_COMPOSE_VARIANTS,
+                    )
+                    out.extend(variants)
+                else:
+                    out.extend(_decrypt_plain_list([item]))
+            return out
+
+        candidates_src = list(getattr(self, "_auth_candidates", ()))
+        if not candidates_src:
+            # Compatibility if a subclass or test mutated self.password directly
+            raw_pw_list = self.password if isinstance(self.password, list) else [self.password]
+            non_empty = tuple(p for p in raw_pw_list if isinstance(p, str) and p != "")
+            if non_empty or self.user:
+                candidates_src = [
+                    AuthCandidate(
+                        user=str(self.user or ""),
+                        password_spec=non_empty if len(non_empty) > 1 else (non_empty[0] if non_empty else ""),
+                        is_fallback=False,
+                        label="primary",
+                    )
+                ]
+
+        runtime_candidates: list[RuntimeAuthCandidate] = []
+        raw_secrets: list[str] = []
+
+        for cand in candidates_src:
+            if cand.is_fallback and not allow_fallback:
+                continue
+            if isinstance(cand.password_spec, tuple):
+                raw_secrets.extend(s for s in cand.password_spec if isinstance(s, str) and s)
+            elif isinstance(cand.password_spec, str) and cand.password_spec:
+                raw_secrets.append(cand.password_spec)
+
+            expanded_pws = _expand_spec(cand.password_spec)
+            raw_secrets.extend(p for p in expanded_pws if isinstance(p, str) and p)
+            if expanded_pws:
+                for pw_val in expanded_pws:
+                    runtime_candidates.append(
+                        RuntimeAuthCandidate(
+                            user=cand.user,
+                            password=pw_val,
+                            has_password=True,
+                            is_fallback=cand.is_fallback,
+                            label=cand.label,
+                        )
+                    )
+            else:
+                runtime_candidates.append(
+                    RuntimeAuthCandidate(
+                        user=cand.user,
+                        password="",
+                        has_password=False,
+                        is_fallback=cand.is_fallback,
+                        label=cand.label,
+                    )
+                )
+
+        hop_runtime_passwords: list[list[str]] = []
+        for hop in getattr(self, "_jumphost_hops", ()):
+            h_pws = _expand_spec(hop.get("passwords", ()))
+            raw_secrets.extend(p for p in h_pws if isinstance(p, str) and p)
+            hop_runtime_passwords.append(h_pws)
+
+        return runtime_candidates, hop_runtime_passwords, raw_secrets
+
+    def _disambiguate_prompt(self, line: str) -> tuple[str, int | None]:
+        """Classify password prompt line strictly using exact host boundaries."""
+        tags_dict = self.tags if isinstance(self.tags, dict) else {}
+        target_names = [str(self.host)]
+        if tags_dict.get("fqdn"):
+            target_names.append(str(tags_dict["fqdn"]))
+        matched_target = any(
+            host_exact_re(h).search(line) for h in target_names if h
+        )
+
+        matched_hops: list[int] = []
+        for idx, hop in enumerate(getattr(self, "_jumphost_hops", ())):
+            h_names = [hop.get("host", "")]
+            if hop.get("resolved_fqdn"):
+                h_names.append(str(hop["resolved_fqdn"]))
+            if any(host_exact_re(h).search(line) for h in h_names if h):
+                matched_hops.append(idx)
+
+        total_matches = len(matched_hops) + (1 if matched_target else 0)
+        if total_matches > 1:
+            return "conflict", None
+        if matched_hops:
+            return "hop", matched_hops[0]
+        if matched_target:
+            return "target", None
+        return "ambiguous", None
 
     @MethodHook
     def _connect(
@@ -2376,13 +2838,13 @@ class node:
         _default_cmd_timeout=10,
         _default_max_total_seconds=None,
         clock=_time_mod.monotonic,
+        unattended=False,
+        attempt_tracker=None,
     ):
+        self.last_fallback_used = False
         effective_protocol = "ssh" if force_ssh else self.protocol
-        if effective_protocol == "mosh":
-            import shutil
-
-            if shutil.which("mosh") is None:
-                return "Connection failed: mosh binary not found in PATH"
+        if effective_protocol == "mosh" and shutil.which("mosh") is None:
+            return "Connection failed: mosh binary not found in PATH"
 
         hop_meta = getattr(self, "_hop_chain_meta", None) or []
         try:
@@ -2405,6 +2867,21 @@ class node:
         except ValueError as e:
             return f"Connection failed code: 12\nInvalid timeout configuration: {e}"
 
+        try:
+            (
+                max_auth_prompts,
+                max_total_auth_attempts,
+                max_hop_host_attempts,
+                max_global_user_attempts,
+            ) = self._extract_auth_budgets()
+        except ValueError as exc:
+            san = sanitize_exception(
+                exc,
+                code="AUTH_FAILED",
+                context_label="invalid auth budget config",
+            )
+            return str(san)
+
         if effective_protocol == "local":
             cmd = self._get_cmd()
             args = shlex.split(cmd)
@@ -2419,25 +2896,51 @@ class node:
                 self.logfile = self._logfile()
             return True
 
-        cmd = self._get_cmd(
-            force_ssh=force_ssh,
-            allow_reverse_tunnel_port=allow_reverse_tunnel_port,
-            connect_timeout=eff_ct,
+        cfg_dict = (
+            self.config.config
+            if (self.config and hasattr(self.config, "config") and isinstance(self.config.config, dict))
+            else {}
         )
-        passwords = self._passtx(self.password) if self.password and any(self.password) else []
-        raw_secrets = [
-            s
-            for s in (
-                list(passwords)
-                + (list(self.password) if isinstance(self.password, list) else [])
+        tags_dict = self.tags if isinstance(self.tags, dict) else {}
+        allow_fallback = not (tags_dict.get("allow_fallback") is False)
+        disable_insecure_hk = bool(
+            getattr(self, "disable_fallback_on_insecure_hostkey", False)
+            or tags_dict.get("disable_fallback_on_insecure_hostkey")
+            or cfg_dict.get("disable_fallback_on_insecure_hostkey")
+        )
+        if (
+            allow_fallback
+            and disable_insecure_hk
+            and has_insecure_hostkey_checking(
+                self.options,
+                self.tags,
+                getattr(self, "_jumphost_hops", ()),
             )
-            if isinstance(s, str) and s
-        ]
+        ):
+            allow_fallback = False
+
+        raw_secrets: list[str] = []
+        try:
+            runtime_candidates, hop_runtime_passwords, raw_secrets = self._resolve_runtime_credentials(
+                allow_fallback=allow_fallback,
+                unattended=unattended,
+            )
+        except Exception as exc:  # noqa: BLE001
+            san = sanitize_exception(
+                exc,
+                code="AUTH_FAILED",
+                secrets=raw_secrets,
+                context_label="credential resolution failed",
+            )
+            return str(san)
+
         if self.logs != '':
             self.logfile = self._logfile()
         default_prompt = r'>$|#$|\$$|>.$|#.$|\$.$'
-        prompt = self.tags.get("prompt", default_prompt) if isinstance(self.tags, dict) else default_prompt
-        password_prompt = r'[pP]assword:|[uU]sername:' if effective_protocol != 'telnet' else r'[pP]assword:'
+        prompt = tags_dict.get("prompt", default_prompt) if tags_dict else default_prompt
+        password_prompt = (
+            r'[pP]assword:|[uU]sername:' if effective_protocol != 'telnet' else r'[pP]assword:'
+        )
         prompt_unanchored = "|".join(t.removesuffix("$") for t in prompt.split("|"))
         mosh_prompt = r"(?:" + prompt_unanchored + r")\s*(?:\x1b\[[0-9;?]*[a-zA-Z])*$"
 
@@ -2548,26 +3051,26 @@ class node:
             ],
         }
         expects["mosh"] = [
-            'yes/no',                                                                              # 0  (initial)
-            r'(?:ssh: connect to host .* port .*: Connection refused|Connection refused)',         # 1  (error)
-            r'(?:ssh|mosh): .*supported',                                                          # 2  (error)
-            r'(?:(?:ssh|mosh): (?:Invalid|usage)|Unknown option:)',                                # 3  (error)
-            'ssh-keygen.*"',                                                                      # 4  (error)
-            r'(?:ssh: connect to host .* port .*: Connection timed out|mosh: .* timed out)',       # 5  (error)
-            r'(?:ssh|mosh): .*unavailable',                                                        # 6  (error)
-            r'(?:Connection to .* closed|Connection closed by remote host)',                       # 7  (error)
-            password_prompt,                                                                       # 8  (eof)
-            mosh_prompt_pat,                                                                       # 9  (eof)
-            'suspend',                                                                             # 10 (eof)
-            pexpect.EOF,                                                                           # 11 (eof)
-            pexpect.TIMEOUT,                                                                       # 12 (error)
-            "No route to host",                                                                    # 13 (error)
-            "resolve hostname",                                                                    # 14 (error)
-            r'(?:ssh|mosh): .*no matching',                                                        # 15 (error)
-            r"[bB]ad (owner|permissions)",                                                         # 16 (error)
-            "mosh-server:.*not found|command not found",                                           # 17 (error)
-            r"(?:Did not find mosh server startup message|(?:mosh: )?Nothing received from server on UDP port \d+\.?|Nothing received from server)",  # 18 (error)
-            "needs a UTF-8 native locale to run|requires a UTF-8 locale|locale.*not available",    # 19 (error)
+            'yes/no',
+            r'(?:ssh: connect to host .* port .*: Connection refused|Connection refused)',
+            r'(?:(?:ssh|mosh): .*supported|Permission denied \([^)\r\n]{1,256}\)\.)',
+            r'(?:(?:ssh|mosh): (?:Invalid|usage)|Unknown option:)',
+            'ssh-keygen.*"',
+            r'(?:ssh: connect to host .* port .*: Connection timed out|mosh: .* timed out)',
+            r'(?:ssh|mosh): .*unavailable',
+            r'(?:Connection to .* closed|Connection closed by remote host)',
+            password_prompt,
+            mosh_prompt_pat,
+            'suspend',
+            pexpect.EOF,
+            pexpect.TIMEOUT,
+            "No route to host",
+            "resolve hostname",
+            r'(?:ssh|mosh): .*no matching',
+            r"[bB]ad (owner|permissions)",
+            "mosh-server:.*not found|command not found",
+            r"(?:Did not find mosh server startup message|(?:mosh: )?Nothing received from server on UDP port \d+\.?|Nothing received from server)",
+            "needs a UTF-8 native locale to run|requires a UTF-8 locale|locale.*not available",
         ]
 
         compiled_expects = compile_expects(expects)
@@ -2616,13 +3119,214 @@ class node:
                 return val.decode("utf-8", errors="replace")
             return str(val)
 
+        tracker = (
+            attempt_tracker
+            if attempt_tracker is not None
+            else AuthAttemptTracker(
+                default_max_host_attempts=DEFAULT_MAX_TOTAL_AUTH_ATTEMPTS,
+                default_max_hop_attempts=DEFAULT_MAX_HOP_HOST_ATTEMPTS,
+                clock=clock,
+            )
+        )
         deadline = clock() + max_total
         budget_warned = False
         proto_expects = compiled_expects[effective_protocol]
         pw_prompt_idx = 5 if effective_protocol == "kubectl" else 8
         suspend_idx = 10 if effective_protocol in ("ssh", "sftp", "telnet", "mosh") else None
+        stream_limit = MAX_AUTH_STREAM_BYTES if unattended else MAX_PRE_AUTH_BUFFER_BYTES
+        jumphost_hops = getattr(self, "_jumphost_hops", ())
 
-        for attempts in range(1, max_attempts + 1):
+        st: dict[str, object] = {
+            "cand_idx": 0,
+            "connect_retries": 0,
+            "eof_fallback_advances": 0,
+            "target_creds_sent": False,
+            "cur_cand": None,
+            "cur_user": "",
+            "handshake_progressed": False,
+            "prompts_this_conn": 0,
+            "cand_sent_pw_this_conn": False,
+            "logged_fallback_this_cand": False,
+            "stage": "connect",
+            "last_observed_bytes_len": 0,
+        }
+
+        def _handle_username_prompt(child_obj) -> tuple[bool, str | None]:
+            if not unattended:
+                if self.user:
+                    child_obj.sendline(self.user)
+                    st["last_observed_bytes_len"] = 0
+                    return False, None
+                self.missingtext = True
+                return True, None
+
+            cand_idx_cur = int(st["cand_idx"])
+            prompts_cur = int(st["prompts_this_conn"])
+            cur_cand = st["cur_cand"]
+
+            if st["cand_sent_pw_this_conn"]:
+                if (cand_idx_cur + 1) >= len(runtime_candidates):
+                    return False, str(sanitize_exception(None, code="AUTH_FAILED", secrets=raw_secrets))
+                if prompts_cur >= max_auth_prompts:
+                    st["cand_idx"] = cand_idx_cur + 1
+                    return False, "__NEXT__:next_candidate"
+                cand_idx_cur += 1
+                st["cand_idx"] = cand_idx_cur
+                cur_cand = runtime_candidates[cand_idx_cur]
+                st["cur_cand"] = cur_cand
+                st["cur_user"] = cur_cand.user
+                st["cand_sent_pw_this_conn"] = False
+                st["logged_fallback_this_cand"] = False
+
+            u_to_send = cur_cand.user if cur_cand is not None else ""
+            if not u_to_send:
+                if (cand_idx_cur + 1) < len(runtime_candidates) and runtime_candidates[cand_idx_cur + 1].user:
+                    cand_idx_cur += 1
+                    st["cand_idx"] = cand_idx_cur
+                    cur_cand = runtime_candidates[cand_idx_cur]
+                    st["cur_cand"] = cur_cand
+                    st["cur_user"] = cur_cand.user
+                    u_to_send = cur_cand.user
+                    st["logged_fallback_this_cand"] = False
+                else:
+                    return False, str(sanitize_exception(None, code="NO_CREDS", secrets=raw_secrets))
+
+            if not tracker.try_acquire_user(u_to_send, limit=max_global_user_attempts):
+                return False, str(
+                    sanitize_exception(None, code="USER_BUDGET_EXHAUSTED", secrets=raw_secrets)
+                )
+
+            if cur_cand is not None and cur_cand.is_fallback and not st["logged_fallback_this_cand"]:
+                self._emit_aaa_fallback_log(
+                    logger,
+                    unique=str(self.unique),
+                    host=str(self.host),
+                    protocol=effective_protocol,
+                    user=u_to_send,
+                    label=cur_cand.label,
+                    secrets=raw_secrets,
+                )
+                self.last_fallback_used = True
+                st["logged_fallback_this_cand"] = True
+
+            child_obj.sendline(u_to_send)
+            st["handshake_progressed"] = True
+            st["stage"] = "auth"
+            st["last_observed_bytes_len"] = 0
+            return False, None
+
+        def _handle_target_password_prompt(child_obj) -> tuple[bool, str | None]:
+            cand_idx_cur = int(st["cand_idx"])
+            prompts_cur = int(st["prompts_this_conn"])
+            cur_cand = st["cur_cand"]
+            cur_user = str(st["cur_user"])
+
+            if not unattended:
+                if cur_cand is not None and cur_cand.has_password and not st["cand_sent_pw_this_conn"]:
+                    child_obj.sendline(cur_cand.password)
+                    st["cand_sent_pw_this_conn"] = True
+                    st["target_creds_sent"] = True
+                    st["handshake_progressed"] = True
+                    st["stage"] = "auth"
+                    st["last_observed_bytes_len"] = 0
+                    return False, None
+                if (cand_idx_cur + 1) < len(runtime_candidates) and not runtime_candidates[cand_idx_cur + 1].is_fallback:
+                    cand_idx_cur += 1
+                    st["cand_idx"] = cand_idx_cur
+                    cur_cand = runtime_candidates[cand_idx_cur]
+                    st["cur_cand"] = cur_cand
+                    if cur_cand.has_password:
+                        child_obj.sendline(cur_cand.password)
+                        st["cand_sent_pw_this_conn"] = True
+                        st["target_creds_sent"] = True
+                        st["handshake_progressed"] = True
+                        st["stage"] = "auth"
+                        st["last_observed_bytes_len"] = 0
+                        return False, None
+                self.missingtext = True
+                return True, None
+
+            if st["cand_sent_pw_this_conn"]:
+                if (cand_idx_cur + 1) >= len(runtime_candidates):
+                    return False, str(sanitize_exception(None, code="AUTH_FAILED", secrets=raw_secrets))
+                nxt = runtime_candidates[cand_idx_cur + 1]
+                if nxt.user == cur_user and prompts_cur < max_auth_prompts:
+                    cand_idx_cur += 1
+                    st["cand_idx"] = cand_idx_cur
+                    cur_cand = nxt
+                    st["cur_cand"] = cur_cand
+                    st["cand_sent_pw_this_conn"] = False
+                    st["logged_fallback_this_cand"] = False
+                else:
+                    st["cand_idx"] = cand_idx_cur + 1
+                    return False, "__NEXT__:next_candidate"
+
+            if cur_cand is None or not cur_cand.has_password:
+                if (cand_idx_cur + 1) < len(runtime_candidates):
+                    nxt = runtime_candidates[cand_idx_cur + 1]
+                    if nxt.user == cur_user and prompts_cur < max_auth_prompts:
+                        cand_idx_cur += 1
+                        st["cand_idx"] = cand_idx_cur
+                        cur_cand = nxt
+                        st["cur_cand"] = cur_cand
+                        st["cand_sent_pw_this_conn"] = False
+                        st["logged_fallback_this_cand"] = False
+                    else:
+                        st["cand_idx"] = cand_idx_cur + 1
+                        return False, "__NEXT__:next_candidate"
+                else:
+                    return False, str(sanitize_exception(None, code="NO_CREDS", secrets=raw_secrets))
+
+            if not cur_cand.has_password:
+                return False, str(sanitize_exception(None, code="NO_CREDS", secrets=raw_secrets))
+
+            if prompts_cur >= max_auth_prompts:
+                if (cand_idx_cur + 1) < len(runtime_candidates):
+                    st["cand_idx"] = cand_idx_cur + 1
+                    return False, "__NEXT__:next_candidate"
+                return False, str(sanitize_exception(None, code="AUTH_FAILED", secrets=raw_secrets))
+
+            eff_u = cur_cand.user or str(self.user or "")
+            acquired, budget_err_code = tracker.try_acquire_target_attempt(
+                host=str(self.host),
+                port=str(self.port or ""),
+                protocol=effective_protocol,
+                user=eff_u,
+                host_limit=max_total_auth_attempts,
+                user_limit=max_global_user_attempts,
+            )
+            if not acquired:
+                return False, str(
+                    sanitize_exception(
+                        None,
+                        code=budget_err_code or "HOST_BUDGET_EXHAUSTED",
+                        secrets=raw_secrets,
+                    )
+                )
+
+            if cur_cand.is_fallback and not st["logged_fallback_this_cand"]:
+                self._emit_aaa_fallback_log(
+                    logger,
+                    unique=str(self.unique),
+                    host=str(self.host),
+                    protocol=effective_protocol,
+                    user=eff_u,
+                    label=cur_cand.label,
+                    secrets=raw_secrets,
+                )
+                self.last_fallback_used = True
+                st["logged_fallback_this_cand"] = True
+
+            child_obj.sendline(cur_cand.password)
+            st["cand_sent_pw_this_conn"] = True
+            st["target_creds_sent"] = True
+            st["prompts_this_conn"] = prompts_cur + 1
+            st["handshake_progressed"] = True
+            st["stage"] = "auth"
+            st["last_observed_bytes_len"] = 0
+            return False, None
+
+        while True:
             remaining = deadline - clock()
             if remaining <= 0:
                 return _redact_known_secrets(
@@ -2630,16 +3334,50 @@ class node:
                     raw_secrets,
                 )
 
-            handshake_progressed = False
+            cand_idx_val = int(st["cand_idx"])
+            cur_cand = runtime_candidates[cand_idx_val] if cand_idx_val < len(runtime_candidates) else None
+            cur_user = cur_cand.user if cur_cand is not None else str(self.user or "")
+            st["cur_cand"] = cur_cand
+            st["cur_user"] = cur_user
+            user_override = (
+                cur_user
+                if (cand_idx_val > 0 or (cur_user and cur_user != str(self.user or "")))
+                else None
+            )
+
+            cmd = self._get_cmd(
+                force_ssh=force_ssh,
+                allow_reverse_tunnel_port=allow_reverse_tunnel_port,
+                connect_timeout=eff_ct,
+                user_override=user_override,
+            )
+
+            st["handshake_progressed"] = False
             args = shlex.split(cmd)
-            child, err = self._spawn_child(args, protocol=effective_protocol)
+            child, err = self._spawn_child(
+                args,
+                protocol=effective_protocol,
+                _secrets=raw_secrets,
+            )
             if err:
                 return _redact_known_secrets(err, raw_secrets)
 
             connected_ok = False
             local_mylog = None
-            retry_attempt = False
+            next_action: str | None = None
+            hop_pw_idx = [0] * len(jumphost_hops)
+            hop_cursor = 0
+            st["prompts_this_conn"] = 0
+            st["cand_sent_pw_this_conn"] = False
+            st["logged_fallback_this_cand"] = False
+            transport_error_seen = False
+
             try:
+                child.logfile = None
+                child.logfile_send = None
+                if unattended:
+                    child.logfile_read = None
+
                 if isinstance(self.tags, dict) and self.tags.get("console"):
                     child.sendline()
                 if debug:
@@ -2647,13 +3385,14 @@ class node:
                         logger("debug", f"Command:\n{_redact_known_secrets(cmd, raw_secrets)}")
                     local_mylog = io.BytesIO()
                     self.mylog = local_mylog
-                    local_mylog.write(f"[i] [DEBUG] Command:\r\n    {cmd}\r\n".encode())
-                    child.logfile_read = local_mylog
+                    redacted_cmd = _redact_known_secrets(cmd, raw_secrets)
+                    local_mylog.write(f"[i] [DEBUG] Command:\r\n    {redacted_cmd}\r\n".encode())
+                    if not unattended:
+                        child.logfile_read = local_mylog
 
-                pw_idx = 0
-                stage = "connect"
+                st["stage"] = "connect"
                 progress_extensions = 0
-                last_observed_bytes_len = 0
+                st["last_observed_bytes_len"] = 0
 
                 while True:
                     remaining = deadline - clock()
@@ -2662,42 +3401,45 @@ class node:
                             f"Connection failed code: 12\nConnection timeout (global deadline {max_total}s exceeded)",
                             raw_secrets,
                         )
-                    stage_timeout = eff_ct if stage == "connect" else eff_at
+                    stage_timeout = eff_ct if st["stage"] == "connect" else eff_at
                     expect_timeout = max(0.001, min(stage_timeout, remaining))
                     results = child.expect(proto_expects, timeout=expect_timeout)
                     results_value = proto_expects[results]
                     before_bytes = _to_bytes(getattr(child, "before", b""))
+                    after_bytes = _to_bytes(getattr(child, "after", b""))
 
-                    if len(before_bytes) > MAX_PRE_AUTH_BUFFER_BYTES:
+                    if len(before_bytes) > stream_limit:
                         return _redact_known_secrets(
-                            f"Connection failed code: 12\nPre-auth buffer exceeded maximum size ({MAX_PRE_AUTH_BUFFER_BYTES} bytes)",
+                            f"Connection failed code: 12\nPre-auth buffer exceeded maximum size ({stream_limit} bytes)",
                             raw_secrets,
                         )
 
                     if results in initial_indices[effective_protocol]:
                         if effective_protocol in ["ssh", "sftp", "mosh"]:
                             child.sendline('yes')
-                            handshake_progressed = True
-                            last_observed_bytes_len = 0
+                            st["handshake_progressed"] = True
+                            st["last_observed_bytes_len"] = 0
                         elif effective_protocol in ["telnet", "kubectl", "docker", "ssm"]:
-                            if self.user:
-                                child.sendline(self.user)
-                                last_observed_bytes_len = 0
-                            else:
-                                self.missingtext = True
+                            should_break, msg_or_action = _handle_username_prompt(child)
+                            if msg_or_action == "__NEXT__:next_candidate":
+                                next_action = "next_candidate"
+                                break
+                            if msg_or_action is not None:
+                                return msg_or_action
+                            if should_break:
                                 break
 
                     elif results in error_indices[effective_protocol]:
                         if results_value == pexpect.TIMEOUT:
                             cur_len = len(before_bytes)
-                            bytes_grew = cur_len > last_observed_bytes_len
-                            last_observed_bytes_len = cur_len
+                            bytes_grew = cur_len > int(st["last_observed_bytes_len"])
+                            st["last_observed_bytes_len"] = cur_len
                             remaining = deadline - clock()
                             can_extend = (
                                 bytes_grew
                                 and progress_extensions < max_ext
                                 and remaining > 0
-                                and not (effective_protocol == "mosh" and handshake_progressed)
+                                and not (effective_protocol == "mosh" and st["handshake_progressed"])
                             )
                             if can_extend:
                                 progress_extensions += 1
@@ -2710,13 +3452,26 @@ class node:
                                         )
                                 continue
 
-                            can_retry = (
-                                attempts < max_attempts
+                            if (
+                                unattended
+                                and st["stage"] == "auth"
+                                and st["target_creds_sent"]
+                                and (int(st["cand_idx"]) + 1) < len(runtime_candidates)
                                 and remaining > 0
-                                and not (effective_protocol == "mosh" and handshake_progressed)
+                            ):
+                                st["cand_idx"] = int(st["cand_idx"]) + 1
+                                next_action = "next_candidate"
+                                break
+
+                            can_retry = (
+                                not st["target_creds_sent"]
+                                and (int(st["connect_retries"]) + 1) < max_attempts
+                                and remaining > 0
+                                and not (effective_protocol == "mosh" and st["handshake_progressed"])
                             )
                             if can_retry:
-                                retry_attempt = True
+                                st["connect_retries"] = int(st["connect_retries"]) + 1
+                                next_action = "retry_connect"
                                 break
 
                             before_str = _to_str(before_bytes)
@@ -2731,7 +3486,23 @@ class node:
                                 raw_secrets,
                             )
 
-                        after = _to_str(getattr(child, "after", b""))
+                        is_perm_denied = (
+                            effective_protocol in ("ssh", "sftp", "mosh")
+                            and results == 2
+                            and b"permission denied" in (before_bytes + after_bytes).lower()
+                        )
+                        if (
+                            unattended
+                            and is_perm_denied
+                            and (int(st["cand_idx"]) + 1) < len(runtime_candidates)
+                            and remaining > 0
+                        ):
+                            st["cand_idx"] = int(st["cand_idx"]) + 1
+                            next_action = "next_candidate"
+                            break
+
+                        transport_error_seen = not is_perm_denied
+                        after = _to_str(after_bytes)
                         before = _to_str(before_bytes)
                         readline_val = _to_str(child.readline())
                         if effective_protocol == "mosh":
@@ -2759,28 +3530,120 @@ class node:
 
                     elif results in eof_indices[effective_protocol]:
                         if results == pw_prompt_idx:
-                            if passwords and pw_idx < len(passwords):
-                                child.sendline(passwords[pw_idx])
-                                pw_idx += 1
-                                handshake_progressed = True
-                                stage = "auth"
-                                last_observed_bytes_len = 0
-                            else:
-                                self.missingtext = True
+                            after_lower = after_bytes.lower()
+                            if b"username" in after_lower and b"password" not in after_lower:
+                                should_break, msg_or_action = _handle_username_prompt(child)
+                                if msg_or_action == "__NEXT__:next_candidate":
+                                    next_action = "next_candidate"
+                                    break
+                                if msg_or_action is not None:
+                                    return msg_or_action
+                                if should_break:
+                                    break
+                                continue
+
+                            if jumphost_hops:
+                                prompt_line = normalize_prompt_line(before_bytes, after_bytes)
+                                kind, hop_idx = self._disambiguate_prompt(prompt_line)
+                                if kind == "conflict":
+                                    return str(
+                                        sanitize_exception(None, code="JUMP_AUTH_FAILED", secrets=raw_secrets)
+                                    )
+                                if kind == "hop":
+                                    assert hop_idx is not None
+                                    if st["target_creds_sent"] or hop_idx < hop_cursor:
+                                        return str(
+                                            sanitize_exception(None, code="JUMP_AUTH_FAILED", secrets=raw_secrets)
+                                        )
+                                    hop_cursor = hop_idx
+                                    hop_obj = jumphost_hops[hop_idx]
+                                    hop_pws = hop_runtime_passwords[hop_idx]
+                                    if hop_pw_idx[hop_idx] >= len(hop_pws):
+                                        return str(
+                                            sanitize_exception(None, code="JUMP_AUTH_FAILED", secrets=raw_secrets)
+                                        )
+                                    if not tracker.try_acquire_hop(
+                                        hop_obj["host"],
+                                        hop_obj["port"],
+                                        hop_obj["protocol"],
+                                        limit=max_hop_host_attempts,
+                                    ):
+                                        return str(
+                                            sanitize_exception(None, code="HOST_BUDGET_EXHAUSTED", secrets=raw_secrets)
+                                        )
+                                    child.sendline(hop_pws[hop_pw_idx[hop_idx]])
+                                    hop_pw_idx[hop_idx] += 1
+                                    st["handshake_progressed"] = True
+                                    st["last_observed_bytes_len"] = 0
+                                    continue
+                                if kind == "target":
+                                    hop_cursor = len(jumphost_hops)
+                                else:
+                                    allow_ambig = bool(
+                                        tags_dict.get("allow_ambiguous_single_hop_prompt", False)
+                                    )
+                                    if len(jumphost_hops) > 1 or not allow_ambig:
+                                        return str(
+                                            sanitize_exception(None, code="JUMP_AUTH_FAILED", secrets=raw_secrets)
+                                        )
+                                    if not st["target_creds_sent"] and hop_pw_idx[0] < len(hop_runtime_passwords[0]):
+                                        hop_obj = jumphost_hops[0]
+                                        if not tracker.try_acquire_hop(
+                                            hop_obj["host"],
+                                            hop_obj["port"],
+                                            hop_obj["protocol"],
+                                            limit=max_hop_host_attempts,
+                                        ):
+                                            return str(
+                                                sanitize_exception(
+                                                    None,
+                                                    code="HOST_BUDGET_EXHAUSTED",
+                                                    secrets=raw_secrets,
+                                                )
+                                            )
+                                        child.sendline(hop_runtime_passwords[0][hop_pw_idx[0]])
+                                        hop_pw_idx[0] += 1
+                                        st["handshake_progressed"] = True
+                                        st["last_observed_bytes_len"] = 0
+                                        continue
+
+                            should_break, msg_or_action = _handle_target_password_prompt(child)
+                            if msg_or_action == "__NEXT__:next_candidate":
+                                next_action = "next_candidate"
                                 break
+                            if msg_or_action is not None:
+                                return msg_or_action
+                            if should_break:
+                                break
+
                         elif suspend_idx is not None and results == suspend_idx:
                             child.sendline("\r")
                             sleep(2)
-                            last_observed_bytes_len = 0
+                            st["last_observed_bytes_len"] = 0
                         elif results_value == pexpect.EOF:
                             norm_buf = (
                                 before_bytes.replace(b"\r\n", b"\n").replace(b"\r", b"\n") + b"\n"
                             )
+                            eof_perm_denied = False
                             for err_idx in error_indices[effective_protocol]:
                                 err_pat = proto_expects[err_idx]
                                 if isinstance(err_pat, re.Pattern):
                                     m = err_pat.search(norm_buf)
                                     if m:
+                                        is_pd = (
+                                            effective_protocol in ("ssh", "sftp", "mosh")
+                                            and err_idx == 2
+                                            and b"permission denied" in m.group(0).lower()
+                                        )
+                                        if (
+                                            unattended
+                                            and is_pd
+                                            and (int(st["cand_idx"]) + 1) < len(runtime_candidates)
+                                            and remaining > 0
+                                        ):
+                                            eof_perm_denied = True
+                                            break
+                                        transport_error_seen = not is_pd
                                         b_str = _to_str(norm_buf[: m.start()])
                                         a_str = _to_str(m.group(0))
                                         if effective_protocol == "mosh":
@@ -2790,16 +3653,70 @@ class node:
                                             f"Connection failed code: {err_idx}\n{b_str.lstrip()}{a_str}".rstrip(),
                                             raw_secrets,
                                         )
+                            if eof_perm_denied:
+                                st["cand_idx"] = int(st["cand_idx"]) + 1
+                                next_action = "next_candidate"
+                                break
+
+                            if unattended and not transport_error_seen:
+                                if st["target_creds_sent"]:
+                                    if (int(st["cand_idx"]) + 1) < len(runtime_candidates):
+                                        eof_adv = int(st["eof_fallback_advances"])
+                                        if eof_adv < MAX_EOF_FALLBACK_ADVANCES:
+                                            st["eof_fallback_advances"] = eof_adv + 1
+                                            st["cand_idx"] = int(st["cand_idx"]) + 1
+                                            next_action = "next_candidate"
+                                            break
+                                        return str(
+                                            sanitize_exception(
+                                                None,
+                                                code="EOF_BUDGET_EXHAUSTED",
+                                                secrets=raw_secrets,
+                                            )
+                                        )
+                                    return str(
+                                        sanitize_exception(
+                                            None,
+                                            code="AUTH_FAILED",
+                                            secrets=raw_secrets,
+                                        )
+                                    )
+                                if effective_protocol != "local":
+                                    return str(
+                                        sanitize_exception(
+                                            None,
+                                            code="TRANSPORT_ERROR",
+                                            secrets=raw_secrets,
+                                        )
+                                    )
+
                             try:
                                 child.sendline()
                             except Exception as exc:  # noqa: BLE001
                                 _LOGGER.debug("EOF fallback sendline ignored: %s", type(exc).__name__)
                             break
                         else:
+                            cur_cand_now = st["cur_cand"]
+                            if (
+                                cur_cand_now is not None
+                                and cur_cand_now.is_fallback
+                                and not st["logged_fallback_this_cand"]
+                            ):
+                                self._emit_aaa_fallback_log(
+                                    logger,
+                                    unique=str(self.unique),
+                                    host=str(self.host),
+                                    protocol=effective_protocol,
+                                    user=str(st["cur_user"]),
+                                    label=cur_cand_now.label,
+                                    secrets=raw_secrets,
+                                )
+                                self.last_fallback_used = True
+                                st["logged_fallback_this_cand"] = True
                             child.sendline()
                             break
 
-                if retry_attempt:
+                if next_action in ("retry_connect", "next_candidate"):
                     continue
 
                 if isinstance(self.tags, dict) and self.tags.get("post_connect_commands"):
@@ -2815,6 +3732,14 @@ class node:
                 self.raw_child = fdpexpect.fdspawn(self.child.child_fd)
                 connected_ok = True
                 return True
+            except Exception as exc:  # noqa: BLE001
+                san = sanitize_exception(
+                    exc,
+                    code="AUTH_FAILED",
+                    secrets=raw_secrets,
+                    context_label="unexpected connection error",
+                )
+                return str(san)
             finally:
                 if not connected_ok:
                     try:
@@ -2877,18 +3802,17 @@ class nodes:
         '''
         self.nodelist = []
         self.config = config
+        self.fallback_used = {}
         for n, node_cfg in nodes.items():
             this = node(n, **node_cfg, config=config)
             self.nodelist.append(this)
             setattr(self, n, this)
 
-    
     @MethodHook
     def _splitlist(self, lst, n):
         #split a list in lists of n members.
         for i in range(0, len(lst), n):
             yield lst[i:i + n]
-
 
     @MethodHook
     def run(
@@ -2906,6 +3830,8 @@ class nodes:
         connect_timeout=None,
         auth_timeout=None,
         _default_cmd_timeout=10,
+        unattended=True,
+        attempt_tracker=None,
     ):
         '''
         Run a command or list of commands on all the nodes in nodelist.
@@ -2977,8 +3903,11 @@ class nodes:
             args["auth_timeout"] = auth_timeout
         if _default_cmd_timeout != 10:
             args["_default_cmd_timeout"] = _default_cmd_timeout
+        if unattended is not True:
+            args["unattended"] = unattended
         output = {}
         status = {}
+        fallback_used = {}
         tasks = []
 
         def _run_node(node_obj, node_args, callback):
@@ -2989,6 +3918,8 @@ class nodes:
 
         for n in self.nodelist:
             nodesargs[n.unique] = deepcopy(args)
+            if attempt_tracker is not None:
+                nodesargs[n.unique]["attempt_tracker"] = attempt_tracker
             if vars is not None:
                 nodesargs[n.unique]["vars"] = {}
                 if "__global__" in vars:
@@ -3021,8 +3952,10 @@ class nodes:
         for i in self.nodelist:
             output[i.unique] = i.output
             status[i.unique] = i.status
+            fallback_used[i.unique] = bool(getattr(i, "last_fallback_used", False))
         self.output = output
         self.status = status
+        self.fallback_used = fallback_used
         return output
 
     @MethodHook
@@ -3041,6 +3974,8 @@ class nodes:
         connect_timeout=None,
         auth_timeout=None,
         _default_cmd_timeout=10,
+        unattended=True,
+        attempt_tracker=None,
     ):
         '''
         Run a command or list of commands on all the nodes in nodelist, then check if expected value appears on the output after the last command.
@@ -3109,9 +4044,12 @@ class nodes:
             args["auth_timeout"] = auth_timeout
         if _default_cmd_timeout != 10:
             args["_default_cmd_timeout"] = _default_cmd_timeout
+        if unattended is not True:
+            args["unattended"] = unattended
         output = {}
         result = {}
         status = {}
+        fallback_used = {}
         tasks = []
 
         def _test_node(node_obj, node_args, callback):
@@ -3122,6 +4060,8 @@ class nodes:
 
         for n in self.nodelist:
             nodesargs[n.unique] = deepcopy(args)
+            if attempt_tracker is not None:
+                nodesargs[n.unique]["attempt_tracker"] = attempt_tracker
             if vars is not None:
                 nodesargs[n.unique]["vars"] = {}
                 if "__global__" in vars:
@@ -3152,9 +4092,11 @@ class nodes:
             result[i.unique] = i.result
             output[i.unique] = i.output
             status[i.unique] = i.status
+            fallback_used[i.unique] = bool(getattr(i, "last_fallback_used", False))
         self.output = output
         self.result = result
         self.status = status
+        self.fallback_used = fallback_used
         return result
 
 # script

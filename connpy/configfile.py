@@ -1,15 +1,31 @@
 #!/usr/bin/env python3
-#Imports
 import json
 import os
 import re
-import sys
-import yaml
 import shutil
-from pathlib import Path
+import sys
+import tempfile
+import threading
+from contextlib import suppress
 from copy import deepcopy
-from .hooks import MethodHook, ClassHook
+from pathlib import Path
+
+import yaml
+
 from . import printer
+from .auth_utils import (
+    MAX_PROFILE_DEPTH,
+    SanitizedAuthError,
+    extract_profile_refs_from_value,
+    is_compose_expression,
+    resolve_fallback_entries,
+    validate_auth_budget_tags,
+    validate_compose_syntax,
+    validate_config_auth_settings,
+    validate_fallback_entries,
+)
+from .hooks import ClassHook, MethodHook
+
 
 class NoAliasDumper(yaml.SafeDumper):
     def ignore_aliases(self, data):
@@ -42,6 +58,8 @@ class configfile:
         '''
 
     def __init__(self, conf = None, key = None, shared_config = None):
+        self._mutation_lock = threading.RLock()
+        self._cache_dirty = False
         self._shared_config = shared_config
         ''' 
             
@@ -109,10 +127,10 @@ class configfile:
                                 json.dump(old_data, f)
                             shutil.move(legacy_file, legacy_file + ".backup")
                             printer.success(f"Migrated legacy config ({len(old_data.get('connections',{}))} folders/nodes) into YAML and Cache successfully!")
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     if os.path.exists(self.file):
-                        try: os.remove(self.file)
-                        except OSError: pass
+                        with suppress(OSError):
+                            os.remove(self.file)
                     printer.warning(f"Failed to migrate legacy config: {e}")
         else:
             # Custom path (common in tests): isolate everything to the conf parent directory
@@ -207,12 +225,99 @@ class configfile:
         return val if val is not None else default
 
 
+    def _validate_config_entry_unlocked(self, entry):
+        """Strictly validate tags, fallback, and password compose syntax on a node or profile entry."""
+        if not isinstance(entry, dict):
+            return
+        if "tags" in entry and entry["tags"] not in ("", None):
+            validate_auth_budget_tags(entry["tags"])
+        if "fallback" in entry and entry["fallback"] not in (None, "", []):
+            validate_fallback_entries(entry["fallback"])
+        pw = entry.get("password")
+        if is_compose_expression(pw):
+            validate_compose_syntax(pw)
+        elif isinstance(pw, (list, tuple)):
+            for item in pw:
+                if is_compose_expression(item):
+                    validate_compose_syntax(item)
+
+    def _walk_connections_validate_unlocked(self, container):
+        """Recursively validate all connection dicts inside nested folders/subfolders."""
+        if not isinstance(container, dict):
+            raise TypeError("Connections container must be a dict")
+        for key, val in container.items():
+            if key == "type" or not isinstance(val, dict):
+                continue
+            entry_type = val.get("type")
+            if entry_type in ("folder", "subfolder"):
+                self._walk_connections_validate_unlocked(val)
+            else:
+                self._validate_config_entry_unlocked(val)
+
+    def _validate_config_strict(self, data):
+        """Strictly validate config structure, budgets, and fallback rules; raises on error."""
+        if not isinstance(data, dict):
+            raise TypeError("Config root must be a dict")
+        required = {"config", "connections", "profiles"}
+        if not required.issubset(data.keys()):
+            raise ValueError("Config missing required sections")
+        if not isinstance(data["config"], dict):
+            raise TypeError("'config' section must be a dict")
+        if not isinstance(data["connections"], dict):
+            raise TypeError("'connections' section must be a dict")
+        if not isinstance(data["profiles"], dict):
+            raise TypeError("'profiles' section must be a dict")
+        validate_config_auth_settings(data["config"])
+        self._walk_connections_validate_unlocked(data["connections"])
+        for prof_val in data["profiles"].values():
+            if not isinstance(prof_val, dict):
+                raise TypeError("Each profile entry must be a dict")
+            self._validate_config_entry_unlocked(prof_val)
+
     def _validate_config(self, data):
         """Verify config data has the required structure."""
-        if not isinstance(data, dict):
+        try:
+            self._validate_config_strict(data)
+        except (ValueError, TypeError, SanitizedAuthError):
             return False
-        required = {"config", "connections", "profiles"}
-        return required.issubset(data.keys())
+        return True
+
+    def _atomic_write_text_unlocked(self, target_path, writer):
+        """Atomically write text file with symlink refusal, 0o600 mode, fsync, and os.replace."""
+        if os.path.islink(target_path):
+            raise OSError(f"Refusing to write through symlink: {target_path}")
+        target_dir = os.path.dirname(os.path.abspath(target_path)) or "."
+        os.makedirs(target_dir, exist_ok=True)
+        fd, tmp_path = tempfile.mkstemp(
+            dir=target_dir,
+            prefix=f".{os.path.basename(target_path)}.",
+            suffix=".tmp",
+        )
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                writer(f)
+                f.flush()
+                os.fsync(f.fileno())
+            os.chmod(tmp_path, 0o600)
+            os.replace(tmp_path, target_path)
+        except BaseException:
+            with suppress(OSError):
+                os.unlink(tmp_path)
+            raise
+
+    def _fsync_dir_nonfatal(self, file_path):
+        target_dir = os.path.dirname(os.path.abspath(file_path)) or "."
+        try:
+            dir_fd = os.open(target_dir, os.O_RDONLY)
+        except OSError:
+            return
+        try:
+            os.fsync(dir_fd)
+        except OSError:
+            return
+        finally:
+            with suppress(OSError):
+                os.close(dir_fd)
 
     def _loadconfig(self, conf):
         #Loads config file using dual cache
@@ -231,17 +336,23 @@ class configfile:
                         data = json.load(f)
                     if self._validate_config(data):
                         # Re-write the YAML from good cache
-                        with open(conf, 'w') as f:
-                            yaml.dump(data, f, Dumper=NoAliasDumper, default_flow_style=False, sort_keys=False)
+                        with suppress(OSError):
+                            self._atomic_write_text_unlocked(
+                                conf,
+                                lambda fp: yaml.dump(
+                                    data,
+                                    fp,
+                                    Dumper=NoAliasDumper,
+                                    default_flow_style=False,
+                                    sort_keys=False,
+                                ),
+                            )
                         return data
                 # Both broken or no cache - create fresh
                 printer.error("Config file is corrupt and no valid cache exists. Creating default config.")
                 return self._createconfig(conf)
-            try:
-                with open(self.cachefile, 'w') as f:
-                    json.dump(data, f)
-            except Exception:
-                pass
+            with suppress(OSError, TypeError, ValueError):
+                self._atomic_write_text_unlocked(self.cachefile, lambda fp: json.dump(data, fp))
             return data
         else:
             with open(self.cachefile, 'r') as f:
@@ -259,61 +370,152 @@ class configfile:
 
     def _createconfig(self, conf):
         #Create config file (always writes defaults, safe for recovery)
-        defaultconfig = {'config': {'case': False, 'idletime': 30, 'fzf': False}, 'connections': {}, 'profiles': { "default": { "host":"", "protocol":"ssh", "port":"", "user":"", "password":"", "options":"", "logs":"", "tags": "", "jumphost":""}}}
-        with open(conf, "w") as f:
-            yaml.dump(defaultconfig, f, Dumper=NoAliasDumper, default_flow_style=False, sort_keys=False)
-        os.chmod(conf, 0o600)
-        try:
-            with open(self.cachefile, 'w') as f:
-                json.dump(defaultconfig, f)
-        except Exception:
-            pass
+        defaultconfig = {'config': {'case': False, 'idletime': 30, 'fzf': False}, 'connections': {}, 'profiles': { "default": { "host":"", "protocol":"ssh", "port":"", "user":"", "password":"", "options":"", "logs":"", "tags": "", "jumphost":"", "fallback": ""}}}
+        self._atomic_write_text_unlocked(
+            conf,
+            lambda f: yaml.dump(defaultconfig, f, Dumper=NoAliasDumper, default_flow_style=False, sort_keys=False),
+        )
+        with suppress(OSError, TypeError, ValueError):
+            self._atomic_write_text_unlocked(self.cachefile, lambda f: json.dump(defaultconfig, f))
         return defaultconfig
+
+    def _saveconfig_unlocked(self, conf, *, _raise_on_error=False):
+        # Save config file atomically inside _mutation_lock without invoking hooks or printer
+        newconfig = {
+            "config": self.config,
+            "connections": self.connections,
+            "profiles": self.profiles,
+        }
+        try:
+            self._atomic_write_text_unlocked(
+                conf,
+                lambda f: yaml.dump(
+                    newconfig,
+                    f,
+                    Dumper=NoAliasDumper,
+                    default_flow_style=False,
+                    sort_keys=False,
+                ),
+            )
+        except (OSError, TypeError, yaml.YAMLError) as e:
+            if _raise_on_error:
+                raise
+            return 1, f"Failed to save config: {e}"
+
+        # YAML is safely committed on disk; fsync dir and sidecar caches are non-fatal
+        self._fsync_dir_nonfatal(conf)
+        try:
+            self._atomic_write_text_unlocked(self.cachefile, lambda f: json.dump(newconfig, f))
+            self._generate_nodes_cache_unlocked(_raise_on_error=True)
+            self._cache_dirty = False
+        except (OSError, TypeError, ValueError):
+            self._cache_dirty = True
+        return 0, None
+
+    def _run_saveconfig_post_hooks(self, conf, result):
+        """Run @MethodHook post-hooks registered for _saveconfig outside _mutation_lock."""
+        cls_desc = type(self).__dict__.get("_saveconfig")
+        cls_post = list(cls_desc.post_hooks) if isinstance(cls_desc, MethodHook) else []
+        inst_post = (
+            self.__dict__.get("_method_post_hooks", {}).get("_saveconfig", [])
+            if isinstance(self.__dict__.get("_method_post_hooks"), dict)
+            else []
+        )
+        all_post = cls_post + [h for h in inst_post if h not in cls_post]
+        for hook in all_post:
+            try:
+                result = hook(self, conf, result=result)
+            except Exception as e:  # noqa: BLE001
+                hook_name = getattr(hook, "__name__", str(hook))
+                printer.error(f"_saveconfig Post-hook {hook_name} raised an exception: {e}")
+        return result
 
     @MethodHook
     def _saveconfig(self, conf):
         #Save config file atomically to prevent corruption
-        newconfig = {"config":{}, "connections": {}, "profiles": {}}
-        newconfig["config"] = self.config
-        newconfig["connections"] = self.connections
-        newconfig["profiles"] = self.profiles
-        tmpfile = conf + '.tmp'
-        try:
-            with open(tmpfile, "w") as f:
-                yaml.dump(newconfig, f, Dumper=NoAliasDumper, default_flow_style=False, sort_keys=False)
-            # Atomic replace: only overwrite original if write succeeded
-            shutil.move(tmpfile, conf)
-            with open(self.cachefile, "w") as f:
-                json.dump(newconfig, f)
-            self._generate_nodes_cache()
-        except (IOError, OSError) as e:
-            printer.error(f"Failed to save config: {e}")
-            # Clean up temp file if it exists
-            if os.path.exists(tmpfile):
-                try:
-                    os.remove(tmpfile)
-                except OSError:
-                    pass
-            return 1
-        return 0
+        with self._mutation_lock:
+            rc, err_msg = self._saveconfig_unlocked(conf, _raise_on_error=False)
+        if err_msg:
+            printer.error(err_msg)
+        return rc
 
-    def _generate_nodes_cache(self, nodes=None, folders=None, profiles=None):
+    def transactional_update(self, mutator):
+        """Run mutator atomically inside _mutation_lock with in-place RAM rollback on error."""
+        save_desc = type(self).__dict__.get("_saveconfig")
+        mocked_save = "_saveconfig" in self.__dict__ or not isinstance(save_desc, MethodHook)
+        with self._mutation_lock:
+            snap_config = deepcopy(self.config)
+            snap_connections = deepcopy(self.connections)
+            snap_profiles = deepcopy(self.profiles)
+            try:
+                result = mutator(self)
+                self._validate_config_strict(
+                    {
+                        "config": self.config,
+                        "connections": self.connections,
+                        "profiles": self.profiles,
+                    }
+                )
+                if mocked_save:
+                    rc = self._saveconfig(self.file)
+                    if rc != 0:
+                        raise OSError("Failed to save config")
+                else:
+                    self._saveconfig_unlocked(self.file, _raise_on_error=True)
+            except BaseException:
+                self.config.clear()
+                self.config.update(snap_config)
+                self.connections.clear()
+                self.connections.update(snap_connections)
+                self.profiles.clear()
+                self.profiles.update(snap_profiles)
+                raise
+        if not mocked_save:
+            self._run_saveconfig_post_hooks(self.file, 0)
+        return result
+
+    def refresh_cache(self):
+        """Rebuild JSON and fzf sidecar caches atomically; returns True on success."""
+        with self._mutation_lock:
+            snapshot = {
+                "config": self.config,
+                "connections": self.connections,
+                "profiles": self.profiles,
+            }
+            try:
+                self._atomic_write_text_unlocked(self.cachefile, lambda f: json.dump(snapshot, f))
+                self._generate_nodes_cache_unlocked(_raise_on_error=True)
+                self._cache_dirty = False
+                return True
+            except (OSError, TypeError, ValueError):
+                self._cache_dirty = True
+                return False
+
+    def _generate_nodes_cache_unlocked(self, nodes=None, folders=None, profiles=None, *, _raise_on_error=False):
         try:
             if nodes is None:
-                nodes = self._getallnodes()
+                nodes = self._getallnodes_unlocked()
             if folders is None:
-                folders = self._getallfolders()
+                folders = self._getallfolders_unlocked()
             if profiles is None:
                 profiles = list(self.profiles.keys())
-            
-            with open(self.fzf_cachefile, "w") as f:
-                f.write("\n".join(nodes))
-            with open(self.folders_cachefile, "w") as f:
-                f.write("\n".join(folders))
-            with open(self.profiles_cachefile, "w") as f:
-                f.write("\n".join(profiles))
-        except Exception:
-            pass
+
+            self._atomic_write_text_unlocked(self.fzf_cachefile, lambda f: f.write("\n".join(nodes)))
+            self._atomic_write_text_unlocked(self.folders_cachefile, lambda f: f.write("\n".join(folders)))
+            self._atomic_write_text_unlocked(self.profiles_cachefile, lambda f: f.write("\n".join(profiles)))
+        except (OSError, TypeError, ValueError):
+            if _raise_on_error:
+                raise
+            self._cache_dirty = True
+
+    def _generate_nodes_cache(self, nodes=None, folders=None, profiles=None):
+        with self._mutation_lock:
+            self._generate_nodes_cache_unlocked(
+                nodes=nodes,
+                folders=folders,
+                profiles=profiles,
+                _raise_on_error=False,
+            )
 
 
     def _createkey(self, keyfile):
@@ -326,8 +528,7 @@ class configfile:
             os.chmod(keyfile, 0o600)
         return key
 
-    @MethodHook
-    def _explode_unique(self, unique):
+    def _explode_unique_unlocked(self, unique):
         #Divide unique name into folder, subfolder and id
         uniques = unique.split("@")
         if not unique.startswith("@"):
@@ -348,30 +549,172 @@ class configfile:
         return result
 
     @MethodHook
-    def getitem(self, unique, keys = None, extract = False):
-        '''
-        Get an node or a group of nodes from configfile which can be passed to node/nodes class
+    def _explode_unique(self, unique):
+        return self._explode_unique_unlocked(unique)
 
-        ### Parameters:  
+    def _resolve_profile_attr_unlocked(self, prof_name, key, *, depth=0, visited=frozenset()):
+        if prof_name in visited or depth >= 5:
+            return None
+        prof = self.profiles.get(prof_name)
+        if not isinstance(prof, dict) or key not in prof:
+            return None
+        val = prof[key]
+        if key == "password":
+            if isinstance(val, str):
+                if is_compose_expression(val):
+                    return val
+                if val.startswith("@") and val[1:] in self.profiles:
+                    sub = self._resolve_profile_attr_unlocked(
+                        val[1:],
+                        key,
+                        depth=depth + 1,
+                        visited=visited | {prof_name},
+                    )
+                    return sub if sub is not None else val
+                return val
+            if isinstance(val, list):
+                resolved_list = []
+                for item in val:
+                    if (
+                        isinstance(item, str)
+                        and not is_compose_expression(item)
+                        and item.startswith("@")
+                        and item[1:] in self.profiles
+                    ):
+                        sub = self._resolve_profile_attr_unlocked(
+                            item[1:],
+                            "password",
+                            depth=depth + 1,
+                            visited=visited | {prof_name},
+                        )
+                        if isinstance(sub, list):
+                            resolved_list.extend(deepcopy(sub))
+                        elif sub is not None:
+                            resolved_list.append(deepcopy(sub))
+                        else:
+                            resolved_list.append(item)
+                    else:
+                        resolved_list.append(deepcopy(item))
+                return resolved_list
+            return deepcopy(val)
 
-            - unique (str): Unique name of the node or folder in config using
-                            connection manager style: node[@subfolder][@folder]
-                            or [@subfolder]@folder
+        if isinstance(val, str) and val.startswith("@") and val[1:] in self.profiles:
+            sub = self._resolve_profile_attr_unlocked(
+                val[1:],
+                key,
+                depth=depth + 1,
+                visited=visited | {prof_name},
+            )
+            return sub if sub is not None else ""
+        return deepcopy(val)
 
-        ### Optional Parameters:  
+    def _find_inherited_profile_fallback_unlocked(self, raw_user, raw_pw):
+        """Inherit fallback from a primary @profile referenced by node user/password."""
+        for candidate_val, field in ((raw_user, "user"), (raw_pw, "password")):
+            if (
+                isinstance(candidate_val, str)
+                and not is_compose_expression(candidate_val)
+                and candidate_val.startswith("@")
+                and "+" not in candidate_val
+            ):
+                prof_name = candidate_val[1:]
+                visited = set()
+                while prof_name and prof_name not in visited and len(visited) < MAX_PROFILE_DEPTH:
+                    visited.add(prof_name)
+                    prof = self.profiles.get(prof_name)
+                    if not isinstance(prof, dict):
+                        break
+                    prof_fb = prof.get("fallback")
+                    if prof_fb in (None, "", []) and isinstance(prof.get("tags"), dict):
+                        prof_fb = prof["tags"].get("fallback")
+                    if prof_fb not in (None, "", []):
+                        return deepcopy(prof_fb)
+                    next_val = prof.get(field)
+                    if (
+                        isinstance(next_val, str)
+                        and not is_compose_expression(next_val)
+                        and next_val.startswith("@")
+                        and "+" not in next_val
+                    ):
+                        prof_name = next_val[1:]
+                    else:
+                        break
+        return None
 
-            - keys (list): In case you pass a folder as unique, you can filter
-                           nodes inside the folder passing a list.
-            - extract (bool): If True, extract information from profiles. 
-                              Default False.
+    def _extract_node_fields_unlocked(self, node_dict):
+        """Resolve @profile references on a copied node dict, keeping legacy core.node(**cfg) contract."""
+        raw_user = node_dict.get("user")
+        raw_pw = node_dict.get("password")
+        raw_fb = node_dict.pop("fallback", None)
 
-        ### Returns:  
+        for key, value in list(node_dict.items()):
+            if key == "password":
+                if isinstance(value, str):
+                    if is_compose_expression(value):
+                        continue
+                    if value.startswith("@") and value[1:] in self.profiles:
+                        resolved = self._resolve_profile_attr_unlocked(value[1:], "password")
+                        node_dict["password"] = resolved if resolved is not None else ""
+                elif isinstance(value, list):
+                    resolved_pw = []
+                    for item in value:
+                        if (
+                            isinstance(item, str)
+                            and not is_compose_expression(item)
+                            and item.startswith("@")
+                            and item[1:] in self.profiles
+                        ):
+                            sub = self._resolve_profile_attr_unlocked(item[1:], "password")
+                            if isinstance(sub, list):
+                                resolved_pw.extend(deepcopy(sub))
+                            elif sub is not None:
+                                resolved_pw.append(deepcopy(sub))
+                            else:
+                                resolved_pw.append("")
+                        else:
+                            resolved_pw.append(deepcopy(item))
+                    node_dict["password"] = resolved_pw
+                continue
 
-            dict: Dictionary containing information of node or multiple 
-                  dictionaries of multiple nodes.
+            if isinstance(value, str) and value.startswith("@"):
+                ref_name = value[1:]
+                if ref_name in self.profiles:
+                    res = self._resolve_profile_attr_unlocked(ref_name, key)
+                    node_dict[key] = res if res is not None else ""
+                else:
+                    node_dict[key] = ""
+            elif value == "" and key == "protocol":
+                default_proto = self.profiles.get("default", {}).get("protocol", "ssh")
+                node_dict[key] = default_proto if default_proto else "ssh"
 
-        '''
-        uniques = self._explode_unique(unique)
+        tags_fb_present = (
+            isinstance(node_dict.get("tags"), dict)
+            and node_dict["tags"].get("fallback") not in (None, "", [])
+        )
+        if raw_fb in (None, "", []) and not tags_fb_present:
+            raw_fb = self._find_inherited_profile_fallback_unlocked(raw_user, raw_pw)
+
+        resolved_fb = []
+        if raw_fb not in (None, "", []):
+            resolved_fb = resolve_fallback_entries(raw_fb, self.profiles)
+
+        if resolved_fb:
+            tags_val = node_dict.get("tags", "")
+            if isinstance(tags_val, dict):
+                tags_copy = deepcopy(tags_val)
+                tags_copy["_fallback"] = resolved_fb
+                node_dict["tags"] = tags_copy
+            elif tags_val in ("", None):
+                node_dict["tags"] = {"_fallback": resolved_fb}
+            else:
+                node_dict["tags"] = {"_raw": tags_val, "_fallback": resolved_fb}
+        elif isinstance(node_dict.get("tags"), dict) and node_dict["tags"].get("fallback") not in (None, "", []):
+            tags_copy = deepcopy(node_dict["tags"])
+            tags_copy["_fallback"] = resolve_fallback_entries(tags_copy["fallback"], self.profiles)
+            node_dict["tags"] = tags_copy
+
+    def getitem_unlocked(self, unique, keys=None, extract=False):
+        uniques = self._explode_unique_unlocked(unique)
         if unique.startswith("@"):
             if uniques.keys() >= {"folder", "subfolder"}:
                 folder = self.connections[uniques["folder"]][uniques["subfolder"]]
@@ -379,59 +722,41 @@ class configfile:
                 folder = self.connections[uniques["folder"]]
             newfolder = deepcopy(folder)
             newfolder.pop("type")
-            for node_name in folder.keys():
+            for node_name in list(folder.keys()):
                 if node_name == "type":
                     continue
-                if "type" in newfolder[node_name].keys():
+                if "type" in newfolder[node_name]:
                     if newfolder[node_name]["type"] == "subfolder":
                         newfolder.pop(node_name)
                     else:
                         newfolder[node_name].pop("type")
-            
-            if keys != None:
-                newfolder = dict((k, newfolder[k]) for k in keys)
-            
+
+            if keys is not None:
+                newfolder = {k: newfolder[k] for k in keys}
+
             if extract:
-                for node_name, node_keys in newfolder.items():
-                    for key, value in node_keys.items():
-                        profile = re.search("^@(.*)", str(value))
-                        if profile:
-                            try:
-                                newfolder[node_name][key] = self.profiles[profile.group(1)][key]
-                            except KeyError:
-                                newfolder[node_name][key] = ""
-                        elif value == '' and key == "protocol":
-                            try:
-                                newfolder[node_name][key] = self.profiles["default"][key]
-                            except KeyError:
-                                newfolder[node_name][key] = "ssh"
-            
-            newfolder = {"{}{}".format(k,unique):v for k,v in newfolder.items()}
-            return newfolder
+                for node_keys in newfolder.values():
+                    self._extract_node_fields_unlocked(node_keys)
+
+            return {f"{k}{unique}": v for k, v in newfolder.items()}
+
+        if uniques.keys() >= {"folder", "subfolder"}:
+            node = self.connections[uniques["folder"]][uniques["subfolder"]][uniques["id"]]
+        elif "folder" in uniques:
+            node = self.connections[uniques["folder"]][uniques["id"]]
         else:
-            if uniques.keys() >= {"folder", "subfolder"}:
-                node = self.connections[uniques["folder"]][uniques["subfolder"]][uniques["id"]]
-            elif "folder" in uniques.keys():
-                node = self.connections[uniques["folder"]][uniques["id"]]
-            else:
-                node = self.connections[uniques["id"]]
-            newnode = deepcopy(node)
-            newnode.pop("type")
-            
-            if extract:
-                for key, value in newnode.items():
-                    profile = re.search("^@(.*)", str(value))
-                    if profile:
-                        try:
-                            newnode[key] = self.profiles[profile.group(1)][key]
-                        except KeyError:
-                            newnode[key] = ""
-                    elif value == '' and key == "protocol":
-                        try:
-                            newnode[key] = self.profiles["default"][key]
-                        except KeyError:
-                            newnode[key] = "ssh"
-            return newnode
+            node = self.connections[uniques["id"]]
+        newnode = deepcopy(node)
+        newnode.pop("type")
+        if extract:
+            self._extract_node_fields_unlocked(newnode)
+        return newnode
+
+    @MethodHook
+    def getitem(self, unique, keys = None, extract = False):
+        """Get a node or folder of nodes from configfile."""
+        with self._mutation_lock:
+            return self.getitem_unlocked(unique, keys=keys, extract=extract)
 
     @MethodHook
     def getitems(self, uniques, extract = False):
@@ -455,47 +780,94 @@ class configfile:
                   dictionaries of multiple nodes.
 
         '''
-        nodes = {}
         if isinstance(uniques, str):
             uniques = [uniques]
-        for i in uniques:
-            if i.startswith("@"):
-                if not self.config["case"]:
-                    i = i.lower()
-                this = self.getitem(i, extract = extract)
-                nodes.update(this)
-            else:
-                if not self.config["case"]:
-                    i = i.lower()
-                this = self.getitem(i, extract = extract)
-                nodes[i] = this
-        return nodes
+        with self._mutation_lock:
+            nodes = {}
+            case_sensitive = self.config.get("case", False)
+            for item in uniques:
+                target = item if case_sensitive else item.lower()
+                if target.startswith("@"):
+                    nodes.update(self.getitem_unlocked(target, extract=extract))
+                else:
+                    nodes[target] = self.getitem_unlocked(target, extract=extract)
+            return nodes
 
+    def _connections_add_unlocked(
+        self,
+        *,
+        id,
+        host,
+        folder='',
+        subfolder='',
+        options='',
+        logs='',
+        password='',
+        port='',
+        protocol='',
+        user='',
+        tags='',
+        jumphost='',
+        fallback='',
+        type="connection",
+    ):
+        entry = {
+            "host": host,
+            "options": options,
+            "logs": logs,
+            "password": password,
+            "port": port,
+            "protocol": protocol,
+            "user": user,
+            "tags": tags,
+            "jumphost": jumphost,
+            "fallback": fallback,
+            "type": type,
+        }
+        if folder == '':
+            self.connections[id] = entry
+        elif subfolder == '':
+            self.connections[folder][id] = entry
+        else:
+            self.connections[folder][subfolder][id] = entry
 
     @MethodHook
-    def _connections_add(self,*, id, host, folder='', subfolder='', options='', logs='', password='', port='', protocol='', user='', tags='', jumphost='', type = "connection" ):
+    def _connections_add(self,*, id, host, folder='', subfolder='', options='', logs='', password='', port='', protocol='', user='', tags='', jumphost='', fallback='', type = "connection" ):
         #Add connection from config
-        if folder == '':
-            self.connections[id] = {"host": host, "options": options, "logs": logs, "password": password, "port": port, "protocol": protocol, "user": user, "tags": tags,"jumphost": jumphost,"type": type}
-        elif folder != '' and subfolder == '':
-            self.connections[folder][id] = {"host": host, "options": options, "logs": logs, "password": password, "port": port, "protocol": protocol, "user": user, "tags": tags, "jumphost": jumphost, "type": type}
-        elif folder != '' and subfolder != '':
-            self.connections[folder][subfolder][id] = {"host": host, "options": options, "logs": logs, "password": password, "port": port, "protocol": protocol, "user": user, "tags": tags,  "jumphost": jumphost, "type": type}
+        with self._mutation_lock:
+            self._connections_add_unlocked(
+                id=id,
+                host=host,
+                folder=folder,
+                subfolder=subfolder,
+                options=options,
+                logs=logs,
+                password=password,
+                port=port,
+                protocol=protocol,
+                user=user,
+                tags=tags,
+                jumphost=jumphost,
+                fallback=fallback,
+                type=type,
+            )
             
+
+    def _connections_del_unlocked(self, *, id, folder='', subfolder=''):
+        if folder == '':
+            del self.connections[id]
+        elif subfolder == '':
+            del self.connections[folder][id]
+        else:
+            del self.connections[folder][subfolder][id]
 
     @MethodHook
     def _connections_del(self,*, id, folder='', subfolder=''):
         #Delete connection from config
-        if folder == '':
-            del self.connections[id]
-        elif folder != '' and subfolder == '':
-            del self.connections[folder][id]
-        elif folder != '' and subfolder != '':
-            del self.connections[folder][subfolder][id]
+        with self._mutation_lock:
+            self._connections_del_unlocked(id=id, folder=folder, subfolder=subfolder)
 
-    @MethodHook
-    def _folder_add(self,*, folder, subfolder = ''):
-        #Add Folder from config
+    def _folder_add_unlocked(self, *, folder, subfolder=''):
         if subfolder == '':
             if folder not in self.connections:
                 self.connections[folder] = {"type": "folder"}
@@ -504,124 +876,196 @@ class configfile:
                 self.connections[folder][subfolder] = {"type": "subfolder"}
 
     @MethodHook
-    def _folder_del(self,*, folder, subfolder=''):
-        #Delete folder from config
+    def _folder_add(self,*, folder, subfolder = ''):
+        #Add Folder from config
+        with self._mutation_lock:
+            self._folder_add_unlocked(folder=folder, subfolder=subfolder)
+
+    def _folder_del_unlocked(self, *, folder, subfolder=''):
         if subfolder == '':
             del self.connections[folder]
         else:
             del self.connections[folder][subfolder]
 
+    @MethodHook
+    def _folder_del(self,*, folder, subfolder=''):
+        #Delete folder from config
+        with self._mutation_lock:
+            self._folder_del_unlocked(folder=folder, subfolder=subfolder)
+
+    def _profiles_add_unlocked(self, *, id, host='', options='', logs='', password='', port='', protocol='', user='', tags='', jumphost='', fallback=''):
+        self.profiles[id] = {
+            "host": host,
+            "options": options,
+            "logs": logs,
+            "password": password,
+            "port": port,
+            "protocol": protocol,
+            "user": user,
+            "tags": tags,
+            "jumphost": jumphost,
+            "fallback": fallback,
+        }
 
     @MethodHook
-    def _profiles_add(self,*, id, host = '', options='', logs='', password='', port='', protocol='', user='', tags='', jumphost='' ):
+    def _profiles_add(self,*, id, host = '', options='', logs='', password='', port='', protocol='', user='', tags='', jumphost='', fallback=''):
         #Add profile from config
-        self.profiles[id] = {"host": host, "options": options, "logs": logs, "password": password, "port": port, "protocol": protocol, "user": user, "tags": tags, "jumphost": jumphost}
-            
+        with self._mutation_lock:
+            self._profiles_add_unlocked(
+                id=id,
+                host=host,
+                options=options,
+                logs=logs,
+                password=password,
+                port=port,
+                protocol=protocol,
+                user=user,
+                tags=tags,
+                jumphost=jumphost,
+                fallback=fallback,
+            )
+
+    def _profiles_del_unlocked(self, *, id):
+        del self.profiles[id]
 
     @MethodHook
     def _profiles_del(self,*, id ):
         #Delete profile from config
-        del self.profiles[id]
-        
-    @MethodHook
-    def _getallnodes(self, filter = None):
-        #get all nodes on configfile
+        with self._mutation_lock:
+            self._profiles_del_unlocked(id=id)
+
+    @staticmethod
+    def _normalize_filter_arg(filter_arg):
+        if not filter_arg:
+            return []
+        if isinstance(filter_arg, str):
+            return [filter_arg]
+        if isinstance(filter_arg, list):
+            return [item for item in filter_arg if isinstance(item, str)]
+        return None
+
+    def _getallnodes_unlocked(self, filter=None):
         nodes = []
-        layer1 = [k for k,v in self.connections.items() if isinstance(v, dict) and v.get("type") == "connection"]
-        folders = [k for k,v in self.connections.items() if isinstance(v, dict) and v.get("type") == "folder"]
+        layer1 = [k for k, v in self.connections.items() if isinstance(v, dict) and v.get("type") == "connection"]
+        folders = [k for k, v in self.connections.items() if isinstance(v, dict) and v.get("type") == "folder"]
         nodes.extend(layer1)
         for f in folders:
-            layer2 = [k + "@" + f for k,v in self.connections[f].items() if isinstance(v, dict) and v.get("type") == "connection"]
+            layer2 = [k + "@" + f for k, v in self.connections[f].items() if isinstance(v, dict) and v.get("type") == "connection"]
             nodes.extend(layer2)
-            subfolders = [k for k,v in self.connections[f].items() if isinstance(v, dict) and v.get("type") == "subfolder"]
+            subfolders = [k for k, v in self.connections[f].items() if isinstance(v, dict) and v.get("type") == "subfolder"]
             for s in subfolders:
-                layer3 = [k + "@" + s + "@" + f for k,v in self.connections[f][s].items() if isinstance(v, dict) and v.get("type") == "connection"]
+                layer3 = [k + "@" + s + "@" + f for k, v in self.connections[f][s].items() if isinstance(v, dict) and v.get("type") == "connection"]
                 nodes.extend(layer3)
         if filter:
-            flat_filter = []
-            if isinstance(filter, str):
-                flat_filter = [filter]
-            elif isinstance(filter, list):
-                for item in filter:
-                    if isinstance(item, str):
-                        flat_filter.append(item)
-            else:
-                printer.error("Filter must be a string or a list of strings")
-                sys.exit(1)
+            flat_filter = self._normalize_filter_arg(filter)
             flags = re.IGNORECASE if not self.config.get("case", False) else 0
             nodes = [item for item in nodes if any(re.search(pattern, item, flags) for pattern in flat_filter)]
         return nodes
 
     @MethodHook
-    def _getallnodesfull(self, filter = None, extract = True):
-        #get all nodes on configfile with all their attributes.
+    def _getallnodes(self, filter = None):
+        #get all nodes on configfile
+        if filter and self._normalize_filter_arg(filter) is None:
+            printer.error("Filter must be a string or a list of strings")
+            sys.exit(1)
+        with self._mutation_lock:
+            return self._getallnodes_unlocked(filter=filter)
+
+    def _getallnodesfull_unlocked(self, filter=None, extract=True):
         nodes = {}
-        layer1 = {k:v for k,v in self.connections.items() if isinstance(v, dict) and v.get("type") == "connection"}
-        folders = [k for k,v in self.connections.items() if isinstance(v, dict) and v.get("type") == "folder"]
+        layer1 = {k: deepcopy(v) for k, v in self.connections.items() if isinstance(v, dict) and v.get("type") == "connection"}
+        folders = [k for k, v in self.connections.items() if isinstance(v, dict) and v.get("type") == "folder"]
         nodes.update(layer1)
         for f in folders:
-            layer2 = {k + "@" + f:v for k,v in self.connections[f].items() if isinstance(v, dict) and v.get("type") == "connection"}
+            layer2 = {k + "@" + f: deepcopy(v) for k, v in self.connections[f].items() if isinstance(v, dict) and v.get("type") == "connection"}
             nodes.update(layer2)
-            subfolders = [k for k,v in self.connections[f].items() if isinstance(v, dict) and v.get("type") == "subfolder"]
+            subfolders = [k for k, v in self.connections[f].items() if isinstance(v, dict) and v.get("type") == "subfolder"]
             for s in subfolders:
-                layer3 = {k + "@" + s + "@" + f:v for k,v in self.connections[f][s].items() if isinstance(v, dict) and v.get("type") == "connection"}
+                layer3 = {k + "@" + s + "@" + f: deepcopy(v) for k, v in self.connections[f][s].items() if isinstance(v, dict) and v.get("type") == "connection"}
                 nodes.update(layer3)
         if filter:
-            flat_filter = []
-            if isinstance(filter, str):
-                flat_filter = [filter]
-            elif isinstance(filter, list):
-                for item in filter:
-                    if isinstance(item, str):
-                        flat_filter.append(item)
-            else:
-                printer.error("Filter must be a string or a list of strings")
-                sys.exit(1)
+            flat_filter = self._normalize_filter_arg(filter)
             flat_filter = ["^(?!.*@).+$" if item == "@" else item for item in flat_filter]
             nodes = {k: v for k, v in nodes.items() if any(re.search(pattern, k) for pattern in flat_filter)}
         if extract:
-            for node, keys in nodes.items():
-                for key, value in keys.items():
-                    profile = re.search("^@(.*)", str(value))
-                    if profile:
-                        try:
-                            nodes[node][key] = self.profiles[profile.group(1)][key]
-                        except KeyError:
-                            nodes[node][key] = ""
-                    elif value == '' and key == "protocol":
-                        try:
-                            nodes[node][key] = self.profiles["default"][key]
-                        except KeyError:
-                            nodes[node][key] = "ssh"
+            for node_dict in nodes.values():
+                self._extract_node_fields_unlocked(node_dict)
         return nodes
 
-
     @MethodHook
-    def _getallfolders(self):
-        #get all folders on configfile
-        folders = ["@" + k for k,v in self.connections.items() if isinstance(v, dict) and v.get("type") == "folder"]
+    def _getallnodesfull(self, filter = None, extract = True):
+        #get all nodes on configfile with all their attributes.
+        if filter and self._normalize_filter_arg(filter) is None:
+            printer.error("Filter must be a string or a list of strings")
+            sys.exit(1)
+        with self._mutation_lock:
+            return self._getallnodesfull_unlocked(filter=filter, extract=extract)
+
+    def _getallfolders_unlocked(self):
+        folders = ["@" + k for k, v in self.connections.items() if isinstance(v, dict) and v.get("type") == "folder"]
         subfolders = []
         for f in folders:
-            s = ["@" + k + f for k,v in self.connections[f[1:]].items() if isinstance(v, dict) and v.get("type") == "subfolder"]
+            s = ["@" + k + f for k, v in self.connections[f[1:]].items() if isinstance(v, dict) and v.get("type") == "subfolder"]
             subfolders.extend(s)
         folders.extend(subfolders)
         return folders
 
     @MethodHook
-    def _profileused(self, profile):
-        #Return all the nodes that uses this profile.
+    def _getallfolders(self):
+        #get all folders on configfile
+        with self._mutation_lock:
+            return self._getallfolders_unlocked()
+
+    def _profileused_unlocked(self, profile):
+        target_profiles = {profile}
+        changed = True
+        while changed:
+            changed = False
+            for pname, pval in self.profiles.items():
+                if (
+                    pname not in target_profiles
+                    and isinstance(pval, dict)
+                    and (extract_profile_refs_from_value(pval) & target_profiles)
+                ):
+                    target_profiles.add(pname)
+                    changed = True
+
         nodes = []
-        layer1 = [k for k,v in self.connections.items() if isinstance(v, dict) and v.get("type") == "connection" and ("@" + profile in v.values() or ( isinstance(v.get("password"),list) and "@" + profile in v.get("password")))]
-        folders = [k for k,v in self.connections.items() if isinstance(v, dict) and v.get("type") == "folder"]
+        layer1 = [
+            k
+            for k, v in self.connections.items()
+            if isinstance(v, dict)
+            and v.get("type") == "connection"
+            and bool(extract_profile_refs_from_value(v) & target_profiles)
+        ]
+        folders = [k for k, v in self.connections.items() if isinstance(v, dict) and v.get("type") == "folder"]
         nodes.extend(layer1)
         for f in folders:
-            layer2 = [k + "@" + f for k,v in self.connections[f].items() if isinstance(v, dict) and v.get("type") == "connection" and ("@" + profile in v.values() or ( isinstance(v.get("password"),list) and "@" + profile in v.get("password")))]
+            layer2 = [
+                k + "@" + f
+                for k, v in self.connections[f].items()
+                if isinstance(v, dict)
+                and v.get("type") == "connection"
+                and bool(extract_profile_refs_from_value(v) & target_profiles)
+            ]
             nodes.extend(layer2)
-            subfolders = [k for k,v in self.connections[f].items() if isinstance(v, dict) and v.get("type") == "subfolder"]
+            subfolders = [k for k, v in self.connections[f].items() if isinstance(v, dict) and v.get("type") == "subfolder"]
             for s in subfolders:
-                layer3 = [k + "@" + s + "@" + f for k,v in self.connections[f][s].items() if isinstance(v, dict) and v.get("type") == "connection" and ("@" + profile in v.values() or ( isinstance(v.get("password"),list) and "@" + profile in v.get("password")))]
+                layer3 = [
+                    k + "@" + s + "@" + f
+                    for k, v in self.connections[f][s].items()
+                    if isinstance(v, dict)
+                    and v.get("type") == "connection"
+                    and bool(extract_profile_refs_from_value(v) & target_profiles)
+                ]
                 nodes.extend(layer3)
         return nodes
+
+    @MethodHook
+    def _profileused(self, profile):
+        #Return all the nodes that uses this profile.
+        with self._mutation_lock:
+            return self._profileused_unlocked(profile)
 
     @MethodHook
     def encrypt(self, password, keyfile=None):

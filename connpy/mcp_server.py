@@ -6,6 +6,20 @@ from typing import Any, ClassVar
 
 import yaml
 
+from .auth_utils import (
+    MAX_FALLBACK_ENTRIES,
+    MAX_JSON_INPUT_BYTES,
+    MAX_JSON_INPUT_DEPTH,
+    SanitizedAuthError,
+    is_compose_expression,
+    mask_node_secrets,
+    sanitize_exception,
+    validate_auth_budget_tags,
+    validate_compose_syntax,
+    validate_fallback_entries,
+    validate_json_depth_and_size,
+)
+
 try:
     from mcp.server.mcpserver import MCPServer
 except ImportError:
@@ -124,20 +138,7 @@ class ConnpyMCPServer:
 
     def _mask_secrets(self, val: Any) -> Any:
         """Recursively mask passwords, passphrases, secrets, and auth tokens with '***'."""
-        if isinstance(val, dict):
-            masked = {}
-            for k, v in val.items():
-                k_lower = str(k).lower()
-                if any(sec in k_lower for sec in ["password", "passphrase", "secret", "token"]):
-                    masked[k] = "***"
-                elif isinstance(v, (dict, list)):
-                    masked[k] = self._mask_secrets(v)
-                else:
-                    masked[k] = v
-            return masked
-        if isinstance(val, list):
-            return [self._mask_secrets(item) for item in val]
-        return val
+        return mask_node_secrets(val)
 
     # -------------------------------------------------------------------------
     # Level 1: Read-Only Inventory and Context Tools
@@ -196,6 +197,31 @@ class ConnpyMCPServer:
     # Level 2: Execution, Testing, and Playbooks Tools
     # -------------------------------------------------------------------------
 
+    @staticmethod
+    def _parse_json_list_or_lines(raw_val: list[str] | str, *, allow_empty_str: bool = False) -> list[str]:
+        if isinstance(raw_val, str):
+            if len(raw_val.encode("utf-8", errors="replace")) > MAX_JSON_INPUT_BYTES:
+                raise ValueError(f"Input exceeds maximum size of {MAX_JSON_INPUT_BYTES} bytes")
+            stripped = raw_val.strip()
+            if stripped.startswith(("[", "{")):
+                parsed = validate_json_depth_and_size(
+                    stripped,
+                    max_bytes=MAX_JSON_INPUT_BYTES,
+                    max_depth=MAX_JSON_INPUT_DEPTH,
+                )
+                return parsed if isinstance(parsed, list) else [raw_val]
+            return ([raw_val] if raw_val else []) if allow_empty_str else [
+                c.strip() for c in raw_val.splitlines() if c.strip()
+            ]
+        if isinstance(raw_val, list):
+            validate_json_depth_and_size(
+                raw_val,
+                max_bytes=MAX_JSON_INPUT_BYTES,
+                max_depth=MAX_JSON_INPUT_DEPTH,
+            )
+            return raw_val
+        return [str(raw_val)] if (raw_val or not allow_empty_str) else []
+
     def run_commands(
         self,
         nodes_filter: str,
@@ -210,17 +236,10 @@ class ConnpyMCPServer:
         if not self.services or not hasattr(self.services, "execution"):
             return {"success": False, "error": "Execution service unavailable."}
 
-        # Normalize commands list
-        if isinstance(commands, str):
-            try:
-                import json
-
-                parsed = json.loads(commands)
-                commands = parsed if isinstance(parsed, list) else [commands]
-            except Exception:  # noqa: BLE001
-                commands = [c.strip() for c in commands.splitlines() if c.strip()]
-        elif not isinstance(commands, list):
-            commands = [str(commands)]
+        try:
+            commands = self._parse_json_list_or_lines(commands, allow_empty_str=False)
+        except ValueError as exc:
+            return {"success": False, "error": str(exc)}
 
         # Check safety
         if not self.trust:
@@ -239,9 +258,24 @@ class ConnpyMCPServer:
                 parallel=par_count,
                 timeout=timeout,
             )
-            return {"success": True, "results": results}
+            fb_used = False
+            if isinstance(results, dict):
+                fb_used = any(
+                    isinstance(v, dict) and bool(v.get("fallback_used", False))
+                    for v in results.values()
+                )
+            if not fb_used:
+                fb_map = getattr(self.services.execution, "last_fallback_used", {})
+                if isinstance(fb_map, dict):
+                    fb_used = any(bool(v) for v in fb_map.values())
+            return {"success": True, "results": results, "fallback_used": fb_used}
         except Exception as e:  # noqa: BLE001
-            return {"success": False, "error": str(e)}
+            san = sanitize_exception(
+                e,
+                code="AUTH_FAILED",
+                context_label="command execution failed",
+            )
+            return {"success": False, "error": str(san)}
 
     def test_commands(
         self,
@@ -255,29 +289,11 @@ class ConnpyMCPServer:
         if not self.services or not hasattr(self.services, "execution"):
             return {"success": False, "error": "Execution service unavailable."}
 
-        # Normalize commands
-        if isinstance(commands, str):
-            try:
-                import json
-
-                parsed = json.loads(commands)
-                commands = parsed if isinstance(parsed, list) else [commands]
-            except Exception:  # noqa: BLE001
-                commands = [c.strip() for c in commands.splitlines() if c.strip()]
-        elif not isinstance(commands, list):
-            commands = [str(commands)]
-
-        # Normalize expected
-        if isinstance(expected, str):
-            try:
-                import json
-
-                parsed = json.loads(expected)
-                expected = parsed if isinstance(parsed, list) else ([expected] if expected else [])
-            except Exception:  # noqa: BLE001
-                expected = [expected] if expected else []
-        elif not isinstance(expected, list):
-            expected = [str(expected)] if expected else []
+        try:
+            commands = self._parse_json_list_or_lines(commands, allow_empty_str=False)
+            expected = self._parse_json_list_or_lines(expected, allow_empty_str=True)
+        except ValueError as exc:
+            return {"success": False, "error": str(exc)}
 
         # Check safety
         if not self.trust:
@@ -297,9 +313,16 @@ class ConnpyMCPServer:
                 parallel=par_count,
                 timeout=timeout,
             )
-            return {"success": True, "results": results}
+            fb_map = getattr(self.services.execution, "last_fallback_used", {})
+            fb_used = any(bool(v) for v in fb_map.values()) if isinstance(fb_map, dict) else False
+            return {"success": True, "results": results, "fallback_used": fb_used}
         except Exception as e:  # noqa: BLE001
-            return {"success": False, "error": str(e)}
+            san = sanitize_exception(
+                e,
+                code="AUTH_FAILED",
+                context_label="test execution failed",
+            )
+            return {"success": False, "error": str(san)}
 
     def validate_playbook(self, playbook_yaml: str) -> dict:
         """Validate the syntax, schema, and tasks of a Connpy YAML playbook."""
@@ -427,6 +450,47 @@ class ConnpyMCPServer:
     # Level 3: Inventory Mutation Tools (CRUD - Requires trust=True)
     # -------------------------------------------------------------------------
 
+    @staticmethod
+    def _validate_and_normalize_node_payload(node_data: dict[str, Any]) -> dict[str, Any]:
+        validate_json_depth_and_size(
+            node_data,
+            max_bytes=MAX_JSON_INPUT_BYTES,
+            max_depth=MAX_JSON_INPUT_DEPTH,
+        )
+        normalized = node_data.copy()
+        if "tags" in normalized and normalized["tags"] not in ("", None):
+            tags_val = normalized["tags"]
+            if isinstance(tags_val, str) and tags_val.strip().startswith("{"):
+                tags_val = validate_json_depth_and_size(
+                    tags_val,
+                    max_bytes=MAX_JSON_INPUT_BYTES,
+                    max_depth=MAX_JSON_INPUT_DEPTH,
+                )
+                normalized["tags"] = tags_val
+            validate_auth_budget_tags(tags_val)
+
+        if "fallback" in normalized and normalized["fallback"] not in (None, "", []):
+            fb_val = normalized["fallback"]
+            if isinstance(fb_val, str) and fb_val.strip().startswith(("[", "{")):
+                fb_val = validate_json_depth_and_size(
+                    fb_val,
+                    max_bytes=MAX_JSON_INPUT_BYTES,
+                    max_depth=MAX_JSON_INPUT_DEPTH,
+                )
+            normalized["fallback"] = validate_fallback_entries(
+                fb_val,
+                max_entries=MAX_FALLBACK_ENTRIES,
+            )
+
+        pw = normalized.get("password")
+        if is_compose_expression(pw):
+            validate_compose_syntax(pw)
+        elif isinstance(pw, (list, tuple)):
+            for item in pw:
+                if is_compose_expression(item):
+                    validate_compose_syntax(item)
+        return normalized
+
     def add_node(
         self, unique_id: str, data: dict | None = None, is_folder: bool = False, **kwargs
     ) -> dict:
@@ -444,11 +508,14 @@ class ConnpyMCPServer:
         node_data.update(kwargs)
 
         try:
+            node_data = self._validate_and_normalize_node_payload(node_data)
             self.services.nodes.add_node(unique_id, node_data, is_folder=is_folder)
             return {
                 "success": True,
                 "message": f"{'Folder' if is_folder else 'Node'} '{unique_id}' created successfully.",
             }
+        except (ValueError, TypeError, SanitizedAuthError) as exc:
+            return {"success": False, "error": str(exc)}
         except Exception as e:  # noqa: BLE001
             return {"success": False, "error": str(e)}
 
@@ -467,8 +534,11 @@ class ConnpyMCPServer:
         node_updates.update(kwargs)
 
         try:
+            node_updates = self._validate_and_normalize_node_payload(node_updates)
             self.services.nodes.update_node(unique_id, node_updates)
             return {"success": True, "message": f"Node '{unique_id}' updated successfully."}
+        except (ValueError, TypeError, SanitizedAuthError) as exc:
+            return {"success": False, "error": str(exc)}
         except Exception as e:  # noqa: BLE001
             return {"success": False, "error": str(e)}
 

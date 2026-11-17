@@ -1,5 +1,69 @@
 import ast
+import json
+
+from ..auth_utils import (
+    MAX_FALLBACK_ENTRIES,
+    MAX_JSON_INPUT_BYTES,
+    MAX_JSON_INPUT_DEPTH,
+    validate_auth_budget_tags,
+    validate_fallback_entries,
+    validate_json_depth_and_size,
+)
 from .validators import Validators
+
+
+def _parse_tags_input(raw_tags):
+    if raw_tags in ("", None):
+        return ""
+    if isinstance(raw_tags, dict):
+        validate_json_depth_and_size(
+            raw_tags,
+            max_bytes=MAX_JSON_INPUT_BYTES,
+            max_depth=MAX_JSON_INPUT_DEPTH,
+        )
+        validate_auth_budget_tags(raw_tags)
+        return raw_tags
+    s = str(raw_tags)
+    if s.startswith("@"):
+        return s
+    if len(s.encode("utf-8", errors="replace")) > MAX_JSON_INPUT_BYTES:
+        raise ValueError(f"Tags exceed maximum size of {MAX_JSON_INPUT_BYTES} bytes")
+    try:
+        parsed = json.loads(s)
+    except (ValueError, TypeError):
+        parsed = ast.literal_eval(s)
+    validate_json_depth_and_size(
+        parsed,
+        max_bytes=MAX_JSON_INPUT_BYTES,
+        max_depth=MAX_JSON_INPUT_DEPTH,
+    )
+    validate_auth_budget_tags(parsed)
+    return parsed
+
+
+def _parse_fallback_input(raw_fb):
+    if raw_fb in (None, "", []):
+        return ""
+    if isinstance(raw_fb, str):
+        stripped = raw_fb.strip()
+        if not stripped:
+            return ""
+        if stripped.startswith(("[", "{")):
+            parsed = validate_json_depth_and_size(
+                stripped,
+                max_bytes=MAX_JSON_INPUT_BYTES,
+                max_depth=MAX_JSON_INPUT_DEPTH,
+            )
+            return validate_fallback_entries(parsed, max_entries=MAX_FALLBACK_ENTRIES)
+        validate_fallback_entries(stripped, max_entries=MAX_FALLBACK_ENTRIES)
+        return stripped
+    validate_json_depth_and_size(
+        raw_fb,
+        max_bytes=MAX_JSON_INPUT_BYTES,
+        max_depth=MAX_JSON_INPUT_DEPTH,
+    )
+    return validate_fallback_entries(raw_fb, max_entries=MAX_FALLBACK_ENTRIES)
+
 
 class Forms:
     def __init__(self, app):
@@ -18,6 +82,7 @@ class Forms:
         questions.append(inquirer.Confirm("jumphost", message="Edit jumphost?"))
         questions.append(inquirer.Confirm("user", message="Edit User?"))
         questions.append(inquirer.Confirm("password", message="Edit password?"))
+        questions.append(inquirer.Confirm("fallback", message="Edit fallback credentials?"))
         return inquirer.prompt(questions)
 
     def questions_nodes(self, unique, uniques=None, edit=None):
@@ -28,11 +93,13 @@ class Forms:
                 defaults["tags"] = ""
             if "jumphost" not in defaults:
                 defaults["jumphost"] = ""
-        except Exception:
-            defaults = {"host": "", "protocol": "", "port": "", "user": "", "options": "", "logs": "", "tags": "", "password": "", "jumphost": ""}
+            if "fallback" not in defaults:
+                defaults["fallback"] = ""
+        except Exception:  # noqa: BLE001
+            defaults = {"host": "", "protocol": "", "port": "", "user": "", "options": "", "logs": "", "tags": "", "password": "", "jumphost": "", "fallback": ""}
         node = {}
         if edit is None:
-            edit = {"host": True, "protocol": True, "port": True, "user": True, "password": True, "options": True, "logs": True, "tags": True, "jumphost": True}
+            edit = {"host": True, "protocol": True, "port": True, "user": True, "password": True, "options": True, "logs": True, "tags": True, "jumphost": True, "fallback": True}
         questions = []
         if edit["host"]:
             questions.append(inquirer.Text("host", message="Add Hostname or IP", validate=self.validators.host_validation, default=defaults["host"]))
@@ -70,11 +137,17 @@ class Forms:
             questions.append(inquirer.List("password", message="Password: Use a local password, no password or a list of profiles to reference?", choices=["Local Password", "Profiles", "No Password"]))
         else:
             node["password"] = defaults["password"]
-            
+        if edit.get("fallback"):
+            raw_def_fb = defaults.get("fallback", "")
+            def_fb_str = json.dumps(raw_def_fb) if isinstance(raw_def_fb, (list, dict)) else str(raw_def_fb or "")
+            questions.append(inquirer.Text("fallback", message="Add fallback credentials (JSON list/dict, @profile, or compose:)", validate=self.validators.fallback_validation, default=def_fb_str.replace("{", "{{").replace("}", "}}")))
+        else:
+            node["fallback"] = defaults.get("fallback", "")
+
         answer = inquirer.prompt(questions)
         if answer is None:
             return False
-            
+
         if "password" in answer:
             if answer["password"] == "Local Password":
                 passq = [inquirer.Password("password", message="Set Password")]
@@ -90,10 +163,12 @@ class Forms:
                 answer["password"] = passa["password"].split(",")
             elif answer["password"] == "No Password":
                 answer["password"] = ""
-                
-        if "tags" in answer and not answer["tags"].startswith("@") and answer["tags"]:
-            answer["tags"] = ast.literal_eval(answer["tags"])
-            
+
+        if "tags" in answer and answer["tags"] and not str(answer["tags"]).startswith("@"):
+            answer["tags"] = _parse_tags_input(answer["tags"])
+        if "fallback" in answer:
+            answer["fallback"] = _parse_fallback_input(answer["fallback"])
+
         result = {**uniques, **answer, **node}
         result["type"] = "connection"
         return result
@@ -106,11 +181,13 @@ class Forms:
                 defaults["tags"] = ""
             if "jumphost" not in defaults:
                 defaults["jumphost"] = ""
-        except Exception:
-            defaults = {"host": "", "protocol": "", "port": "", "user": "", "options": "", "logs": "", "tags": "", "jumphost": ""}
+            if "fallback" not in defaults:
+                defaults["fallback"] = ""
+        except Exception:  # noqa: BLE001
+            defaults = {"host": "", "protocol": "", "port": "", "user": "", "options": "", "logs": "", "tags": "", "jumphost": "", "fallback": ""}
         profile = {}
         if edit is None:
-            edit = {"host": True, "protocol": True, "port": True, "user": True, "password": True, "options": True, "logs": True, "tags": True, "jumphost": True}
+            edit = {"host": True, "protocol": True, "port": True, "user": True, "password": True, "options": True, "logs": True, "tags": True, "jumphost": True, "fallback": True}
         questions = []
         if edit["host"]:
             questions.append(inquirer.Text("host", message="Add Hostname or IP", default=defaults["host"]))
@@ -148,18 +225,25 @@ class Forms:
             questions.append(inquirer.Password("password", message="Set Password"))
         else:
             profile["password"] = defaults["password"]
-            
+        if edit.get("fallback"):
+            raw_def_fb = defaults.get("fallback", "")
+            def_fb_str = json.dumps(raw_def_fb) if isinstance(raw_def_fb, (list, dict)) else str(raw_def_fb or "")
+            questions.append(inquirer.Text("fallback", message="Add fallback credentials (JSON list/dict, @profile, or compose:)", validate=self.validators.fallback_validation, default=def_fb_str.replace("{", "{{").replace("}", "}}")))
+        else:
+            profile["fallback"] = defaults.get("fallback", "")
+
         answer = inquirer.prompt(questions)
         if answer is None:
             return False
-            
-        if "password" in answer:
-            if answer["password"] != "":
-                answer["password"] = self.app.services.config_svc.encrypt_password(answer["password"])
-                
+
+        if "password" in answer and answer["password"] != "":
+            answer["password"] = self.app.services.config_svc.encrypt_password(answer["password"])
+
         if "tags" in answer and answer["tags"]:
-            answer["tags"] = ast.literal_eval(answer["tags"])
-            
+            answer["tags"] = _parse_tags_input(answer["tags"])
+        if "fallback" in answer:
+            answer["fallback"] = _parse_fallback_input(answer["fallback"])
+
         result = {**answer, **profile}
         result["id"] = unique
         return result
@@ -178,11 +262,12 @@ class Forms:
         questions.append(inquirer.Text("jumphost", message="Add Jumphost node", validate=self.validators.jumphost_validation))
         questions.append(inquirer.Text("user", message="Pick username", validate=self.validators.default_validation))
         questions.append(inquirer.List("password", message="Password: Use a local password, no password or a list of profiles to reference?", choices=["Local Password", "Profiles", "No Password"]))
-        
+        questions.append(inquirer.Text("fallback", message="Add fallback credentials (JSON list/dict, @profile, or compose:)", validate=self.validators.fallback_validation))
+
         answer = inquirer.prompt(questions)
         if answer is None:
             return False
-            
+
         if "password" in answer:
             if answer["password"] == "Local Password":
                 passq = [inquirer.Password("password", message="Set Password")]
@@ -194,11 +279,13 @@ class Forms:
                 answer["password"] = passa["password"].split(",")
             elif answer["password"] == "No Password":
                 answer["password"] = ""
-                
+
         answer["type"] = "connection"
-        if "tags" in answer and not answer["tags"].startswith("@") and answer["tags"]:
-            answer["tags"] = ast.literal_eval(answer["tags"])
-            
+        if "tags" in answer and answer["tags"] and not str(answer["tags"]).startswith("@"):
+            answer["tags"] = _parse_tags_input(answer["tags"])
+        if "fallback" in answer:
+            answer["fallback"] = _parse_fallback_input(answer["fallback"])
+
         return answer
 
     def mcp_wizard(self, mcp_servers):

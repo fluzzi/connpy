@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-#Imports
+import argparse
 import os
 import re
-import argparse
 import sys
-import yaml
-import sys
-from .core import node,nodes
-from ._version import __version__
-from . import printer
-from .api import start_api,stop_api,debug_api
 
+import yaml
+from rich_argparse import RichHelpFormatter
+
+from . import printer
+from .api import debug_api, start_api, stop_api
+from .cli.help_text import get_help
+from .cli.helpers import folders_completer, nodes_completer
+from .core import node, nodes
 from .plugins import Plugins
 from .services.exceptions import ConnpyError, ProfileNotFoundError, ReservedNameError
 
-from rich_argparse import RichHelpFormatter
 # Bridge rich-argparse with our design system
 RichHelpFormatter.console = printer.console
 RichHelpFormatter.styles.update({
@@ -27,14 +27,6 @@ RichHelpFormatter.styles.update({
     "argparse.help": "default",
 })
 RichHelpFormatter.group_name_formatter = str.upper
-
-from .cli import (
-    NodeHandler, ProfileHandler, ConfigHandler, RunHandler,
-    AIHandler, APIHandler, PluginHandler, ImportExportHandler,
-    ContextHandler, SSOHandler
-)
-from .cli.helpers import nodes_completer, folders_completer, profiles_completer
-from .cli.help_text import get_help
 
 console = printer.console
 
@@ -389,6 +381,11 @@ class connapp:
         configcrud.add_argument("--shell-command", dest="shell_command", nargs=1, action=self._store_type, help="Set default shell command", metavar="COMMAND")
         configcrud.add_argument("--shell-prompt", dest="shell_prompt", nargs=1, action=self._store_type, help="Set shell prompt regex for AI", metavar="REGEX")
         configcrud.add_argument("--shell-os", dest="shell_os", nargs=1, action=self._store_type, help="Set shell OS hint for AI", metavar="OS")
+        configcrud.add_argument("--max-auth-prompts", dest="max_auth_prompts", nargs=1, action=self._store_type, help="Set max auth prompts per connection (1-5, 0 to reset)", type=int, metavar="INT")
+        configcrud.add_argument("--max-total-auth-attempts", dest="max_total_auth_attempts", nargs=1, action=self._store_type, help="Set max total auth attempts per host (1-10, 0 to reset)", type=int, metavar="INT")
+        configcrud.add_argument("--max-hop-host-attempts", dest="max_hop_host_attempts", nargs=1, action=self._store_type, help="Set max auth attempts per jumphost (1-10, 0 to reset)", type=int, metavar="INT")
+        configcrud.add_argument("--max-global-user-attempts", dest="max_global_user_attempts", nargs=1, action=self._store_type, help="Set max global auth attempts per user (1-1000, 0 to reset)", type=int, metavar="INT")
+        configcrud.add_argument("--disable-fallback-on-insecure-hostkey", dest="disable_fallback_on_insecure_hostkey", nargs=1, action=self._store_type, help="Disable AAA fallback when StrictHostKeyChecking=no", choices=["true", "false"])
         configparser.add_argument("--trusted-commands", dest="trusted_commands", nargs=1, action=self._store_type, help="Set custom trusted commands regexes (comma separated)", metavar="REGEX,REGEX")
         configparser.set_defaults(func=self._config.dispatch)
  

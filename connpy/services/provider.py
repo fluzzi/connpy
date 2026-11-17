@@ -1,4 +1,8 @@
+import inspect
+from contextlib import suppress
+
 from .exceptions import InvalidConfigurationError
+
 
 class RemoteStub:
     def __getattr__(self, name):
@@ -7,13 +11,17 @@ class RemoteStub:
             "Use local mode or wait for the gRPC implementation."
         )
 
+
 class ServiceProvider:
     """Dynamic service backend. Transparently provides local or remote services."""
-    
+
     def __init__(self, config, mode="local", remote_host=None):
+        from ..auth_utils import AuthAttemptTracker
+
         self.mode = mode
         self.config = config
         self.remote_host = remote_host
+        self.auth_tracker = AuthAttemptTracker()
         self._system = None
         self._execution = None
         self._import_export = None
@@ -29,47 +37,54 @@ class ServiceProvider:
             raise ValueError(f"Unknown service mode: {mode}")
     
     def _init_local(self):
-        from .node_service import NodeService
-        from .profile_service import ProfileService
         from .config_service import ConfigService
-        from .plugin_service import PluginService
         from .context_service import ContextService
-        
+        from .node_service import NodeService
+        from .plugin_service import PluginService
+        from .profile_service import ProfileService
+
         self.nodes = NodeService(self.config)
         self.profiles = ProfileService(self.config)
         self.config_svc = ConfigService(self.config)
         self.plugins = PluginService(self.config)
         self.context = ContextService(self.config)
-    
+
     def _init_remote(self):
         # Allow ConfigService to work locally so the user can revert the mode
         from .config_service import ConfigService
         from .context_service import ContextService
+
         self.config_svc = ConfigService(self.config)
         self.context = ContextService(self.config)
-        
+
         if not self.remote_host:
             raise InvalidConfigurationError("Remote host must be specified in remote mode")
 
-        import grpc
         import os
+
+        import grpc
+
         from ..grpc_layer.stubs import (
-            NodeStub, ProfileStub, PluginStub, AIStub, 
-            ExecutionStub, ImportExportStub, SystemStub,
-            ConfigStub, AuthClientInterceptor, AuthStub
+            AIStub,
+            AuthClientInterceptor,
+            AuthStub,
+            ConfigStub,
+            ExecutionStub,
+            ImportExportStub,
+            NodeStub,
+            PluginStub,
+            ProfileStub,
+            SystemStub,
         )
-        
+
         def get_token():
             env_token = os.environ.get("CONNPY_TOKEN")
             if env_token:
                 return env_token
             token_path = os.path.join(self.config.defaultdir, ".token")
             if os.path.exists(token_path):
-                try:
-                    with open(token_path, "r") as f:
-                        return f.read().strip()
-                except Exception:
-                    pass
+                with suppress(OSError, UnicodeDecodeError), open(token_path) as f:
+                    return f.read().strip()
             return None
 
         channel = grpc.insecure_channel(self.remote_host)
@@ -105,7 +120,10 @@ class ServiceProvider:
     def execution(self):
         if self._execution is None and self.mode == "local":
             from .execution_service import ExecutionService
-            self._execution = ExecutionService(self.config)
+            if "attempt_tracker" in inspect.signature(ExecutionService.__init__).parameters:
+                self._execution = ExecutionService(self.config, attempt_tracker=self.auth_tracker)
+            else:
+                self._execution = ExecutionService(self.config)
         return self._execution
 
     @execution.setter

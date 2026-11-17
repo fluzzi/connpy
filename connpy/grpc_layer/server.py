@@ -1,26 +1,37 @@
-import grpc
-from concurrent import futures
-from google.protobuf.empty_pb2 import Empty
-import os
-import ctypes
-import threading
 import contextvars
 import datetime
+import functools
+import json
+import os
+from concurrent import futures
+
+import grpc
+from google.protobuf.empty_pb2 import Empty
 
 # Suppress harmless but noisy gRPC fork() warnings from pexpect child processes
 os.environ["GRPC_VERBOSITY"] = "NONE"
 os.environ["GRPC_ENABLE_FORK_SUPPORT"] = "0"
-from . import connpy_pb2, connpy_pb2_grpc, remote_plugin_pb2, remote_plugin_pb2_grpc
-import json
-from .utils import to_value, from_value, to_struct, from_struct
-from ..services.exceptions import ConnpyError
 from .. import printer
+from ..auth_utils import (
+    MAX_FALLBACK_ENTRIES,
+    MAX_JSON_INPUT_BYTES,
+    MAX_JSON_INPUT_DEPTH,
+    SanitizedAuthError,
+    sanitize_exception,
+    validate_auth_budget_tags,
+    validate_fallback_entries,
+    validate_json_depth_and_size,
+)
+from ..services.exceptions import ConnpyError
+from . import connpy_pb2, connpy_pb2_grpc, remote_plugin_pb2, remote_plugin_pb2_grpc
+from .utils import from_struct, from_value, to_struct, to_value
 
 _current_user = contextvars.ContextVar("current_user", default=None)
 
 def handle_errors(func):
     import inspect
     if inspect.isgeneratorfunction(func):
+        @functools.wraps(func)
         def wrapper(*args, **kwargs):
             try:
                 for item in func(*args, **kwargs):
@@ -41,6 +52,7 @@ def handle_errors(func):
                 printer.clear_thread_state()
         return wrapper
     else:
+        @functools.wraps(func)
         def wrapper(*args, **kwargs):
             try:
                 return func(*args, **kwargs)
@@ -115,8 +127,24 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
             self.server_console.print(f"[debug][DEBUG][/debug] gRPC interact_node request for: [bold cyan]{unique_id}[/bold cyan]")
 
         if first_req.connection_params_json:
-            import json
-            params = json.loads(first_req.connection_params_json)
+            try:
+                params = validate_json_depth_and_size(
+                    first_req.connection_params_json,
+                    max_bytes=MAX_JSON_INPUT_BYTES,
+                    max_depth=MAX_JSON_INPUT_DEPTH,
+                )
+                if not isinstance(params, dict):
+                    raise TypeError("connection_params_json must be a JSON object")
+                if "fallback" in params and params["fallback"] not in (None, "", []):
+                    validate_fallback_entries(
+                        params["fallback"],
+                        max_entries=MAX_FALLBACK_ENTRIES,
+                    )
+                if "tags" in params and params["tags"] not in ("", None):
+                    validate_auth_budget_tags(params["tags"])
+            except (ValueError, TypeError, SanitizedAuthError) as exc:
+                context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(exc))
+
             base_node_id = params.get("base_node")
             # Valid attributes that a node object accepts
             valid_attrs = ['host', 'options', 'logs', 'password', 'port', 'protocol', 'user', 'jumphost']
@@ -134,6 +162,8 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
                     for attr in valid_attrs:
                         if attr in params:
                             device[attr] = params[attr]
+                    if "fallback" in params:
+                        device["fallback"] = params["fallback"]
 
                     if "tags" in params:
                         device_tags = device.get("tags", {})
@@ -147,20 +177,30 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
                 else:
                     # base_node not found, fall back to dynamic
                     node_name = params.get("name", fallback_id)
-                    n = node(node_name, host=params.get("host", ""), config=user_config)
-                    for attr in valid_attrs:
-                        if attr in params:
-                            setattr(n, attr, params[attr])
+                    dyn_kwargs = {k: params[k] for k in valid_attrs if k in params and k != "host"}
+                    if "fallback" in params:
+                        dyn_kwargs["fallback"] = params["fallback"]
                     if "tags" in params:
-                        n.tags = params["tags"]
+                        dyn_kwargs["tags"] = params["tags"]
+                    n = node(
+                        node_name,
+                        host=params.get("host", ""),
+                        config=user_config,
+                        **dyn_kwargs,
+                    )
             else:
                 node_name = params.get("name", fallback_id)
-                n = node(node_name, host=params.get("host", ""), config=user_config)
-                for attr in valid_attrs:
-                    if attr in params:
-                        setattr(n, attr, params[attr])
+                dyn_kwargs = {k: params[k] for k in valid_attrs if k in params and k != "host"}
+                if "fallback" in params:
+                    dyn_kwargs["fallback"] = params["fallback"]
                 if "tags" in params:
-                    n.tags = params["tags"]
+                    dyn_kwargs["tags"] = params["tags"]
+                n = node(
+                    node_name,
+                    host=params.get("host", ""),
+                    config=user_config,
+                    **dyn_kwargs,
+                )
             n._orig_protocol = n.protocol
             if sftp:
                 n.protocol = "sftp"
@@ -181,9 +221,11 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
         debug_chunks = []
         if debug:
             from io import StringIO
+
             from rich.console import Console as RichConsole
-            from ..printer import connpy_theme
+
             from .. import printer as _printer
+            from ..printer import connpy_theme
 
             def remote_logger(msg_type, message):
                 buf = StringIO()
@@ -204,7 +246,14 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
         else:
             remote_logger = None
 
-        connect = n._connect(debug=debug, logger=remote_logger)
+        try:
+            connect = n._connect(
+                debug=debug,
+                logger=remote_logger,
+                attempt_tracker=getattr(provider, "auth_tracker", None),
+            )
+        except Exception as exc:  # noqa: BLE001
+            connect = str(sanitize_exception(exc, code="AUTH_FAILED"))
 
         # Send debug output to client before checking result (always show the command)
         for chunk in debug_chunks:
@@ -535,10 +584,9 @@ class NodeServicer(connpy_pb2_grpc.NodeServiceServicer):
                         continue
 
                 asyncio.run(n._async_interact_loop(remote_stream, resize_callback, copilot_handler=remote_copilot_handler))
-            except Exception as e:
-                import traceback
-                print(f"[ERROR in run_async_loop] {e}")
-                traceback.print_exc()
+            except Exception as e:  # noqa: BLE001
+                sanitized_err = sanitize_exception(e, code="TRANSPORT_ERROR", context_label="interact stream")
+                print(f"[ERROR in run_async_loop] {sanitized_err}")
             finally:
                 n._teardown_interact_environment()
                 response_queue.put(None)  # Signal EOF

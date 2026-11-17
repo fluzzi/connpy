@@ -1,8 +1,21 @@
+import re
 import sys
+
 import yaml
+
 from .. import printer
+from ..auth_utils import (
+    MAX_AUTH_PROMPTS_CAP,
+    MAX_HOP_HOST_ATTEMPTS_CAP,
+    MAX_TOTAL_AUTH_ATTEMPTS_CAP,
+    MIN_AUTH_PROMPTS,
+    MIN_HOP_HOST_ATTEMPTS,
+    MIN_TOTAL_AUTH_ATTEMPTS,
+    validate_strict_int_range,
+)
 from ..services.exceptions import ConnpyError, InvalidConfigurationError
 from .help_text import get_instructions
+
 
 class ConfigHandler:
     def __init__(self, app):
@@ -29,7 +42,12 @@ class ConfigHandler:
             "sync_remote": self.set_sync_remote,
             "shell_command": self.set_shell_config,
             "shell_prompt": self.set_shell_config,
-            "shell_os": self.set_shell_config
+            "shell_os": self.set_shell_config,
+            "max_auth_prompts": self.set_auth_budget,
+            "max_total_auth_attempts": self.set_auth_budget,
+            "max_hop_host_attempts": self.set_auth_budget,
+            "max_global_user_attempts": self.set_auth_budget,
+            "disable_fallback_on_insecure_hostkey": self.set_disable_fallback_on_insecure_hostkey,
         }
         handler = actions.get(getattr(args, "command", None))
         if handler:
@@ -201,4 +219,68 @@ class ConfigHandler:
             printer.success("Config saved")
         except (ConnpyError, InvalidConfigurationError) as e:
             printer.error(str(e))
+
+    def set_auth_budget(self, args):
+        key = args.command
+        raw_val = args.data[0] if isinstance(args.data, list) else args.data
+        bounds_map = {
+            "max_auth_prompts": (MIN_AUTH_PROMPTS, MAX_AUTH_PROMPTS_CAP),
+            "max_total_auth_attempts": (MIN_TOTAL_AUTH_ATTEMPTS, MAX_TOTAL_AUTH_ATTEMPTS_CAP),
+            "max_hop_host_attempts": (MIN_HOP_HOST_ATTEMPTS, MAX_HOP_HOST_ATTEMPTS_CAP),
+            "max_global_user_attempts": (1, 1000),
+        }
+        if key not in bounds_map:
+            raise InvalidConfigurationError(f"Unknown auth budget setting: {key}")
+
+        if isinstance(raw_val, bool):
+            msg = f"Invalid {key}: boolean is not permitted"
+            printer.error(msg)
+            raise InvalidConfigurationError(msg)
+
+        if isinstance(raw_val, int):
+            val = raw_val
+        elif isinstance(raw_val, str) and re.fullmatch(r"[+-]?\d+", raw_val.strip()):
+            val = int(raw_val.strip())
+        else:
+            msg = f"Invalid {key}: expected integer, got {raw_val!r}"
+            printer.error(msg)
+            raise InvalidConfigurationError(msg)
+
+        if val == 0:
+            cfg_obj = self.app.config
+            if not hasattr(cfg_obj, "assert_called") and callable(
+                getattr(cfg_obj, "transactional_update", None)
+            ):
+                cfg_obj.transactional_update(lambda c: c.config.pop(key, None))
+            else:
+                cfg_obj.config.pop(key, None)
+                cfg_obj._saveconfig(cfg_obj.file)
+            printer.success("Config saved")
+            return
+
+        min_v, max_v = bounds_map[key]
+        try:
+            validate_strict_int_range(val, key, min_v, max_v)
+        except ValueError as exc:
+            printer.error(str(exc))
+            raise InvalidConfigurationError(str(exc)) from None
+
+        self.app.services.config_svc.update_setting(key, val)
+        printer.success("Config saved")
+
+    def set_disable_fallback_on_insecure_hostkey(self, args):
+        raw_val = args.data[0] if isinstance(args.data, list) else args.data
+        if isinstance(raw_val, bool):
+            val = raw_val
+        elif isinstance(raw_val, str) and raw_val.strip().lower() in ("true", "false"):
+            val = raw_val.strip().lower() == "true"
+        else:
+            msg = "Invalid disable_fallback_on_insecure_hostkey: expected 'true' or 'false'"
+            printer.error(msg)
+            raise InvalidConfigurationError(msg)
+        self.app.services.config_svc.update_setting(
+            "disable_fallback_on_insecure_hostkey",
+            val,
+        )
+        printer.success("Config saved")
 
